@@ -73,7 +73,8 @@ Areas of collaboration may include:
 * Business intelligence and reporting infrastructure
 
 ## ContractFlow ERD
-<img width="1870" height="1567" alt="contractflowERD" src="https://github.com/user-attachments/assets/84f58f9f-ad4f-4222-a01d-0ce10a2b0873" />
+<img width="1679" height="1463" alt="Contractflow_ERD_v3 0" src="https://github.com/user-attachments/assets/0d002f06-c2f5-442b-b193-9a31d764707a" />
+
 
 ## Planned Data Areas
 
