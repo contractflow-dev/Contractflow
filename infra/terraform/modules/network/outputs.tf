@@ -1,18 +1,31 @@
-output "vnet_id" {
-  description = "The ID of the Virtual Network"
-  value       = azurerm_virtual_network.this.id
+output "vpc_id" {
+  description = "ID of the ContractFlow VPC"
+  value       = aws_vpc.this.id
 }
 
-output "vnet_name" {
-  description = "The name of the Virtual Network"
-  value       = azurerm_virtual_network.this.name
-}
-
-output "subnet_ids" {
-  description = "A map of subnet names to subnet IDs"
+output "public_subnet_ids" {
+  description = "Map of public subnet IDs"
 
   value = {
-    for name, subnet in azurerm_subnet.this :
+    for name, subnet in aws_subnet.public :
+    name => subnet.id
+  }
+}
+
+output "application_subnet_ids" {
+  description = "Map of private application subnet IDs"
+
+  value = {
+    for name, subnet in aws_subnet.application :
+    name => subnet.id
+  }
+}
+
+output "database_subnet_ids" {
+  description = "Map of private database subnet IDs"
+
+  value = {
+    for name, subnet in aws_subnet.database :
     name => subnet.id
   }
 }

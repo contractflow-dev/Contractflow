@@ -1,33 +1,42 @@
 variable "name" {
-  description = "The name of the Virtual Network"
+  description = "Name of the ContractFlow VPC"
   type        = string
 }
 
-variable "resource_group_name" {
-  description = "The name of the Azure Resource Group"
+variable "vpc_cidr" {
+  description = "CIDR block for the VPC"
   type        = string
 }
 
-variable "location" {
-  description = "The Azure region"
-  type        = string
-}
-
-variable "address_space" {
-  description = "The address space for the Virtual Network"
-  type        = list(string)
-}
-
-variable "subnets" {
-  description = "The subnets to create in the Virtual Network"
+variable "public_subnets" {
+  description = "Public subnets across Availability Zones"
 
   type = map(object({
-    address_prefixes = list(string)
+    cidr_block        = string
+    availability_zone = string
+  }))
+}
+
+variable "application_subnets" {
+  description = "Private application subnets across Availability Zones"
+
+  type = map(object({
+    cidr_block        = string
+    availability_zone = string
+  }))
+}
+
+variable "database_subnets" {
+  description = "Private database subnets across Availability Zones"
+
+  type = map(object({
+    cidr_block        = string
+    availability_zone = string
   }))
 }
 
 variable "tags" {
-  description = "Tags to apply to the Virtual Network"
+  description = "Tags applied to network resources"
   type        = map(string)
   default     = {}
 }

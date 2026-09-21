@@ -1,39 +1,45 @@
-output "resource_group_name" {
-  description = "The name of the ContractFlow Resource Group"
-  value       = module.resource_group.name
+output "vpc_id" {
+  description = "ID of the ContractFlow VPC"
+  value       = module.network.vpc_id
 }
 
-output "resource_group_id" {
-  description = "The ID of the ContractFlow Resource Group"
-  value       = module.resource_group.id
+output "public_subnet_ids" {
+  description = "Map of ContractFlow public subnet IDs"
+  value       = module.network.public_subnet_ids
 }
 
-output "vnet_name" {
-  description = "The name of the ContractFlow Virtual Network"
-  value       = module.network.vnet_name
+output "application_subnet_ids" {
+  description = "Map of ContractFlow private application subnet IDs"
+  value       = module.network.application_subnet_ids
 }
 
-output "vnet_id" {
-  description = "The ID of the ContractFlow Virtual Network"
-  value       = module.network.vnet_id
+output "database_subnet_ids" {
+  description = "Map of ContractFlow private database subnet IDs"
+  value       = module.network.database_subnet_ids
 }
 
-output "subnet_ids" {
-  description = "Map of ContractFlow subnet names to IDs"
-  value       = module.network.subnet_ids
+output "database_endpoint" {
+  description = "Endpoint of the ContractFlow PostgreSQL database"
+  value       = module.database.endpoint
 }
 
-output "key_vault_name" {
-  description = "The name of the ContractFlow Azure Key Vault"
-  value       = module.key_vault.name
+output "database_port" {
+  description = "Port of the ContractFlow PostgreSQL database"
+  value       = module.database.port
 }
 
-output "key_vault_id" {
-  description = "The ID of the ContractFlow Azure Key Vault"
-  value       = module.key_vault.id
+output "database_name" {
+  description = "Name of the ContractFlow PostgreSQL database"
+  value       = module.database.database_name
 }
 
-output "key_vault_uri" {
-  description = "The URI of the ContractFlow Azure Key Vault"
-  value       = module.key_vault.vault_uri
+output "database_security_group_id" {
+  description = "Security group ID of the ContractFlow PostgreSQL database"
+  value       = module.database.security_group_id
+}
+
+output "database_master_user_secret_arn" {
+  description = "ARN of the AWS-managed RDS master credential secret"
+  value       = module.database.master_user_secret_arn
+  sensitive   = true
 }

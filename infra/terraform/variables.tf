@@ -10,13 +10,8 @@ variable "environment" {
   default     = "dev"
 }
 
-variable "location" {
-  description = "The Azure region for resource deployment"
+variable "aws_region" {
+  description = "AWS region for ContractFlow resources"
   type        = string
-  default     = "eastus"
-}
-
-variable "tenant_id" {
-  description = "The Azure AD tenant ID for the Azure subscription"
-  type        = string
+  default     = "eu-north-1"
 }
