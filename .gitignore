@@ -6,6 +6,7 @@ coverage
 .env.*
 !.env.example
 *.log
+Infrastructure
 *.tsbuildinfo
 # Terraform local state
 *.tfstate
@@ -32,3 +33,6 @@ override.tf.json
 .terraformrc
 terraform.rc
 *.tfplan
+=======
+apps/api/prisma/imports/
+main
