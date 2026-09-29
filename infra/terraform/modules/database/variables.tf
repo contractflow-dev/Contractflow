@@ -13,10 +13,9 @@ variable "vpc_id" {
   type        = string
 }
 
-variable "allowed_security_group_ids" {
-  description = "Security groups allowed to connect to PostgreSQL"
-  type        = list(string)
-  default     = []
+variable "application_security_group_id" {
+  description = "Application security group allowed to connect to PostgreSQL"
+  type        = string
 }
 
 variable "db_name" {
