@@ -81,3 +81,21 @@ module "database" {
     ManagedBy   = "Terraform"
   }
 }
+
+module "ecr" {
+  source = "./modules/ecr"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  repository_names = [
+    "web",
+    "api"
+  ]
+
+  tags = {
+    Project     = var.project_name
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
