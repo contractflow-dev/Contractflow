@@ -1,0 +1,25 @@
+{
+  "name": "@contractflow/contracts-schema",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "files": [
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./common": "./src/common/index.ts",
+    "./compliance": "./src/compliance/index.ts",
+    "./contract": "./src/contract/index.ts",
+    "./cross-cutting": "./src/cross-cutting/index.ts",
+    "./delivery": "./src/delivery/index.ts",
+    "./financial": "./src/financial/index.ts",
+    "./hse": "./src/hse/index.ts",
+    "./identity": "./src/identity/index.ts",
+    "./identity/*": "./src/identity/*.ts",
+    "./site-operations": "./src/site-operations/index.ts"
+  }
+}

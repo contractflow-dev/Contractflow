@@ -1,0 +1,14 @@
+import { Status } from "@contractflow/contracts-schema"
+
+export interface IContractStageEntity {
+    contractId : string
+    name : string
+    description : string
+    sequence : string
+    status : Status
+    weightBps : number
+    plannedStartDate : Date
+    plannedEndDate : Date
+    actualStartDate : Date
+    actualEndDate : Date
+}

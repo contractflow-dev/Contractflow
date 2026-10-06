@@ -1,0 +1,28 @@
+services:
+    - type: web
+    name: contractflow-backend
+    env: node
+    plan: starter
+    branch: main
+    rootDir: ./backend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+            - key: NODE_ENV
+        value: production
+            - key: DATABASE_URL
+        sync: false
+
+    - type: web
+    name: contractflow-frontend
+    env: static
+    plan: starter
+    branch: main
+    rootDir: ./frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    autoDeploy: true
+    envVars:
+            - key: VITE_API_URL
+        sync: false
