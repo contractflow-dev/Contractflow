@@ -25,7 +25,7 @@ export class Conversation extends BaseCustomEntity implements IConversationEntit
   @Column({ name: 'workspace', type: 'enum', enum: ConversationWorkspace })
   workspace!: ConversationWorkspace;
 
-  @Column({ name: 'title', type: 'varchar', length: 100 })
+  @Column({ name: 'title', type: 'varchar', length: 126 })
   title!: string;
 
   @Column({ name: 'conversation_created_at', type: 'timestamptz' })
