@@ -6,7 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ComplianceRecord } from './entities/compliance_record';
-import { ComplianceRequirement } from './entities/compliance-requirement.entity';
+import { ComplianceRequirement } from '../entities/compliance-requirement.entity';
 
 @Injectable()
 export class ComplianceService {

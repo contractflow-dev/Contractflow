@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { IdentityModule } from './modules/identity/identity.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
         synchronize: config.get('NODE_ENV') !== 'production',
       }),
     }),
+    IdentityModule,
   ],
   controllers: [],
 })

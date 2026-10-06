@@ -1,4 +1,4 @@
-import { UserStatus } from "../entities/app-user.entity"
+import type { UserStatus } from "@contractflow/contracts-schema";
 
 export interface IAppUserEntity {
     email : string

@@ -1,0 +1,66 @@
+export enum InvoiceAdjustmentType{
+    VAT = 'vat',
+    WITHHOLDING_TAX = 'withholding_tax',
+    RETENTION = 'retention',
+    ADVANCE_PAYMENT = 'advance_payment',
+    DISCOUNT = 'discount',
+    PENALTY = 'penalty',
+    LATE_PAYMENT_INTEREST = 'late_payment_interest',
+    PRICE_ADJUSTMENT = 'price_adjustment',
+    VARIATION = 'variation',
+    CLAIM = 'claim',
+    CREDIT_NOTE = 'credit_note',
+    DEBIT_NOTE = 'debit_note',
+    REVISION = 'revision',
+    OTHER = 'other'
+}
+export enum InvoiceType{
+    INTERIM = 'interim',
+    FINAL = 'final',
+    ADVANCE = 'advance',
+    RETENTION = 'retention',
+    VARIATION = 'variation',
+    CLAIM = 'claim',
+    DEBIT_NOTE = 'debit_note',
+    CREDIT_NOTE = 'credit_note',
+    PROFORMA = 'proforma',
+    MISCELLANEOUS = 'miscellaneous'
+}
+export enum InvoiceStatus{
+    DRAFT = 'draft',
+    ISSUED = 'issued',
+    SUBMITTED = 'submitted',
+    PENDING_APPROVAL = 'pending_approval',
+    APPROVED = 'approved',
+    REJECTED = 'rejected',
+    PAID = 'paid',
+    PARTIALLY_PAID = 'partially_paid',
+    OVERDUE = 'overdue',
+    DISPUTED = 'disputed',
+    CANCELLED = 'cancelled',
+    VOID = 'void'
+}
+export enum PaymentMethod{
+    BANK_TRANSFER = 'bank_transfer',
+    CHEQUE = 'cheque',
+    CASH = 'cash',
+    CARD = 'card',
+    MOBILE_MONEY = 'mobile_money',
+    LETTER_OF_CREDIT = 'letter_of_credit',
+    ADVANCE = 'advance',
+    ESCROW = 'escrow',
+    OTHER = 'other'
+}
+export enum PaymentStatus{
+    PENDING = 'pending',
+    INITIATED = 'initiated',
+    PROCESSING = 'processing',
+    AUTHORIZED = 'authorized',
+    COMPLETED = 'completed',
+    PARTIALLY_PAID = 'partially_paid',
+    FAILED = 'failed',
+    REVERSED = 'reversed',
+    DISPUTED = 'disputed',
+    CANCELLED = 'cancelled',
+    HOLD = 'hold'
+}
