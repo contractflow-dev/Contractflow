@@ -11,7 +11,6 @@ jobs:
           node-version: 20
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @contractflow/api exec -- prisma generate
       - run: pnpm --filter @contractflow/api lint
       - run: pnpm --filter @contractflow/web lint
       - run: pnpm -r build
