@@ -1,0 +1,22 @@
+name: Application CI
+on: [push, pull_request]
+jobs:
+  app-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @contractflow/api exec prisma generate
+      - run: pnpm --filter @contractflow/api lint
+      - run: pnpm --filter @contractflow/web lint
+      - run: pnpm -r build
+EOF
+
+git add .github/workflows/application-ci.yml
+git commit -m "fix: remove duplicate pnpm version"
+git push origin fix/bring-ci-to-main
