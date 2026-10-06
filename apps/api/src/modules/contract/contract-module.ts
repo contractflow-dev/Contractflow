@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ContractController } from './contract-controller';
+import { ContractController } from './controllers/contract-controller';
 
 @Module({
   imports: [TypeOrmModule.forFeature([ContractController])],

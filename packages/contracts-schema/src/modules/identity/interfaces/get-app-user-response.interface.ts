@@ -1,6 +1,6 @@
-import { UserStatus } from '../../../entities/app-user';
+import type { UserStatus } from "../enums/identity.enum.js";
 
-export interface IGetAppUserResponseDto {
+export interface IGetAppUserResponse {
   email: string;
   firstName: string;
   middleName: string;
