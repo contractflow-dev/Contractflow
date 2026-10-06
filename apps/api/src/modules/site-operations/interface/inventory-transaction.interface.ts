@@ -1,4 +1,4 @@
-import { TransactionType } from "../entities/inventory-transaction.entity"
+import { TransactionType } from "@contractflow/contracts-schema"
 
 export interface IInventoryTransactionEntity {
     contractId : string

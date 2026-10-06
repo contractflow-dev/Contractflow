@@ -1,4 +1,4 @@
-import { HseInpectionResult, HseInpectionRiskLevel } from "../entities/hse-inspection-finding.entity"
+import { HseInpectionResult, HseInpectionRiskLevel } from "@contractflow/contracts-schema"
 
 export interface IHseInspectionFidingEntity {
     hseInspectionId : string

@@ -1,4 +1,4 @@
-import { EquipmentCondition } from "../entities/site-daily-log-equipment.entity"
+import { EquipmentCondition } from "@contractflow/contracts-schema"
 
 export interface ISiteDailyLogEquipmentEntity {
     siteDailyLogId : string

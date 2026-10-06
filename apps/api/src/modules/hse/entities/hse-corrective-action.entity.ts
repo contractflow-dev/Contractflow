@@ -5,17 +5,8 @@ import { HseInspectionFinding } from "./hse-inspection-finding.entity";
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IHseCorrectiveActionEntity } from "../interface/hse-corrective-action.interface";
+import { HseCorrectiveActionPriority, HseActionStatus } from "@contractflow/contracts-schema";
 
-export enum HseCorrectiveActionPriority{
-    LOW="low",
-    MEDIUM="medium",
-    HIGH="high"
-}
-export enum HseActionStatus{
-    OPEN="open",
-    IN_PROGRESS="in_progress",
-    CLOSED="closed"
-}
 
 @Entity("hse_corrective_action")
 export class HseCorrectiveAction extends BaseCustomEntity implements IHseCorrectiveActionEntity{

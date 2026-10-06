@@ -4,25 +4,9 @@ import { ContractSite } from "../../site-operations/entities/contract-site.entit
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IHseInspectionEntity } from "../interface/hse-inspection.interface";
+import { HseInspectionStatus, HseInspectionType, HseOverallResult } from "@contractflow/contracts-schema";
 
 
-export enum HseInspectionType{
-    SAFETY="safety",
-    ENVIRONMENTAL="environmental",
-    HEALTH="health",
-    OTHER="other"
-}
-export enum HseInspectionStatus{
-    PENDING="pending",
-    IN_PROGRESS="in_progress",
-    COMPLETED="completed",
-    CANCELLED="cancelled"
-}
-export enum HseOverallResult{
-    PASS="pass",
-    FAIL="fail",
-    INCONCLUSIVE="inconclusive"
-}
 
 @Entity("hse_inspection")
 export class HseInspection extends BaseCustomEntity implements IHseInspectionEntity{

@@ -1,4 +1,4 @@
-import { InvitationRole, InvitationStatus } from "../entities/company-invitation.entity"
+import { InvitationRole, InvitationStatus } from "@contractflow/contracts-schema"
 
 export interface ICompanyInvitationEntity {
     companyId : string

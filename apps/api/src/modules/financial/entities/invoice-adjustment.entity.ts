@@ -2,24 +2,8 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from "t
 import { Invoice } from "./invoice.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IInvoiceAdjustmentEntity } from "../interface/invoice-adjustment.interface";
+import { InvoiceAdjustmentType } from "@contractflow/contracts-schema"
 
-
-export enum InvoiceAdjustmentType{
-    VAT = 'vat',
-    WITHHOLDING_TAX = 'withholding_tax',
-    RETENTION = 'retention',
-    ADVANCE_PAYMENT = 'advance_payment',
-    DISCOUNT = 'discount',
-    PENALTY = 'penalty',
-    LATE_PAYMENT_INTEREST = 'late_payment_interest',
-    PRICE_ADJUSTMENT = 'price_adjustment',
-    VARIATION = 'variation',
-    CLAIM = 'claim',
-    CREDIT_NOTE = 'credit_note',
-    DEBIT_NOTE = 'debit_note',
-    REVISION = 'revision',
-    OTHER = 'other'
-}
 
 @Entity("invoice_adjustment")
 export class InvoiceAdjustment extends BaseCustomEntity implements IInvoiceAdjustmentEntity{

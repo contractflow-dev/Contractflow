@@ -1,4 +1,4 @@
-import { AppliesToParty, ComplianceCategory, ComplianceFrequency } from "../entities/compliance-requirement.entity"
+import { AppliesToParty, ComplianceCategory, ComplianceFrequency } from "@contractflow/contracts-schema"
 
 export interface IComplianceRequirementEntity {
     contractId : string

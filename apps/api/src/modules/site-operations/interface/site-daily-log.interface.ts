@@ -1,4 +1,4 @@
-import { SiteStatus, WeatherCondition } from "../entities/site-daily-log.entity"
+import { SiteStatus, WeatherCondition } from "@contractflow/contracts-schema"
 
 export interface ISiteDailyLogEntity {
     contractId : string

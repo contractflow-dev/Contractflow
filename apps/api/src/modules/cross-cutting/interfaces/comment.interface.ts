@@ -1,4 +1,4 @@
-import { CommentVisibility, EntityType } from "../entities/comment.entity"
+import { CommentVisibility, EntityType } from "@contractflow/contracts-schema"
 
 export interface ICommentEntity {
     contractId : string

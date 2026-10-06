@@ -1,26 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from "typeorm";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IContractEntity } from "../interfaces/contract.interface";
-
-
-export enum ContractType{
-    SERVICE= 'service', 
-    SUPPLY= 'supply', 
-    EPC= 'epc', 
-    MAINTENANCE= 'maintenance'
-}
-export enum ContractStatus{
-    DRAFT= 'draft', 
-    ACTIVE= 'active', 
-    SUSPENDED= 'suspended', 
-    COMPLETED= 'completed'
-}
-export enum CurrencyType{
-    NAIRA='NGN', 
-    DOLLAR='USD', 
-    EURO='EUR', 
-    POUND='GBP'
-}
+import { ContractStatus, ContractType } from "@contractflow/contracts-schema";
 
 
 @Entity("contract")
@@ -53,8 +34,8 @@ export class Contract extends BaseCustomEntity implements IContractEntity {
     @Column({name: "current_value_minor", type:"bigint"})
     currentValueMinor!: number
 
-    @Column({name: "currency_code", type:"enum", enum:CurrencyType, default: CurrencyType.DOLLAR})
-    currencyCode!: CurrencyType
+    @Column({name: "currency_code", type:"char", length: 3 })
+    currencyCode!: string
 
     @Column({name: "retention_rate_bps", type:"int"})
     retentionRateBps!: number

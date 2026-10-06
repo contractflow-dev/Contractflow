@@ -1,6 +1,5 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
   Column,
   ManyToOne,
   JoinColumn,
@@ -9,17 +8,8 @@ import { Contract } from '../../contract/entities/contract.entity';
 import { CompanyUser } from '../../identity/entities/company-user.entity';
 import { BaseCustomEntity } from './base-custom.entity';
 import { ICommentEntity } from '../interfaces/comment.interface';
+import { EntityType, CommentVisibility } from '@contractflow/contracts-schema';
 
-export enum EntityType {
-  CONTRACT = 'contract',
-  DOCUMENT = 'document',
-  COMMENT = 'comment',
-  OTHER = 'other',
-}
-export enum CommentVisibility {
-  PUBLIC = 'public',
-  PRIVATE = 'private',
-}
 
 @Entity('comment')
 export class Comment extends BaseCustomEntity implements ICommentEntity{

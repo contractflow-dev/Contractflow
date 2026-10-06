@@ -1,4 +1,4 @@
-import { CompanyRole, CompanyUserStatus } from "../entities/company-user.entity"
+import { CompanyRole, CompanyUserStatus } from "@contractflow/contracts-schema"
 
 export interface ICompanyUserEntity {
     companyId : string

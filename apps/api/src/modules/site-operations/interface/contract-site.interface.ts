@@ -1,5 +1,4 @@
-import { ContractVariation } from "../../delivery/entities/contract-variation.entity"
-import { ContractSiteStatus } from "../entities/contract-site.entity"
+import { ContractSiteStatus } from "@contractflow/contracts-schema"
 
 export interface IContractSiteEntity {
     contractId : string

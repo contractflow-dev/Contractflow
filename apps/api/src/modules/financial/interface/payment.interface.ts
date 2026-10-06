@@ -1,5 +1,4 @@
-import { InvoiceStatus, InvoiceType } from "../entities/invoice.entity"
-import { PaymentMethod, PaymentStatus } from "../entities/payment.entity"
+import { PaymentMethod, PaymentStatus } from "@contractflow/contracts-schema"
 
 export interface IPaymentEntity {
     contractId : string

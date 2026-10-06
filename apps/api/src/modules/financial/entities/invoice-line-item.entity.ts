@@ -2,8 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from "t
 import { Invoice } from "./invoice.entity";
 import { Milestone } from "../../delivery/entities/milestone.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
-import { IInvoiceLineItemEntity } from "../interface/payment.interface";
-
+import { IInvoiceLineItemEntity } from "../interface/invoice-line-item.interface";
 
 
 @Entity("invoice_line_item")

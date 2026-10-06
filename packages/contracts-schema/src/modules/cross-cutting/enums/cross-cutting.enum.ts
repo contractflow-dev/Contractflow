@@ -49,3 +49,12 @@ export enum NotificationStatus{
     FAILED = "failed",
     READ = "read"
 }
+export enum ConversationType {
+  COMMENT = 'comment',
+  MESSAGE = 'message',
+}
+export enum ConversationWorkspace {
+    Project = 'project',
+    Finance = 'finance',
+    HSE = 'hse',
+}

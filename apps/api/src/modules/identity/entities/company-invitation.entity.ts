@@ -9,23 +9,8 @@ import { Company } from './company.entity';
 import { CompanyUser } from './company-user.entity';
 import { BaseCustomEntity } from '../../cross-cutting/entities/base-custom.entity';
 import { ICompanyInvitationEntity } from '../interface/company-invitation.interface';
+import { InvitationRole, InvitationStatus } from '@contractflow/contracts-schema';
 
-export enum InvitationRole {
-  CONTRACTOR_PROJECT_LEAD = 'Contractor Project Lead',
-  CONTRACTOR_SITE_SUPERVISOR = 'Contractor Site Supervisor',
-  CLIENT_PROJECT_MANAGER = 'Client Project Manager',
-  CLIENT_SITE_ENGINEER = 'Client Site Engineer',
-  HSE_OFFICER = 'HSE Officer',
-  HSE_MANAGER = 'HSE Manager',
-  FINANCE_OFFICER = 'Finance Officer',
-  FINANCE_DIRECTOR = 'Finance Director',
-}
-
-export enum InvitationStatus {
-  PENDING = 'pending',
-  ACCEPTED = 'accepted',
-  DECLINED = 'declined',
-}
 
 @Entity('company_invitation')
 export class CompanyInvitation

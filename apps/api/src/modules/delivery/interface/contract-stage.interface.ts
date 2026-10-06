@@ -1,4 +1,4 @@
-import { Status } from "../entities/contract-stage.entity"
+import { Status } from "@contractflow/contracts-schema"
 
 export interface IContractStageEntity {
     contractId : string

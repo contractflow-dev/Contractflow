@@ -2,15 +2,8 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from "t
 import { Document } from "./document.entity";
 import { BaseCustomEntity } from "./base-custom.entity";
 import { IDocumentLinkEntity } from "../interfaces/document-link.interface";
+import { DocumentEntityType } from "@contractflow/contracts-schema";
 
-export enum DocumentEntityType{
-    CERTIFICATE="certificate",  
-    HSE="HSE",
-    CONTRACT="contract",
-    INVOICE="invoice",
-    REPORT="report",
-    OTHER="other"
-}
 
 @Entity("document_link")
 export class DocumentLink extends BaseCustomEntity implements IDocumentLinkEntity{

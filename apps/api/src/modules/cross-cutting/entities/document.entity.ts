@@ -3,27 +3,8 @@ import { Contract } from "../../contract/entities/contract.entity";
 import { Company } from "../../identity/entities/company.entity";
 import { BaseCustomEntity } from "./base-custom.entity";
 import { IDocumentEntity } from "../interfaces/document.interface";
+import { DocumentCategory, DocumentStatus, DocumentVisibility } from "@contractflow/contracts-schema";
 
-export enum DocumentCategory {
-    CERTIFICATE="certificate",  
-    HSE="HSE",
-    CONTRACT="contract",
-    INVOICE="invoice",
-    REPORT="report",
-    OTHER="other"
-}
-export enum DocumentVisibility{
-    PUBLIC="public",
-    PRIVATE="private"
-}
-export enum DocumentStatus{
-    VALID="Valid", 
-    EXPIRING="Expiring", 
-    EXPIRED="Expired",
-    VERIFICATION_PENDING="Verification Pending", 
-    VERIFIED="Verified", 
-    REJECTED="Rejected",
-}
 
 @Entity("document")
 export class Document extends BaseCustomEntity implements IDocumentEntity {

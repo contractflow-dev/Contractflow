@@ -2,20 +2,9 @@ import {Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn} from "typ
 import { SiteDailyLog } from "./site-daily-log.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { ISiteDailyLogEquipmentEntity } from "../interface/site-daily-log-equipment.interface";
+import { EquipmentCondition } from "@contractflow/contracts-schema";
 
 
-export enum EquipmentCondition{
-    EXCELLENT = 'excellent',
-    GOOD = 'good',
-    FAIR = 'fair',
-    POOR = 'poor',
-    DAMAGED = 'damaged',
-    REPAIR_REQUIRED = 'repair_required',
-    OUT_OF_SERVICE = 'out_of_service',
-    IDLE = 'idle',
-    OPERATING = 'operating',
-    STANDBY = 'standby'
-}
 
 @Entity("site_daily_log_equipment")
 export class SiteDailyLogEquipment extends BaseCustomEntity implements ISiteDailyLogEquipmentEntity{

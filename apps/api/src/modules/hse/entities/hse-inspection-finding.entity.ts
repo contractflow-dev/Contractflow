@@ -2,17 +2,8 @@ import {Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, JoinColumn
 import { HseInspection } from "./hse-inspection.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IHseInspectionFidingEntity } from "../interface/hse-inspection-finding.interface";
+import { HseInpectionResult, HseInpectionRiskLevel } from "@contractflow/contracts-schema";
 
-export enum HseInpectionResult{
-    COMPLIANT="compliant",
-    NON_COMPLIANT="non_compliant",
-    NOT_APPLICABLE="not_applicable"
-}
-export enum HseInpectionRiskLevel{
-    LOW="low",
-    MEDIUM="medium",
-    HIGH="high"
-}
 
 @Entity("hse_inspection_finding")
 export class HseInspectionFinding extends BaseCustomEntity implements IHseInspectionFidingEntity{

@@ -1,4 +1,4 @@
-import { CompanyStatus } from "../entities/company.entity"
+import { CompanyStatus } from "@contractflow/contracts-schema"
 
 export interface ICompanyEntity {
     name : string

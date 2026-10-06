@@ -1,4 +1,4 @@
-import { HseActionStatus, HseCorrectiveActionPriority } from "../entities/hse-corrective-action.entity"
+import { HseActionStatus, HseCorrectiveActionPriority } from "@contractflow/contracts-schema"
 
 export interface IHseCorrectiveActionEntity {
     contractId : string

@@ -5,14 +5,7 @@ import { SiteDailyLog } from "./site-daily-log.entity";
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IInventoryTransactionEntity } from "../interface/inventory-transaction.interface";
-
-export enum TransactionType {
-    RECEIPT = 'receipt',
-    ISSUE = 'issue',
-    ADJUSTMENT = 'adjustment',
-    TRANSFER = 'transfer',
-    RETURN = 'return'
-}
+import { TransactionType } from "@contractflow/contracts-schema";
 
 
 @Entity("inventory_transaction")

@@ -1,4 +1,4 @@
-import { HseInspectionStatus, HseInspectionType, HseOverallResult } from "../entities/hse-inspection.entity"
+import { HseInspectionStatus, HseInspectionType, HseOverallResult } from "@contractflow/contracts-schema"
 
 export interface IHseInspectionEntity {
     contractId : string
