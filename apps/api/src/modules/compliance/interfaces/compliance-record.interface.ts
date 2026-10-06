@@ -1,4 +1,4 @@
-import { ComplianceRecordStatus } from "../entities/compliance-record.entity"
+import { ComplianceRecordStatus } from "@contractflow/contracts-schema"
 
 export interface IComplianceRecordEntity {
     contractId : string

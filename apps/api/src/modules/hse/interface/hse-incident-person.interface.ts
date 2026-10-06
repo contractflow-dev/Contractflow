@@ -1,4 +1,4 @@
-import { HseIncidentPersonInvolvement } from "../entities/hse-incident-person.entity"
+import { HseIncidentPersonInvolvement } from "@contractflow/contracts-schema"
 
 export interface IHseIncidentPersonEntity {
     hseIncidentId : string

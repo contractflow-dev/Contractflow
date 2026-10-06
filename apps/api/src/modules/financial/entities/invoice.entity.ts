@@ -4,34 +4,8 @@ import { ContractParty } from "../../contract/entities/contract-party.entity";
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IInvoiceEntity } from "../interface/invoice.interface";
+import { InvoiceStatus, InvoiceType } from "@contractflow/contracts-schema";
 
-
-export enum InvoiceType{
-    INTERIM = 'interim',
-    FINAL = 'final',
-    ADVANCE = 'advance',
-    RETENTION = 'retention',
-    VARIATION = 'variation',
-    CLAIM = 'claim',
-    DEBIT_NOTE = 'debit_note',
-    CREDIT_NOTE = 'credit_note',
-    PROFORMA = 'proforma',
-    MISCELLANEOUS = 'miscellaneous'
-}
-export enum InvoiceStatus{
-    DRAFT = 'draft',
-    ISSUED = 'issued',
-    SUBMITTED = 'submitted',
-    PENDING_APPROVAL = 'pending_approval',
-    APPROVED = 'approved',
-    REJECTED = 'rejected',
-    PAID = 'paid',
-    PARTIALLY_PAID = 'partially_paid',
-    OVERDUE = 'overdue',
-    DISPUTED = 'disputed',
-    CANCELLED = 'cancelled',
-    VOID = 'void'
-}
 
 
 @Entity("invoice")

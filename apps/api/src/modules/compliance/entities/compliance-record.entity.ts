@@ -10,20 +10,7 @@ import { ContractParty } from '../../contract/entities/contract-party.entity';
 import { CompanyUser } from '../../identity/entities/company-user.entity';
 import { BaseCustomEntity } from '../../cross-cutting/entities/base-custom.entity';
 import { IComplianceRecordEntity } from '../interfaces/compliance-record.interface';
-
-export enum ComplianceRecordStatus {
-  PENDING = 'pending',
-  ACTIVE = 'active',
-  VALID = 'valid',
-  EXPIRED = 'expired',
-  RENEWAL_DUE = 'renewal_due',
-  RENEWED = 'renewed',
-  UNDER_REVIEW = 'under_review',
-  REJECTED = 'rejected',
-  NON_COMPLIANT = 'non_compliant',
-  WAIVED = 'waived',
-  CANCELLED = 'cancelled',
-}
+import { ComplianceRecordStatus } from '@contractflow/contracts-schema';
 
 @Entity('compliance_record')
 export class ComplianceRecord extends BaseCustomEntity implements IComplianceRecordEntity{

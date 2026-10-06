@@ -1,4 +1,4 @@
-import { DocumentEntityType } from "../entities/document-link.entity"
+import { DocumentEntityType } from "@contractflow/contracts-schema"
 
 export interface IDocumentLinkEntity {
     documentId : string

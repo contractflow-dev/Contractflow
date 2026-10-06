@@ -4,34 +4,9 @@ import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { ContractParty } from "../../contract/entities/contract-party.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IContractVariationEntity } from "../interface/contract-variation.interface";
+import { ContractVariationType, ContractVariationStatus } from "@contractflow/contracts-schema";
 
 
-export enum ContractVariationType{
-    SCOPE_CHANGE = 'scope_change',
-    TIME_EXTENSION = 'time_extension',
-    COST_ADJUSTMENT = 'cost_adjustment',
-    PRICE_REVISON = 'price_revision',
-    SCHEDULE_CHANGE = 'schedule_change',
-    DESIGN_CHANGE = 'design_change',
-    TECHNICAL_CHANGE = 'technical_change',
-    PROCUREMENT_CHANGE = 'procurement_change',
-    MATERIAL_CHANGE = 'material_change',
-    REGULATORY_CHANGE = 'regulatory_change',
-    OTHER = 'other'
-}
-
-export enum ContractVariationStatus{
-    DRAFT = 'draft',
-    SUBMITTED = 'submitted',
-    UNDER_REVIEW = 'under_review',
-    PENDING_APPROVAL = 'pending_approval',
-    APPROVED = 'approved',
-    REJECTED = 'rejected',
-    NEGOTIATING = 'negotiating',
-    IMPLEMENTED = 'implemented',
-    CANCELLED = 'cancelled',
-    WITHDRAWN = 'withdrawn'
-}
 
 @Entity("contract_variation")
 export class ContractVariation extends BaseCustomEntity implements IContractVariationEntity {

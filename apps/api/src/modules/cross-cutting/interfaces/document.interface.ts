@@ -1,4 +1,4 @@
-import { DocumentCategory, DocumentStatus, DocumentVisibility } from "../entities/document.entity"
+import { DocumentCategory, DocumentStatus, DocumentVisibility } from "@contractflow/contracts-schema"
 
 export interface IDocumentEntity {
     contractId : string

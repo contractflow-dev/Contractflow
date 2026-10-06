@@ -5,32 +5,8 @@ import { ContractParty } from "../../contract/entities/contract-party.entity";
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { ISiteDailyLogEntity } from "../interface/site-daily-log.interface";
+import { SiteStatus, WeatherCondition } from "@contractflow/contracts-schema";
 
-export enum WeatherCondition {
-    CLEAR = "clear",
-    CLOUDY = "cloudy",
-    PARTLY_CLOUDY = "partly_cloudy",
-    RAINY = "rainy",
-    HEAVY_RAIN = "heavy_rain",
-    WINDY = "windy",
-    STORMY = "stormy",
-    FOGGY = "foggy",
-    HOT = "hot",
-    COLD = "cold",
-    SNOWY = "snowy",
-    HAIL = "hail"
-}
-export enum SiteStatus {
-    ON_SCHEDULE = "on_schedule",
-    AHEAD_OF_SCHEDULE = "ahead_of_schedule",
-    BEHIND_SCHEDULE = "behind_schedule",
-    DELAYED = "delayed",
-    SUSPENDED = "suspended",
-    COMPLETED = "completed",
-    AT_RISK = "at_risk",
-    HOLD = "hold",
-    CLOSED = "closed"
-}
 
 @Entity("site_daily_log")
 export class SiteDailyLog extends BaseCustomEntity implements ISiteDailyLogEntity{

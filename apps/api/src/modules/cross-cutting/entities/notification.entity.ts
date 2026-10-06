@@ -3,20 +3,8 @@ import { User } from "../../identity/entities/app-user.entity";
 import { Contract } from "../../contract/entities/contract.entity";
 import { BaseCustomEntity } from "./base-custom.entity";
 import { INotificationEntity } from "../interfaces/notification.interface";
+import { NotificationChannel, NotificationStatus } from "@contractflow/contracts-schema";
 
-
-export enum NotificationChannel {
-    PUSH = "push",
-    SMS = "sms",
-    EMAIL = "email"
-}
-export enum NotificationStatus{
-    SENT = "sent",
-    DELIVERED = "delivered",
-    PENDING = "pending",
-    FAILED = "failed",
-    READ = "read"
-}
 
 
 @Entity("notification")

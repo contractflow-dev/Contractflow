@@ -4,17 +4,8 @@ import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { Company } from "../../identity/entities/company.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IContractRoleAssignmentEntity } from "../interfaces/contract-role-assignment.interface";
+import { ContractRole } from "@contractflow/contracts-schema";
 
-export enum ContractRole{
-    CONTRACTOR_PROJECT_LEAD = 'Contractor Project Lead',
-    CONTRACTOR_SITE_SUPERVISOR = 'Contractor Site Supervisor',
-    CLIENT_PROJECT_MANAGER = 'Client Project Manager',
-    CLIENT_SITE_ENGINEER = 'Client Site Engineer',
-    HSE_OFFICER = 'HSE Officer',
-    HSE_MANAGER = 'HSE Manager',
-    FINANCE_OFFICER = 'Finance Officer',
-    FINANCE_DIRECTOR = 'Finance Director'
-}
 
 @Entity("contract_role_assignment")
 export class ContractRoleAssignment extends BaseCustomEntity implements IContractRoleAssignmentEntity {

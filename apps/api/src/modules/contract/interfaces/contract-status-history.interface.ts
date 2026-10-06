@@ -1,4 +1,4 @@
-import { FromStatus, ToStatus } from "../entities/contract-status-history.entity"
+import { FromStatus, ToStatus } from "@contractflow/contracts-schema"
 
 export interface IContractStatusHistoryEntity {
     contractId : string

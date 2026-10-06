@@ -4,19 +4,8 @@ import { ContractStage } from "./contract-stage.entity";
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IMilestoneEntity } from "../interface/milestone.interface";
+import { MilestoneStatus } from "@contractflow/contracts-schema";
 
-export enum MilestoneStatus{
-    PLANNED = 'planned',
-    ACTIVE = 'active',
-    IN_PROGRESS = 'in_progress',
-    PENDING_APPROVAL = 'pending_approval',
-    APPROVED = 'approved',
-    COMPLETED = 'completed',
-    DELAYED = 'delayed',
-    AT_RISK = 'at_risk',
-    ON_HOLD = 'on_hold',
-    CANCELLED = 'cancelled'
-}
 
 @Entity("milestone")
 export class Milestone extends BaseCustomEntity implements IMilestoneEntity{

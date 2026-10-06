@@ -1,4 +1,4 @@
-import { NotificationChannel, NotificationStatus } from "../entities/notification.entity"
+import { NotificationChannel, NotificationStatus } from "@contractflow/contracts-schema"
 
 export interface INotificationEntity {
     recipientUserId : string

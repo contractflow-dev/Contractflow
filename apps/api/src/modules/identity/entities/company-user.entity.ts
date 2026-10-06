@@ -3,22 +3,9 @@ import { Company } from "./company.entity";
 import { User } from "./app-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { ICompanyUserEntity } from "../interface/company-user.interface";
+import { CompanyRole, CompanyUserStatus } from "@contractflow/contracts-schema";
 
 
-export enum CompanyRole{
-    CONTRACTOR_PROJECT_LEAD = 'Contractor Project Lead',
-    CONTRACTOR_SITE_SUPERVISOR = 'Contractor Site Supervisor',
-    CLIENT_PROJECT_MANAGER = 'Client Project Manager',
-    CLIENT_SITE_ENGINEER = 'Client Site Engineer',
-    HSE_OFFICER = 'HSE Officer',
-    HSE_MANAGER = 'HSE Manager',
-    FINANCE_OFFICER = 'Finance Officer',
-    FINANCE_DIRECTOR = 'Finance Director'
-}
-export enum CompanyUserStatus{
-    ACTIVE = "active",
-    INACTIVE = "inactive"
-}
 
 @Entity("company_user")
 export class CompanyUser extends BaseCustomEntity implements ICompanyUserEntity{

@@ -2,17 +2,9 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from "t
 import { Contract } from "../../contract/entities/contract.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IContractStageEntity } from "../interface/contract-stage.interface";
+import { Status } from "@contractflow/contracts-schema";
 
 
-export enum Status{
-    PLANNED = 'planned',
-    ACTIVE = 'active',
-    IN_PROGRESS = 'in_progress',
-    PENDING_APPROVAL = 'pending_approval',
-    COMPLETED = 'completed',
-    DELAYED = 'delayed',
-    CANCELLED = 'cancelled'
-}
 
 @Entity("contract_stage")
 export class ContractStage extends BaseCustomEntity implements IContractStageEntity{

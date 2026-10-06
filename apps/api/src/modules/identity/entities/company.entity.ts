@@ -1,11 +1,8 @@
 import { Entity, PrimaryGeneratedColumn, Column } from "typeorm";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { ICompanyEntity } from "../interface/company.interface";
+import { CompanyStatus } from "@contractflow/contracts-schema";
 
-export enum CompanyStatus{
-    ACTIVE = "active",
-    INACTIVE = "inactive"
-}
 
 @Entity("company")
 export class Company extends BaseCustomEntity implements ICompanyEntity{

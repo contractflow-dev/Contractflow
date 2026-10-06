@@ -1,6 +1,5 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
   Column,
   ManyToOne,
   JoinColumn,
@@ -9,14 +8,7 @@ import { Contract } from './contract.entity';
 import { Company } from '../../identity/entities/company.entity';
 import { BaseCustomEntity } from '../../cross-cutting/entities/base-custom.entity';
 import { IContractPartyEntity } from '../interfaces/contract-party.interface';
-
-export enum PartyType {
-  CLIENT = 'client',
-  CONTRACTOR = 'contractor',
-  SUBCONTRACTOR = 'subcontractor',
-  VENDOR = 'vendor',
-  OTHER = 'other',
-}
+import { PartyType } from '@contractflow/contracts-schema';
 
 @Entity('contract_party')
 export class ContractParty extends BaseCustomEntity implements IContractPartyEntity

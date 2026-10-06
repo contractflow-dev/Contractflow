@@ -1,5 +1,4 @@
-import { FromStatus, ToStatus } from "../entities/contract-status-history.entity"
-import { ContractStatus, ContractType, CurrencyType } from "../entities/contract.entity"
+import { ContractStatus, ContractType } from "@contractflow/contracts-schema"
 
 export interface IContractEntity {
     referenceNumber : string
@@ -10,7 +9,7 @@ export interface IContractEntity {
     parentContractId : string
     originalValueMinor : Number
     currentValueMinor : number
-    currencyCode : CurrencyType
+    currencyCode : string
     retentionRateBps : number
     advancePaymentRateBps : number
     paymentTermsDays : number

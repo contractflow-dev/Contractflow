@@ -1,4 +1,4 @@
-import { ContractRole } from "../entities/contract-role-assignment.entity"
+import { ContractRole } from "@contractflow/contracts-schema"
 
 export interface IContractRoleAssignmentEntity {
     contractPartyId : string

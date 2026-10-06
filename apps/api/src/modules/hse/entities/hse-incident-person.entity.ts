@@ -3,20 +3,7 @@ import { HseIncident } from "./hse-incident.entity";
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IHseIncidentPersonEntity } from "../interface/hse-incident-person.interface";
-
-export enum HseIncidentPersonInvolvement{
-    VICTIM = 'victim',
-    INJURED_PERSON = 'injured_person',
-    WITNESS = 'witness',
-    REPORTER = 'reporter',
-    SUPERVISOR = 'supervisor',
-    FIRST_AIDER = 'first_aider',
-    EMERGENCY_RESPONDER = 'emergency_responder',
-    INVESTIGATOR = 'investigator',
-    CONTRACTOR = 'contractor',
-    VISITOR = 'visitor',
-    OTHER = 'other'
-}
+import { HseIncidentPersonInvolvement } from "@contractflow/contracts-schema";
 
 
 @Entity("hse_incident_person")

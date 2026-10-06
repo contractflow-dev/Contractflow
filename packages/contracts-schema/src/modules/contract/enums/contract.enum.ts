@@ -45,9 +45,3 @@ export enum ContractStatus{
     SUSPENDED= 'suspended', 
     COMPLETED= 'completed'
 }
-export enum CurrencyType{
-    NAIRA='NGN', 
-    DOLLAR='USD', 
-    EURO='EUR', 
-    POUND='GBP'
-}

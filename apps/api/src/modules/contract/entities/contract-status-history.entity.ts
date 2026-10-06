@@ -3,24 +3,9 @@ import { Contract } from "./contract.entity";
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IContractStatusHistoryEntity } from "../interfaces/contract-status-history.interface";
+import { FromStatus, ToStatus } from "@contractflow/contracts-schema";
 
 
-export enum FromStatus {
-    DRAFT = 'draft',
-    ACTIVE = 'active',
-    SUSPENDED = 'suspended',
-    COMPLETED = 'completed',
-    CANCELLED = 'cancelled',
-    UNDER_REVIEW = 'under_review'
-}
-export enum ToStatus {
-    DRAFT = 'draft',
-    ACTIVE = 'active',
-    SUSPENDED = 'suspended',
-    COMPLETED = 'completed',
-    CANCELLED = 'cancelled',
-    UNDER_REVIEW = 'under_review'
-}
 
 @Entity("contract_status_history")
 export class ContractStatusHistory extends BaseCustomEntity implements IContractStatusHistoryEntity {

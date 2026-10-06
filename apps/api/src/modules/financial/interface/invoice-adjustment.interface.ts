@@ -1,4 +1,4 @@
-import { InvoiceAdjustmentType } from "../entities/invoice-adjustment.entity"
+import { InvoiceAdjustmentType } from "@contractflow/contracts-schema"
 
 export interface IInvoiceAdjustmentEntity {
     invoiceId : string

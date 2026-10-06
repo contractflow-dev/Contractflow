@@ -4,31 +4,8 @@ import { Invoice } from "./invoice.entity";
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IPaymentEntity } from "../interface/payment.interface";
+import { PaymentMethod, PaymentStatus } from "@contractflow/contracts-schema";
 
-export enum PaymentMethod{
-    BANK_TRANSFER = 'bank_transfer',
-    CHEQUE = 'cheque',
-    CASH = 'cash',
-    CARD = 'card',
-    MOBILE_MONEY = 'mobile_money',
-    LETTER_OF_CREDIT = 'letter_of_credit',
-    ADVANCE = 'advance',
-    ESCROW = 'escrow',
-    OTHER = 'other'
-}
-export enum PaymentStatus{
-    PENDING = 'pending',
-    INITIATED = 'initiated',
-    PROCESSING = 'processing',
-    AUTHORIZED = 'authorized',
-    COMPLETED = 'completed',
-    PARTIALLY_PAID = 'partially_paid',
-    FAILED = 'failed',
-    REVERSED = 'reversed',
-    DISPUTED = 'disputed',
-    CANCELLED = 'cancelled',
-    HOLD = 'hold'
-}
 
 @Entity("payment")
 export class Payment extends BaseCustomEntity implements IPaymentEntity {

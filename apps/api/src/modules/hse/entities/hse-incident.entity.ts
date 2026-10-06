@@ -4,27 +4,8 @@ import { ContractSite } from "../../site-operations/entities/contract-site.entit
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IHseIncidentEntity } from "../interface/hse-incident.interface";
+import { HseIncidentStatus, HseIncidentType, HseSeverity } from "@contractflow/contracts-schema";
 
-
-export enum HseIncidentType{
-    ACCIDENT="accident",
-    NEAR_MISS="near_miss",
-    HAZARD="hazard",
-    ENVIRONMENTAL="environmental",
-    SECURITY="security",
-    OTHER="other"
-}
-export enum HseSeverity{
-    CRITICAL="critical",
-    MAJOR="major",
-    MINOR="minor",
-    NEGLIGIBLE="negligible"
-}
-export enum HseIncidentStatus{
-    OPEN="open",
-    IN_PROGRESS="in_progress",
-    CLOSED="closed"
-}
 
 
 @Entity("hse_incident")

@@ -7,45 +7,7 @@ import {
 import { Contract } from '../../contract/entities/contract.entity';
 import { BaseCustomEntity } from '../../cross-cutting/entities/base-custom.entity';
 import { IComplianceRequirementEntity } from '../interfaces/compliance-requirement.interface';
-
-export enum ComplianceCategory {
-  HSE = 'hse',
-  ENVIRONMENTAL = 'environmental',
-  PETROLEUM_LICENSING = 'petroleum_licensing',
-  TAX_AND_ROYALTY = 'tax_and_royalty',
-  LABOUR_AND_SAFETY = 'labour_and_safety',
-  LOCAL_CONTENT = 'local_content',
-  COMMUNITY_RELATIONS = 'community_relations',
-  SECURITY_AND_PROTECTION = 'security_and_protection',
-  INSURANCE_AND_INDEMNITY = 'insurance_and_indemnity',
-  FINANCIAL_REPORTING = 'financial_reporting',
-  ANTI_CORRUPTION = 'anti_corruption',
-  DATA_AND_REPORTING = 'data_and_reporting',
-}
-export enum AppliesToParty {
-  CONTRACTOR = 'contractor',
-  SUBCONTRACTOR = 'subcontractor',
-  SUPPLIER = 'supplier',
-  CONSULTANT = 'consultant',
-  OPERATOR = 'operator',
-  JV_PARTNER = 'jv_partner',
-  HOST_COMMUNITY = 'host_community',
-  REGULATOR = 'regulator',
-  INSURER = 'insurer',
-  ALL_PARTIES = 'all_parties',
-}
-
-export enum ComplianceFrequency {
-  ONCE = 'once',
-  DAILY = 'daily',
-  WEEKLY = 'weekly',
-  MONTHLY = 'monthly',
-  QUARTERLY = 'quarterly',
-  HALF_YEARLY = 'half_yearly',
-  YEARLY = 'yearly',
-  EVENT_BASED = 'event_based',
-  CONTINUOUS = 'continuous',
-}
+import { ComplianceCategory, AppliesToParty, ComplianceFrequency } from '@contractflow/contracts-schema';
 
 @Entity('compliance_requirement')
 export class ComplianceRequirement extends BaseCustomEntity implements IComplianceRequirementEntity{

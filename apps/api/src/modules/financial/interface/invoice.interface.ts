@@ -1,4 +1,4 @@
-import { InvoiceStatus, InvoiceType } from "../entities/invoice.entity"
+import { InvoiceStatus, InvoiceType } from "@contractflow/contracts-schema"
 
 export interface IInvoiceEntity {
     contractId : string
