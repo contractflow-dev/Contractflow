@@ -4,14 +4,11 @@ services:
     runtime: node
     rootDir: .
     healthCheckPath: /health
-
     buildCommand: |
       corepack enable
       pnpm install --frozen-lockfile
       pnpm --filter @contractflow/api build
-
     startCommand: pnpm --filter @contractflow/api start
-
     envVars:
             - key: NODE_VERSION
         value: 20.11.0
@@ -25,20 +22,16 @@ services:
         sync: false
             - key: CORS_ORIGIN
         sync: false
-
     - type: web
     name: contractflow-web
     runtime: node
     rootDir: .
     healthCheckPath: /
-
     buildCommand: |
       corepack enable
       pnpm install --frozen-lockfile
       pnpm --filter @contractflow/web build
-
     startCommand: pnpm --filter @contractflow/web start
-
     envVars:
             - key: NODE_VERSION
         value: 20.11.0
