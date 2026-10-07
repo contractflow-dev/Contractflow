@@ -1,18 +1,18 @@
-export enum ContractSiteStatus{
+export enum EContractSiteStatus{
     PLANNED = 'planned',
     ACTIVE = 'active',
     SUSPENDED = 'suspended',
     COMPLETED = 'completed',
     CLOSED = 'closed'
 }
-export enum TransactionType {
+export enum ETransactionType {
     RECEIPT = 'receipt',
     ISSUE = 'issue',
     ADJUSTMENT = 'adjustment',
     TRANSFER = 'transfer',
     RETURN = 'return'
 }
-export enum EquipmentCondition{
+export enum EEquipmentCondition{
     EXCELLENT = 'excellent',
     GOOD = 'good',
     FAIR = 'fair',
@@ -24,7 +24,7 @@ export enum EquipmentCondition{
     OPERATING = 'operating',
     STANDBY = 'standby'
 }
-export enum WeatherCondition {
+export enum EWeatherCondition {
     CLEAR = "clear",
     CLOUDY = "cloudy",
     PARTLY_CLOUDY = "partly_cloudy",
@@ -38,7 +38,7 @@ export enum WeatherCondition {
     SNOWY = "snowy",
     HAIL = "hail"
 }
-export enum SiteStatus {
+export enum ESiteStatus {
     ON_SCHEDULE = "on_schedule",
     AHEAD_OF_SCHEDULE = "ahead_of_schedule",
     BEHIND_SCHEDULE = "behind_schedule",

@@ -1,4 +1,4 @@
-export enum Status{
+export enum EStatus{
     PLANNED = 'planned',
     ACTIVE = 'active',
     IN_PROGRESS = 'in_progress',
@@ -7,7 +7,7 @@ export enum Status{
     DELAYED = 'delayed',
     CANCELLED = 'cancelled'
 }
-export enum ContractVariationType{
+export enum EContractVariationType{
     SCOPE_CHANGE = 'scope_change',
     TIME_EXTENSION = 'time_extension',
     COST_ADJUSTMENT = 'cost_adjustment',
@@ -21,7 +21,7 @@ export enum ContractVariationType{
     OTHER = 'other'
 }
 
-export enum ContractVariationStatus{
+export enum EContractVariationStatus{
     DRAFT = 'draft',
     SUBMITTED = 'submitted',
     UNDER_REVIEW = 'under_review',
@@ -33,7 +33,7 @@ export enum ContractVariationStatus{
     CANCELLED = 'cancelled',
     WITHDRAWN = 'withdrawn'
 }
-export enum MilestoneStatus{
+export enum EMilestoneStatus{
     PLANNED = 'planned',
     ACTIVE = 'active',
     IN_PROGRESS = 'in_progress',

@@ -1,4 +1,4 @@
-export enum InvoiceAdjustmentType{
+export enum EInvoiceAdjustmentType{
     VAT = 'vat',
     WITHHOLDING_TAX = 'withholding_tax',
     RETENTION = 'retention',
@@ -14,7 +14,7 @@ export enum InvoiceAdjustmentType{
     REVISION = 'revision',
     OTHER = 'other'
 }
-export enum InvoiceType{
+export enum EInvoiceType{
     INTERIM = 'interim',
     FINAL = 'final',
     ADVANCE = 'advance',
@@ -26,7 +26,7 @@ export enum InvoiceType{
     PROFORMA = 'proforma',
     MISCELLANEOUS = 'miscellaneous'
 }
-export enum InvoiceStatus{
+export enum EInvoiceStatus{
     DRAFT = 'draft',
     ISSUED = 'issued',
     SUBMITTED = 'submitted',
@@ -40,7 +40,7 @@ export enum InvoiceStatus{
     CANCELLED = 'cancelled',
     VOID = 'void'
 }
-export enum PaymentMethod{
+export enum EPaymentMethod{
     BANK_TRANSFER = 'bank_transfer',
     CHEQUE = 'cheque',
     CASH = 'cash',
@@ -51,7 +51,7 @@ export enum PaymentMethod{
     ESCROW = 'escrow',
     OTHER = 'other'
 }
-export enum PaymentStatus{
+export enum EPaymentStatus{
     PENDING = 'pending',
     INITIATED = 'initiated',
     PROCESSING = 'processing',

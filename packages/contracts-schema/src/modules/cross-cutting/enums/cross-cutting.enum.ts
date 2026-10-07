@@ -1,15 +1,15 @@
-export enum EntityType {
+export enum EEntityType {
   CONTRACT = 'contract',
   DOCUMENT = 'document',
   COMMENT = 'comment',
   OTHER = 'other',
 }
-export enum CommentVisibility {
+export enum ECommentVisibility {
   PUBLIC = 'public',
   PRIVATE = 'private',
 }
 
-export enum DocumentEntityType{
+export enum EDocumentEntityType{
     CERTIFICATE="certificate",  
     HSE="HSE",
     CONTRACT="contract",
@@ -17,7 +17,7 @@ export enum DocumentEntityType{
     REPORT="report",
     OTHER="other"
 }
-export enum DocumentCategory {
+export enum EDocumentCategory {
     CERTIFICATE="certificate",  
     HSE="HSE",
     CONTRACT="contract",
@@ -25,11 +25,11 @@ export enum DocumentCategory {
     REPORT="report",
     OTHER="other"
 }
-export enum DocumentVisibility{
+export enum EDocumentVisibility{
     PUBLIC="public",
     PRIVATE="private"
 }
-export enum DocumentStatus{
+export enum EDocumentStatus{
     VALID="Valid", 
     EXPIRING="Expiring", 
     EXPIRED="Expired",
@@ -37,23 +37,23 @@ export enum DocumentStatus{
     VERIFIED="Verified", 
     REJECTED="Rejected",
 }
-export enum NotificationChannel {
+export enum ENotificationChannel {
     PUSH = "push",
     SMS = "sms",
     EMAIL = "email"
 }
-export enum NotificationStatus{
+export enum ENotificationStatus{
     SENT = "sent",
     DELIVERED = "delivered",
     PENDING = "pending",
     FAILED = "failed",
     READ = "read"
 }
-export enum ConversationType {
+export enum EConversationType {
   COMMENT = 'comment',
   MESSAGE = 'message',
 }
-export enum ConversationWorkspace {
+export enum EConversationWorkspace {
     Project = 'project',
     Finance = 'finance',
     HSE = 'hse',
