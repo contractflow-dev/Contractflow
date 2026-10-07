@@ -1,28 +1,41 @@
 services:
     - type: web
-    name: contractflow-backend
-    env: node
-    plan: starter
-    branch: main
-    rootDir: ./backend
-    buildCommand: npm install && npm run build
-    startCommand: npm start
-    autoDeploy: true
+    name: contractflow-api
+    runtime: node
+    rootDir: .
+    healthCheckPath: /health
+    buildCommand: |
+      corepack enable
+      pnpm install --frozen-lockfile
+      pnpm --filter @contractflow/api build
+    startCommand: pnpm --filter @contractflow/api start
     envVars:
+            - key: NODE_VERSION
+        value: 20.11.0
             - key: NODE_ENV
         value: production
+            - key: PORT
+        value: 10000
             - key: DATABASE_URL
         sync: false
-
+            - key: JWT_SECRET
+        sync: false
+            - key: CORS_ORIGIN
+        sync: false
     - type: web
-    name: contractflow-frontend
-    env: static
-    plan: starter
-    branch: main
-    rootDir: ./frontend
-    buildCommand: npm install && npm run build
-    staticPublishPath: ./dist
-    autoDeploy: true
+    name: contractflow-web
+    runtime: node
+    rootDir: .
+    healthCheckPath: /
+    buildCommand: |
+      corepack enable
+      pnpm install --frozen-lockfile
+      pnpm --filter @contractflow/web build
+    startCommand: pnpm --filter @contractflow/web start
     envVars:
-            - key: VITE_API_URL
+            - key: NODE_VERSION
+        value: 20.11.0
+            - key: NODE_ENV
+        value: production
+            - key: NEXT_PUBLIC_API_URL
         sync: false
