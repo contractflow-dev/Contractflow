@@ -1,5 +1,5 @@
 
-export enum PartyType {
+export enum EPartyType {
   CLIENT = 'client',
   CONTRACTOR = 'contractor',
   SUBCONTRACTOR = 'subcontractor',
@@ -7,7 +7,7 @@ export enum PartyType {
   OTHER = 'other',
 }
 
-export enum ContractRole{
+export enum EContractRole{
     CONTRACTOR_PROJECT_LEAD = 'Contractor Project Lead',
     CONTRACTOR_SITE_SUPERVISOR = 'Contractor Site Supervisor',
     CLIENT_PROJECT_MANAGER = 'Client Project Manager',
@@ -17,7 +17,7 @@ export enum ContractRole{
     FINANCE_OFFICER = 'Finance Officer',
     FINANCE_DIRECTOR = 'Finance Director'
 }
-export enum FromStatus {
+export enum EFromStatus {
     DRAFT = 'draft',
     ACTIVE = 'active',
     SUSPENDED = 'suspended',
@@ -25,7 +25,7 @@ export enum FromStatus {
     CANCELLED = 'cancelled',
     UNDER_REVIEW = 'under_review'
 }
-export enum ToStatus {
+export enum EToStatus {
     DRAFT = 'draft',
     ACTIVE = 'active',
     SUSPENDED = 'suspended',
@@ -33,13 +33,13 @@ export enum ToStatus {
     CANCELLED = 'cancelled',
     UNDER_REVIEW = 'under_review'
 }
-export enum ContractType{
+export enum EContractType{
     SERVICE= 'service', 
     SUPPLY= 'supply', 
     EPC= 'epc', 
     MAINTENANCE= 'maintenance'
 }
-export enum ContractStatus{
+export enum EContractStatus{
     DRAFT= 'draft', 
     ACTIVE= 'active', 
     SUSPENDED= 'suspended', 

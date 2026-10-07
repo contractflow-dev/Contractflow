@@ -1,5 +1,5 @@
 
-export enum ComplianceRecordStatus {
+export enum EComplianceRecordStatus {
   PENDING = 'pending',
   ACTIVE = 'active',
   VALID = 'valid',
@@ -13,7 +13,7 @@ export enum ComplianceRecordStatus {
   CANCELLED = 'cancelled',
 }
 
-export enum ComplianceCategory {
+export enum EComplianceCategory {
   HSE = 'hse',
   ENVIRONMENTAL = 'environmental',
   PETROLEUM_LICENSING = 'petroleum_licensing',
@@ -28,7 +28,7 @@ export enum ComplianceCategory {
   DATA_AND_REPORTING = 'data_and_reporting',
 }
 
-export enum AppliesToParty {
+export enum EAppliesToParty {
   CONTRACTOR = 'contractor',
   SUBCONTRACTOR = 'subcontractor',
   SUPPLIER = 'supplier',
@@ -41,7 +41,7 @@ export enum AppliesToParty {
   ALL_PARTIES = 'all_parties',
 }
 
-export enum ComplianceFrequency {
+export enum EComplianceFrequency {
   ONCE = 'once',
   DAILY = 'daily',
   WEEKLY = 'weekly',

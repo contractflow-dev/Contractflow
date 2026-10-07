@@ -3,7 +3,7 @@ import {
     UpdateDateColumn, 
     PrimaryGeneratedColumn, 
     BeforeInsert} from "typeorm";
-import { ulid } from ulid
+import { ulid } from 'ulid'
 
 export abstract class BaseCustomEntity {
     @PrimaryGeneratedColumn("uuid", { name: "id" })
