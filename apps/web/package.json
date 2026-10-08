@@ -6,13 +6,16 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run"
   },
   "dependencies": {
+    "@contractflow/contracts-schema": "workspace:*",
+    "@reduxjs/toolkit": "^2.13.0",
     "next": "16.3.7",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "@contractflow/contracts-schema": "workspace:*"
+    "react-redux": "^9.3.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
