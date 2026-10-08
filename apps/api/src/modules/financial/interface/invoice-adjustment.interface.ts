@@ -1,8 +1,8 @@
-import { InvoiceAdjustmentType } from "@contractflow/contracts-schema"
+import { EInvoiceAdjustmentType } from "@contractflow/contracts-schema"
 
 export interface IInvoiceAdjustmentEntity {
     invoiceId : string
-    adjustmentType : InvoiceAdjustmentType
+    adjustmentType : EInvoiceAdjustmentType
     description : string
     rateBps : number
     baseAmountMinor : number

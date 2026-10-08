@@ -2,7 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from "t
 import { Document } from "./document.entity";
 import { BaseCustomEntity } from "./base-custom.entity";
 import { IDocumentLinkEntity } from "../interfaces/document-link.interface";
-import { DocumentEntityType } from "@contractflow/contracts-schema";
+import { EDocumentEntityType } from "@contractflow/contracts-schema";
 
 
 @Entity("document_link")
@@ -14,8 +14,8 @@ export class DocumentLink extends BaseCustomEntity implements IDocumentLinkEntit
     @JoinColumn({name:"document_id", referencedColumnName: "id"})
     document!: Document
 
-    @Column({name: "entity_type", type:"enum", enum: DocumentEntityType})
-    entityType!: DocumentEntityType
+    @Column({name: "entity_type", type:"enum", enum: EDocumentEntityType})
+    entityType!: EDocumentEntityType
 
     @Column({name: "entity_id", type:"uuid"})
     entityId!: string

@@ -1,12 +1,12 @@
-import { AppliesToParty, ComplianceCategory, ComplianceFrequency } from "@contractflow/contracts-schema"
+import { EAppliesToParty, EComplianceCategory, EComplianceFrequency } from "@contractflow/contracts-schema"
 
 export interface IComplianceRequirementEntity {
     contractId : string
     name : string
     description : string
-    category : ComplianceCategory
-    appliesToPartyType : AppliesToParty
+    category : EComplianceCategory
+    appliesToPartyType : EAppliesToParty
     isMandatory : boolean
-    frequency : ComplianceFrequency
+    frequency : EComplianceFrequency
     firstDueDate : Date
 }

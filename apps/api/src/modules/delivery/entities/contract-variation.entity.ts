@@ -4,7 +4,7 @@ import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { ContractParty } from "../../contract/entities/contract-party.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IContractVariationEntity } from "../interface/contract-variation.interface";
-import { ContractVariationType, ContractVariationStatus } from "@contractflow/contracts-schema";
+import { EContractVariationType, EContractVariationStatus } from "@contractflow/contracts-schema";
 
 
 
@@ -32,11 +32,11 @@ export class ContractVariation extends BaseCustomEntity implements IContractVari
     @Column({name: "description", type: "text"})
     description!: string
 
-    @Column({name: "variation_type", type: "enum", enum: ContractVariationType})
-    variationType!: ContractVariationType
+    @Column({name: "variation_type", type: "enum", enum: EContractVariationType})
+    variationType!: EContractVariationType
 
-    @Column({name: "status", type: "enum", enum: ContractVariationStatus})
-    status!: ContractVariationStatus
+    @Column({name: "status", type: "enum", enum: EContractVariationStatus})
+    status!: EContractVariationStatus
 
     @Column({name: "amount_delta_minor", type: "bigint"})
     amountDeltaMinor!: number

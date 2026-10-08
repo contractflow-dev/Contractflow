@@ -1,12 +1,12 @@
-import { InvoiceStatus, InvoiceType } from "@contractflow/contracts-schema"
+import { EInvoiceStatus, EInvoiceType } from "@contractflow/contracts-schema"
 
 export interface IInvoiceEntity {
     contractId : string
     issuedByPartyId : string
     billedToPartyId : string
     invoiceNumber : string
-    invoiceType : InvoiceType
-    status : InvoiceStatus
+    invoiceType : EInvoiceType
+    status : EInvoiceStatus
     issueDate : Date
     dueDate : Date
     periodStart : Date
