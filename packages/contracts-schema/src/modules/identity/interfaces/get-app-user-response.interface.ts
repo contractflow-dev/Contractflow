@@ -1,11 +1,11 @@
-import type { UserStatus } from "../enums/identity.enum.js";
+import type { EUserStatus } from "../enums/identity.enum.js";
 
 export interface IGetAppUserResponse {
   email: string;
   firstName: string;
   middleName: string;
   lastName: string;
-  status: UserStatus;
+  status: EUserStatus;
   timezone: string;
   emailVerifiedAt: Date;
   lastLoginAt: Date;
