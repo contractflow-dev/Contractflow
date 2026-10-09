@@ -13,7 +13,7 @@ export class AppUserController {
   @Get('me')
   getMyProfile(
     @Query() query: GetAppUserDto,
-    @CurrentUser() user: { id: string },
+    user: { id: string },
   ): Promise<IGetAppUserResponse> {
     return this.appUserService.findById(query.id);
   }
