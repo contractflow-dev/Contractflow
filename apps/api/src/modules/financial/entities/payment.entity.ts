@@ -4,7 +4,7 @@ import { Invoice } from "./invoice.entity";
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IPaymentEntity } from "../interface/payment.interface";
-import { PaymentMethod, PaymentStatus } from "@contractflow/contracts-schema";
+import { EPaymentMethod, EPaymentStatus } from "@contractflow/contracts-schema";
 
 
 @Entity("payment")
@@ -52,11 +52,11 @@ export class Payment extends BaseCustomEntity implements IPaymentEntity {
     @Column({name: "fx_rate_at", type: "timestamptz"})
     fxRateAt!: Date
 
-    @Column({name: "payment_method", type: "enum", enum: PaymentMethod})
-    paymentMethod!: PaymentMethod
+    @Column({name: "payment_method", type: "enum", enum: EPaymentMethod})
+    paymentMethod!: EPaymentMethod
 
-    @Column({name: "status", type: "enum", enum: PaymentStatus})
-    status!: PaymentStatus
+    @Column({name: "status", type: "enum", enum: EPaymentStatus})
+    status!: EPaymentStatus
 
     @Column({name: "payment_date", type: "date"})
     paymentDate!: Date

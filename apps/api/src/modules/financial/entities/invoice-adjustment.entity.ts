@@ -2,7 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from "t
 import { Invoice } from "./invoice.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IInvoiceAdjustmentEntity } from "../interface/invoice-adjustment.interface";
-import { InvoiceAdjustmentType } from "@contractflow/contracts-schema"
+import { EInvoiceAdjustmentType } from "@contractflow/contracts-schema"
 
 
 @Entity("invoice_adjustment")
@@ -14,8 +14,8 @@ export class InvoiceAdjustment extends BaseCustomEntity implements IInvoiceAdjus
     @JoinColumn({name: "invoice_id", referencedColumnName: "id"})
     invoice!: Invoice
 
-    @Column({name: "adjustment_type", type: "enum", enum: InvoiceAdjustmentType})
-    adjustmentType!: InvoiceAdjustmentType
+    @Column({name: "adjustment_type", type: "enum", enum: EInvoiceAdjustmentType})
+    adjustmentType!: EInvoiceAdjustmentType
 
     @Column({name: "description", type: "varchar", length: 255})
     description!: string

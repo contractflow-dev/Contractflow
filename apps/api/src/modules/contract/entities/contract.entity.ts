@@ -1,7 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from "typeorm";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IContractEntity } from "../interfaces/contract.interface";
-import { ContractStatus, ContractType } from "@contractflow/contracts-schema";
+import { EContractStatus, EContractType } from "@contractflow/contracts-schema";
 
 
 @Entity("contract")
@@ -16,11 +16,11 @@ export class Contract extends BaseCustomEntity implements IContractEntity {
     @Column({name: "description", type: "text"})
     description!: string
 
-    @Column({name: "contract_type", type:"enum", enum: ContractType})
-    contractType!: ContractType
+    @Column({name: "contract_type", type:"enum", enum: EContractType})
+    contractType!: EContractType
 
-    @Column({name: "status", type:"enum", enum: ContractStatus})
-    status!: ContractStatus
+    @Column({name: "status", type:"enum", enum: EContractStatus})
+    status!: EContractStatus
     
     @Column({name: "parent_contract_id", type:"varchar", length: 26, nullable:true})
     parentContractId!: string

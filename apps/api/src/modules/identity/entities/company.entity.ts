@@ -1,7 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column } from "typeorm";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { ICompanyEntity } from "../interface/company.interface";
-import { CompanyStatus } from "@contractflow/contracts-schema";
+import { ECompanyStatus } from "@contractflow/contracts-schema";
 
 
 @Entity("company")
@@ -49,8 +49,8 @@ export class Company extends BaseCustomEntity implements ICompanyEntity{
     @Column({name: "default_currency_code", type: "char", length:3})
     defaultCurrencyCode!: string
 
-    @Column({name: "status", type:"enum", enum: CompanyStatus})
-    status!: CompanyStatus
+    @Column({name: "status", type:"enum", enum: ECompanyStatus})
+    status!: ECompanyStatus
 
     @Column({name: "verified_at", type: "timestamptz"})
     verifiedAt!: Date

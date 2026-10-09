@@ -1,11 +1,11 @@
-import { ContractStatus, ContractType } from "@contractflow/contracts-schema"
+import { EContractStatus, EContractType } from "@contractflow/contracts-schema"
 
 export interface IContractEntity {
     referenceNumber : string
     title : string
     description : string
-    contractType : ContractType
-    status : ContractStatus
+    contractType : EContractType
+    status : EContractStatus
     parentContractId : string
     originalValueMinor : Number
     currentValueMinor : number

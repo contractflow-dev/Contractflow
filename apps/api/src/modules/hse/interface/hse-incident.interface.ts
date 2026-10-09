@@ -1,12 +1,12 @@
-import { HseIncidentStatus, HseIncidentType, HseSeverity } from "@contractflow/contracts-schema"
+import { EHseIncidentStatus, EHseIncidentType, EHseSeverity } from "@contractflow/contracts-schema"
 
 export interface IHseIncidentEntity {
     contractId : string
     contractSiteId : string
     referenceNumber : string
-    incidentType : HseIncidentType
-    severity : HseSeverity
-    status : HseIncidentStatus
+    incidentType : EHseIncidentType
+    severity : EHseSeverity
+    status : EHseIncidentStatus
     occurredAt : Date
     locationDetail : string
     description : string

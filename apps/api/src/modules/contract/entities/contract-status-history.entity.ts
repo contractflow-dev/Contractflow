@@ -3,7 +3,7 @@ import { Contract } from "./contract.entity";
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IContractStatusHistoryEntity } from "../interfaces/contract-status-history.interface";
-import { FromStatus, ToStatus } from "@contractflow/contracts-schema";
+import { EFromStatus, EToStatus } from "@contractflow/contracts-schema";
 
 
 
@@ -16,11 +16,11 @@ export class ContractStatusHistory extends BaseCustomEntity implements IContract
     @JoinColumn({name:"contract_id", referencedColumnName: "id"})
     contract!: Contract
 
-    @Column({name: "from_status", type: "enum", enum: FromStatus})
-    fromStatus!: FromStatus
+    @Column({name: "from_status", type: "enum", enum: EFromStatus})
+    fromStatus!: EFromStatus
 
-    @Column({name: "to_status", type: "enum", enum: ToStatus})
-    toStatus!: ToStatus
+    @Column({name: "to_status", type: "enum", enum: EToStatus})
+    toStatus!: EToStatus
 
     @Column({name: "reason", type: "text"})
     reason!: string

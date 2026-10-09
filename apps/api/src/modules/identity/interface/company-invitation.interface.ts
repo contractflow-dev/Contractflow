@@ -1,4 +1,4 @@
-import { InvitationRole, InvitationStatus } from "@contractflow/contracts-schema"
+import { EInvitationRole, EInvitationStatus } from "@contractflow/contracts-schema"
 
 export interface ICompanyInvitationEntity {
     companyId : string
@@ -6,9 +6,9 @@ export interface ICompanyInvitationEntity {
     email : string
     firstName : string
     lastName : string
-    companyRole : InvitationRole
+    companyRole : EInvitationRole
     tokenHash : string
-    status : InvitationStatus
+    status : EInvitationStatus
     expiresAt : Date
     acceptedAt : Date
 }

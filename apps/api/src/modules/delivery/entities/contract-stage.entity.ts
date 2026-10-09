@@ -2,7 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from "t
 import { Contract } from "../../contract/entities/contract.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IContractStageEntity } from "../interface/contract-stage.interface";
-import { Status } from "@contractflow/contracts-schema";
+import { EStatus } from "@contractflow/contracts-schema";
 
 
 
@@ -25,8 +25,8 @@ export class ContractStage extends BaseCustomEntity implements IContractStageEnt
     @Column({name: "sequence", type: "int"})
     sequence!: string
 
-    @Column({name: "status", type: "enum", enum: Status})
-    status!: Status
+    @Column({name: "status", type: "enum", enum: EStatus})
+    status!: EStatus
 
     @Column({name:"weight_bps", type: "int"})
     weightBps!: number

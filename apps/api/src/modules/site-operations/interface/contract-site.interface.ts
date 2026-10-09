@@ -1,4 +1,4 @@
-import { ContractSiteStatus } from "@contractflow/contracts-schema"
+import { EContractSiteStatus } from "@contractflow/contracts-schema"
 
 export interface IContractSiteEntity {
     contractId : string
@@ -10,5 +10,5 @@ export interface IContractSiteEntity {
     countryCode : string
     latitudeE6 : number
     longitudeE6 : number
-    status : ContractSiteStatus
+    status : EContractSiteStatus
 }

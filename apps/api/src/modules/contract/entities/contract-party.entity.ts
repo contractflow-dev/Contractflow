@@ -8,7 +8,7 @@ import { Contract } from './contract.entity';
 import { Company } from '../../identity/entities/company.entity';
 import { BaseCustomEntity } from '../../cross-cutting/entities/base-custom.entity';
 import { IContractPartyEntity } from '../interfaces/contract-party.interface';
-import { PartyType } from '@contractflow/contracts-schema';
+import { EPartyType } from '@contractflow/contracts-schema';
 
 @Entity('contract_party')
 export class ContractParty extends BaseCustomEntity implements IContractPartyEntity
@@ -25,8 +25,8 @@ export class ContractParty extends BaseCustomEntity implements IContractPartyEnt
   @JoinColumn({ name: 'company_id', referencedColumnName: 'id' })
   company!: Company;
 
-  @Column({ name: 'party_type', type: 'enum', enum: PartyType })
-  partyType!: PartyType;
+  @Column({ name: 'party_type', type: 'enum', enum: EPartyType })
+  partyType!: EPartyType;
 
   @Column({ name: 'signatory_first_name', type: 'varchar', length: 100 })
   signatoryFirstName!: string;
