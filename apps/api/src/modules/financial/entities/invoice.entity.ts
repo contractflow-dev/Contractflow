@@ -4,7 +4,7 @@ import { ContractParty } from "../../contract/entities/contract-party.entity";
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IInvoiceEntity } from "../interface/invoice.interface";
-import { InvoiceStatus, InvoiceType } from "@contractflow/contracts-schema";
+import { EInvoiceStatus, EInvoiceType } from "@contractflow/contracts-schema";
 
 
 
@@ -32,11 +32,11 @@ export class Invoice extends BaseCustomEntity implements IInvoiceEntity{
     @Column({name: "invoice_number", type: "varchar", length: 40})
     invoiceNumber!: string
 
-    @Column({name: "invoice_type", type: "enum", enum: InvoiceType})
-    invoiceType!: InvoiceType
+    @Column({name: "invoice_type", type: "enum", enum: EInvoiceType})
+    invoiceType!: EInvoiceType
 
-    @Column({name: "status", type: "enum", enum: InvoiceStatus})
-    status!: InvoiceStatus
+    @Column({name: "status", type: "enum", enum: EInvoiceStatus})
+    status!: EInvoiceStatus
 
     @Column({name: "issue_date", type: "date"})
     issueDate!: Date

@@ -1,9 +1,9 @@
-import { FromStatus, ToStatus } from "@contractflow/contracts-schema"
+import { EFromStatus, EToStatus } from "@contractflow/contracts-schema"
 
 export interface IContractStatusHistoryEntity {
     contractId : string
-    fromStatus : FromStatus
-    toStatus : ToStatus
+    fromStatus : EFromStatus
+    toStatus : EToStatus
     reason : string
     changedById : string
     changedAt : Date

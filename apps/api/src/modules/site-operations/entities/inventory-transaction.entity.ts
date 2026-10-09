@@ -5,7 +5,7 @@ import { SiteDailyLog } from "./site-daily-log.entity";
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IInventoryTransactionEntity } from "../interface/inventory-transaction.interface";
-import { TransactionType } from "@contractflow/contracts-schema";
+import { ETransactionType } from "@contractflow/contracts-schema";
 
 
 @Entity("inventory_transaction")
@@ -29,8 +29,8 @@ export class InventoryTransaction extends BaseCustomEntity implements IInventory
     @JoinColumn({name: "site_daily_log_id", referencedColumnName: "id"})
     siteDailyLog!: SiteDailyLog
 
-    @Column({name: "transaction_type", type: "enum", enum: TransactionType})
-    transactionType!: TransactionType
+    @Column({name: "transaction_type", type: "enum", enum: ETransactionType})
+    transactionType!: ETransactionType
 
     @Column({name: "quantity_milli", type: "bigint"})
     quantityMilli!: number

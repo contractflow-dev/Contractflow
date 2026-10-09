@@ -3,7 +3,7 @@ import { Company } from "./company.entity";
 import { User } from "./app-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { ICompanyUserEntity } from "../interface/company-user.interface";
-import { CompanyRole, CompanyUserStatus } from "@contractflow/contracts-schema";
+import { ECompanyRole, ECompanyUserStatus } from "@contractflow/contracts-schema";
 
 
 
@@ -24,14 +24,14 @@ export class CompanyUser extends BaseCustomEntity implements ICompanyUserEntity{
     @JoinColumn({name: "user_id", referencedColumnName: "id"})
     user!: User
 
-    @Column({name: "company_role", type: "enum", enum: CompanyRole})
-    companyRole!: CompanyRole
+    @Column({name: "company_role", type: "enum", enum: ECompanyRole})
+    companyRole!: ECompanyRole
 
     @Column({name: "job_title", type: "varchar", length: 150})
     jobTitle!: string
 
-    @Column({name: "status", type: "enum", enum: CompanyUserStatus})
-    status!: CompanyUserStatus
+    @Column({name: "status", type: "enum", enum: ECompanyUserStatus})
+    status!: ECompanyUserStatus
 
     @Column({name: "joined_at", type: "timestamptz"})
     joinedAt!: Date

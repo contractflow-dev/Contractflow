@@ -3,7 +3,7 @@ import { User } from "../../identity/entities/app-user.entity";
 import { Contract } from "../../contract/entities/contract.entity";
 import { BaseCustomEntity } from "./base-custom.entity";
 import { INotificationEntity } from "../interfaces/notification.interface";
-import { NotificationChannel, NotificationStatus } from "@contractflow/contracts-schema";
+import { ENotificationChannel, ENotificationStatus } from "@contractflow/contracts-schema";
 
 
 
@@ -39,11 +39,11 @@ export class Notification extends BaseCustomEntity implements INotificationEntit
     @Column({name: "entity_id",type: "uuid"})
     entityId!: string
 
-    @Column({name: "channel", type: "enum", enum: NotificationChannel})
-    channel!: NotificationChannel
+    @Column({name: "channel", type: "enum", enum: ENotificationChannel})
+    channel!: ENotificationChannel
     
-    @Column({name: "status", type: "enum", enum: NotificationStatus, default: NotificationStatus.PENDING})
-    status!: NotificationStatus
+    @Column({name: "status", type: "enum", enum: ENotificationStatus, default: ENotificationStatus.PENDING})
+    status!: ENotificationStatus
 
     @Column({name: "sent_at", type:"timestamptz"})
     sentAt!: Date

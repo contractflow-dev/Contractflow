@@ -1,11 +1,11 @@
-import { MilestoneStatus } from "@contractflow/contracts-schema"
+import { EMilestoneStatus } from "@contractflow/contracts-schema"
 export interface IMilestoneEntity {
     contractId : string
     contractStageId : string
     title : string
     description : string    
     sequence : number
-    status : MilestoneStatus
+    status : EMilestoneStatus
     progressBps : number
     weightBps : number
     isPaymentMilestone : boolean

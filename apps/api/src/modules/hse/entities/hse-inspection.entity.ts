@@ -4,7 +4,7 @@ import { ContractSite } from "../../site-operations/entities/contract-site.entit
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IHseInspectionEntity } from "../interface/hse-inspection.interface";
-import { HseInspectionStatus, HseInspectionType, HseOverallResult } from "@contractflow/contracts-schema";
+import { EHseInspectionStatus, EHseInspectionType, EHseOverallResult } from "@contractflow/contracts-schema";
 
 
 
@@ -32,11 +32,11 @@ export class HseInspection extends BaseCustomEntity implements IHseInspectionEnt
     @Column({name: "reference_number", type:"varchar", length:40})
     referenceNumber!: string
 
-    @Column({name: "inspection_type", type:"enum", enum: HseInspectionType})
-    inspectionType!: HseInspectionType
+    @Column({name: "inspection_type", type:"enum", enum: EHseInspectionType})
+    inspectionType!: EHseInspectionType
 
-    @Column({name: "status", type:"enum", enum: HseInspectionStatus})
-    status!: HseInspectionStatus
+    @Column({name: "status", type:"enum", enum: EHseInspectionStatus})
+    status!: EHseInspectionStatus
 
     @Column({name: "scheduled_date", type:"date"})
     scheduledDate!: Date
@@ -53,8 +53,8 @@ export class HseInspection extends BaseCustomEntity implements IHseInspectionEnt
     @Column({name: "external_inspector_organization", type:"varchar", length:255})
     externalInspectorOrganization!: string
 
-    @Column({name: "overall_result", type:"enum", enum: HseOverallResult})
-    overallResult!: HseOverallResult
+    @Column({name: "overall_result", type:"enum", enum: EHseOverallResult})
+    overallResult!: EHseOverallResult
 
     @Column({name: "score_bps", type:"int"})
     scoreBps!: number

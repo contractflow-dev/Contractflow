@@ -1,4 +1,4 @@
-import { ComplianceRecordStatus } from "@contractflow/contracts-schema"
+import { EComplianceRecordStatus } from "@contractflow/contracts-schema"
 
 export interface IComplianceRecordEntity {
     contractId : string
@@ -10,7 +10,7 @@ export interface IComplianceRecordEntity {
     expiryDate : Date
     coveredAmountMinor : number
     currencyCode : string
-    status : ComplianceRecordStatus
+    status : EComplianceRecordStatus
     verifiedAt : Date
     verifiedById : string
     remarks : string

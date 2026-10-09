@@ -1,8 +1,8 @@
-import { DocumentEntityType } from "@contractflow/contracts-schema"
+import { EDocumentEntityType } from "@contractflow/contracts-schema"
 
 export interface IDocumentLinkEntity {
     documentId : string
-    entityType : DocumentEntityType
+    entityType : EDocumentEntityType
     entityId : string
     caption : string
 }

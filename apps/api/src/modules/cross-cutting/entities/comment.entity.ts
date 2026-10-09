@@ -8,7 +8,7 @@ import { Contract } from '../../contract/entities/contract.entity';
 import { CompanyUser } from '../../identity/entities/company-user.entity';
 import { BaseCustomEntity } from './base-custom.entity';
 import { ICommentEntity } from '../interfaces/comment.interface';
-import { EntityType, CommentVisibility } from '@contractflow/contracts-schema';
+import { EEntityType, ECommentVisibility } from '@contractflow/contracts-schema';
 
 
 @Entity('comment')
@@ -31,8 +31,8 @@ export class Comment extends BaseCustomEntity implements ICommentEntity{
   @JoinColumn({ name: 'parent_comment_id', referencedColumnName: 'id' })
   comment!: Comment;
 
-  @Column({ name: 'entity_type', type: 'enum', enum: EntityType })
-  entityType!: EntityType;
+  @Column({ name: 'entity_type', type: 'enum', enum: EEntityType })
+  entityType!: EEntityType;
 
   @Column({ name: 'entity_id', type: 'uuid' })
   entityId!: string;
@@ -40,6 +40,6 @@ export class Comment extends BaseCustomEntity implements ICommentEntity{
   @Column({ name: 'body', type: 'varchar' })
   body!: string;
 
-  @Column({ name: 'visibility', type: 'enum', enum: CommentVisibility })
-  visibility!: CommentVisibility;
+  @Column({ name: 'visibility', type: 'enum', enum: ECommentVisibility })
+  visibility!: ECommentVisibility;
 }

@@ -3,7 +3,7 @@ import { Contract } from "../../contract/entities/contract.entity";
 import { Company } from "../../identity/entities/company.entity";
 import { BaseCustomEntity } from "./base-custom.entity";
 import { IDocumentEntity } from "../interfaces/document.interface";
-import { DocumentCategory, DocumentStatus, DocumentVisibility } from "@contractflow/contracts-schema";
+import { EDocumentCategory, EDocumentStatus, EDocumentVisibility } from "@contractflow/contracts-schema";
 
 
 @Entity("document")
@@ -27,12 +27,12 @@ export class Document extends BaseCustomEntity implements IDocumentEntity {
     @Column({name: "document_number", type:"varchar", length:60})
     documentNumber!: string
 
-    @Column({name: "category", type:"enum", enum: DocumentCategory})
-    category!: DocumentCategory
+    @Column({name: "category", type:"enum", enum: EDocumentCategory})
+    category!: EDocumentCategory
 
-    @Column({name: "visibility", type:"enum", enum: DocumentVisibility})
-    visibility!: DocumentVisibility
+    @Column({name: "visibility", type:"enum", enum: EDocumentVisibility})
+    visibility!: EDocumentVisibility
 
-    @Column({name: "status", type:"enum", enum: DocumentStatus})
-    status!: DocumentStatus
+    @Column({name: "status", type:"enum", enum: EDocumentStatus})
+    status!: EDocumentStatus
 }

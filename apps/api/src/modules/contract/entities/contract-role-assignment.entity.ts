@@ -4,7 +4,7 @@ import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { Company } from "../../identity/entities/company.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IContractRoleAssignmentEntity } from "../interfaces/contract-role-assignment.interface";
-import { ContractRole } from "@contractflow/contracts-schema";
+import { EContractRole } from "@contractflow/contracts-schema";
 
 
 @Entity("contract_role_assignment")
@@ -30,8 +30,8 @@ export class ContractRoleAssignment extends BaseCustomEntity implements IContrac
     @JoinColumn({name:"company_id", referencedColumnName:"id"})
     company!: Company
 
-    @Column({name: "contract_role", type: "enum", enum: ContractRole})
-    role!: ContractRole
+    @Column({name: "contract_role", type: "enum", enum: EContractRole})
+    role!: EContractRole
 
     @Column({name: "assigned_at", type: "timestamptz"})
     assignedAt!: Date

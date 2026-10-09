@@ -10,7 +10,7 @@ import { ContractParty } from '../../contract/entities/contract-party.entity';
 import { CompanyUser } from '../../identity/entities/company-user.entity';
 import { BaseCustomEntity } from '../../cross-cutting/entities/base-custom.entity';
 import { IComplianceRecordEntity } from '../interfaces/compliance-record.interface';
-import { ComplianceRecordStatus } from '@contractflow/contracts-schema';
+import { EComplianceRecordStatus } from '@contractflow/contracts-schema';
 
 @Entity('compliance_record')
 export class ComplianceRecord extends BaseCustomEntity implements IComplianceRecordEntity{
@@ -50,8 +50,8 @@ export class ComplianceRecord extends BaseCustomEntity implements IComplianceRec
   @Column({ name: 'currency_code', type: 'char', length: 3 })
   currencyCode!: string;
 
-  @Column({ name: 'status', type: 'enum', enum: ComplianceRecordStatus })
-  status!: ComplianceRecordStatus;
+  @Column({ name: 'status', type: 'enum', enum: EComplianceRecordStatus })
+  status!: EComplianceRecordStatus;
 
   @Column({ name: 'verified_at', type: 'timestamptz' })
   verifiedAt!: Date;

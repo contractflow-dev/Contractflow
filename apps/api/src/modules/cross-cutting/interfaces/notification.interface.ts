@@ -1,4 +1,4 @@
-import { NotificationChannel, NotificationStatus } from "@contractflow/contracts-schema"
+import { ENotificationChannel, ENotificationStatus } from "@contractflow/contracts-schema"
 
 export interface INotificationEntity {
     recipientUserId : string
@@ -8,8 +8,8 @@ export interface INotificationEntity {
     body : string
     entityType : string
     entityId : string
-    channel : NotificationChannel
-    status : NotificationStatus
+    channel : ENotificationChannel
+    status : ENotificationStatus
     sentAt : Date
     readAt : Date
 }

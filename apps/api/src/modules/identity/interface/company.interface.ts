@@ -1,4 +1,4 @@
-import { CompanyStatus } from "@contractflow/contracts-schema"
+import { ECompanyStatus } from "@contractflow/contracts-schema"
 
 export interface ICompanyEntity {
     name : string
@@ -15,6 +15,6 @@ export interface ICompanyEntity {
     postalCode : string
     countryCode : string
     defaultCurrencyCode : string
-    status : CompanyStatus
+    status : ECompanyStatus
     verifiedAt : Date
 }

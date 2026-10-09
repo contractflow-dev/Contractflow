@@ -1,4 +1,4 @@
-import { HseActionStatus, HseCorrectiveActionPriority } from "@contractflow/contracts-schema"
+import { EHseActionStatus, EHseCorrectiveActionPriority } from "@contractflow/contracts-schema"
 
 export interface IHseCorrectiveActionEntity {
     contractId : string
@@ -6,8 +6,8 @@ export interface IHseCorrectiveActionEntity {
     hseInspectionFindingId : string
     assignedToCompanyUserId : string
     description : string
-    priority : HseCorrectiveActionPriority
-    status : HseActionStatus
+    priority : EHseCorrectiveActionPriority
+    status : EHseActionStatus
     dueDate : Date
     completedAt : Date
     verifiedAt : Date

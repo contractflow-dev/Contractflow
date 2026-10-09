@@ -1,9 +1,9 @@
-import { PartyType } from '@contractflow/contracts-schema';
+import { EPartyType } from '@contractflow/contracts-schema';
 
 export interface IContractPartyEntity {
   contractId: string;
   companyId: string;
-  partyType: PartyType;
+  partyType: EPartyType;
   signatoryFirstName: string;
   signatoryLastName: string;
   signatoryTitle: string;

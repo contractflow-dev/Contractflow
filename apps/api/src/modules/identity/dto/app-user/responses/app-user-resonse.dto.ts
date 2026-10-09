@@ -1,6 +1,6 @@
 import {
   IGetAppUserResponse,
-  UserStatus,
+  EUserStatus,
 } from '@contractflow/contracts-schema';
 import { AppUser } from '../../../entities/app-user.entity';
 
@@ -12,7 +12,7 @@ export class AppUserResponseDto implements IGetAppUserResponse {
   middleName: string;
   phoneNumber: string;
   timezone: string;
-  status: UserStatus;
+  status: EUserStatus;
   createdAt: Date;
   updatedAt: Date;
   emailVerifiedAt: Date;

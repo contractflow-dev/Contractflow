@@ -2,7 +2,7 @@ import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from "t
 import { Contract } from "../../contract/entities/contract.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IContractSiteEntity } from "../interface/contract-site.interface";
-import { ContractSiteStatus } from "@contractflow/contracts-schema";
+import { EContractSiteStatus } from "@contractflow/contracts-schema";
 
 
 @Entity("contract_site")
@@ -39,6 +39,6 @@ export class ContractSite extends BaseCustomEntity implements IContractSiteEntit
     @Column({name: "longitude_e6", type: "int"})
     longitudeE6!: number
 
-    @Column({name:"status", type: "enum", enum: ContractSiteStatus})
-    status!: ContractSiteStatus
+    @Column({name:"status", type: "enum", enum: EContractSiteStatus})
+    status!: EContractSiteStatus
 }

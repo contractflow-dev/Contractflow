@@ -1,18 +1,18 @@
-import { HseInspectionStatus, HseInspectionType, HseOverallResult } from "@contractflow/contracts-schema"
+import { EHseInspectionStatus, EHseInspectionType, EHseOverallResult } from "@contractflow/contracts-schema"
 
 export interface IHseInspectionEntity {
     contractId : string
     contractSiteId : string
     inspectorCompanyUserId : string
     referenceNumber : string
-    inspectionType : HseInspectionType
-    status : HseInspectionStatus
+    inspectionType : EHseInspectionType
+    status : EHseInspectionStatus
     scheduledDate : Date
     conductedAt : Date
     externalInspectorFirstName : string
     externalInspectorLastName : string
     externalInspectorOrganization : string
-    overallResult : HseOverallResult
+    overallResult : EHseOverallResult
     scoreBps : number
     summary : string
 }

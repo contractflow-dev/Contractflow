@@ -1,4 +1,4 @@
-import { PaymentMethod, PaymentStatus } from "@contractflow/contracts-schema"
+import { EPaymentMethod, EPaymentStatus } from "@contractflow/contracts-schema"
 
 export interface IPaymentEntity {
     contractId : string
@@ -13,8 +13,8 @@ export interface IPaymentEntity {
     fxRateMicro : number
     fxRateSource : string
     fxRateAt : Date
-    paymentMethod : PaymentMethod
-    status : PaymentStatus
+    paymentMethod : EPaymentMethod
+    status : EPaymentStatus
     paymentDate : Date
     externalReference : string
     recordedAt : Date

@@ -2,7 +2,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, BaseEntity } from 'typeorm';
 import { BaseCustomEntity } from '../../cross-cutting/entities/base-custom.entity';
 import { IAppUserEntity } from '../interface/app-user.interface';
-import { UserStatus } from '@contractflow/contracts-schema';
+import { EUserStatus } from '@contractflow/contracts-schema';
 
 @Entity('app_user')
 export class AppUser extends BaseCustomEntity implements IAppUserEntity {
@@ -32,10 +32,10 @@ export class AppUser extends BaseCustomEntity implements IAppUserEntity {
   @Column({
     name: 'status',
     type: 'enum',
-    enum: UserStatus,
-    default: UserStatus.ACTIVE,
+    enum: EUserStatus,
+    default: EUserStatus.ACTIVE,
   })
-  status!: UserStatus;
+  status!: EUserStatus;
 
   @Column({ name: 'is_platform_admin', type: 'boolean' })
   isPlatformAdmin!: boolean;
