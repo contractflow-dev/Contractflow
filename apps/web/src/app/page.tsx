@@ -1,13 +1,13 @@
-import type { UserDto } from "@contractflow/contracts-schema";
-import { api } from "./lib/api";
+import type { UserProfile } from "@/services/authApi";
+import { api } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  let users: UserDto[] = [];
+  let users: UserProfile[] = [];
   let error: string | null = null;
   try {
-    users = await api<UserDto[]>("/users");
+    users = await api<UserProfile[]>("/users");
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to reach API";
   }
@@ -23,8 +23,9 @@ export default async function Home() {
             <li className="text-gray-500">No users yet.</li>
           )}
           {users.map((u) => (
-            <li key={u.id}>
-              {u.name} <span className="text-gray-500">({u.email})</span>
+            <li key={u.id ?? u.email}>
+              {u.firstName} {u.lastName}{" "}
+              <span className="text-gray-500">({u.email})</span>
             </li>
           ))}
         </ul>
