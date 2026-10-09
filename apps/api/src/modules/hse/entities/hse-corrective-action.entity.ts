@@ -5,7 +5,7 @@ import { HseInspectionFinding } from "./hse-inspection-finding.entity";
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IHseCorrectiveActionEntity } from "../interface/hse-corrective-action.interface";
-import { HseCorrectiveActionPriority, HseActionStatus } from "@contractflow/contracts-schema";
+import { EHseCorrectiveActionPriority, EHseActionStatus } from "@contractflow/contracts-schema";
 
 
 @Entity("hse_corrective_action")
@@ -38,11 +38,11 @@ export class HseCorrectiveAction extends BaseCustomEntity implements IHseCorrect
     @Column({name: "description", type:"text"})
     description!: string
 
-    @Column({name: "priority", type:"enum", enum:HseCorrectiveActionPriority})
-    priority!: HseCorrectiveActionPriority  
+    @Column({name: "priority", type:"enum", enum: EHseCorrectiveActionPriority})
+    priority!: EHseCorrectiveActionPriority  
 
-    @Column({name: "status", type:"enum", enum:HseActionStatus})
-    status!: HseActionStatus
+    @Column({name: "status", type:"enum", enum: EHseActionStatus})
+    status!: EHseActionStatus
 
     @Column({name: "due_date", type:"date"})
     dueDate!: Date

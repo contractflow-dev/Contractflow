@@ -9,7 +9,7 @@ import { Company } from './company.entity';
 import { CompanyUser } from './company-user.entity';
 import { BaseCustomEntity } from '../../cross-cutting/entities/base-custom.entity';
 import { ICompanyInvitationEntity } from '../interface/company-invitation.interface';
-import { InvitationRole, InvitationStatus } from '@contractflow/contracts-schema';
+import { EInvitationRole, EInvitationStatus } from '@contractflow/contracts-schema';
 
 
 @Entity('company_invitation')
@@ -41,8 +41,8 @@ export class CompanyInvitation
   @Column({ name: 'last_name', type: 'varchar', length: 100 })
   lastName!: string;
 
-  @Column({ name: 'company_role', type: 'enum', enum: InvitationRole })
-  companyRole!: InvitationRole;
+  @Column({ name: 'company_role', type: 'enum', enum: EInvitationRole })
+  companyRole!: EInvitationRole;
 
   @Column({ name: 'token_hash', type: 'varchar', length: 255, unique: true })
   tokenHash!: string;
@@ -50,10 +50,10 @@ export class CompanyInvitation
   @Column({
     name: 'status',
     type: 'enum',
-    enum: InvitationStatus,
-    default: InvitationStatus.PENDING,
+    enum: EInvitationStatus,
+    default: EInvitationStatus.PENDING,
   })
-  status!: InvitationStatus;
+  status!: EInvitationStatus;
 
   @Column({ name: 'expires_at', type: 'timestamptz' })
   expiresAt!: Date;

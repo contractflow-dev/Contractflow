@@ -4,7 +4,7 @@ import { ContractStage } from "./contract-stage.entity";
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IMilestoneEntity } from "../interface/milestone.interface";
-import { MilestoneStatus } from "@contractflow/contracts-schema";
+import { EMilestoneStatus } from "@contractflow/contracts-schema";
 
 
 @Entity("milestone")
@@ -31,8 +31,8 @@ export class Milestone extends BaseCustomEntity implements IMilestoneEntity{
     @Column({name: "sequence", type: "int"})
     sequence!: number
 
-    @Column({name: "status", type: "enum", enum: MilestoneStatus})
-    status!: MilestoneStatus
+    @Column({name: "status", type: "enum", enum: EMilestoneStatus})
+    status!: EMilestoneStatus
 
     @Column({name: "progress_bps", type: "int"})
     progressBps!: number

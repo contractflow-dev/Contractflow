@@ -5,7 +5,7 @@ import { ContractParty } from "../../contract/entities/contract-party.entity";
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { ISiteDailyLogEntity } from "../interface/site-daily-log.interface";
-import { SiteStatus, WeatherCondition } from "@contractflow/contracts-schema";
+import { ESiteStatus, EWeatherCondition } from "@contractflow/contracts-schema";
 
 
 @Entity("site_daily_log")
@@ -32,8 +32,8 @@ export class SiteDailyLog extends BaseCustomEntity implements ISiteDailyLogEntit
     @Column({name: "log_date", type: "date"})
     logDate!: Date
 
-    @Column({name:"weather_condition", type:"enum", enum: WeatherCondition})
-    weatherCondition!: WeatherCondition
+    @Column({name:"weather_condition", type:"enum", enum: EWeatherCondition})
+    weatherCondition!: EWeatherCondition
 
     @Column({name:"temperature_celsius", type: "smallint"})
     temperatureCelsius!: number
@@ -50,8 +50,8 @@ export class SiteDailyLog extends BaseCustomEntity implements ISiteDailyLogEntit
     @Column({name: "issues_and_delays", type: "text"})
     issuesAndDelays!: string
 
-    @Column({name:"status", type:"enum", enum:SiteStatus})
-    status!: SiteStatus
+    @Column({name:"status", type:"enum", enum:ESiteStatus})
+    status!: ESiteStatus
 
     @Column({name: "submitted_at", type: "timestamptz"})
     submittedAt!: Date

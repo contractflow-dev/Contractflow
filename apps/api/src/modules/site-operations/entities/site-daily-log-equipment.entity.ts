@@ -2,7 +2,7 @@ import {Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn} from "typ
 import { SiteDailyLog } from "./site-daily-log.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { ISiteDailyLogEquipmentEntity } from "../interface/site-daily-log-equipment.interface";
-import { EquipmentCondition } from "@contractflow/contracts-schema";
+import { EEquipmentCondition } from "@contractflow/contracts-schema";
 
 
 
@@ -30,8 +30,8 @@ export class SiteDailyLogEquipment extends BaseCustomEntity implements ISiteDail
     @Column({name: "minutes_idle", type: "int"})
     minutesIdle!: number
 
-    @Column({name: "condition", type: "enum", enum: EquipmentCondition})
-    condition!: EquipmentCondition
+    @Column({name: "condition", type: "enum", enum: EEquipmentCondition})
+    condition!: EEquipmentCondition
 
     @Column({name: "remarks", type: "text"})
     remarks!: string

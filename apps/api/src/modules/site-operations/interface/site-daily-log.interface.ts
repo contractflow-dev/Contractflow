@@ -1,17 +1,17 @@
-import { SiteStatus, WeatherCondition } from "@contractflow/contracts-schema"
+import { ESiteStatus, EWeatherCondition } from "@contractflow/contracts-schema"
 
 export interface ISiteDailyLogEntity {
     contractId : string
     contractSiteId : string
     contractPartyId : string
     logDate : Date
-    weatherCondition : WeatherCondition
+    weatherCondition : EWeatherCondition
     temperatureCelsius : number
     weatherDelayMinutes : number
     workPerformed : string
     workPlannedNext : string
     issuesAndDelays : string
-    status : SiteStatus
+    status : ESiteStatus
     submittedAt : Date
     submittedById : string
     approvedAt : Date

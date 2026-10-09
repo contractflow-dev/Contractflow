@@ -4,7 +4,7 @@ import { ContractSite } from "../../site-operations/entities/contract-site.entit
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IHseIncidentEntity } from "../interface/hse-incident.interface";
-import { HseIncidentStatus, HseIncidentType, HseSeverity } from "@contractflow/contracts-schema";
+import { EHseIncidentStatus, EHseIncidentType, EHseSeverity } from "@contractflow/contracts-schema";
 
 
 
@@ -26,14 +26,14 @@ export class HseIncident extends BaseCustomEntity implements IHseIncidentEntity{
     @Column({name: "reference_number", type:"varchar", length:40})
     referenceNumber!: string
 
-    @Column({name: "incident_type", type:"enum", enum: HseIncidentType})
-    incidentType!: HseIncidentType
+    @Column({name: "incident_type", type:"enum", enum: EHseIncidentType})
+    incidentType!: EHseIncidentType
 
-    @Column({name: "severity", type:"enum", enum: HseSeverity})
-    severity!: HseSeverity
+    @Column({name: "severity", type:"enum", enum: EHseSeverity})
+    severity!: EHseSeverity
 
-    @Column({name: "status", type:"enum", enum: HseIncidentStatus})
-    status!: HseIncidentStatus
+    @Column({name: "status", type:"enum", enum: EHseIncidentStatus})
+    status!: EHseIncidentStatus
 
     @Column({name: "occurred_at", type:"timestamptz"})
     occurredAt!: Date

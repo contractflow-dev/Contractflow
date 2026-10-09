@@ -1,4 +1,4 @@
-import type { UserStatus } from "@contractflow/contracts-schema";
+import type { EUserStatus } from "@contractflow/contracts-schema";
 
 export interface IAppUserEntity {
     email : string
@@ -7,7 +7,7 @@ export interface IAppUserEntity {
     middleName : string
     phoneNumber : string
     passwordHash : string
-    status : UserStatus
+    status : EUserStatus
     isPlatformAdmin : boolean
     mfaEnabled : boolean
     timezone : string

@@ -2,7 +2,7 @@ import {Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, JoinColumn
 import { HseInspection } from "./hse-inspection.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IHseInspectionFidingEntity } from "../interface/hse-inspection-finding.interface";
-import { HseInpectionResult, HseInpectionRiskLevel } from "@contractflow/contracts-schema";
+import { EHseInpectionResult, EHseInpectionRiskLevel } from "@contractflow/contracts-schema";
 
 
 @Entity("hse_inspection_finding")
@@ -23,11 +23,11 @@ export class HseInspectionFinding extends BaseCustomEntity implements IHseInspec
     @Column({name: "description", type:"text"})
     description!: string
 
-    @Column({name: "result", type: "enum", enum: HseInpectionResult})
-    result!: HseInpectionResult
+    @Column({name: "result", type: "enum", enum: EHseInpectionResult})
+    result!: EHseInpectionResult
 
-    @Column({name: "risk_level", type: "enum", enum: HseInpectionRiskLevel})
-    riskLevel!: HseInpectionRiskLevel
+    @Column({name: "risk_level", type: "enum", enum: EHseInpectionRiskLevel})
+    riskLevel!: EHseInpectionRiskLevel
 
     @Column({name: "recommendation", type: "text"})
     recommendation!: string

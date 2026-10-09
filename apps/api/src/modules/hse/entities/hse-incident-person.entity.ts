@@ -3,7 +3,7 @@ import { HseIncident } from "./hse-incident.entity";
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IHseIncidentPersonEntity } from "../interface/hse-incident-person.interface";
-import { HseIncidentPersonInvolvement } from "@contractflow/contracts-schema";
+import { EHseIncidentPersonInvolvement } from "@contractflow/contracts-schema";
 
 
 @Entity("hse_incident_person")
@@ -27,8 +27,8 @@ export class HseIncidentPerson extends BaseCustomEntity implements IHseIncidentP
     @Column({name: "last_name", type: "varchar", length: 100})
     lastName!: string 
 
-    @Column({name: "involvement", type:"enum", enum:HseIncidentPersonInvolvement})
-    involvement!: HseIncidentPersonInvolvement
+    @Column({name: "involvement", type:"enum", enum: EHseIncidentPersonInvolvement})
+    involvement!: EHseIncidentPersonInvolvement
 
     @Column({name: "employer_name", type: "varchar", length: 255})
     employerName!: string 
