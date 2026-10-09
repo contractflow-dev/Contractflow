@@ -2,5 +2,6 @@
     "cSpell.words": [
         "contractflow"
     ],
-    "css.lint.unknownAtRules": "ignore"
+    "css.lint.unknownAtRules": "ignore",
+    "liveServer.settings.multiRootWorkspaceName": "Contractflow"
 }

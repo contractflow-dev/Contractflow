@@ -4,13 +4,18 @@
   "private": true,
   "packageManager": "pnpm@9.15.0",
   "scripts": {
-    "dev:web": "pnpm --filter @contractflow/web dev",
-    "dev:api": "pnpm --filter @contractflow/api start:dev",
+    "dev:web": "pnpm --filter ./apps/web dev",
+    "dev:api": "pnpm --filter ./apps/api start:dev",
+    "dev": "concurrently -n web,api -c cyan,magenta \"pnpm run dev:web\" \"pnpm run dev:api\"",
     "build": "pnpm -r --if-present run build",
     "lint": "pnpm -r --if-present run lint",
     "format": "prettier --write ."
   },
   "devDependencies": {
+    "concurrently": "^10.0.5",
     "prettier": "^3.5.3"
+  },
+  "dependencies": {
+    "ulid": "^3.0.2"
   }
 }
