@@ -2,50 +2,50 @@ services:
   # =========================
   # ContractFlow API
   # =========================
-    - type: web
+  - type: web
     name: contractflow-api
-    env: node
+    runtime: node
     plan: free
     rootDir: .
     healthCheckPath: /health
     buildCommand: |
       corepack enable
       NODE_ENV=development pnpm install --frozen-lockfile
-      pnpm --filter @contractflow/api build
+      pnpm --filter "@contractflow/api..." build
     startCommand: pnpm --filter @contractflow/api start:prod
     envVars:
-            - key: NODE_VERSION
+      - key: NODE_VERSION
         value: 22.14.0
-            - key: NODE_ENV
+      - key: NODE_ENV
         value: production
-            - key: PORT
+      - key: PORT
         value: 10000
-            - key: DATABASE_URL
+      - key: DATABASE_URL
         sync: false
-            - key: JWT_SECRET
+      - key: JWT_SECRET
         sync: false
-            - key: CORS_ORIGIN
+      - key: CORS_ORIGIN
         sync: false
 
   # =========================
   # ContractFlow Web
   # =========================
-    - type: web
+  - type: web
     name: contractflow-web
-    env: node
+    runtime: node
     plan: free
     rootDir: .
     buildCommand: |
       corepack enable
       NODE_ENV=development pnpm install --frozen-lockfile
-      pnpm --filter @contractflow/web build
+      pnpm --filter "@contractflow/web..." build
     startCommand: pnpm --filter @contractflow/web start
     envVars:
-            - key: NODE_VERSION
+      - key: NODE_VERSION
         value: 22.14.0
-            - key: NODE_ENV
+      - key: NODE_ENV
         value: production
-            - key: PORT
+      - key: PORT
         value: 10000
-            - key: NEXT_PUBLIC_API_URL
+      - key: NEXT_PUBLIC_API_URL
         sync: false
