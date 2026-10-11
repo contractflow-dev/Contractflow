@@ -4,6 +4,7 @@ services:
   # =========================
   - type: web
     name: contractflow-api
+    plan: free
     runtime: node
     rootDir: .
     healthCheckPath: /health
