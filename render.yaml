@@ -11,7 +11,7 @@ services:
 
     buildCommand: |
       corepack enable
-      pnpm install --frozen-lockfile
+      NODE_ENV=development pnpm install --frozen-lockfile
       pnpm --filter @contractflow/api build
 
     startCommand: pnpm --filter @contractflow/api start
@@ -47,7 +47,7 @@ services:
 
     buildCommand: |
       corepack enable
-      pnpm install --frozen-lockfile
+      NODE_ENV=developmentpnpm install --frozen-lockfile
       pnpm --filter @contractflow/web build
 
     startCommand: pnpm --filter @contractflow/web start
