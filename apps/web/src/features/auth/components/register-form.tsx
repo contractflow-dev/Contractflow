@@ -43,7 +43,7 @@ const labelClass =
 
 const nameFields = [
   { name: "firstName", placeholder: "First name" },
-  { name: "middleName", placeholder: "Middle name" },
+  { name: "middleName", placeholder: "Middle name (optional)" },
   { name: "lastName", placeholder: "Last name" },
 ] as const;
 

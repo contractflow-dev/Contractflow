@@ -15,8 +15,8 @@ export class AppUserResponseDto implements IGetAppUserResponse {
   status: EUserStatus;
   createdAt: Date;
   updatedAt: Date;
-  emailVerifiedAt: Date;
-  lastLoginAt: Date;
+  emailVerifiedAt: Date | null;
+  lastLoginAt: Date | null;
 
   static fromEntity(entity: AppUser): AppUserResponseDto {
     return {
@@ -28,7 +28,7 @@ export class AppUserResponseDto implements IGetAppUserResponse {
       status: entity.status,
       timezone: entity.timezone,
       emailVerifiedAt: entity.emailVerifiedAt,
-      lastLoginAt: entity.lastLoginAt,
+      lastLoginAt: entity.createdAt,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
       phoneNumber: entity.phoneNumber,

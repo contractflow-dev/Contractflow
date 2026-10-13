@@ -1,5 +1,5 @@
 // @ts-ignore - TypeORM is expected to be installed in the project dependencies.
-import { Entity, PrimaryGeneratedColumn, Column, BaseEntity } from 'typeorm';
+import { Entity, Column } from 'typeorm';
 import { BaseCustomEntity } from '../../cross-cutting/entities/base-custom.entity';
 import { IAppUserEntity } from '../interface/app-user.interface';
 import { EUserStatus } from '@contractflow/contracts-schema';
@@ -46,11 +46,11 @@ export class AppUser extends BaseCustomEntity implements IAppUserEntity {
   @Column({ name: 'timezone', type: 'varchar', length: 64 })
   timezone!: string;
 
-  @Column({ name: 'email_verified_at', type: 'timestamptz' })
-  emailVerifiedAt!: Date;
+  @Column({ name: 'email_verified_at', type: 'timestamptz', nullable: true })
+  emailVerifiedAt!: Date | null;
 
-  @Column({ name: 'last_login_at', type: 'timestamptz' })
-  lastLoginAt!: Date;
+  @Column({ name: 'last_login_at', type: 'timestamptz', nullable: true })
+  lastLoginAt!: Date | null;
 }
 
 export { AppUser as User };

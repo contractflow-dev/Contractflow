@@ -52,7 +52,7 @@ export class Company extends BaseCustomEntity implements ICompanyEntity{
     @Column({name: "status", type:"enum", enum: ECompanyStatus})
     status!: ECompanyStatus
 
-    @Column({name: "verified_at", type: "timestamptz"})
-    verifiedAt!: Date
+    @Column({name: "verified_at", type: "timestamptz", nullable: true})
+    verifiedAt!: Date | null
 
 }

@@ -1,23 +1,51 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { clearUser } from "@/features/auth/authSlice";
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api';
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
+
+const baseQuery = fetchBaseQuery({
+  baseUrl: API_BASE_URL,
+  credentials: "include",
+});
+
+function isProtectedRoute(pathname: string): boolean {
+  return pathname === "/dashboards" ||
+    pathname.startsWith("/dashboards/") ||
+    pathname === "/onboarding" ||
+    pathname.startsWith("/onboarding/");
+}
 
 /**
  * Base RTK Query API service for ContractFlow.
  * Extended with injectEndpoints() in domain-specific service files.
  */
 export const api = createApi({
-  reducerPath: 'api',
-  baseQuery: fetchBaseQuery({
-    baseUrl: API_BASE_URL,
-    credentials: 'include',
-    prepareHeaders: (headers) => {
-      // Headers can be customized here if needed (e.g. CSRF tokens).
-      // Authentication uses secure HTTP-only cookies/credentials per ContractFlow architecture.
-      return headers;
-    },
-  }),
-  tagTypes: ['Auth', 'User', 'Workspace', 'Contract', 'Onboarding'],
+  reducerPath: "api",
+  baseQuery: async (args, baseQueryApi, extraOptions) => {
+    const result = await baseQuery(args, baseQueryApi, extraOptions);
+
+    if (result.error?.status === 401) {
+      baseQueryApi.dispatch(clearUser());
+
+      if (
+        typeof window !== "undefined" &&
+        isProtectedRoute(window.location.pathname)
+      ) {
+        window.location.replace("/login");
+      }
+    }
+
+    return result;
+  },
+  tagTypes: [
+    "Auth",
+    "User",
+    "Workspace",
+    "Contract",
+    "Onboarding",
+    "Company",
+    "Dashboard",
+  ],
   endpoints: () => ({}),
 });

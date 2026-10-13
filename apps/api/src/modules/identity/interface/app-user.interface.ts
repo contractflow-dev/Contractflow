@@ -11,6 +11,6 @@ export interface IAppUserEntity {
   isPlatformAdmin: boolean;
   mfaEnabled: boolean;
   timezone: string;
-  emailVerifiedAt: Date;
-  lastLoginAt: Date;
+  emailVerifiedAt: Date | null;
+  lastLoginAt: Date | null;
 }

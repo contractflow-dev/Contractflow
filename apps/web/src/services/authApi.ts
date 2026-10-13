@@ -1,10 +1,7 @@
-import type { IGetAppUserResponse } from '@contractflow/contracts-schema';
-import { api } from './api';
+import type { IGetAppUserResponse } from "@contractflow/contracts-schema";
+import { api } from "./api";
 
-export interface UserProfile extends IGetAppUserResponse {
-  id?: string;
-  phoneNumber?: string;
-}
+export type UserProfile = IGetAppUserResponse;
 
 export interface LoginRequest {
   email: string;
@@ -26,6 +23,10 @@ export interface AuthResponse {
   message?: string;
 }
 
+export interface RegisterResponse {
+  message?: string;
+}
+
 export interface LogoutResponse {
   success: boolean;
   message?: string;
@@ -33,45 +34,56 @@ export interface LogoutResponse {
 
 export const authApi = api.injectEndpoints({
   endpoints: (builder) => ({
-    getCurrentUser: builder.query<UserProfile, { id?: string } | void>({
-      query: (params) => {
-        if (params && params.id) {
-          return {
-            url: '/users/me',
-            params: { id: params.id },
-          };
-        }
-        return {
-          url: '/users/me',
-        };
-      },
-      providesTags: ['Auth', 'User'],
+    getCurrentUser: builder.query<UserProfile, void>({
+      query: () => "/users/me",
+      providesTags: ["Auth", "User"],
     }),
 
     login: builder.mutation<AuthResponse, LoginRequest>({
       query: (credentials) => ({
-        url: '/auth/login',
-        method: 'POST',
+        url: "/auth/login",
+        method: "POST",
         body: credentials,
       }),
-      invalidatesTags: ['Auth', 'User', 'Workspace'],
+      invalidatesTags: ["Auth", "User", "Workspace"],
     }),
 
-    register: builder.mutation<AuthResponse, RegisterRequest>({
+    register: builder.mutation<RegisterResponse, RegisterRequest>({
       query: (data) => ({
-        url: '/auth/register',
-        method: 'POST',
+        url: "/auth/register",
+        method: "POST",
         body: data,
       }),
-      invalidatesTags: ['Auth', 'User'],
+      invalidatesTags: ["Auth", "User"],
+    }),
+
+    verifyEmail: builder.mutation<{ message?: string }, { token: string }>({
+      query: (data) => ({
+        url: "/auth/verify-email",
+        method: "POST",
+        body: data,
+        timeout: 15_000,
+      }),
+      invalidatesTags: ["Auth", "User"],
+    }),
+
+    resendVerificationEmail: builder.mutation<
+      { message?: string },
+      { email: string }
+    >({
+      query: (data) => ({
+        url: "/auth/resend-verification",
+        method: "POST",
+        body: data,
+      }),
     }),
 
     logout: builder.mutation<LogoutResponse, void>({
       query: () => ({
-        url: '/auth/logout',
-        method: 'POST',
+        url: "/auth/logout",
+        method: "POST",
       }),
-      invalidatesTags: ['Auth', 'User', 'Workspace', 'Onboarding'],
+      invalidatesTags: ["Auth", "User", "Workspace", "Onboarding"],
     }),
   }),
   overrideExisting: false,
@@ -82,5 +94,7 @@ export const {
   useLazyGetCurrentUserQuery,
   useLoginMutation,
   useRegisterMutation,
+  useVerifyEmailMutation,
+  useResendVerificationEmailMutation,
   useLogoutMutation,
 } = authApi;

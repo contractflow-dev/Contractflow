@@ -174,3 +174,5 @@ export const { useGetComplianceRecordsQuery } = complianceApi;
 - ContractFlow relies on **secure HTTP-only session cookies** managed by the backend.
 - **Never store access tokens or passwords in Redux state or `localStorage`**.
 - RTK Query is preconfigured with `credentials: 'include'` so browser cookies are automatically attached to all API queries and mutations.
+- Dashboard and onboarding layouts verify the HTTP-only session against `/users/me` before rendering protected content. The shared RTK Query base query clears client identity state and hard-navigates to sign-in on unauthorized responses from protected routes.
+- The session cookie is issued by the API host, so Next.js middleware on a separate web host cannot reliably inspect it. Route guards validate through the authenticated API request instead; API authorization remains enforced server-side by the global session guard.

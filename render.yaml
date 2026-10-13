@@ -1,61 +1,54 @@
+databases:
+  - name: contractflow-db
+    databaseName: contractflow
+    user: contractflow
+    # add a plan that fits your budget
+
 services:
-  # =========================
-  # ContractFlow API
-  # =========================
   - type: web
     name: contractflow-api
     runtime: node
-    rootDir: .
     healthCheckPath: /health
 
     buildCommand: |
       corepack enable
-      pnpm install --frozen-lockfile
+      pnpm install --frozen-lockfile --prod=false
+      pnpm --filter @contractflow/contracts-schema build
       pnpm --filter @contractflow/api build
 
-    startCommand: pnpm --filter @contractflow/api start
+    startCommand: pnpm --filter @contractflow/api start:prod
 
     envVars:
       - key: NODE_VERSION
-        value: 20.11.0
-
+        value: 22.12.0
       - key: NODE_ENV
         value: production
-
-      - key: PORT
-        value: 10000
-
       - key: DATABASE_URL
-        sync: false
-
+        fromDatabase:
+          name: contractflow-db
+          property: connectionString
       - key: JWT_SECRET
+        generateValue: true
+      - key: WEB_URL
         sync: false
 
-      - key: CORS_ORIGIN
-        sync: false
-
-  # =========================
-  # ContractFlow Web
-  # =========================
   - type: web
     name: contractflow-web
     runtime: node
-    rootDir: .
     healthCheckPath: /
 
     buildCommand: |
       corepack enable
-      pnpm install --frozen-lockfile
+      pnpm install --frozen-lockfile --prod=false
+      pnpm --filter @contractflow/contracts-schema build
       pnpm --filter @contractflow/web build
 
     startCommand: pnpm --filter @contractflow/web start
 
     envVars:
       - key: NODE_VERSION
-        value: 20.11.0
-
+        value: 22.12.0
       - key: NODE_ENV
         value: production
-
       - key: NEXT_PUBLIC_API_URL
         sync: false

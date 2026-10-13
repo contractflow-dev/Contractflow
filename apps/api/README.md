@@ -25,6 +25,44 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+## Authentication and email delivery
+
+The API uses an opaque, server-side session stored in the
+`contractflow_session` HTTP-only cookie. Configure `DATABASE_URL` and
+`SESSION_TTL_DAYS` (defaults to 7). In production, set `NODE_ENV=production` so
+the session cookie is marked `Secure`, and set `WEB_URL` to the exact frontend
+origin allowed to send credentialed requests.
+
+Verification messages use Mailpit over SMTP in non-production environments by
+default (`SMTP_HOST=localhost`, `SMTP_PORT=1025`). Set `MAIL_PROVIDER=smtp` to
+select SMTP explicitly, and open `http://localhost:8025` to view captured
+messages. The local API commands (`start`, `start:dev`, and `start:debug`) start
+the Mailpit container automatically; Docker Compose must be installed and
+running. Set `MAIL_PROVIDER=resend`, `RESEND_API_KEY`, and `EMAIL_FROM` (a
+sender verified with Resend) to use Resend instead. Production defaults to
+Resend and requires those values. `WEB_URL` defaults to
+`http://localhost:3000` outside production and must be set for production.
+Registration and the verification token are committed before delivery, so a
+failed delivery can be retried with `POST /api/auth/resend-verification`.
+
+The identity endpoints are `POST /api/auth/register`,
+`POST /api/auth/login`, `POST /api/auth/verify-email`,
+`POST /api/auth/resend-verification`, `POST /api/auth/logout`, and the
+authenticated `GET /api/users/me`. Company endpoints are authenticated
+`POST /api/companies`, `GET /api/companies`, `GET /api/companies/current`,
+`GET /api/companies/:companyId/membership`, and the administrator-only
+`GET /api/companies/:companyId/dashboard`.
+
+The session guard is registered globally and protects routes by default.
+Only controllers or handlers explicitly marked public (currently the auth
+controller) bypass session validation; future API controllers must not opt out
+unless the endpoint is intentionally unauthenticated.
+
+Apply the TypeORM migration in `src/common/database/migrations` before
+deploying schema changes. Company and initial-administrator rows are created within one
+transaction; the database unique index prevents duplicate company/user
+memberships.
+
 ## Project setup
 
 ```bash
