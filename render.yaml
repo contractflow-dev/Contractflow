@@ -1,3 +1,9 @@
+databases:
+  - name: contractflow-db
+    databaseName: contractflow
+    user: contractflow
+    # add a plan that fits your budget
+
 services:
   # =========================
   # ContractFlow API
@@ -10,7 +16,7 @@ services:
     healthCheckPath: /health
     buildCommand: |
       corepack enable
-      NODE_ENV=development pnpm install --frozen-lockfile
+      pnpm install --frozen-lockfile --prod=false
       pnpm --filter "@contractflow/api..." build
     startCommand: pnpm --filter @contractflow/api start:prod
     envVars:
@@ -21,8 +27,12 @@ services:
       - key: PORT
         value: 10000
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: contractflow-db
+          property: connectionString
       - key: JWT_SECRET
+        generateValue: true
+      - key: WEB_URL
         sync: false
       - key: CORS_ORIGIN
         sync: false
@@ -35,9 +45,10 @@ services:
     runtime: node
     plan: free
     rootDir: .
+    healthCheckPath: /
     buildCommand: |
       corepack enable
-      NODE_ENV=development pnpm install --frozen-lockfile
+      pnpm install --frozen-lockfile --prod=false
       pnpm --filter "@contractflow/web..." build
     startCommand: pnpm --filter @contractflow/web start
     envVars:

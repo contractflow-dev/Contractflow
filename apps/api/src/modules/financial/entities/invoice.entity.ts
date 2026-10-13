@@ -26,7 +26,7 @@ export class Invoice extends BaseCustomEntity implements IInvoiceEntity{
     @Column({name: "billed_to_party_id", type: "varchar", length: 26})
     billedToPartyId!: string
     @ManyToOne(() => ContractParty, {onDelete:"CASCADE"})
-    @JoinColumn({name: "billed_by_party_id", referencedColumnName: "id"})
+    @JoinColumn({ name: "billed_to_party_id", referencedColumnName: "id" })
     billedToContractParty!: ContractParty
 
     @Column({name: "invoice_number", type: "varchar", length: 40})

@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { RiFileList3Line } from "@remixicon/react";
 import { RegisterForm } from "@/features/auth/components/register-form";
 
@@ -10,7 +9,7 @@ const stats = [
 
 export default function RegisterPage() {
   return (
-    <main className="dark grid min-h-svh bg-background text-foreground lg:grid-cols-[380px_1fr]">
+    <main className="grid min-h-svh bg-background text-foreground lg:grid-cols-[380px_1fr]">
       {/* Left: form panel */}
       <section className="flex flex-col gap-6 overflow-y-auto border-e bg-card p-8">
         <div className="flex items-center gap-2">
@@ -28,15 +27,7 @@ export default function RegisterPage() {
       </section>
 
       {/* Right: hero */}
-      <section className="relative hidden lg:block">
-        <Image
-          src="/images/auth-hero.jpg"
-          alt=""
-          fill
-          priority
-          sizes="(min-width: 1024px) calc(100vw - 380px), 0px"
-          className="object-cover"
-        />
+      <section className="relative hidden bg-auth-hero bg-cover bg-center lg:block">
         <div className="absolute inset-0 bg-linear-to-t from-background via-background/60 to-background/20" />
 
         <div className="absolute inset-x-12 bottom-10 max-w-2xl">

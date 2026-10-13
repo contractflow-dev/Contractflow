@@ -1,26 +1,62 @@
 {
-  "name": "@contractflow/contracts-schema",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
-  "files": ["dist"],
-  "scripts": {
-    "build": "tsc -p tsconfig.build.json"
-  },
-  "devDependencies": {
-    "typescript": "^5.6.0"
-  },
-  "exports": {
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
-    "./common": { "types": "./dist/common/index.d.ts", "default": "./dist/common/index.js" },
-    "./compliance": { "types": "./dist/compliance/index.d.ts", "default": "./dist/compliance/index.js" },
-    "./contract": { "types": "./dist/contract/index.d.ts", "default": "./dist/contract/index.js" },
-    "./cross-cutting": { "types": "./dist/cross-cutting/index.d.ts", "default": "./dist/cross-cutting/index.js" },
-    "./delivery": { "types": "./dist/delivery/index.d.ts", "default": "./dist/delivery/index.js" },
-    "./financial": { "types": "./dist/financial/index.d.ts", "default": "./dist/financial/index.js" },
-    "./hse": { "types": "./dist/hse/index.d.ts", "default": "./dist/hse/index.js" },
-    "./identity": { "types": "./dist/identity/index.d.ts", "default": "./dist/identity/index.js" },
-    "./identity/*": { "types": "./dist/identity/*.d.ts", "default": "./dist/identity/*.js" },
-    "./site-operations": { "types": "./dist/site-operations/index.d.ts", "default": "./dist/site-operations/index.js" }
-  }
+"name": "@contractflow/contracts-schema",
+"version": "0.1.0",
+"private": true,
+"type": "module",
+"files": ["dist"],
+"main": "./dist/index.js",
+"types": "./dist/index.d.ts",
+"exports": {
+".": {
+"types": "./dist/index.d.ts",
+"default": "./dist/index.js"
+},
+"./common": {
+"types": "./dist/common/index.d.ts",
+"default": "./dist/common/index.js"
+},
+"./compliance": {
+"types": "./dist/compliance/index.d.ts",
+"default": "./dist/compliance/index.js"
+},
+"./contract": {
+"types": "./dist/contract/index.d.ts",
+"default": "./dist/contract/index.js"
+},
+"./cross-cutting": {
+"types": "./dist/cross-cutting/index.d.ts",
+"default": "./dist/cross-cutting/index.js"
+},
+"./delivery": {
+"types": "./dist/delivery/index.d.ts",
+"default": "./dist/delivery/index.js"
+},
+"./financial": {
+"types": "./dist/financial/index.d.ts",
+"default": "./dist/financial/index.js"
+},
+"./hse": {
+"types": "./dist/hse/index.d.ts",
+"default": "./dist/hse/index.js"
+},
+"./identity": {
+"types": "./dist/identity/index.d.ts",
+"default": "./dist/identity/index.js"
+},
+"./identity/*": {
+"types": "./dist/identity/*.d.ts",
+"default": "./dist/identity/*.js"
+},
+"./site-operations": {
+"types": "./dist/site-operations/index.d.ts",
+"default": "./dist/site-operations/index.js"
+}
+},
+"scripts": {
+"build": "tsc -p tsconfig.build.json"
+},
+"devDependencies": {
+"@types/node": "^26.6.4",
+"typescript": "^5.6.0"
+}
 }

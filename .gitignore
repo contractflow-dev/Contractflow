@@ -36,3 +36,4 @@ terraform.rc
 =======
 apps/api/prisma/imports/
 main
+apps/api/tsconfig.build.tsbuildinfo

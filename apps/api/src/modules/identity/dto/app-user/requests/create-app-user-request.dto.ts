@@ -6,6 +6,7 @@ import {
   IsNotEmpty,
   MaxLength,
   IsTimeZone,
+  IsOptional,
 } from 'class-validator';
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
@@ -31,10 +32,10 @@ export class CreateAppUserRequestDto {
   lastName: string;
 
   @Transform(trim)
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(100)
-  middleName: string;
+  middleName?: string;
 
   @IsStrongPassword({
     minLength: 12,

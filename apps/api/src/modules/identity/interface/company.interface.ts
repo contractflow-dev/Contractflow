@@ -16,5 +16,5 @@ export interface ICompanyEntity {
     countryCode : string
     defaultCurrencyCode : string
     status : ECompanyStatus
-    verifiedAt : Date
+    verifiedAt : Date | null
 }

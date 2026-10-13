@@ -16,15 +16,15 @@ export class UserSession extends BaseCustomEntity implements IUserSessionEntity{
     @Column({name: "refresh_token_hash", type:"varchar", length: 255, unique: true })
     refreshTokenHash!: string
 
-    @Column({name: "ip_address", type:"inet"})
-    ipAddress!: string
+    @Column({name: "ip_address", type:"inet", nullable: true})
+    ipAddress!: string | null
 
-    @Column({name: "user_agent", type: "text"})
+    @Column({name: "user_agent", type: "text", default: ""})
     userAgent!: string
 
     @Column({name: "expires_at", type:"timestamptz"})
     expiresAt!: Date
 
-    @Column({name: "revoked_at",type: "timestamptz"})
-    revokedAt!: Date
+    @Column({name: "revoked_at",type: "timestamptz", nullable: true})
+    revokedAt!: Date | null
 }
