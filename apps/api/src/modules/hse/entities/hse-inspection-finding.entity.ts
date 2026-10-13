@@ -12,7 +12,7 @@ export class HseInspectionFinding extends BaseCustomEntity implements IHseInspec
     hseInspectionId!: string
     @ManyToOne(() => HseInspection, {onDelete:"CASCADE"})
     @JoinColumn({name:"hse_inspection_id", referencedColumnName: "id"})
-    hseInspection!: HseInspectionFinding
+    hseInspection!: HseInspection
 
     @Column({name: "item_number", type: "int"})
     itemNumber!: number

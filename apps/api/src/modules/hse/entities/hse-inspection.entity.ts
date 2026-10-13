@@ -26,7 +26,7 @@ export class HseInspection extends BaseCustomEntity implements IHseInspectionEnt
     @Column({name: "inspector_company_user_id", type: "varchar", length: 26})
     inspectorCompanyUserId!: string
     @ManyToOne(() => CompanyUser, {onDelete:"CASCADE"})
-    @JoinColumn({name:"company_id", referencedColumnName: "id"})
+    @JoinColumn({ name: "inspector_company_user_id", referencedColumnName: "id" })
     CompanyUser!: CompanyUser
 
     @Column({name: "reference_number", type:"varchar", length:40})

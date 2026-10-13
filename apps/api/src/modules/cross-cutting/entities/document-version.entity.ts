@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from "typeorm";
 import { Document} from "./document.entity";
+import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "./base-custom.entity";
 import { IDocumentVersionEntity } from "../interfaces/document-version.interface";
 
@@ -36,9 +37,9 @@ export class DocumentVersion extends BaseCustomEntity implements IDocumentVersio
 
     @Column({name: "uploaded_by_id", type: "varchar", length: 26})
     uploadedById!: string
-    @ManyToOne(() => Document, {onDelete:"NO ACTION"})
-    @JoinColumn({name:"uploaded_by_id", referencedColumnName: "owner_company_id"})
-    uploadedBy!: Document
+    @ManyToOne(() => CompanyUser, {onDelete:"NO ACTION"})
+    @JoinColumn({name:"uploaded_by_id", referencedColumnName: "id"})
+    uploadedBy!: CompanyUser
 
     @Column({name: "uploaded_at", type:"timestamptz"})
     uploadedAt!: Date

@@ -14,7 +14,7 @@ export class Notification extends BaseCustomEntity implements INotificationEntit
     recipientUserId!: string
 
     @ManyToOne (() => User, {onDelete: "CASCADE"})
-    @JoinColumn ({name: "user_id", referencedColumnName: "id"})
+    @JoinColumn({ name: "recipient_user_id", referencedColumnName: "id" })
     user!: User
 
     @Column({name: "contract_id", type: "varchar", length: 26})

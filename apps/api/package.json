@@ -21,7 +21,7 @@
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
     "dev": "pnpm run start:dev",
-    "typeorm": "typeorm-ts-node-commonjs -d src/common/database/data-source.ts",
+    "typeorm": "tsx ./node_modules/typeorm/cli.js -d src/common/database/data-source.ts",
     "migration:generate": "pnpm run typeorm migration:generate",
     "migration:run": "pnpm run typeorm migration:run",
     "migration:revert": "pnpm run typeorm migration:revert"

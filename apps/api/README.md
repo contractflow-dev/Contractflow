@@ -58,10 +58,10 @@ Only controllers or handlers explicitly marked public (currently the auth
 controller) bypass session validation; future API controllers must not opt out
 unless the endpoint is intentionally unauthenticated.
 
-Apply the TypeORM migration in `src/common/database/migrations` before
-deploying schema changes. Company and initial-administrator rows are created within one
-transaction; the database unique index prevents duplicate company/user
-memberships.
+Run `pnpm run migration:run` from `apps/api` to apply the TypeORM migrations
+before deploying schema changes. Company and initial-administrator rows are
+created within one transaction; the database unique index prevents duplicate
+company/user memberships.
 
 ## Project setup
 
