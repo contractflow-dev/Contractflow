@@ -251,7 +251,7 @@ export default function RegisterPage() {
 
             <div className="grid gap-3 sm:grid-cols-2">
               <Field
-                label="Phone number (optional)"
+                label="Phone number"
                 error={errors.phoneNumber?.message}
               >
                 <input
