@@ -9,8 +9,8 @@ export interface IGetAppUserResponse {
   phoneNumber: string;
   status: EUserStatus;
   timezone: string;
-  emailVerifiedAt: string | null;
-  lastLoginAt: string | null;
-  createdAt: string;
-  updatedAt: string;
+  emailVerifiedAt: Date | null;
+  lastLoginAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
