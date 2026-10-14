@@ -1,13 +1,7 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../services/auth.service';
-import { CreateCompanyRequestDto } from '../dto/company/create-company-request.dto';
+import { CreateCompanyRequestDto } from '../dto/company/requests/create-company-request.dto';
 import { CompanyService } from '../services/company.service';
 
 @Controller('companies')

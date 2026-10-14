@@ -1,3 +1,4 @@
+import { ECurrencyCode } from '@contractflow/contracts-schema';
 import { Transform } from 'class-transformer';
 import {
   IsEmail,
@@ -105,5 +106,5 @@ export class CreateCompanyRequestDto {
   @IsString()
   @Length(3, 3)
   @Matches(/^[A-Z]{3}$/)
-  defaultCurrencyCode!: string;
+  defaultCurrencyCode!: ECurrencyCode;
 }

@@ -16,6 +16,7 @@ import { AuthService } from './services/auth.service';
 import { CompanyService } from './services/company.service';
 import { SessionAuthGuard } from '../../common/guards/session-auth.guard';
 import { MailService } from '../mail/mail.service';
+import { CompanyRepository } from './repositories/company.repository';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { MailService } from '../mail/mail.service';
     AppUserService,
     AuthService,
     CompanyService,
+    CompanyRepository,
     { provide: APP_GUARD, useClass: SessionAuthGuard },
     MailService,
   ],
