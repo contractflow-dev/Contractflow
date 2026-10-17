@@ -1,4 +1,4 @@
-import { EHseInpectionResult, EHseInpectionRiskLevel } from "@contractflow/contracts-schema"
+import { EHseInspectionResult, EHseInspectionRiskLevel } from "@contractflow/contracts-schema"
 
 export interface IHseInspectionFidingEntity {
     hseInspectionId : string
