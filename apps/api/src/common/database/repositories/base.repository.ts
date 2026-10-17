@@ -92,8 +92,20 @@ export abstract class BaseRepository<
     } as DeepPartial<T>);
   }
 
-  async save(entity: T): Promise<T> {
+  async save(entity: T, _scope: Scope): Promise<T> {
     return this.repository.save(entity);
+  }
+
+  async findPage(
+    scope: Scope,
+    options: FindManyOptions<T> = {},
+  ): Promise<{ items: T[]; total: number }> {
+    const [items, total] = await this.repository.findAndCount({
+      ...options,
+      where: this.withScope(options.where as FindOptionsWhere<T>, scope),
+    });
+
+    return { items, total };
   }
 
   async update(

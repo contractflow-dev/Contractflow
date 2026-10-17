@@ -35,6 +35,20 @@ export abstract class CompanyScopedRepository<
   protected override scopeValues(scope: Scope): DeepPartial<Entity> {
     return { companyId: requireCompanyId(scope) } as DeepPartial<Entity>;
   }
+
+  override async save(entity: Entity, scope: Scope): Promise<Entity> {
+    if (entity.id?.trim()) {
+      throw new BadRequestException(
+        'Scoped save only creates new records; use update for existing records',
+      );
+    }
+
+    const scopedEntity = this.repository.create({
+      ...entity,
+      ...this.scopeValues(scope),
+    } as DeepPartial<Entity>);
+    return this.repository.save(scopedEntity);
+  }
 }
 
 function requireCompanyId(scope: ICompanyScope): string {

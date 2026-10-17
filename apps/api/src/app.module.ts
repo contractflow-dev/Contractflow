@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { IdentityModule } from './modules/identity/identity.module';
+import { ContractModule } from './modules/contract/contract-module';
+import { CrossCuttingModule } from './modules/cross-cutting/cross-cutting.module';
 import { EnvVars, NodeEnv, validateEnv } from './config/env.validation';
 
 @Module({
@@ -27,6 +29,8 @@ import { EnvVars, NodeEnv, validateEnv } from './config/env.validation';
       }),
     }),
     IdentityModule,
+    ContractModule,
+    CrossCuttingModule,
   ],
   controllers: [],
 })

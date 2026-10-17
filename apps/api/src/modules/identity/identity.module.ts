@@ -17,6 +17,9 @@ import { CompanyService } from './services/company.service';
 import { SessionAuthGuard } from '../../common/guards/session-auth.guard';
 import { MailService } from '../mail/mail.service';
 import { CompanyRepository } from './repositories/company.repository';
+import { CompanyInvitationRepository } from './repositories/company-invitation.repository';
+import { CompanyScopeService } from './services/company-scope.service';
+import { CompanyUserRepository } from './repositories/company-user.respository';
 
 @Module({
   imports: [
@@ -29,16 +32,24 @@ import { CompanyRepository } from './repositories/company.repository';
       EmailVerificationToken,
     ]),
   ],
-  exports: [TypeOrmModule],
   controllers: [AppUserController, AuthController, CompanyController],
   providers: [
     AppUserRepository,
     AppUserService,
     AuthService,
     CompanyService,
+    CompanyUserRepository,
     CompanyRepository,
+    CompanyInvitationRepository,
+    CompanyScopeService,
     { provide: APP_GUARD, useClass: SessionAuthGuard },
     MailService,
+  ],
+  exports: [
+    CompanyInvitationRepository,
+    CompanyScopeService,
+    CompanyService,
+    CompanyUserRepository,
   ],
 })
 export class IdentityModule {}

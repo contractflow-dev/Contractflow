@@ -44,7 +44,13 @@ export class CompanyInvitation
   @Column({ name: 'company_role', type: 'enum', enum: EInvitationRole })
   companyRole!: EInvitationRole;
 
-  @Column({ name: 'token_hash', type: 'varchar', length: 255, unique: true })
+  @Column({
+    name: 'token_hash',
+    type: 'varchar',
+    length: 255,
+    unique: true,
+    select: false,
+  })
   tokenHash!: string;
 
   @Column({

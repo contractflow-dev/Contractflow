@@ -1,69 +1,189 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 
-import { CompanyRepository } from '../repositories/company.repository';
+import {
+  ECompanyRole,
+  ECompanyStatus,
+  ECompanyUserStatus,
+  EUserStatus,
+} from '@contractflow/contracts-schema';
+import { AppUser } from '../entities/app-user.entity';
+import { Company } from '../entities/company.entity';
+import { CompanyUser } from '../entities/company-user.entity';
 import { CompanyResponseDto } from '../dto/company/responses/company-response.dto';
 import { CreateCompanyRequestDto } from '../dto/company/requests/create-company-request.dto';
 
-import type { ICompanyProfileResponse } from '@contractflow/contracts-schema';
+import type {
+  ICompanyAccessResponse,
+  ICompanyDashboardResponse,
+  ICompanyMembershipResponse,
+  ICompanyProfileResponse,
+} from '@contractflow/contracts-schema';
 
 @Injectable()
 export class CompanyService {
-  constructor(private readonly companyRepository: CompanyRepository) {}
-
-  async findById(id: string): Promise<ICompanyProfileResponse> {
-    const company = await this.companyRepository.findById(id);
-
-    if (!company) {
-      throw new NotFoundException(`Company with ID ${id} not found`);
-    }
-
-    return CompanyResponseDto.fromEntity(company);
-  }
+  constructor(
+    private readonly dataSource: DataSource,
+    @InjectRepository(CompanyUser)
+    private readonly companyUserRepository: Repository<CompanyUser>,
+  ) {}
 
   async create(
     userId: string,
     dto: CreateCompanyRequestDto,
-  ): Promise<ICompanyProfileResponse> {
-    // TODO: Create the company and its initial membership
-    // atomically once the membership repository is available.
-    void userId;
+  ): Promise<ICompanyAccessResponse> {
+    const result = await this.dataSource.transaction(async (manager) => {
+      const users = manager.getRepository(AppUser);
+      const user = await users.findOne({
+        where: { id: userId },
+      });
 
-    const company = await this.companyRepository.createCompany(dto);
+      if (!user) {
+        throw new UnauthorizedException('Authentication required.');
+      }
 
-    return CompanyResponseDto.fromEntity(company);
+      if (user.status !== EUserStatus.ACTIVE || !user.emailVerifiedAt) {
+        throw new ForbiddenException(
+          'Only verified, active accounts can create companies.',
+        );
+      }
+
+      const companyRepository = manager.getRepository(Company);
+      const savedCompany = await companyRepository.save(
+        companyRepository.create({
+          ...dto,
+          website: dto.website ?? '',
+          addressLine2: dto.addressLine2 ?? '',
+          status: ECompanyStatus.ACTIVE,
+        }),
+      );
+
+      const membershipRepository = manager.getRepository(CompanyUser);
+      const savedMembership = await membershipRepository.save(
+        membershipRepository.create({
+          companyId: savedCompany.id,
+          userId: user.id,
+          companyRole: ECompanyRole.COMPANY_ADMIN,
+          jobTitle: 'Company Administrator',
+          status: ECompanyUserStatus.ACTIVE,
+          joinedAt: new Date(),
+          leftAt: null,
+        }),
+      );
+
+      return {
+        company: savedCompany,
+        membership: savedMembership,
+      };
+    });
+
+    return {
+      company: CompanyResponseDto.fromEntity(result.company),
+      membership: this.mapMembership(result.membership),
+    };
   }
 
-  async listForUser(userId: string): Promise<ICompanyProfileResponse[]> {
-    // TODO: Query only companies belonging to this user.
-    void userId;
+  async listForUser(userId: string): Promise<ICompanyAccessResponse[]> {
+    const memberships = await this.companyUserRepository.find({
+      where: {
+        userId,
+        status: ECompanyUserStatus.ACTIVE,
+      },
+    });
 
-    throw new Error('listForUser requires a company membership repository');
+    return memberships.map((membership) => ({
+      company: CompanyResponseDto.fromEntity(membership.company),
+      membership: this.mapMembership(membership),
+    }));
   }
 
   async getCurrent(userId: string): Promise<ICompanyProfileResponse> {
-    // TODO: Resolve the user's current company through membership.
-    void userId;
+    const membership = await this.companyUserRepository.findOne({
+      where: {
+        userId,
+        status: ECompanyUserStatus.ACTIVE,
+      },
+      order: { joinedAt: 'DESC' },
+    });
 
-    throw new Error(
-      'getCurrent requires a current-company selection or membership model',
-    );
+    if (!membership?.company) {
+      throw new ForbiddenException('Active company membership is required');
+    }
+
+    return CompanyResponseDto.fromEntity(membership.company);
   }
 
-  async getMembership(userId: string, companyId: string) {
-    // TODO: Query membership and verify access.
-    void userId;
-    void companyId;
+  async getMembership(
+    userId: string,
+    companyId: string,
+  ): Promise<ICompanyAccessResponse> {
+    const membership = await this.companyUserRepository.findOne({
+      where: {
+        userId,
+        companyId,
+        status: ECompanyUserStatus.ACTIVE,
+      },
+    });
 
-    throw new Error('getMembership requires a company membership repository');
+    if (!membership?.company) {
+      throw new Error('Company membership was not found.');
+    }
+
+    return {
+      company: CompanyResponseDto.fromEntity(membership.company),
+      membership: this.mapMembership(membership),
+    };
   }
 
-  async getDashboard(userId: string, companyId: string) {
-    // TODO: Verify membership and return a defined dashboard DTO.
-    void userId;
-    void companyId;
+  async getDashboard(
+    userId: string,
+    companyId: string,
+  ): Promise<ICompanyDashboardResponse> {
+    const membership = await this.companyUserRepository.findOne({
+      where: {
+        userId,
+        companyId,
+        status: ECompanyUserStatus.ACTIVE,
+      },
+    });
 
-    throw new Error(
-      'getDashboard requires dashboard contracts and membership checks',
-    );
+    if (!membership?.company) {
+      throw new Error('Company membership was not found.');
+    }
+
+    if (membership.companyRole !== ECompanyRole.COMPANY_ADMIN) {
+      throw new ForbiddenException(
+        'Only company administrators can access dashboard data.',
+      );
+    }
+
+    const activeMembershipCount = await this.companyUserRepository.count({
+      where: {
+        companyId,
+        status: ECompanyUserStatus.ACTIVE,
+      },
+    });
+
+    return {
+      company: CompanyResponseDto.fromEntity(membership.company),
+      membership: this.mapMembership(membership),
+      summary: { activeMembershipCount },
+    };
+  }
+
+  private mapMembership(membership: CompanyUser): ICompanyMembershipResponse {
+    return {
+      id: membership.id,
+      companyId: membership.companyId,
+      companyRole: membership.companyRole,
+      status: membership.status,
+      canManageCompany: membership.companyRole === ECompanyRole.COMPANY_ADMIN,
+    };
   }
 }

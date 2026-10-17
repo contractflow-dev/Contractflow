@@ -5,7 +5,7 @@ export interface IBaseRepository<T extends { id: string }, Scope = void> {
   findOne(options: FindOneOptions<T>, scope: Scope): Promise<T | null>;
   findAll(scope: Scope, options?: FindManyOptions<T>): Promise<T[]>;
   create(data: DeepPartial<T>, scope: Scope): T;
-  save(entity: T): Promise<T>;
+  save(entity: T, scope: Scope): Promise<T>;
   update(
     id: string,
     data: Omit<DeepPartial<T>, 'id'>,
