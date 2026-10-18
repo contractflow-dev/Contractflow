@@ -5,6 +5,7 @@ import { IdentityModule } from './modules/identity/identity.module';
 import { ContractModule } from './modules/contract/contract-module';
 import { CrossCuttingModule } from './modules/cross-cutting/cross-cutting.module';
 import { EnvVars, NodeEnv, validateEnv } from './config/env.validation';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -16,22 +17,22 @@ import { EnvVars, NodeEnv, validateEnv } from './config/env.validation';
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService<EnvVars, true>) => ({
-        type: 'postgres' as const,
-        url: config.get('DATABASE_URL', { infer: true }),
-        ssl: config.get('DB_SSL', { infer: true })
-          ? { rejectUnauthorized: false }
-          : false,
-        autoLoadEntities: true,
-        synchronize:
-          config.get('DB_SYNC', { infer: true }) ??
-          config.get('NODE_ENV', { infer: true }) !== NodeEnv.Production,
-      }),
+      useFactory: (config: ConfigService) => {
+        const isProd = config.get('NODE_ENV') === 'production';
+        return {
+          type: 'postgres' as const,
+          url: config.getOrThrow<string>('DATABASE_URL'),
+          autoLoadEntities: true,
+          synchronize: !isProd,
+          ssl: isProd ? { rejectUnauthorized: false } : false,
+          extra: isProd ? { ssl: { rejectUnauthorized: false } } : {},
+        };
+      },
     }),
     IdentityModule,
     ContractModule,
     CrossCuttingModule,
   ],
-  controllers: [],
+  controllers: [HealthController],
 })
 export class AppModule {}
