@@ -12,12 +12,17 @@ import { HealthController } from './health.controller';
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres' as const,
-        url: config.getOrThrow<string>('DATABASE_URL'),
-        autoLoadEntities: true,
-        synchronize: config.get('NODE_ENV') !== 'production',
-      }),
+      useFactory: (config: ConfigService) => {
+        const isProd = config.get('NODE_ENV') === 'production';
+        return {
+          type: 'postgres' as const,
+          url: config.getOrThrow<string>('DATABASE_URL'),
+          autoLoadEntities: true,
+          synchronize: !isProd,
+          ssl: isProd ? { rejectUnauthorized: false } : false,
+          extra: isProd ? { ssl: { rejectUnauthorized: false } } : {},
+        };
+      },
     }),
     IdentityModule,
   ],
