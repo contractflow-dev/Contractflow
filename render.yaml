@@ -1,14 +1,17 @@
 databases:
-  - name: contractflow-db
+    - name: contractflow-db
     databaseName: contractflow
     user: contractflow
-    # add a plan that fits your budget
+    plan: free
+
+  # Add Redis for prod
+    - name: contractflow-redis
+    type: redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
 
 services:
-  # =========================
-  # ContractFlow API
-  # =========================
-  - type: web
+    - type: web
     name: contractflow-api
     runtime: node
     plan: free
@@ -20,27 +23,34 @@ services:
       pnpm --filter "@contractflow/api..." build
     startCommand: pnpm --filter @contractflow/api start:prod
     envVars:
-      - key: NODE_VERSION
+            - key: NODE_VERSION
         value: "22"
-      - key: NODE_ENV
+            - key: NODE_ENV
         value: production
-      - key: PORT
+            - key: PORT
         value: 10000
-      - key: DATABASE_URL
+            - key: DATABASE_URL
         fromDatabase:
           name: contractflow-db
           property: connectionString
-      - key: JWT_SECRET
+            - key: REDIS_URL
+        fromDatabase:
+          name: contractflow-redis
+          property: connectionString
+            - key: JWT_SECRET
         generateValue: true
-      - key: WEB_URL
-        sync: false
-      - key: CORS_ORIGIN
-        sync: false
+            - key: WEB_URL
+        fromService:
+          name: contractflow-web
+          type: web
+          property: host
+            - key: CORS_ORIGIN
+        fromService:
+          name: contractflow-web
+          type: web
+          property: host
 
-  # =========================
-  # ContractFlow Web
-  # =========================
-  - type: web
+    - type: web
     name: contractflow-web
     runtime: node
     plan: free
@@ -52,11 +62,14 @@ services:
       pnpm --filter "@contractflow/web..." build
     startCommand: pnpm --filter @contractflow/web start
     envVars:
-      - key: NODE_VERSION
+            - key: NODE_VERSION
         value: "22"
-      - key: NODE_ENV
+            - key: NODE_ENV
         value: production
-      - key: PORT
+            - key: PORT
         value: 10000
-      - key: NEXT_PUBLIC_API_URL
-        sync: false
+            - key: NEXT_PUBLIC_API_URL
+        fromService:
+          name: contractflow-api
+          type: web
+          property: host
