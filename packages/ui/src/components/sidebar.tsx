@@ -6,7 +6,7 @@ import { useRender } from "@base-ui/react/use-render"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "cn"
 
-import { useIsMobile } from "@/hooks/use-mobile"
+import { useIsMobile } from "../hooks/use-mobile"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Separator } from "@workspace/ui/components/separator"
@@ -168,6 +168,7 @@ function Sidebar({
     return (
       <div
         data-slot="sidebar"
+        dir={dir}
         className={cn(
           "flex h-full w-(--sidebar-width) flex-col bg-sidebar text-sidebar-foreground",
           className
@@ -213,6 +214,7 @@ function Sidebar({
       data-variant={variant}
       data-side={side}
       data-slot="sidebar"
+      dir={dir}
     >
       {/* This is what handles the sidebar gap on desktop */}
       <div
