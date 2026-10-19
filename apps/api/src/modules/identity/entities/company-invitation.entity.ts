@@ -1,18 +1,19 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  ManyToOne,
-  JoinColumn,
-} from 'typeorm';
+import { Entity, Index, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { Company } from './company.entity';
 import { CompanyUser } from './company-user.entity';
 import { BaseCustomEntity } from '../../cross-cutting/entities/base-custom.entity';
 import { ICompanyInvitationEntity } from '../interface/company-invitation.interface';
-import { EInvitationRole, EInvitationStatus } from '@contractflow/contracts-schema';
-
+import {
+  EInvitationRole,
+  EInvitationStatus,
+} from '@contractflow/contracts-schema';
 
 @Entity('company_invitation')
+@Index('ix_company_invitation_company_status_expiry', [
+  'companyId',
+  'status',
+  'expiresAt',
+])
 export class CompanyInvitation
   extends BaseCustomEntity
   implements ICompanyInvitationEntity
@@ -64,6 +65,9 @@ export class CompanyInvitation
   @Column({ name: 'expires_at', type: 'timestamptz' })
   expiresAt!: Date;
 
-  @Column({ name: 'accepted_at', type: 'timestamptz' })
-  acceptedAt!: Date;
+  @Column({ name: 'accepted_at', type: 'timestamptz', nullable: true })
+  acceptedAt!: Date | null;
+
+  @Column({ name: 'revoked_at', type: 'timestamptz', nullable: true })
+  revokedAt!: Date | null;
 }

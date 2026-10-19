@@ -48,8 +48,9 @@ describe('AuthService', () => {
     mail = { sendVerificationEmail: vi.fn().mockResolvedValue(undefined) };
 
     const manager = {
-      getRepository: (entity: typeof AppUser | typeof EmailVerificationToken) =>
-        entity === AppUser ? appUsers : tokens,
+      getRepository: (
+        entity: typeof AppUser | typeof EmailVerificationToken,
+      ) => (entity === AppUser ? appUsers : tokens),
     };
     transaction = vi.fn(
       async <T>(work: (manager: EntityManager) => Promise<T>) =>
@@ -105,8 +106,9 @@ describe('AuthService', () => {
     tokens.findOne.mockResolvedValue(record);
     appUsers.findOne.mockResolvedValue(user);
 
-    await expect(service.verifyEmail('test-token-with-enough-length')).resolves
-      .toMatchObject({ message: 'Your email address is verified.' });
+    await expect(
+      service.verifyEmail('test-token-with-enough-length'),
+    ).resolves.toMatchObject({ message: 'Your email address is verified.' });
 
     expect(record.usedAt).toBeInstanceOf(Date);
     expect(user.emailVerifiedAt).toBeInstanceOf(Date);

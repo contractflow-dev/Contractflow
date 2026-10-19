@@ -37,6 +37,7 @@ export interface AuthenticatedUser {
   id: string;
   email: string;
   emailVerifiedAt: Date | null;
+  isPlatformAdmin: boolean;
 }
 
 export interface AuthenticatedSession {
@@ -298,6 +299,7 @@ export class AuthService {
         id: session.user.id,
         email: session.user.email,
         emailVerifiedAt: session.user.emailVerifiedAt,
+        isPlatformAdmin: Boolean(session.user.isPlatformAdmin),
       },
       sessionId: session.id,
     };

@@ -59,5 +59,8 @@ export interface ICompanyAccessResponse {
 export interface ICompanyDashboardResponse extends ICompanyAccessResponse {
   summary: {
     activeMembershipCount: number;
+    pendingInvitationCount: number;
+    activeContractCount: number;
+    expiringContractCount: number;
   };
 }

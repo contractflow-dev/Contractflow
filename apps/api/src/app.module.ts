@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { IdentityModule } from './modules/identity/identity.module';
 import { ContractModule } from './modules/contract/contract-module';
 import { CrossCuttingModule } from './modules/cross-cutting/cross-cutting.module';
+import { AdminModule } from './modules/admin/admin.module';
 import { EnvVars, NodeEnv, validateEnv } from './config/env.validation';
 import { HealthController } from './health.controller';
 
@@ -32,6 +33,7 @@ import { HealthController } from './health.controller';
     IdentityModule,
     ContractModule,
     CrossCuttingModule,
+    AdminModule,
   ],
   controllers: [HealthController],
 })

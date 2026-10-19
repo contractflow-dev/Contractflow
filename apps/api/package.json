@@ -24,7 +24,8 @@
     "typeorm": "tsx ./node_modules/typeorm/cli.js -d src/common/database/data-source.ts",
     "migration:generate": "pnpm run typeorm migration:generate",
     "migration:run": "pnpm run typeorm migration:run",
-    "migration:revert": "pnpm run typeorm migration:revert"
+    "migration:revert": "pnpm run typeorm migration:revert",
+    "admin:promote": "node dist/scripts/promote-platform-admin.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",

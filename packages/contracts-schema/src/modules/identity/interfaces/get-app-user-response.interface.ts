@@ -11,6 +11,7 @@ export interface IGetAppUserResponse {
   timezone: string;
   emailVerifiedAt: Date | null;
   lastLoginAt: Date | null;
+  isPlatformAdmin: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

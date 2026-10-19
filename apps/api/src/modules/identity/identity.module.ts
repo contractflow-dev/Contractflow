@@ -10,16 +10,20 @@ import { EmailVerificationToken } from './entities/email-verification-token.enti
 import { AppUserController } from './controllers/app-user.controller';
 import { AuthController } from './controllers/auth.controller';
 import { CompanyController } from './controllers/company.controller';
+import { CompanyInvitationController } from './controllers/company-invitation.controller';
 import { AppUserRepository } from './repositories/app-user.repository';
 import { AppUserService } from './services/app-user.service';
 import { AuthService } from './services/auth.service';
 import { CompanyService } from './services/company.service';
+import { CompanyAdminService } from './services/company-admin.service';
 import { SessionAuthGuard } from '../../common/guards/session-auth.guard';
 import { MailService } from '../mail/mail.service';
 import { CompanyRepository } from './repositories/company.repository';
 import { CompanyInvitationRepository } from './repositories/company-invitation.repository';
 import { CompanyScopeService } from './services/company-scope.service';
 import { CompanyUserRepository } from './repositories/company-user.respository';
+import { Contract } from '../contract/entities/contract.entity';
+import { ContractParty } from '../contract/entities/contract-party.entity';
 
 @Module({
   imports: [
@@ -28,16 +32,24 @@ import { CompanyUserRepository } from './repositories/company-user.respository';
       Company,
       CompanyUser,
       CompanyInvitation,
+      Contract,
+      ContractParty,
       UserSession,
       EmailVerificationToken,
     ]),
   ],
-  controllers: [AppUserController, AuthController, CompanyController],
+  controllers: [
+    AppUserController,
+    AuthController,
+    CompanyController,
+    CompanyInvitationController,
+  ],
   providers: [
     AppUserRepository,
     AppUserService,
     AuthService,
     CompanyService,
+    CompanyAdminService,
     CompanyUserRepository,
     CompanyRepository,
     CompanyInvitationRepository,
