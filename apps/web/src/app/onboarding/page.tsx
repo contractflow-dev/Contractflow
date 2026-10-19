@@ -10,7 +10,12 @@ import { getApiErrorMessage } from "@/lib/apiError";
 import { useCreateCompanyMutation } from "@/features/companies";
 import { useGetCurrentUserQuery } from "@/services/authApi";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
-import { ECurrencyCode, COUNTRY_CURRENCY_MAP } from "@contractflow/contracts-schema";
+import {
+  ECountryCode,
+  ECurrencyCode,
+  COUNTRY_CURRENCY_MAP,
+} from "@contractflow/contracts-schema";
+import { countryCodes, countryOptions } from "@/lib/countries";
 
 const currencyCodes = Object.values(ECurrencyCode);
 
@@ -44,7 +49,9 @@ const companySchema = z.object({
     .string()
     .trim()
     .toUpperCase()
-    .regex(/^[A-Z]{2}$/, "Enter a two-letter country code"),
+    .refine((code) => countryCodes.includes(code as ECountryCode), {
+      message: "Select a country",
+    }),
   defaultCurrencyCode: z
     .string()
     .trim()
@@ -133,9 +140,12 @@ export default function OnboardingPage() {
       return;
     }
 
-    const inferredCurrency = COUNTRY_CURRENCY_MAP[countryCode.trim().toUpperCase()];
+    const inferredCurrency =
+      COUNTRY_CURRENCY_MAP[countryCode.trim().toUpperCase()];
     if (inferredCurrency) {
-      setValue("defaultCurrencyCode", inferredCurrency, { shouldValidate: true });
+      setValue("defaultCurrencyCode", inferredCurrency, {
+        shouldValidate: true,
+      });
     }
   }, [countryCode, setValue]);
 
@@ -451,17 +461,23 @@ export default function OnboardingPage() {
               </CompanyField>
               <CompanyField
                 id="countryCode"
-                label="Country code (2 letters)"
+                label="Country"
                 error={errors.countryCode?.message}
               >
-                <input
+                <select
                   id="countryCode"
                   autoComplete="country"
-                  maxLength={2}
                   className={inputClass}
                   aria-invalid={!!errors.countryCode}
                   {...register("countryCode")}
-                />
+                >
+                  <option value="">Select a country</option>
+                  {countryOptions.map(({ code, name }) => (
+                    <option key={code} value={code}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
               </CompanyField>
               <CompanyField
                 id="defaultCurrencyCode"

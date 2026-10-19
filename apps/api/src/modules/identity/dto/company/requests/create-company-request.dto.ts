@@ -1,4 +1,4 @@
-import { ECurrencyCode } from '@contractflow/contracts-schema';
+import { ECountryCode, ECurrencyCode } from '@contractflow/contracts-schema';
 import { Transform } from 'class-transformer';
 import {
   IsEnum,
@@ -96,11 +96,8 @@ export class CreateCompanyRequestDto {
   @Transform(({ value }) =>
     typeof value === 'string' ? value.trim().toUpperCase() : value,
   )
-  @IsString()
-  @Length(2, 2)
-  @Matches(/^[A-Z]{2}$/)
-  countryCode!: string;
-  // Add country Enum
+  @IsEnum(ECountryCode)
+  countryCode!: ECountryCode;
 
   @Transform(({ value }) =>
     typeof value === 'string' ? value.trim().toUpperCase() : value,

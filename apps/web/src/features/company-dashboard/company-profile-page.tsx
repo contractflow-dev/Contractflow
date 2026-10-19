@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ECurrencyCode } from "@contractflow/contracts-schema";
+import { ECountryCode, ECurrencyCode } from "@contractflow/contracts-schema";
+import { countryCodes, countryOptions } from "@/lib/countries";
 import { Button } from "@workspace/ui/components/button";
 import {
   useGetCompanyDashboardQuery,
@@ -32,11 +33,7 @@ const profileSchema = z.object({
   city: z.string().trim().min(1).max(100),
   stateRegion: z.string().trim().min(1).max(100),
   postalCode: z.string().trim().min(1).max(20),
-  countryCode: z
-    .string()
-    .trim()
-    .toUpperCase()
-    .regex(/^[A-Z]{2}$/, "Use a two-letter country code"),
+  countryCode: z.enum(countryCodes, { message: "Select a country" }),
   defaultCurrencyCode: z.enum(
     Object.values(ECurrencyCode) as [ECurrencyCode, ...ECurrencyCode[]],
   ),
@@ -73,7 +70,6 @@ const fields: Array<{
     autoComplete: "address-level1",
   },
   { key: "postalCode", label: "Postal code", autoComplete: "postal-code" },
-  { key: "countryCode", label: "Country code", autoComplete: "country" },
 ];
 
 export function CompanyProfilePage({
@@ -162,7 +158,7 @@ function ProfileForm({
       city: company.city,
       stateRegion: company.stateRegion,
       postalCode: company.postalCode,
-      countryCode: company.countryCode,
+      countryCode: company.countryCode as ECountryCode,
       defaultCurrencyCode: company.defaultCurrencyCode as ECurrencyCode,
     },
   });
@@ -219,6 +215,26 @@ function ProfileForm({
             )}
           </label>
         ))}
+        <label className="space-y-1.5 text-sm font-medium">
+          Country
+          <select
+            {...register("countryCode")}
+            autoComplete="country"
+            aria-invalid={Boolean(errors.countryCode)}
+            className={inputClass}
+          >
+            {countryOptions.map(({ code, name }) => (
+              <option key={code} value={code}>
+                {name}
+              </option>
+            ))}
+          </select>
+          {errors.countryCode?.message && (
+            <span role="alert" className="block text-xs text-destructive">
+              {errors.countryCode.message}
+            </span>
+          )}
+        </label>
         <label className="space-y-1.5 text-sm font-medium">
           Default currency
           <select
