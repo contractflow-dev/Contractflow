@@ -1,13 +1,7 @@
-import {
-  Body,
-  Controller,
-  Post,
-  Req,
-  Res,
-} from '@nestjs/common';
+import { Body, Controller, Post, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthService, RequestMetadata } from '../services/auth.service';
-import { AppUserResponseDto } from '../dto/app-user/responses/app-user-resonse.dto';
+import { AppUserResponseDto } from '../dto/app-user/responses/app-user-response.dto';
 import { CreateAppUserRequestDto } from '../dto/app-user/requests/create-app-user-request.dto';
 import { LoginAppUserDto } from '../dto/app-user/requests/login-app-user-request.dto';
 import { VerifyEmailRequestDto } from '../dto/auth/verify-email-request.dto';
@@ -21,7 +15,10 @@ function requestMetadata(request: Request): RequestMetadata {
   };
 }
 
-function sessionToken(request: Request, cookieName: string): string | undefined {
+function sessionToken(
+  request: Request,
+  cookieName: string,
+): string | undefined {
   const cookieHeader = request.headers.cookie;
   const cookie = cookieHeader
     ?.split(';')
@@ -36,7 +33,9 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
-  register(@Body() body: CreateAppUserRequestDto): Promise<{ message: string }> {
+  register(
+    @Body() body: CreateAppUserRequestDto,
+  ): Promise<{ message: string }> {
     return this.authService.register(body);
   }
 

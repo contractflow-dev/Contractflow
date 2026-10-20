@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { IGetAppUserResponse } from '@contractflow/contracts-schema';
 import { AppUserRepository } from '../repositories/app-user.repository';
-import { AppUserResponseDto } from '../dto/app-user/responses/app-user-resonse.dto';
+import { AppUserResponseDto } from '../dto/app-user/responses/app-user-response.dto';
 
 @Injectable()
 export class AppUserService {

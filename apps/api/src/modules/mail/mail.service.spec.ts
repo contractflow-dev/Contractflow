@@ -82,4 +82,41 @@ describe('MailService', () => {
     );
     expect(mocks.sendMail).not.toHaveBeenCalled();
   });
+
+  it('sends company invitations through the configured local SMTP server', async () => {
+    const service = createService({
+      NODE_ENV: 'development',
+    });
+
+    await service.sendCompanyInvitationEmail(
+      'member@example.com',
+      'Example Energy',
+      'Finance Officer',
+      'single-use-token',
+    );
+
+    expect(mocks.sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'member@example.com',
+        subject: 'Invitation to join Example Energy',
+        text: expect.stringContaining(
+          'http://localhost:3000/invitations/respond?token=single-use-token',
+        ),
+      }),
+    );
+  });
+
+  it('reports SMTP invitation delivery failures to the calling transaction', async () => {
+    mocks.sendMail.mockRejectedValueOnce(new Error('SMTP offline'));
+    const service = createService({ NODE_ENV: 'development' });
+
+    await expect(
+      service.sendCompanyInvitationEmail(
+        'member@example.com',
+        'Example Energy',
+        'Finance Officer',
+        'single-use-token',
+      ),
+    ).rejects.toThrow('could not be delivered through SMTP');
+  });
 });

@@ -4,11 +4,13 @@ import { api } from "@/services/api";
 import { authApi } from "@/services/authApi";
 import { companiesApi } from "@/features/companies/companiesApi";
 import { getApiErrorMessage, getApiErrorStatus } from "@/lib/apiError";
+import { EInvitationRole } from "@contractflow/contracts-schema";
 
 describe("RTK Query authentication and company API contracts", () => {
-  const fetchMock = vi.fn<
-    (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
-  >();
+  const fetchMock =
+    vi.fn<
+      (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+    >();
 
   beforeEach(() => {
     store.dispatch(api.util.resetApiState());
@@ -62,7 +64,8 @@ describe("RTK Query authentication and company API contracts", () => {
       new Response(
         JSON.stringify({
           statusCode: 400,
-          message: "This verification link is invalid, expired, or already used.",
+          message:
+            "This verification link is invalid, expired, or already used.",
         }),
         {
           status: 400,
@@ -75,8 +78,9 @@ describe("RTK Query authentication and company API contracts", () => {
     try {
       await store
         .dispatch(
-          authApi.endpoints.verifyEmail
-            .initiate({ token: "expired-verification-token" }),
+          authApi.endpoints.verifyEmail.initiate({
+            token: "expired-verification-token",
+          }),
         )
         .unwrap();
     } catch (caught) {
@@ -156,7 +160,10 @@ describe("RTK Query authentication and company API contracts", () => {
 
     fetchMock.mockResolvedValueOnce(
       new Response(
-        JSON.stringify({ statusCode: 401, message: "Authentication required." }),
+        JSON.stringify({
+          statusCode: 401,
+          message: "Authentication required.",
+        }),
         {
           status: 401,
           headers: { "Content-Type": "application/json" },
@@ -168,6 +175,113 @@ describe("RTK Query authentication and company API contracts", () => {
     );
     await expect(currentUserRequest.unwrap()).rejects.toMatchObject({
       status: 401,
+    });
+  });
+
+  it("scopes member management, invitation, and profile requests by company", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          items: [],
+          total: 0,
+          page: 1,
+          limit: 20,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    await store
+      .dispatch(
+        companiesApi.endpoints.getCompanyMembers.initiate({
+          companyId: "company-1",
+          page: 1,
+          limit: 20,
+          search: "person",
+        }),
+      )
+      .unwrap();
+
+    let request = fetchMock.mock.calls[0][0] as Request;
+    expect(request.url).toBe(
+      "http://localhost:3001/api/companies/company-1/members?page=1&limit=20&search=person",
+    );
+    expect(request.credentials).toBe("include");
+
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ id: "invite-1", status: "pending" }), {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    await store
+      .dispatch(
+        companiesApi.endpoints.inviteCompanyMember.initiate({
+          companyId: "company-1",
+          data: {
+            email: "person@example.com",
+            firstName: "Test",
+            lastName: "Person",
+            companyRole: EInvitationRole.FINANCE_OFFICER,
+          },
+        }),
+      )
+      .unwrap();
+
+    request = fetchMock.mock.calls[1][0] as Request;
+    expect(request.url).toBe(
+      "http://localhost:3001/api/companies/company-1/invitations",
+    );
+    expect(request.method).toBe("POST");
+    await expect(request.clone().json()).resolves.toMatchObject({
+      email: "person@example.com",
+      companyRole: "Finance Officer",
+    });
+
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ name: "Updated Company" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    await store
+      .dispatch(
+        companiesApi.endpoints.updateCompanyProfile.initiate({
+          companyId: "company-1",
+          data: { name: "Updated Company" },
+        }),
+      )
+      .unwrap();
+    request = fetchMock.mock.calls[2][0] as Request;
+    expect(request.url).toBe(
+      "http://localhost:3001/api/companies/company-1/profile",
+    );
+    expect(request.method).toBe("PATCH");
+  });
+
+  it("posts invitation decisions without putting the token in the request URL", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: "accepted" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await store
+      .dispatch(
+        companiesApi.endpoints.respondToCompanyInvitation.initiate({
+          token: "invitation-token",
+          decision: "accept",
+        }),
+      )
+      .unwrap();
+
+    const request = fetchMock.mock.calls[0][0] as Request;
+    expect(request.url).toBe("http://localhost:3001/api/invitations/respond");
+    expect(request.method).toBe("POST");
+    expect(request.url).not.toContain("invitation-token");
+    await expect(request.clone().json()).resolves.toEqual({
+      token: "invitation-token",
+      decision: "accept",
     });
   });
 });

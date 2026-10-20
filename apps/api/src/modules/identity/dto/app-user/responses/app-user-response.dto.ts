@@ -17,6 +17,7 @@ export class AppUserResponseDto implements IGetAppUserResponse {
   updatedAt: Date;
   emailVerifiedAt: Date | null;
   lastLoginAt: Date | null;
+  isPlatformAdmin: boolean;
 
   static fromEntity(entity: AppUser): AppUserResponseDto {
     return {
@@ -28,7 +29,8 @@ export class AppUserResponseDto implements IGetAppUserResponse {
       status: entity.status,
       timezone: entity.timezone,
       emailVerifiedAt: entity.emailVerifiedAt,
-      lastLoginAt: entity.createdAt,
+      lastLoginAt: entity.lastLoginAt,
+      isPlatformAdmin: Boolean(entity.isPlatformAdmin),
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
       phoneNumber: entity.phoneNumber,

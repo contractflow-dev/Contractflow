@@ -1,19 +1,19 @@
-import {
-  ForbiddenException,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import type { DataSource, EntityManager, Repository } from 'typeorm';
 import { getMetadataArgsStorage } from 'typeorm';
 import {
   ECompanyRole,
   ECompanyStatus,
   ECompanyUserStatus,
+  EContractStatus,
   EUserStatus,
 } from '@contractflow/contracts-schema';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppUser } from '../entities/app-user.entity';
 import { Company } from '../entities/company.entity';
 import { CompanyUser } from '../entities/company-user.entity';
+import { ContractParty } from '../../contract/entities/contract-party.entity';
+import { CompanyInvitationRepository } from '../repositories/company-invitation.repository';
 import { CompanyService } from './company.service';
 
 const companyData = {
@@ -55,6 +55,8 @@ describe('CompanyService', () => {
   let users: Record<string, ReturnType<typeof vi.fn>>;
   let companyRepository: Record<string, ReturnType<typeof vi.fn>>;
   let membershipRepository: Record<string, ReturnType<typeof vi.fn>>;
+  let invitationRepository: Record<string, ReturnType<typeof vi.fn>>;
+  let contractPartyRepository: Record<string, ReturnType<typeof vi.fn>>;
   let transaction: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -80,8 +82,30 @@ describe('CompanyService', () => {
       findOne: vi.fn(),
       count: vi.fn(),
     };
+    invitationRepository = {
+      countPending: vi.fn().mockResolvedValue(2),
+    };
+    const queryBuilder = {
+      innerJoin: vi.fn(),
+      select: vi.fn(),
+      where: vi.fn(),
+      andWhere: vi.fn(),
+      getRawOne: vi
+        .fn()
+        .mockResolvedValueOnce({ count: '4' })
+        .mockResolvedValueOnce({ count: '1' }),
+    };
+    queryBuilder.innerJoin.mockReturnValue(queryBuilder);
+    queryBuilder.select.mockReturnValue(queryBuilder);
+    queryBuilder.where.mockReturnValue(queryBuilder);
+    queryBuilder.andWhere.mockReturnValue(queryBuilder);
+    contractPartyRepository = {
+      createQueryBuilder: vi.fn().mockReturnValue(queryBuilder),
+    };
     const manager = {
-      getRepository: (entity: typeof AppUser | typeof Company | typeof CompanyUser) =>
+      getRepository: (
+        entity: typeof AppUser | typeof Company | typeof CompanyUser,
+      ) =>
         entity === AppUser
           ? users
           : entity === Company
@@ -95,6 +119,8 @@ describe('CompanyService', () => {
     service = new CompanyService(
       { transaction } as unknown as DataSource,
       membershipRepository as unknown as Repository<CompanyUser>,
+      invitationRepository as unknown as CompanyInvitationRepository,
+      contractPartyRepository as unknown as Repository<ContractParty>,
     );
   });
 
@@ -162,6 +188,7 @@ describe('CompanyService', () => {
         where: {
           userId: 'current-user',
           status: ECompanyUserStatus.ACTIVE,
+          leftAt: expect.anything(),
         },
       }),
     );
@@ -180,12 +207,22 @@ describe('CompanyService', () => {
     await expect(
       service.getDashboard('user-id', companyData.id),
     ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(membershipRepository.findOne).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          userId: 'user-id',
+          companyId: companyData.id,
+          status: ECompanyUserStatus.ACTIVE,
+          leftAt: expect.anything(),
+        },
+      }),
+    );
     expect(membershipRepository.count).not.toHaveBeenCalled();
 
     membershipRepository.findOne.mockResolvedValueOnce(null);
     await expect(
       service.getMembership('another-user', companyData.id),
-    ).rejects.toThrow('Company membership was not found.');
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('returns a database-backed company-member summary to an administrator', async () => {
@@ -194,6 +231,7 @@ describe('CompanyService', () => {
       companyId: companyData.id,
       companyRole: ECompanyRole.COMPANY_ADMIN,
       status: ECompanyUserStatus.ACTIVE,
+      leftAt: null,
       company: companyData,
     });
     membershipRepository.count.mockResolvedValue(3);
@@ -203,13 +241,34 @@ describe('CompanyService', () => {
     ).resolves.toMatchObject({
       company: { id: companyData.id },
       membership: { canManageCompany: true },
-      summary: { activeMembershipCount: 3 },
+      summary: {
+        activeMembershipCount: 3,
+        pendingInvitationCount: 2,
+        activeContractCount: 4,
+        expiringContractCount: 1,
+      },
     });
     expect(membershipRepository.count).toHaveBeenCalledWith({
       where: {
         companyId: companyData.id,
         status: ECompanyUserStatus.ACTIVE,
+        leftAt: expect.anything(),
       },
+    });
+    expect(invitationRepository.countPending).toHaveBeenCalledWith(
+      { companyId: companyData.id },
+      expect.any(Date),
+    );
+    expect(contractPartyRepository.createQueryBuilder).toHaveBeenCalledTimes(2);
+    expect(
+      contractPartyRepository.createQueryBuilder.mock.results[0].value.where,
+    ).toHaveBeenCalledWith('party.companyId = :companyId', {
+      companyId: companyData.id,
+    });
+    expect(
+      contractPartyRepository.createQueryBuilder.mock.results[0].value.andWhere,
+    ).toHaveBeenCalledWith('contract.status = :status', {
+      status: EContractStatus.ACTIVE,
     });
   });
 

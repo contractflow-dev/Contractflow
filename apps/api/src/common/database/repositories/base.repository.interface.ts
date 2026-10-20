@@ -1,15 +1,15 @@
-import { FindManyOptions, FindOneOptions } from 'typeorm';
+import type { DeepPartial, FindManyOptions, FindOneOptions } from 'typeorm';
 
-export interface IBaseRepository<T extends { id: string }> {
-  findById(id: string): Promise<T | null>;
-
-  findOne(options: FindOneOptions<T>): Promise<T | null>;
-
-  findAll(options: FindManyOptions): Promise<T[]>;
-
-  create(data: Partial<T>): T;
-
-  update(id: string, data: Partial<T>): Promise<T>;
-
-  delete(id: string): Promise<void>;
+export interface IBaseRepository<T extends { id: string }, Scope = void> {
+  findById(id: string, scope: Scope): Promise<T | null>;
+  findOne(options: FindOneOptions<T>, scope: Scope): Promise<T | null>;
+  findAll(scope: Scope, options?: FindManyOptions<T>): Promise<T[]>;
+  create(data: DeepPartial<T>, scope: Scope): T;
+  save(entity: T, scope: Scope): Promise<T>;
+  update(
+    id: string,
+    data: Omit<DeepPartial<T>, 'id'>,
+    scope: Scope,
+  ): Promise<T>;
+  delete(id: string, scope: Scope): Promise<void>;
 }

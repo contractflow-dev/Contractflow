@@ -37,7 +37,18 @@ export default function LoginPage() {
     setServerError(null);
     try {
       await login(values).unwrap();
-      router.replace("/dashboards");
+      const requestedRedirect = new URLSearchParams(window.location.search).get(
+        "redirect",
+      );
+      const redirectUrl = requestedRedirect
+        ? new URL(requestedRedirect, window.location.origin)
+        : null;
+      const safeRedirect =
+        requestedRedirect?.startsWith("/") &&
+        redirectUrl?.origin === window.location.origin
+          ? `${redirectUrl.pathname}${redirectUrl.search}${redirectUrl.hash}`
+          : "/dashboards";
+      router.replace(safeRedirect);
     } catch (error) {
       setServerError(getApiErrorMessage(error, "Sign in failed."));
     }

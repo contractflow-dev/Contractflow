@@ -1,5 +1,7 @@
+import { ECountryCode, ECurrencyCode } from '@contractflow/contracts-schema';
 import { Transform } from 'class-transformer';
 import {
+  IsEnum,
   IsEmail,
   IsOptional,
   IsString,
@@ -94,10 +96,8 @@ export class CreateCompanyRequestDto {
   @Transform(({ value }) =>
     typeof value === 'string' ? value.trim().toUpperCase() : value,
   )
-  @IsString()
-  @Length(2, 2)
-  @Matches(/^[A-Z]{2}$/)
-  countryCode!: string;
+  @IsEnum(ECountryCode)
+  countryCode!: ECountryCode;
 
   @Transform(({ value }) =>
     typeof value === 'string' ? value.trim().toUpperCase() : value,
@@ -105,5 +105,6 @@ export class CreateCompanyRequestDto {
   @IsString()
   @Length(3, 3)
   @Matches(/^[A-Z]{3}$/)
-  defaultCurrencyCode!: string;
+  @IsEnum(ECurrencyCode)
+  defaultCurrencyCode!: ECurrencyCode;
 }
