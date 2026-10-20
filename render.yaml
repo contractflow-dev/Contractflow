@@ -1,75 +1,61 @@
-databases:
-    - name: contractflow-db
-    databaseName: contractflow
-    user: contractflow
-    plan: free
-
-  # Add Redis for prod
-    - name: contractflow-redis
-    type: redis
-    plan: free
-    maxmemoryPolicy: allkeys-lru
-
 services:
-    - type: web
+  # ContractFlow API
+  - type: web
     name: contractflow-api
     runtime: node
     plan: free
     rootDir: .
     healthCheckPath: /health
+
     buildCommand: |
       corepack enable
       pnpm install --frozen-lockfile --prod=false
       pnpm --filter "@contractflow/api..." build
-    startCommand: pnpm --filter @contractflow/api start:prod
-    envVars:
-            - key: NODE_VERSION
-        value: "22"
-            - key: NODE_ENV
-        value: production
-            - key: PORT
-        value: 10000
-            - key: DATABASE_URL
-        fromDatabase:
-          name: contractflow-db
-          property: connectionString
-            - key: REDIS_URL
-        fromDatabase:
-          name: contractflow-redis
-          property: connectionString
-            - key: JWT_SECRET
-        generateValue: true
-            - key: WEB_URL
-        fromService:
-          name: contractflow-web
-          type: web
-          property: host
-            - key: CORS_ORIGIN
-        fromService:
-          name: contractflow-web
-          type: web
-          property: host
 
-    - type: web
+    startCommand: pnpm --filter @contractflow/api start:prod
+
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+
+      - key: NODE_ENV
+        value: production
+
+      - key: DATABASE_URL
+        sync: false
+
+      - key: JWT_SECRET
+        generateValue: true
+
+      - key: WEB_URL
+        value: https://contractflow-web-o6yz.onrender.com
+
+      - key: CORS_ORIGIN
+        value: https://contractflow-web-o6yz.onrender.com
+
+      - key: MAIL_PROVIDER
+        value: smtp
+
+  # ContractFlow Web
+  - type: web
     name: contractflow-web
     runtime: node
     plan: free
     rootDir: .
-    healthCheckPath: /
+
     buildCommand: |
       corepack enable
       pnpm install --frozen-lockfile --prod=false
       pnpm --filter "@contractflow/web..." build
+
     startCommand: pnpm --filter @contractflow/web start
+
     envVars:
-            - key: NODE_VERSION
+      - key: NODE_VERSION
         value: "22"
-            - key: NODE_ENV
+
+      - key: NODE_ENV
         value: production
-            - key: PORT
-        value: 10000
-            - key: NEXT_PUBLIC_API_URL
-        fromService:
-          name: contractflow-api
-          type: web
-          property: host
+
+      - key: NEXT_PUBLIC_API_URL
+        value: https://contractflow-api.onrender.com
