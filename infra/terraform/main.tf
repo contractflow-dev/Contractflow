@@ -59,11 +59,11 @@ module "application" {
     ManagedBy   = "Terraform"
   }
 }
+
 module "database" {
   source = "./modules/database"
 
-  name = "${var.project_name}-${var.environment}"
-
+  name   = "${var.project_name}-${var.environment}"
   vpc_id = module.network.vpc_id
 
   application_security_group_id = module.application.security_group_id
@@ -92,6 +92,25 @@ module "ecr" {
     "web",
     "api"
   ]
+
+  tags = {
+    Project     = var.project_name
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+module "ecs" {
+  source = "./modules/ecs"
+
+  name       = "${var.project_name}-${var.environment}"
+  aws_region = var.aws_region
+
+  web_repository_url = module.ecr.repository_urls["web"]
+  api_repository_url = module.ecr.repository_urls["api"]
+
+  web_container_port = 3000
+  api_container_port = 3001
 
   tags = {
     Project     = var.project_name
