@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import type { Ref } from "react";
+import { Button } from "@workspace/ui/components/button";
 import { Checkbox } from "@workspace/ui/components/checkbox";
+import { FieldError } from "@workspace/ui/components/field";
 import { LegalDocumentDialog } from "@/components/legal/legal-document-dialog";
 import { PrivacyPolicyContent } from "@/components/legal/privacy-policy-content";
 import { TermsOfServiceContent } from "@/components/legal/terms-of-service-content";
@@ -53,32 +54,33 @@ export function LegalConsent({
             className="min-w-0 text-sm leading-6 text-muted-foreground"
           >
             I agree to the{" "}
-            <button
+            <Button
               type="button"
+              variant="link"
               onClick={() => setOpenDocument("terms")}
-              className="font-medium text-foreground underline underline-offset-4 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="h-auto p-0 align-baseline font-medium text-foreground underline hover:text-primary"
             >
               Terms of Service
-            </button>{" "}
+            </Button>{" "}
             and acknowledge the{" "}
-            <button
+            <Button
               type="button"
+              variant="link"
               onClick={() => setOpenDocument("privacy")}
-              className="font-medium text-foreground underline underline-offset-4 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="h-auto p-0 align-baseline font-medium text-foreground underline hover:text-primary"
             >
               Privacy Policy
-            </button>
+            </Button>
             .
           </p>
         </div>
         {error && (
-          <p
+          <FieldError
             id="legal-consent-error"
-            role="alert"
-            className="break-words ps-8 text-xs text-destructive"
+            className="break-words ps-8 text-xs"
           >
             {error}
-          </p>
+          </FieldError>
         )}
         {/* <p className="ps-8 text-xs text-muted-foreground">
           You may also read the{" "}

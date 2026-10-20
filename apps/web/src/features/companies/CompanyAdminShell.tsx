@@ -3,6 +3,20 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
+import { Alert, AlertDescription } from "@workspace/ui/components/alert";
+import { Button, buttonVariants } from "@workspace/ui/components/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@workspace/ui/components/native-select";
+import { Separator } from "@workspace/ui/components/separator";
+import { Skeleton } from "@workspace/ui/components/skeleton";
 import { useLogoutMutation } from "@/services/authApi";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
@@ -10,11 +24,9 @@ import {
   selectActiveWorkspaceId,
 } from "@/features/workspace/workspaceSlice";
 import { getApiErrorMessage } from "@/lib/apiError";
+import { cn } from "@/lib/utils";
 import { useGetCompaniesQuery } from "./companiesApi";
 import type { CompanyAccess } from "./companiesApi";
-
-const linkClass =
-  "rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted";
 
 export function CompanyAdminShell({
   children,
@@ -53,36 +65,56 @@ export function CompanyAdminShell({
   if (isFetching && !companies) {
     return (
       <main className="grid min-h-svh place-items-center p-6">
-        <p role="status" className="text-sm text-muted-foreground">
-          Loading your companies…
-        </p>
+        <div role="status" className="flex flex-col items-center gap-3">
+          <Skeleton className="h-4 w-48" />
+          <p className="text-sm text-muted-foreground">
+            Loading your companies…
+          </p>
+        </div>
       </main>
     );
   }
   if (error) {
     return (
       <main className="grid min-h-svh place-items-center p-6">
-        <section className="max-w-lg space-y-3 rounded-xl border bg-card p-6">
-          <h1 className="text-lg font-semibold">Unable to load companies</h1>
-          <p role="alert" className="text-sm text-destructive">
-            {getApiErrorMessage(error, "Please try again in a moment.")}
-          </p>
-        </section>
+        <Card className="max-w-lg">
+          <CardHeader>
+            <CardTitle role="heading" aria-level={1} className="text-lg font-semibold">
+              Unable to load companies
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Alert variant="destructive">
+              <AlertDescription>
+                {getApiErrorMessage(error, "Please try again in a moment.")}
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
       </main>
     );
   }
   if (!companies?.length) {
     return (
       <main className="grid min-h-svh place-items-center p-6">
-        <section className="max-w-lg space-y-3 rounded-xl border bg-card p-6">
-          <h1 className="text-lg font-semibold">No active company</h1>
-          <p className="text-sm text-muted-foreground">
-            Create a company or ask an administrator to invite you.
-          </p>
-          <Link className="text-sm font-medium text-primary underline" href="/onboarding">
-            Continue to onboarding
-          </Link>
-        </section>
+        <Card className="max-w-lg">
+          <CardHeader>
+            <CardTitle role="heading" aria-level={1} className="text-lg font-semibold">
+              No active company
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Create a company or ask an administrator to invite you.
+            </p>
+            <Link
+              className={buttonVariants({ variant: "link" })}
+              href="/onboarding"
+            >
+              Continue to onboarding
+            </Link>
+          </CardContent>
+        </Card>
       </main>
     );
   }
@@ -95,10 +127,15 @@ export function CompanyAdminShell({
         { href: `/dashboards/settings${companyQuery}`, label: "Company profile" },
       ]
     : [];
+  const navLinkClass = (current: boolean) =>
+    cn(
+      buttonVariants({ variant: current ? "secondary" : "ghost" }),
+      "h-9 px-3",
+    );
 
   return (
     <main className="min-h-svh bg-muted/30">
-      <header className="border-b bg-background">
+      <header className="bg-background">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-4">
             <Link href={`/dashboards${companyQuery}`} className="font-semibold">
@@ -107,10 +144,10 @@ export function CompanyAdminShell({
             <label className="sr-only" htmlFor="company-switcher">
               Select company
             </label>
-            <select
+            <NativeSelect
               id="company-switcher"
               aria-label="Select company"
-              className="h-10 max-w-[min(60vw,22rem)] rounded-md border bg-background px-3 text-sm"
+              className="max-w-[min(60vw,22rem)]"
               value={access.company.id}
               onChange={(event) => {
                 dispatch(setActiveWorkspaceId(event.target.value));
@@ -118,20 +155,20 @@ export function CompanyAdminShell({
               }}
             >
               {companies.map(({ company }) => (
-                <option key={company.id} value={company.id}>
+                <NativeSelectOption key={company.id} value={company.id}>
                   {company.name}
-                </option>
+                </NativeSelectOption>
               ))}
-            </select>
+            </NativeSelect>
           </div>
-          <button
+          <Button
             type="button"
-            className="min-h-10 rounded-md border px-3 text-sm hover:bg-muted disabled:opacity-60"
+            variant="outline"
             disabled={logoutState.isLoading}
             onClick={() => void signOut()}
           >
             {logoutState.isLoading ? "Signing out…" : "Sign out"}
-          </button>
+          </Button>
         </div>
         <nav
           aria-label="Company dashboard"
@@ -140,7 +177,7 @@ export function CompanyAdminShell({
           <Link
             href={`/dashboards${companyQuery}`}
             aria-current={pathname === "/dashboards" ? "page" : undefined}
-            className={linkClass}
+            className={navLinkClass(pathname === "/dashboards")}
           >
             Overview
           </Link>
@@ -149,12 +186,13 @@ export function CompanyAdminShell({
               key={href.split("?")[0]}
               href={href}
               aria-current={pathname === href.split("?")[0] ? "page" : undefined}
-              className={linkClass}
+              className={navLinkClass(pathname === href.split("?")[0])}
             >
               {label}
             </Link>
           ))}
         </nav>
+        <Separator />
       </header>
       <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         {children(access)}

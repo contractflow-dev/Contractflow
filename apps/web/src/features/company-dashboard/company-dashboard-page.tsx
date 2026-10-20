@@ -14,8 +14,28 @@ import {
   RiRefreshLine,
   RiShieldUserLine,
 } from "@remixicon/react";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@workspace/ui/components/alert";
+import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
+import { FieldLabel } from "@workspace/ui/components/field";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@workspace/ui/components/native-select";
+import { Skeleton } from "@workspace/ui/components/skeleton";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { getApiErrorMessage, getApiErrorStatus } from "@/lib/apiError";
 import {
@@ -223,30 +243,30 @@ export function CompanyDashboardPage({
             </h1>
           </div>
           <div className="flex items-center gap-2">
-            {adminCompanies.length > 1 && (
-              <label className="sr-only" htmlFor="company-switcher">
-                Select company
-              </label>
-            )}
             {adminCompanies.length > 1 ? (
-              <select
-                id="company-switcher"
-                value={selectedCompanyId}
-                onChange={(event) => {
-                  const nextCompanyId = event.target.value;
-                  setCompanyId(nextCompanyId);
-                  router.replace(
-                    `/dashboards?companyId=${encodeURIComponent(nextCompanyId)}`,
-                  );
-                }}
-                className="h-9 max-w-40 rounded-md border border-input bg-background px-2 text-sm sm:max-w-56"
-              >
-                {adminCompanies.map(({ company }) => (
-                  <option key={company.id} value={company.id}>
-                    {company.name}
-                  </option>
-                ))}
-              </select>
+              <>
+                <FieldLabel className="sr-only" htmlFor="company-switcher">
+                  Select company
+                </FieldLabel>
+                <NativeSelect
+                  id="company-switcher"
+                  className="max-w-40 sm:max-w-56"
+                  value={selectedCompanyId}
+                  onChange={(event) => {
+                    const nextCompanyId = event.target.value;
+                    setCompanyId(nextCompanyId);
+                    router.replace(
+                      `/dashboards?companyId=${encodeURIComponent(nextCompanyId)}`,
+                    );
+                  }}
+                >
+                  {adminCompanies.map(({ company }) => (
+                    <NativeSelectOption key={company.id} value={company.id}>
+                      {company.name}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              </>
             ) : null}
             <ThemeToggle />
             <Button
@@ -288,9 +308,9 @@ export function CompanyDashboardPage({
 
         <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
           {logoutError && (
-            <p role="alert" className="text-sm text-destructive">
-              {logoutError}
-            </p>
+            <Alert variant="destructive">
+              <AlertDescription>{logoutError}</AlertDescription>
+            </Alert>
           )}
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
@@ -330,34 +350,34 @@ export function CompanyDashboardPage({
               className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
             >
               {summaryCards.map(({ key }) => (
-                <div
-                  key={key}
-                  className="h-36 animate-pulse rounded-xl border bg-card"
-                />
+                <Skeleton key={key} className="h-36 rounded-xl" />
               ))}
             </div>
           ) : error ? (
-            <div className="flex flex-col justify-between gap-4 rounded-xl border border-destructive/30 bg-destructive/5 p-5 sm:flex-row sm:items-center">
+            <Alert
+              variant="destructive"
+              className="sm:flex sm:items-center sm:justify-between sm:gap-4"
+            >
               <div>
-                <h3 className="font-semibold text-destructive">
+                <AlertTitle>
                   {isForbidden
                     ? "Company administrator access required"
                     : "Dashboard data could not be loaded"}
-                </h3>
-                <p role="alert" className="mt-1 text-sm text-muted-foreground">
+                </AlertTitle>
+                <AlertDescription>
                   {isForbidden
                     ? "Your company membership may have changed. Refresh your access before continuing."
                     : getApiErrorMessage(error, "Please retry the request.")}
-                </p>
+                </AlertDescription>
               </div>
               <Button
                 variant="outline"
                 onClick={() => void refetch()}
-                className="self-start sm:self-auto"
+                className="mt-3 self-start sm:mt-0 sm:self-auto"
               >
                 Retry
               </Button>
-            </div>
+            </Alert>
           ) : data ? (
             <>
               <section
@@ -365,85 +385,97 @@ export function CompanyDashboardPage({
                 className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
               >
                 {summaryCards.map(({ key, label, description, icon: Icon }) => (
-                  <article
-                    key={key}
-                    className="rounded-xl border bg-card p-5 shadow-sm"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-medium text-muted-foreground">
-                        {label}
+                  <Card key={key}>
+                    <CardHeader>
+                      <div className="flex items-center justify-between gap-3">
+                        <CardDescription className="font-medium">
+                          {label}
+                        </CardDescription>
+                        <Avatar className="rounded-lg after:rounded-lg">
+                          <AvatarFallback className="rounded-lg bg-primary/10 text-primary">
+                            <Icon className="size-5" aria-hidden="true" />
+                          </AvatarFallback>
+                        </Avatar>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="font-heading text-3xl font-semibold tabular-nums">
+                        {data.summary[key].toLocaleString()}
                       </p>
-                      <span className="grid size-9 place-items-center rounded-lg bg-primary/10 text-primary">
-                        <Icon className="size-5" aria-hidden="true" />
-                      </span>
-                    </div>
-                    <p className="mt-4 font-heading text-3xl font-semibold tabular-nums">
-                      {data.summary[key].toLocaleString()}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {description}
-                    </p>
-                  </article>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {description}
+                      </p>
+                    </CardContent>
+                  </Card>
                 ))}
               </section>
 
               <section className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-                <article className="rounded-xl border bg-card p-5 sm:p-6">
-                  <h3 className="font-heading text-lg font-semibold">
-                    Company profile
-                  </h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Company information currently registered with ContractFlow.
-                  </p>
-                  <dl className="mt-5 grid gap-x-6 gap-y-4 sm:grid-cols-2">
-                    <ProfileField
-                      label="Legal name"
-                      value={data.company.legalName}
-                    />
-                    <ProfileField
-                      label="Registration number"
-                      value={data.company.registrationNumber}
-                    />
-                    <ProfileField
-                      label="Contact email"
-                      value={data.company.email}
-                    />
-                    <ProfileField
-                      label="Phone"
-                      value={data.company.phoneNumber}
-                    />
-                    <ProfileField
-                      label="Location"
-                      value={`${data.company.city}, ${data.company.countryCode}`}
-                    />
-                    <ProfileField
-                      label="Default currency"
-                      value={data.company.defaultCurrencyCode}
-                    />
-                  </dl>
-                </article>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>
+                      <h3 className="text-lg">Company profile</h3>
+                    </CardTitle>
+                    <CardDescription>
+                      Company information currently registered with
+                      ContractFlow.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+                      <ProfileField
+                        label="Legal name"
+                        value={data.company.legalName}
+                      />
+                      <ProfileField
+                        label="Registration number"
+                        value={data.company.registrationNumber}
+                      />
+                      <ProfileField
+                        label="Contact email"
+                        value={data.company.email}
+                      />
+                      <ProfileField
+                        label="Phone"
+                        value={data.company.phoneNumber}
+                      />
+                      <ProfileField
+                        label="Location"
+                        value={`${data.company.city}, ${data.company.countryCode}`}
+                      />
+                      <ProfileField
+                        label="Default currency"
+                        value={data.company.defaultCurrencyCode}
+                      />
+                    </dl>
+                  </CardContent>
+                </Card>
 
-                <article className="rounded-xl border bg-card p-5 sm:p-6">
-                  <h3 className="font-heading text-lg font-semibold">
-                    Your access
-                  </h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Permissions are determined by your current company
-                    membership.
-                  </p>
-                  <div className="mt-5 flex items-start gap-3 rounded-lg bg-muted/60 p-4">
-                    <RiShieldUserLine className="mt-0.5 size-5 shrink-0 text-primary" />
-                    <div>
-                      <p className="text-sm font-medium">
-                        {data.membership.companyRole}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        You can administer this company workspace. Platform
-                        administration is a separate role.
-                      </p>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>
+                      <h3 className="text-lg">Your access</h3>
+                    </CardTitle>
+                    <CardDescription>
+                      Permissions are determined by your current company
+                      membership.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-start gap-3 rounded-lg bg-muted/60 p-4">
+                      <RiShieldUserLine className="mt-0.5 size-5 shrink-0 text-primary" />
+                      <div>
+                        <p className="text-sm font-medium">
+                          {data.membership.companyRole}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          You can administer this company workspace. Platform
+                          administration is a separate role.
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                </article>
+                  </CardContent>
+                </Card>
               </section>
             </>
           ) : null}
@@ -473,11 +505,15 @@ function DashboardMessage({
 }) {
   return (
     <main className="grid min-h-[60vh] place-items-center p-4">
-      <section className="w-full max-w-lg space-y-4 rounded-xl border bg-card p-6 shadow-sm sm:p-8">
-        <h1 className="font-heading text-xl font-semibold">{title}</h1>
-        <p className="text-sm text-muted-foreground">{description}</p>
-        {action}
-      </section>
+      <Card className="w-full max-w-lg">
+        <CardHeader>
+          <CardTitle>
+            <h1 className="text-xl">{title}</h1>
+          </CardTitle>
+          <CardDescription>{description}</CardDescription>
+        </CardHeader>
+        {action && <CardFooter>{action}</CardFooter>}
+      </Card>
     </main>
   );
 }

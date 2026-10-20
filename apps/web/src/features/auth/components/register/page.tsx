@@ -1,4 +1,5 @@
 import { RiFileList3Line } from "@remixicon/react";
+import { Separator } from "@workspace/ui/components/separator";
 import { RegisterForm } from "@/features/auth/components/register-form";
 
 const stats = [
@@ -21,9 +22,12 @@ export default function RegisterPage() {
 
         <RegisterForm />
 
-        <p className="mt-auto border-t pt-4 text-[10px] text-muted-foreground">
-          SOC 2 Type II Certified • ISO 29001 Energy Standard Compliant
-        </p>
+        <div className="mt-auto flex flex-col gap-4">
+          <Separator />
+          <p className="text-[10px] text-muted-foreground">
+            SOC 2 Type II Certified • ISO 29001 Energy Standard Compliant
+          </p>
+        </div>
       </section>
 
       {/* Right: hero */}

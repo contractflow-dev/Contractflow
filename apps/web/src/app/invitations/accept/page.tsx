@@ -3,6 +3,17 @@
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { Alert, AlertDescription } from "@workspace/ui/components/alert";
+import { Button, buttonVariants } from "@workspace/ui/components/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
+import { Skeleton } from "@workspace/ui/components/skeleton";
+import { cn } from "@/lib/utils";
 import { useRespondToCompanyInvitationMutation } from "@/features/companies/companiesApi";
 import { useGetCurrentUserQuery } from "@/services/authApi";
 import { getApiErrorMessage, getApiErrorStatus } from "@/lib/apiError";
@@ -47,9 +58,11 @@ function InvitationContent() {
   if (!token) {
     return (
       <main className="mx-auto grid min-h-svh max-w-xl place-items-center p-6">
-        <p role="alert" className="rounded-lg border p-5 text-sm">
-          This invitation link is incomplete.
-        </p>
+        <Alert variant="destructive">
+          <AlertDescription>
+            This invitation link is incomplete.
+          </AlertDescription>
+        </Alert>
       </main>
     );
   }
@@ -60,81 +73,94 @@ function InvitationContent() {
 
   return (
     <main className="grid min-h-svh place-items-center bg-muted/30 p-4">
-      <section className="w-full max-w-lg space-y-5 rounded-xl border bg-background p-6 shadow-sm sm:p-8">
-        <header className="space-y-2">
+      <Card className="w-full max-w-lg">
+        <CardHeader>
           <p className="text-sm font-semibold text-primary">ContractFlow</p>
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <CardTitle role="heading" aria-level={1} className="text-2xl font-semibold tracking-tight">
             Company invitation
-          </h1>
-          <p className="text-sm text-muted-foreground">
+          </CardTitle>
+          <CardDescription>
             Sign in with the verified email address that received this
             invitation. Acceptance creates company membership only; contract
             workspace access is assigned separately.
-          </p>
-        </header>
-        {isFetching ? (
-          <p role="status" className="text-sm text-muted-foreground">
-            Checking your session…
-          </p>
-        ) : unauthenticated || !user ? (
-          <div className="space-y-3">
-            {userError && !unauthenticated && (
-              <p role="alert" className="text-sm text-destructive">
-                {getApiErrorMessage(userError, "Unable to check your session.")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isFetching ? (
+            <div role="status" className="space-y-2">
+              <Skeleton className="h-4 w-40" />
+              <p className="text-sm text-muted-foreground">
+                Checking your session…
               </p>
-            )}
-            <Link
-              href={`/login?invitationToken=${encodeURIComponent(token)}`}
-              className="inline-flex min-h-10 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              Sign in to continue
-            </Link>
-            <p className="text-xs text-muted-foreground">
-              If you do not have an account yet, register and verify this email,
-              then reopen the invitation link.
-            </p>
-          </div>
-        ) : feedback ? (
-          <div className="space-y-3">
-            <p role="status" className="text-sm">{feedback}</p>
-            <Link
-              href="/dashboards"
-              className="inline-flex min-h-10 items-center justify-center rounded-md border px-4 text-sm font-medium hover:bg-muted"
-            >
-              Go to dashboard
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {failure && (
-              <p role="alert" className="text-sm text-destructive">
-                {failure}
-              </p>
-            )}
-            <p className="text-sm">
-              Signed in as <strong>{user.email}</strong>
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void accept()}
-                className="min-h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
-              >
-                {busy && pending === "accept" ? "Accepting…" : "Accept invitation"}
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void decline()}
-                className="min-h-10 rounded-md border px-4 text-sm font-medium hover:bg-muted disabled:opacity-60"
-              >
-                {busy && pending === "decline" ? "Declining…" : "Decline"}
-              </button>
             </div>
-          </div>
-        )}
-      </section>
+          ) : unauthenticated || !user ? (
+            <div className="space-y-3">
+              {userError && !unauthenticated && (
+                <Alert variant="destructive">
+                  <AlertDescription>
+                    {getApiErrorMessage(
+                      userError,
+                      "Unable to check your session.",
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
+              <Link
+                href={`/login?invitationToken=${encodeURIComponent(token)}`}
+                className={cn(buttonVariants({ size: "lg" }), "w-full")}
+              >
+                Sign in to continue
+              </Link>
+              <p className="text-xs text-muted-foreground">
+                If you do not have an account yet, register and verify this
+                email, then reopen the invitation link.
+              </p>
+            </div>
+          ) : feedback ? (
+            <div className="space-y-3">
+              <p role="status" className="text-sm">{feedback}</p>
+              <Link
+                href="/dashboards"
+                className={buttonVariants({ variant: "outline", size: "lg" })}
+              >
+                Go to dashboard
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {failure && (
+                <Alert variant="destructive">
+                  <AlertDescription>{failure}</AlertDescription>
+                </Alert>
+              )}
+              <p className="text-sm">
+                Signed in as <strong>{user.email}</strong>
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="lg"
+                  disabled={busy}
+                  onClick={() => void accept()}
+                >
+                  {busy && pending === "accept"
+                    ? "Accepting…"
+                    : "Accept invitation"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  disabled={busy}
+                  onClick={() => void decline()}
+                >
+                  {busy && pending === "decline" ? "Declining…" : "Decline"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </main>
   );
 }
@@ -144,9 +170,10 @@ export default function AcceptInvitationPage() {
     <Suspense
       fallback={
         <main className="grid min-h-svh place-items-center p-6">
-          <p role="status" className="text-sm text-muted-foreground">
-            Loading invitation…
-          </p>
+          <div role="status" className="flex flex-col items-center gap-3">
+            <Skeleton className="h-4 w-40" />
+            <p className="text-sm text-muted-foreground">Loading invitation…</p>
+          </div>
         </main>
       }
     >

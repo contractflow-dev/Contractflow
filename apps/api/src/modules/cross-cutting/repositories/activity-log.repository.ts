@@ -1,15 +1,19 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { DeepPartial, Repository } from 'typeorm';
-import { CompanyScopedRepository } from '../../../common/database/repositories/company-scoped.repository';
-import type { ICompanyScope } from '../../../common/database/repositories/company-scope.interface';
+import { ContractScopedRepository } from '../../../common/database/repositories/contract-scoped.repository';
+import type { IContractCompanyScope } from '../../../common/database/repositories/contract-scope.interface';
 import { ActivityLog } from '../entities/activity-log.entity';
 
+/** Append-only; each entry belongs to a contract and the company that acted. */
 @Injectable()
-export class ActivityLogRepository extends CompanyScopedRepository<
+export class ActivityLogRepository extends ContractScopedRepository<
   ActivityLog,
-  ICompanyScope
+  IContractCompanyScope
 > {
+  protected override readonly requireCompany = true;
+  protected override readonly companyProperty = 'companyId';
+
   constructor(
     @InjectRepository(ActivityLog)
     repository: Repository<ActivityLog>,
@@ -17,33 +21,18 @@ export class ActivityLogRepository extends CompanyScopedRepository<
     super(repository);
   }
 
-  async findForContract(
-    contractId: string,
-    scope: ICompanyScope,
-  ): Promise<ActivityLog[]> {
-    return this.scopedQuery(scope, 'activity')
-      .andWhere('activity.contractId = :contractId', { contractId })
-      .orderBy('activity.occurredAt', 'DESC')
-      .getMany();
-  }
-
   async append(
     data: DeepPartial<ActivityLog>,
-    scope: ICompanyScope,
+    scope: IContractCompanyScope,
   ): Promise<ActivityLog> {
-    const entity = this.create(data, scope);
-    return this.save(entity, scope);
+    return this.save(this.create(data, scope), scope);
   }
 
-  override async update(
-    _id: string,
-    _data: Omit<DeepPartial<ActivityLog>, 'id'>,
-    _scope: ICompanyScope,
-  ): Promise<ActivityLog> {
+  override async update(): Promise<ActivityLog> {
     throw new ForbiddenException('Activity logs are immutable');
   }
 
-  override async delete(_id: string, _scope: ICompanyScope): Promise<void> {
+  override async delete(): Promise<void> {
     throw new ForbiddenException('Activity logs are immutable');
   }
 }

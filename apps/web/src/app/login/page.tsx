@@ -6,6 +6,15 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { Alert, AlertDescription } from "@workspace/ui/components/alert";
+import { Button } from "@workspace/ui/components/button";
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@workspace/ui/components/field";
+import { Input } from "@workspace/ui/components/input";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { useLoginMutation } from "@/services/authApi";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
@@ -16,9 +25,6 @@ const loginSchema = z.object({
   password: z.string().min(1, "Enter your password"),
 });
 type LoginValues = z.infer<typeof loginSchema>;
-
-const inputClass =
-  "h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 aria-invalid:border-destructive disabled:opacity-60";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -70,68 +76,49 @@ export default function LoginPage() {
               Sign in to continue to your company workspace.
             </p>
           </header>
-          <form
-            onSubmit={handleSubmit(onSubmit)}
-            noValidate
-            className="space-y-4"
-          >
-            {serverError && (
-              <p
-                role="alert"
-                className="break-words rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-              >
-                {serverError}
-              </p>
-            )}
-            <div className="space-y-1.5">
-              <label htmlFor="login-email" className="text-sm font-medium">
-                Email
-              </label>
-              <input
-                id="login-email"
-                type="email"
-                autoComplete="email"
-                aria-invalid={!!errors.email}
-                className={inputClass}
-                {...register("email")}
-              />
-              {errors.email && (
-                <p
-                  role="alert"
-                  className="break-words text-xs text-destructive"
-                >
-                  {errors.email.message}
-                </p>
+          <form onSubmit={handleSubmit(onSubmit)} noValidate>
+            <FieldGroup className="gap-4">
+              {serverError && (
+                <Alert variant="destructive" className="break-words">
+                  <AlertDescription>{serverError}</AlertDescription>
+                </Alert>
               )}
-            </div>
-            <div className="space-y-1.5">
-              <label htmlFor="login-password" className="text-sm font-medium">
-                Password
-              </label>
-              <input
-                id="login-password"
-                type="password"
-                autoComplete="current-password"
-                aria-invalid={!!errors.password}
-                className={inputClass}
-                {...register("password")}
-              />
-              {errors.password && (
-                <p
-                  role="alert"
-                  className="break-words text-xs text-destructive"
-                >
-                  {errors.password.message}
-                </p>
-              )}
-            </div>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="h-11 w-full rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60"
-            >
-              {isSubmitting ? "Signing in…" : "Sign in"}
-            </button>
+              <Field data-invalid={!!errors.email}>
+                <FieldLabel htmlFor="login-email">Email</FieldLabel>
+                <Input
+                  id="login-email"
+                  type="email"
+                  autoComplete="email"
+                  aria-invalid={!!errors.email}
+                  className="h-11"
+                  {...register("email")}
+                />
+                {errors.email && (
+                  <FieldError className="break-words text-xs">
+                    {errors.email.message}
+                  </FieldError>
+                )}
+              </Field>
+              <Field data-invalid={!!errors.password}>
+                <FieldLabel htmlFor="login-password">Password</FieldLabel>
+                <Input
+                  id="login-password"
+                  type="password"
+                  autoComplete="current-password"
+                  aria-invalid={!!errors.password}
+                  className="h-11"
+                  {...register("password")}
+                />
+                {errors.password && (
+                  <FieldError className="break-words text-xs">
+                    {errors.password.message}
+                  </FieldError>
+                )}
+              </Field>
+              <Button type="submit" disabled={isSubmitting} className="h-11 w-full">
+                {isSubmitting ? "Signing in…" : "Sign in"}
+              </Button>
+            </FieldGroup>
           </form>
           <p className="text-center text-sm text-muted-foreground">
             New to ContractFlow?{" "}

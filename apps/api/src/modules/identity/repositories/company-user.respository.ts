@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
+import { ECompanyUserStatus } from '@contractflow/contracts-schema';
 import { CompanyUser } from '../entities/company-user.entity';
 import { CompanyScopedRepository } from '../../../common/database/repositories/company-scoped.repository';
 import { ICompanyScope } from '../../../common/database/repositories/company-scope.interface';
@@ -15,10 +16,20 @@ export class CompanyUserRepository extends CompanyScopedRepository<
   ) {
     super(repository);
   }
-  async findById(
-    id: string,
+  /** The user's current membership of the scoped company, or null. */
+  async findActiveMember(
+    userId: string,
     scope: ICompanyScope,
   ): Promise<CompanyUser | null> {
-    return this.scopedQuery(scope).andWhere('entity.id =:id', { id }).getOne();
+    return this.findOne(
+      {
+        where: {
+          userId,
+          status: ECompanyUserStatus.ACTIVE,
+          leftAt: IsNull(),
+        },
+      },
+      scope,
+    );
   }
 }

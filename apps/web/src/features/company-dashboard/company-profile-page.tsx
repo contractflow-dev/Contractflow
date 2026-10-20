@@ -6,7 +6,21 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { ECountryCode, ECurrencyCode } from "@contractflow/contracts-schema";
 import { countryCodes, countryOptions } from "@/lib/countries";
+import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
+import { Card, CardContent } from "@workspace/ui/components/card";
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@workspace/ui/components/field";
+import { Input } from "@workspace/ui/components/input";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@workspace/ui/components/native-select";
+import { Separator } from "@workspace/ui/components/separator";
 import {
   useGetCompanyDashboardQuery,
   useUpdateCompanyProfileMutation,
@@ -106,18 +120,15 @@ function ProfileContent({ companyId }: { companyId: string }) {
         </p>
       </header>
       {isLoading ? (
-        <p
-          role="status"
-          className="rounded-xl border bg-card p-6 text-sm text-muted-foreground"
-        >
-          Loading company profile…
-        </p>
+        <Alert role="status">
+          <AlertDescription>Loading company profile…</AlertDescription>
+        </Alert>
       ) : error ? (
-        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
-          <p role="alert" className="text-sm text-destructive">
+        <Alert variant="destructive">
+          <AlertDescription>
             {getApiErrorMessage(error, "Company details could not be loaded.")}
-          </p>
-        </div>
+          </AlertDescription>
+        </Alert>
       ) : currentData ? (
         <ProfileForm
           key={companyId}
@@ -177,100 +188,84 @@ function ProfileForm({
   }
 
   return (
-    <form
-      onSubmit={handleSubmit(save)}
-      noValidate
-      className="space-y-6 rounded-xl border bg-card p-5 shadow-sm sm:p-7"
-    >
-      {submitError && (
-        <p
-          role="alert"
-          className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
-        >
-          {submitError}
-        </p>
-      )}
-      {saved && (
-        <p
-          role="status"
-          className="rounded-md border border-emerald-600/20 bg-emerald-600/5 p-3 text-sm text-emerald-700 dark:text-emerald-400"
-        >
-          Company profile updated.
-        </p>
-      )}
-      <div className="grid gap-4 sm:grid-cols-2">
-        {fields.map(({ key, label, autoComplete }) => (
-          <label key={key} className="space-y-1.5 text-sm font-medium">
-            {label}
-            <input
-              {...register(key)}
-              autoComplete={autoComplete}
-              aria-invalid={Boolean(errors[key])}
-              className={inputClass}
-            />
-            {errors[key]?.message && (
-              <span role="alert" className="block text-xs text-destructive">
-                {errors[key]?.message}
-              </span>
-            )}
-          </label>
-        ))}
-        <label className="space-y-1.5 text-sm font-medium">
-          Country
-          <select
-            {...register("countryCode")}
-            autoComplete="country"
-            aria-invalid={Boolean(errors.countryCode)}
-            className={inputClass}
-          >
-            {countryOptions.map(({ code, name }) => (
-              <option key={code} value={code}>
-                {name}
-              </option>
-            ))}
-          </select>
-          {errors.countryCode?.message && (
-            <span role="alert" className="block text-xs text-destructive">
-              {errors.countryCode.message}
-            </span>
+    <Card>
+      <CardContent>
+        <form onSubmit={handleSubmit(save)} noValidate className="space-y-6">
+          {submitError && (
+            <Alert variant="destructive">
+              <AlertDescription>{submitError}</AlertDescription>
+            </Alert>
           )}
-        </label>
-        <label className="space-y-1.5 text-sm font-medium">
-          Default currency
-          <select
-            {...register("defaultCurrencyCode")}
-            aria-invalid={Boolean(errors.defaultCurrencyCode)}
-            className={inputClass}
-          >
-            {Object.values(ECurrencyCode).map((currency) => (
-              <option key={currency} value={currency}>
-                {currency}
-              </option>
-            ))}
-          </select>
-          {errors.defaultCurrencyCode?.message && (
-            <span role="alert" className="block text-xs text-destructive">
-              {errors.defaultCurrencyCode.message}
-            </span>
+          {saved && (
+            <Alert role="status">
+              <AlertDescription>Company profile updated.</AlertDescription>
+            </Alert>
           )}
-        </label>
-      </div>
-      <div className="flex flex-col-reverse gap-3 border-t pt-5 sm:flex-row sm:justify-end">
-        <Button
-          type="button"
-          variant="outline"
-          disabled={!isDirty || isLoading}
-          onClick={() => window.location.reload()}
-        >
-          Reset
-        </Button>
-        <Button type="submit" disabled={!isDirty || isLoading}>
-          {isLoading ? "Saving…" : "Save changes"}
-        </Button>
-      </div>
-    </form>
+          <FieldGroup className="grid gap-4 sm:grid-cols-2">
+            {fields.map(({ key, label, autoComplete }) => (
+              <Field key={key} data-invalid={Boolean(errors[key])}>
+                <FieldLabel htmlFor={`profile-${key}`}>{label}</FieldLabel>
+                <Input
+                  id={`profile-${key}`}
+                  {...register(key)}
+                  autoComplete={autoComplete}
+                  aria-invalid={Boolean(errors[key])}
+                />
+                <FieldError>{errors[key]?.message}</FieldError>
+              </Field>
+            ))}
+            <Field data-invalid={Boolean(errors.countryCode)}>
+              <FieldLabel htmlFor="profile-countryCode">Country</FieldLabel>
+              <NativeSelect
+                id="profile-countryCode"
+                className="w-full"
+                {...register("countryCode")}
+                autoComplete="country"
+                aria-invalid={Boolean(errors.countryCode)}
+              >
+                {countryOptions.map(({ code, name }) => (
+                  <NativeSelectOption key={code} value={code}>
+                    {name}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+              <FieldError>{errors.countryCode?.message}</FieldError>
+            </Field>
+            <Field data-invalid={Boolean(errors.defaultCurrencyCode)}>
+              <FieldLabel htmlFor="profile-defaultCurrencyCode">
+                Default currency
+              </FieldLabel>
+              <NativeSelect
+                id="profile-defaultCurrencyCode"
+                className="w-full"
+                {...register("defaultCurrencyCode")}
+                aria-invalid={Boolean(errors.defaultCurrencyCode)}
+              >
+                {Object.values(ECurrencyCode).map((currency) => (
+                  <NativeSelectOption key={currency} value={currency}>
+                    {currency}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+              <FieldError>{errors.defaultCurrencyCode?.message}</FieldError>
+            </Field>
+          </FieldGroup>
+          <Separator />
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!isDirty || isLoading}
+              onClick={() => window.location.reload()}
+            >
+              Reset
+            </Button>
+            <Button type="submit" disabled={!isDirty || isLoading}>
+              {isLoading ? "Saving…" : "Save changes"}
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
-
-const inputClass =
-  "h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 aria-invalid:border-destructive";

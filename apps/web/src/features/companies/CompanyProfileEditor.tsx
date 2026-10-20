@@ -4,6 +4,15 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { Alert, AlertDescription } from "@workspace/ui/components/alert";
+import { Button } from "@workspace/ui/components/button";
+import { Card, CardContent } from "@workspace/ui/components/card";
+import {
+  Field,
+  FieldError,
+  FieldLabel,
+} from "@workspace/ui/components/field";
+import { Input } from "@workspace/ui/components/input";
 import { getApiErrorMessage } from "@/lib/apiError";
 import {
   useUpdateCompanyProfileMutation,
@@ -156,77 +165,75 @@ export function CompanyProfileEditor({
         </p>
       </header>
       {feedback && (
-        <p role="status" className="rounded-md border bg-card p-3 text-sm">
-          {feedback}
-        </p>
+        <Alert role="status">
+          <AlertDescription className="text-foreground">
+            {feedback}
+          </AlertDescription>
+        </Alert>
       )}
       {failure && (
-        <p
-          role="alert"
-          className="rounded-md border border-destructive/40 bg-card p-3 text-sm text-destructive"
-        >
-          {failure}
-        </p>
+        <Alert variant="destructive">
+          <AlertDescription>{failure}</AlertDescription>
+        </Alert>
       )}
-      <form
-        noValidate
-        onSubmit={handleSubmit(submit)}
-        className="space-y-6 rounded-xl border bg-card p-4 sm:p-6"
-      >
-        <div className="grid gap-4 sm:grid-cols-2">
-          {profileFields.map(({ name, label, required, type = "text" }) => (
-            <label key={name} className="grid gap-1.5 text-sm font-medium">
-              {label}
-              <input
-                {...register(name)}
-                type={type}
-                required={required}
-                maxLength={
-                  name === "name" || name === "legalName"
-                    ? 255
-                    : name === "registrationNumber" ||
-                        name === "taxIdentificationNumber"
-                      ? 64
-                      : undefined
-                }
-                aria-invalid={Boolean(errors[name])}
-                aria-describedby={errors[name] ? `${name}-error` : undefined}
-                disabled={mutationState.isLoading}
-                className="h-10 rounded-md border bg-background px-3 font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring/40 aria-invalid:border-destructive disabled:opacity-60"
-              />
-              {errors[name]?.message && (
-                <span
-                  id={`${name}-error`}
-                  role="alert"
-                  className="text-xs font-normal text-destructive"
-                >
-                  {errors[name]?.message}
-                </span>
-              )}
-            </label>
-          ))}
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="submit"
-            disabled={!isDirty || isSubmitting || mutationState.isLoading}
-            className="min-h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+      <Card>
+        <CardContent>
+          <form
+            noValidate
+            onSubmit={handleSubmit(submit)}
+            className="space-y-6"
           >
-            {mutationState.isLoading ? "Saving…" : "Save changes"}
-          </button>
-          <button
-            type="button"
-            disabled={!isDirty || mutationState.isLoading}
-            onClick={() => reset(profileValues(company))}
-            className="min-h-10 rounded-md border px-4 text-sm font-medium hover:bg-muted disabled:opacity-60"
-          >
-            Discard changes
-          </button>
-          <span className="text-xs text-muted-foreground">
-            Company status and verification settings are managed separately.
-          </span>
-        </div>
-      </form>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {profileFields.map(({ name, label, required, type = "text" }) => (
+                <Field key={name} data-invalid={Boolean(errors[name])}>
+                  <FieldLabel htmlFor={`company-${name}`}>{label}</FieldLabel>
+                  <Input
+                    id={`company-${name}`}
+                    {...register(name)}
+                    type={type}
+                    required={required}
+                    maxLength={
+                      name === "name" || name === "legalName"
+                        ? 255
+                        : name === "registrationNumber" ||
+                            name === "taxIdentificationNumber"
+                          ? 64
+                          : undefined
+                    }
+                    aria-invalid={Boolean(errors[name])}
+                    aria-describedby={errors[name] ? `${name}-error` : undefined}
+                    disabled={mutationState.isLoading}
+                  />
+                  {errors[name]?.message && (
+                    <FieldError id={`${name}-error`}>
+                      {errors[name]?.message}
+                    </FieldError>
+                  )}
+                </Field>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                type="submit"
+                disabled={!isDirty || isSubmitting || mutationState.isLoading}
+              >
+                {mutationState.isLoading ? "Saving…" : "Save changes"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!isDirty || mutationState.isLoading}
+                onClick={() => reset(profileValues(company))}
+              >
+                Discard changes
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                Company status and verification settings are managed separately.
+              </span>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -1,12 +1,56 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useId, useMemo, useState, type FormEvent } from "react";
 import {
   ECompanyRole,
   ECompanyUserStatus,
   EInvitationRole,
   EInvitationStatus,
 } from "@contractflow/contracts-schema";
+import { Alert, AlertDescription } from "@workspace/ui/components/alert";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@workspace/ui/components/alert-dialog";
+import { Badge } from "@workspace/ui/components/badge";
+import { Button } from "@workspace/ui/components/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+} from "@workspace/ui/components/empty";
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+} from "@workspace/ui/components/field";
+import { Input } from "@workspace/ui/components/input";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@workspace/ui/components/native-select";
+import { Separator } from "@workspace/ui/components/separator";
+import { Skeleton } from "@workspace/ui/components/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@workspace/ui/components/table";
 import { getApiErrorMessage } from "@/lib/apiError";
 import {
   useInviteCompanyMemberMutation,
@@ -48,6 +92,7 @@ export function CompanyTeamManagement({ companyId }: { companyId: string }) {
   const [updateMember, updateState] = useChangeCompanyMemberRoleMutation();
   const [removeMember, removeState] = useRemoveCompanyMemberMutation();
   const [revokeInvitation, revokeState] = useRevokeCompanyInvitationMutation();
+  const formId = useId();
 
   const filteredMembers = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -154,138 +199,175 @@ export function CompanyTeamManagement({ companyId }: { companyId: string }) {
       </header>
 
       {feedback && (
-        <p role="status" className="rounded-md border bg-card p-3 text-sm">
-          {feedback}
-        </p>
+        <Alert role="status">
+          <AlertDescription className="text-foreground">
+            {feedback}
+          </AlertDescription>
+        </Alert>
       )}
       {failure && (
-        <p
-          role="alert"
-          className="rounded-md border border-destructive/40 bg-card p-3 text-sm text-destructive"
-        >
-          {failure}
-        </p>
+        <Alert variant="destructive">
+          <AlertDescription>{failure}</AlertDescription>
+        </Alert>
       )}
 
-      <section className="space-y-4 rounded-xl border bg-card p-4 sm:p-6">
-        <div>
-          <h2 className="text-lg font-semibold">Invite a team member</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+      <Card>
+        <CardHeader>
+          <CardTitle role="heading" aria-level={2} className="text-lg font-semibold">
+            Invite a team member
+          </CardTitle>
+          <CardDescription>
             The invitee must sign in and verify this email address to accept.
-          </p>
-        </div>
-        <form
-          onSubmit={(event) => void submitInvitation(event)}
-          className="grid gap-4 sm:grid-cols-2"
-        >
-          <Field label="First name" name="firstName" required />
-          <Field label="Last name" name="lastName" required />
-          <Field label="Email" name="email" type="email" required />
-          <label className="grid gap-1.5 text-sm font-medium">
-            Company role
-            <select
-              name="companyRole"
-              required
-              defaultValue={EInvitationRole.CONTRACTOR_PROJECT_LEAD}
-              className="h-10 rounded-md border bg-background px-3 font-normal"
-            >
-              {Object.values(EInvitationRole).map((role) => (
-                <option key={role} value={role}>
-                  {role}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="submit"
-            disabled={inviteState.isLoading}
-            className="min-h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60 sm:col-span-2 sm:justify-self-start"
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            onSubmit={(event) => void submitInvitation(event)}
+            className="grid gap-4 sm:grid-cols-2"
           >
-            {inviteState.isLoading ? "Sending invitation…" : "Send invitation"}
-          </button>
-        </form>
-      </section>
-
-      <section className="space-y-4 rounded-xl border bg-card p-4 sm:p-6">
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">Company members</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Inactive records remain visible for membership history.
-            </p>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <label className="sr-only" htmlFor="member-search">
-              Search members
-            </label>
-            <input
-              id="member-search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search members"
-              className="h-10 rounded-md border bg-background px-3 text-sm"
+            <InviteField
+              id={`${formId}-firstName`}
+              label="First name"
+              name="firstName"
+              required
             />
-            <label className="sr-only" htmlFor="member-status">
-              Filter members by status
-            </label>
-            <select
-              id="member-status"
-              value={statusFilter}
-              onChange={(event) =>
-                setStatusFilter(event.target.value as StatusFilter)
-              }
-              className="h-10 rounded-md border bg-background px-3 text-sm"
-            >
-              <option value="active">Active members</option>
-              <option value="inactive">Inactive members</option>
-              <option value="all">All statuses</option>
-            </select>
-          </div>
-        </header>
-        {membersError ? (
-          <p role="alert" className="text-sm text-destructive">
-            {getApiErrorMessage(membersError, "Unable to load team members.")}
-          </p>
-        ) : membersFetching && !members ? (
-          <p role="status" className="text-sm text-muted-foreground">
-            Loading team members…
-          </p>
-        ) : filteredMembers.length === 0 ? (
-          <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-            {members?.length
-              ? "No members match these filters."
-              : "There are no company members to display."}
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b text-muted-foreground">
-                  <th scope="col" className="px-3 py-3 font-medium">Member</th>
-                  <th scope="col" className="px-3 py-3 font-medium">Role</th>
-                  <th scope="col" className="px-3 py-3 font-medium">Status</th>
-                  <th scope="col" className="px-3 py-3 font-medium">Joined</th>
-                  <th scope="col" className="px-3 py-3 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
+            <InviteField
+              id={`${formId}-lastName`}
+              label="Last name"
+              name="lastName"
+              required
+            />
+            <InviteField
+              id={`${formId}-email`}
+              label="Email"
+              name="email"
+              type="email"
+              required
+            />
+            <Field>
+              <FieldLabel htmlFor={`${formId}-companyRole`}>
+                Company role
+              </FieldLabel>
+              <NativeSelect
+                id={`${formId}-companyRole`}
+                name="companyRole"
+                required
+                defaultValue={EInvitationRole.CONTRACTOR_PROJECT_LEAD}
+                className="w-full"
+              >
+                {Object.values(EInvitationRole).map((role) => (
+                  <NativeSelectOption key={role} value={role}>
+                    {role}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </Field>
+            <div className="sm:col-span-2">
+              <Button type="submit" disabled={inviteState.isLoading}>
+                {inviteState.isLoading
+                  ? "Sending invitation…"
+                  : "Send invitation"}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle role="heading" aria-level={2} className="text-lg font-semibold">
+            Company members
+          </CardTitle>
+          <CardDescription>
+            Inactive records remain visible for membership history.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <FieldGroup className="gap-2 sm:flex-row">
+            <Field>
+              <FieldLabel className="sr-only" htmlFor="member-search">
+                Search members
+              </FieldLabel>
+              <Input
+                id="member-search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search members"
+              />
+            </Field>
+            <Field>
+              <FieldLabel className="sr-only" htmlFor="member-status">
+                Filter members by status
+              </FieldLabel>
+              <NativeSelect
+                id="member-status"
+                value={statusFilter}
+                onChange={(event) =>
+                  setStatusFilter(event.target.value as StatusFilter)
+                }
+                className="w-full"
+              >
+                <NativeSelectOption value="active">
+                  Active members
+                </NativeSelectOption>
+                <NativeSelectOption value="inactive">
+                  Inactive members
+                </NativeSelectOption>
+                <NativeSelectOption value="all">All statuses</NativeSelectOption>
+              </NativeSelect>
+            </Field>
+          </FieldGroup>
+          {membersError ? (
+            <Alert variant="destructive">
+              <AlertDescription>
+                {getApiErrorMessage(membersError, "Unable to load team members.")}
+              </AlertDescription>
+            </Alert>
+          ) : membersFetching && !members ? (
+            <div role="status" className="space-y-2">
+              <span className="sr-only">Loading team members…</span>
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : filteredMembers.length === 0 ? (
+            <Empty className="border border-dashed">
+              <EmptyHeader>
+                <EmptyDescription>
+                  {members?.length
+                    ? "No members match these filters."
+                    : "There are no company members to display."}
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            <Table className="min-w-[680px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead scope="col">Member</TableHead>
+                  <TableHead scope="col">Role</TableHead>
+                  <TableHead scope="col">Status</TableHead>
+                  <TableHead scope="col">Joined</TableHead>
+                  <TableHead scope="col">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {filteredMembers.map((member) => {
                   const selectedRole =
                     roleDrafts[member.id] ?? member.companyRole;
                   const active = member.status === ECompanyUserStatus.ACTIVE;
                   return (
-                    <tr key={member.id} className="border-b last:border-0">
-                      <td className="px-3 py-3">
+                    <TableRow key={member.id}>
+                      <TableCell>
                         <p className="font-medium">{memberName(member)}</p>
                         <p className="text-muted-foreground">{member.email}</p>
-                      </td>
-                      <td className="px-3 py-3">
+                      </TableCell>
+                      <TableCell>
                         {active ? (
                           <div className="flex items-center gap-2">
                             <label className="sr-only" htmlFor={`role-${member.id}`}>
                               Role for {memberName(member)}
                             </label>
-                            <select
+                            <NativeSelect
                               id={`role-${member.id}`}
                               value={selectedRole}
                               onChange={(event) =>
@@ -294,29 +376,36 @@ export function CompanyTeamManagement({ companyId }: { companyId: string }) {
                                   [member.id]: event.target.value as ECompanyRole,
                                 }))
                               }
-                              className="h-9 max-w-56 rounded-md border bg-background px-2"
+                              className="max-w-56"
                             >
                               {Object.values(ECompanyRole).map((role) => (
-                                <option key={role} value={role}>{role}</option>
+                                <NativeSelectOption key={role} value={role}>
+                                  {role}
+                                </NativeSelectOption>
                               ))}
-                            </select>
+                            </NativeSelect>
                             {selectedRole !== member.companyRole && (
-                              <button
+                              <Button
                                 type="button"
+                                variant="outline"
+                                size="sm"
                                 disabled={updateState.isLoading}
                                 onClick={() => void saveRole(member)}
-                                className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted disabled:opacity-60"
                               >
                                 Save
-                              </button>
+                              </Button>
                             )}
                           </div>
                         ) : (
                           member.companyRole
                         )}
-                      </td>
-                      <td className="px-3 py-3 capitalize">{member.status}</td>
-                      <td className="px-3 py-3">
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="capitalize">
+                          {member.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
                         <time dateTime={member.joinedAt}>
                           {new Date(member.joinedAt).toLocaleDateString()}
                         </time>
@@ -325,139 +414,145 @@ export function CompanyTeamManagement({ companyId }: { companyId: string }) {
                             Left {new Date(member.leftAt).toLocaleDateString()}
                           </p>
                         )}
-                      </td>
-                      <td className="px-3 py-3">
+                      </TableCell>
+                      <TableCell>
                         {active && (
-                          <button
+                          <Button
                             type="button"
+                            variant="destructive"
+                            size="sm"
                             onClick={() => setMemberToRemove(member)}
-                            className="rounded-md border border-destructive/40 px-2 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10"
                           >
                             Remove
-                          </button>
+                          </Button>
                         )}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
-      <section className="space-y-4 rounded-xl border bg-card p-4 sm:p-6">
-        <div>
-          <h2 className="text-lg font-semibold">Invitations</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+      <Card>
+        <CardHeader>
+          <CardTitle role="heading" aria-level={2} className="text-lg font-semibold">
+            Invitations
+          </CardTitle>
+          <CardDescription>
             Invitations expire after seven days and can be used only once.
-          </p>
-        </div>
-        {invitationsError ? (
-          <p role="alert" className="text-sm text-destructive">
-            {getApiErrorMessage(invitationsError, "Unable to load invitations.")}
-          </p>
-        ) : invitationsFetching && !invitations ? (
-          <p role="status" className="text-sm text-muted-foreground">
-            Loading invitations…
-          </p>
-        ) : !invitations?.length ? (
-          <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-            No invitations have been sent.
-          </p>
-        ) : (
-          <ul className="divide-y">
-            {invitations.map((invitation) => (
-              <li
-                key={invitation.id}
-                className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div>
-                  <p className="font-medium">
-                    {invitation.firstName} {invitation.lastName} · {invitation.email}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {invitation.companyRole} · {invitation.status}
-                    {invitation.status === EInvitationStatus.PENDING &&
-                      ` · Expires ${new Date(invitation.expiresAt).toLocaleDateString()}`}
-                  </p>
-                </div>
-                {invitation.status === EInvitationStatus.PENDING && (
-                  <button
-                    type="button"
-                    disabled={revokeState.isLoading}
-                    onClick={() => void revoke(invitation.id)}
-                    className="min-h-9 self-start rounded-md border px-3 text-sm hover:bg-muted disabled:opacity-60 sm:self-auto"
-                  >
-                    Revoke
-                  </button>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {invitationsError ? (
+            <Alert variant="destructive">
+              <AlertDescription>
+                {getApiErrorMessage(
+                  invitationsError,
+                  "Unable to load invitations.",
                 )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+              </AlertDescription>
+            </Alert>
+          ) : invitationsFetching && !invitations ? (
+            <div role="status" className="space-y-2">
+              <span className="sr-only">Loading invitations…</span>
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : !invitations?.length ? (
+            <Empty className="border border-dashed">
+              <EmptyHeader>
+                <EmptyDescription>No invitations have been sent.</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            <ul>
+              {invitations.map((invitation, index) => (
+                <li key={invitation.id}>
+                  {index > 0 && <Separator />}
+                  <div className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-medium">
+                        {invitation.firstName} {invitation.lastName} ·{" "}
+                        {invitation.email}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {invitation.companyRole} · {invitation.status}
+                        {invitation.status === EInvitationStatus.PENDING &&
+                          ` · Expires ${new Date(invitation.expiresAt).toLocaleDateString()}`}
+                      </p>
+                    </div>
+                    {invitation.status === EInvitationStatus.PENDING && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="self-start sm:self-auto"
+                        disabled={revokeState.isLoading}
+                        onClick={() => void revoke(invitation.id)}
+                      >
+                        Revoke
+                      </Button>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
 
-      {memberToRemove && (
-        <div
-          role="alertdialog"
-          aria-modal="true"
-          aria-labelledby="remove-member-title"
-          aria-describedby="remove-member-description"
-          className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"
-        >
-          <section className="w-full max-w-md space-y-4 rounded-xl border bg-background p-6 shadow-xl">
-            <h2 id="remove-member-title" className="text-lg font-semibold">
-              Remove {memberName(memberToRemove)}?
-            </h2>
-            <p id="remove-member-description" className="text-sm text-muted-foreground">
+      <AlertDialog
+        open={memberToRemove !== null}
+        onOpenChange={(open) => {
+          if (!open) setMemberToRemove(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Remove {memberToRemove ? memberName(memberToRemove) : ""}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
               This deactivates company membership while preserving the record.
               Contract-specific assignments are not changed.
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setMemberToRemove(null)}
-                className="min-h-10 rounded-md border px-4 text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={removeState.isLoading}
-                onClick={() => void confirmRemove()}
-                className="min-h-10 rounded-md bg-destructive px-4 text-sm font-medium text-destructive-foreground disabled:opacity-60"
-              >
-                {removeState.isLoading ? "Removing…" : "Remove member"}
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={removeState.isLoading}
+              onClick={() => void confirmRemove()}
+            >
+              {removeState.isLoading ? "Removing…" : "Remove member"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
-function Field({
+function InviteField({
+  id,
   label,
   name,
   required = false,
   type = "text",
 }: {
+  id: string;
   label: string;
   name: string;
   required?: boolean;
   type?: string;
 }) {
   return (
-    <label className="grid gap-1.5 text-sm font-medium">
-      {label}
-      <input
-        name={name}
-        type={type}
-        required={required}
-        className="h-10 rounded-md border bg-background px-3 font-normal"
-      />
-    </label>
+    <Field>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <Input id={id} name={name} type={type} required={required} />
+    </Field>
   );
 }

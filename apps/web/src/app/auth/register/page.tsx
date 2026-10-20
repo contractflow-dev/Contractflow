@@ -12,6 +12,20 @@ import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { Alert, AlertDescription } from "@workspace/ui/components/alert";
+import { Button } from "@workspace/ui/components/button";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@workspace/ui/components/field";
+import { Input } from "@workspace/ui/components/input";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@workspace/ui/components/native-select";
 import { useRegisterMutation } from "@/services/authApi";
 import type { RegisterRequest } from "@/services/authApi";
 import { getApiErrorMessage } from "@/lib/apiError";
@@ -53,8 +67,7 @@ const registerSchema = z
 
 type RegisterValues = z.infer<typeof registerSchema>;
 
-const inputClass =
-  "h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-base outline-none lg:h-10 lg:text-sm transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 aria-invalid:border-destructive disabled:opacity-60";
+const inputClass = "h-11 lg:h-10";
 
 /** Props Field injects into its (single) control so label, hint and error are wired up. */
 type FieldControlProps = {
@@ -63,7 +76,7 @@ type FieldControlProps = {
   "aria-describedby"?: string;
 };
 
-function Field({
+function FormField({
   label,
   error,
   hint,
@@ -79,29 +92,23 @@ function Field({
   const messageId = `${id}-message`;
 
   return (
-    <div className="space-y-1.5">
-      <label htmlFor={id} className="text-sm font-medium">
-        {label}
-      </label>
+    <Field data-invalid={error ? true : undefined} className="min-w-0 gap-1.5">
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
       {cloneElement(children, {
         id,
         "aria-invalid": error ? true : undefined,
         "aria-describedby": error || hint ? messageId : undefined,
       })}
       {error ? (
-        <p
-          id={messageId}
-          role="alert"
-          className="break-words text-xs text-destructive"
-        >
+        <FieldError id={messageId} className="break-words text-xs">
           {error}
-        </p>
+        </FieldError>
       ) : hint ? (
-        <p id={messageId} className="text-xs text-muted-foreground">
+        <FieldDescription id={messageId} className="text-xs">
           {hint}
-        </p>
+        </FieldDescription>
       ) : null}
-    </div>
+    </Field>
   );
 }
 
@@ -195,51 +202,45 @@ export default function RegisterPage() {
             </p>
           </header>
 
-          <form
-            onSubmit={handleSubmit(onSubmit)}
-            noValidate
-            className="space-y-4"
-          >
+          <form onSubmit={handleSubmit(onSubmit)} noValidate>
+            <FieldGroup className="gap-4">
             {serverError && (
-              <div
-                role="alert"
-                className="break-words rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-              >
-                {serverError}
-              </div>
+              <Alert variant="destructive" className="break-words">
+                <AlertDescription>{serverError}</AlertDescription>
+              </Alert>
             )}
 
             <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="First name" error={errors.firstName?.message}>
-                <input
+              <FormField label="First name" error={errors.firstName?.message}>
+                <Input
                   className={inputClass}
                   autoComplete="given-name"
                   {...register("firstName")}
                 />
-              </Field>
-              <Field label="Last name" error={errors.lastName?.message}>
-                <input
+              </FormField>
+              <FormField label="Last name" error={errors.lastName?.message}>
+                <Input
                   className={inputClass}
                   autoComplete="family-name"
                   {...register("lastName")}
                 />
-              </Field>
+              </FormField>
               <div className="sm:col-span-2">
-                <Field
+                <FormField
                   label="Middle name (optional)"
                   error={errors.middleName?.message}
                 >
-                  <input
+                  <Input
                     className={inputClass}
                     autoComplete="additional-name"
                     {...register("middleName")}
                   />
-                </Field>
+                </FormField>
               </div>
             </div>
 
-            <Field label="Email" error={errors.email?.message}>
-              <input
+            <FormField label="Email" error={errors.email?.message}>
+              <Input
                 type="email"
                 className={inputClass}
                 autoComplete="email"
@@ -247,37 +248,37 @@ export default function RegisterPage() {
                 spellCheck={false}
                 {...register("email")}
               />
-            </Field>
+            </FormField>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field
+              <FormField
                 label="Phone number"
                 error={errors.phoneNumber?.message}
               >
-                <input
+                <Input
                   type="tel"
                   className={inputClass}
                   autoComplete="tel"
                   {...register("phoneNumber")}
                 />
-              </Field>
-              <Field label="Timezone" error={errors.timezone?.message}>
-                <select className={inputClass} {...register("timezone")}>
+              </FormField>
+              <FormField label="Timezone" error={errors.timezone?.message}>
+                <NativeSelect className="w-full" {...register("timezone")}>
                   {timezones.map((tz) => (
-                    <option key={tz} value={tz}>
+                    <NativeSelectOption key={tz} value={tz}>
                       {tz.replace(/_/g, " ")}
-                    </option>
+                    </NativeSelectOption>
                   ))}
-                </select>
-              </Field>
+                </NativeSelect>
+              </FormField>
             </div>
 
-            <Field
+            <FormField
               label="Password"
               error={errors.password?.message}
               hint="12+ characters with upper, lower, number and symbol."
             >
-              <input
+              <Input
                 type="password"
                 className={inputClass}
                 autoComplete="new-password"
@@ -291,19 +292,19 @@ export default function RegisterPage() {
                   },
                 })}
               />
-            </Field>
+            </FormField>
 
-            <Field
+            <FormField
               label="Confirm password"
               error={errors.confirmPassword?.message}
             >
-              <input
+              <Input
                 type="password"
                 className={inputClass}
                 autoComplete="new-password"
                 {...register("confirmPassword")}
               />
-            </Field>
+            </FormField>
 
             <Controller
               control={control}
@@ -319,13 +320,14 @@ export default function RegisterPage() {
               )}
             />
 
-            <button
+            <Button
               type="submit"
               disabled={isSubmitting}
-              className="h-11 w-full rounded-md bg-primary text-sm font-medium lg:h-10 text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60"
+              className="h-11 w-full lg:h-10"
             >
               {isSubmitting ? "Creating account…" : "Create account"}
-            </button>
+            </Button>
+            </FieldGroup>
           </form>
 
           <p className="text-center text-sm text-muted-foreground">

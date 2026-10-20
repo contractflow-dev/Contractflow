@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+
 type Metric = {
   value: string;
   label: string;
@@ -18,7 +20,10 @@ export function HeroMetrics({ className = "" }: { className?: string }) {
   return (
     <dl
       aria-label="Platform performance highlights"
-      className={`mt-6 grid w-full max-w-xl grid-cols-1 gap-3 xl:mt-8 xl:grid-cols-3 xl:gap-5 ${className}`}
+      className={cn(
+        "mt-6 grid w-full max-w-xl grid-cols-1 gap-3 xl:mt-8 xl:grid-cols-3 xl:gap-5",
+        className,
+      )}
     >
       {METRICS.map((metric, index) => (
         <div

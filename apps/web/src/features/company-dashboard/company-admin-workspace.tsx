@@ -9,6 +9,18 @@ import {
   RiSettings3Line,
 } from "@remixicon/react";
 import { Button } from "@workspace/ui/components/button";
+import {
+  Card,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
+import { FieldLabel } from "@workspace/ui/components/field";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@workspace/ui/components/native-select";
 import { useGetCompaniesQuery } from "@/features/companies";
 import { getApiErrorMessage } from "@/lib/apiError";
 
@@ -140,25 +152,25 @@ export function CompanyAdminWorkspace({
           <div className="flex items-center gap-2">
             {adminCompanies.length > 1 && (
               <>
-                <label className="sr-only" htmlFor="company-switcher">
+                <FieldLabel className="sr-only" htmlFor="company-switcher">
                   Select company
-                </label>
-                <select
+                </FieldLabel>
+                <NativeSelect
                   id="company-switcher"
+                  className="max-w-40 sm:max-w-56"
                   value={selectedId}
                   onChange={(event) => {
                     const next = new URLSearchParams();
                     next.set("companyId", event.target.value);
                     router.replace(`${pathname}?${next.toString()}`);
                   }}
-                  className="h-9 max-w-40 rounded-md border border-input bg-background px-2 text-sm sm:max-w-56"
                 >
                   {adminCompanies.map(({ company }) => (
-                    <option key={company.id} value={company.id}>
+                    <NativeSelectOption key={company.id} value={company.id}>
                       {company.name}
-                    </option>
+                    </NativeSelectOption>
                   ))}
-                </select>
+                </NativeSelect>
               </>
             )}
           </div>
@@ -202,11 +214,15 @@ function WorkspaceNotice({
 }) {
   return (
     <main className="grid min-h-[60vh] place-items-center p-4">
-      <section className="w-full max-w-lg space-y-4 rounded-xl border bg-card p-6 shadow-sm sm:p-8">
-        <h1 className="font-heading text-xl font-semibold">{title}</h1>
-        <p className="text-sm text-muted-foreground">{description}</p>
-        {action}
-      </section>
+      <Card className="w-full max-w-lg">
+        <CardHeader>
+          <CardTitle>
+            <h1 className="text-xl">{title}</h1>
+          </CardTitle>
+          <CardDescription>{description}</CardDescription>
+        </CardHeader>
+        {action && <CardFooter>{action}</CardFooter>}
+      </Card>
     </main>
   );
 }

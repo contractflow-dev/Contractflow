@@ -10,6 +10,7 @@ import {
   RiCheckLine,
 } from "@remixicon/react";
 import { Badge } from "@workspace/ui/components/badge";
+import { Card } from "@workspace/ui/components/card";
 import type { AdminOverviewResponse } from "@/services/adminApi";
 
 interface OverviewKpiGridProps {
@@ -22,7 +23,7 @@ export function OverviewKpiGrid({ data }: OverviewKpiGridProps) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {/* Companies KPI */}
-      <div className="flex flex-col justify-between rounded-xl border bg-card p-5 shadow-sm transition-all hover:shadow-md">
+      <Card className="justify-between gap-0 px-5 transition-all hover:shadow-md">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Tenant Companies
@@ -51,10 +52,10 @@ export function OverviewKpiGrid({ data }: OverviewKpiGridProps) {
             <span>{companies.inactive} inactive</span>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Users KPI */}
-      <div className="flex flex-col justify-between rounded-xl border bg-card p-5 shadow-sm transition-all hover:shadow-md">
+      <Card className="justify-between gap-0 px-5 transition-all hover:shadow-md">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Registered Users
@@ -84,10 +85,10 @@ export function OverviewKpiGrid({ data }: OverviewKpiGridProps) {
             </span>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Contracts KPI */}
-      <div className="flex flex-col justify-between rounded-xl border bg-card p-5 shadow-sm transition-all hover:shadow-md">
+      <Card className="justify-between gap-0 px-5 transition-all hover:shadow-md">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Total Contracts
@@ -123,10 +124,10 @@ export function OverviewKpiGrid({ data }: OverviewKpiGridProps) {
             <span>{contracts.completed} completed</span>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Invitations KPI */}
-      <div className="flex flex-col justify-between rounded-xl border bg-card p-5 shadow-sm transition-all hover:shadow-md">
+      <Card className="justify-between gap-0 px-5 transition-all hover:shadow-md">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Invitations
@@ -162,7 +163,7 @@ export function OverviewKpiGrid({ data }: OverviewKpiGridProps) {
             )}
           </div>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

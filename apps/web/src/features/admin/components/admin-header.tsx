@@ -10,6 +10,8 @@ import {
 } from "@remixicon/react";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
+import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar";
+import { Separator } from "@workspace/ui/components/separator";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { useGetCurrentUserQuery, useLogoutMutation } from "@/services/authApi";
 
@@ -40,14 +42,16 @@ export function AdminHeader({ onToggleMobileNav }: AdminHeaderProps) {
     <header className="sticky top-0 z-20 flex h-16 w-full items-center justify-between border-b bg-card/80 px-4 backdrop-blur-md sm:px-6">
       {/* Left: Mobile hamburger & breadcrumbs */}
       <div className="flex items-center gap-3">
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon"
           onClick={onToggleMobileNav}
-          className="md:hidden rounded-lg p-2 text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="md:hidden text-muted-foreground"
           aria-label="Open navigation menu"
         >
           <RiMenuLine className="size-5" />
-        </button>
+        </Button>
 
         <div className="flex items-center gap-2 text-xs sm:text-sm">
           <span className="font-semibold text-foreground">Platform Admin</span>
@@ -66,10 +70,13 @@ export function AdminHeader({ onToggleMobileNav }: AdminHeaderProps) {
           <span>Platform Administrator</span>
         </Badge>
 
-        <div className="hidden lg:flex items-center gap-2 pl-2 border-l border-border/60">
-          <div className="grid size-8 place-items-center rounded-full bg-primary/10 text-primary font-semibold text-xs">
-            {user?.firstName?.[0] ?? <RiUserLine className="size-4" />}
-          </div>
+        <div className="hidden lg:flex items-center gap-2 h-8">
+          <Separator orientation="vertical" className="mr-1 bg-border/60" />
+          <Avatar>
+            <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+              {user?.firstName?.[0] ?? <RiUserLine className="size-4" />}
+            </AvatarFallback>
+          </Avatar>
           <div className="flex flex-col text-left">
             <span className="text-xs font-semibold leading-none text-foreground">
               {displayName}

@@ -1,5 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { Alert, AlertDescription } from "@workspace/ui/components/alert";
+import { buttonVariants } from "@workspace/ui/components/button";
+import { Separator } from "@workspace/ui/components/separator";
+import { cn } from "@/lib/utils";
 
 export function LegalDocumentPage({
   title,
@@ -13,12 +17,12 @@ export function LegalDocumentPage({
       <article className="mx-auto w-full max-w-3xl space-y-7">
         <Link
           href="/auth/register"
-          className="inline-flex min-h-11 items-center rounded-md text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className={cn(buttonVariants({ variant: "link" }), "h-11 px-0")}
         >
           Back to registration
         </Link>
 
-        <header className="space-y-3 border-b pb-6">
+        <header className="space-y-3 pb-3">
           <p className="text-sm font-semibold text-primary">ContractFlow</p>
           <h1 className="break-words text-3xl font-semibold tracking-tight sm:text-4xl">
             {title}
@@ -28,17 +32,17 @@ export function LegalDocumentPage({
             <span aria-hidden="true"> · </span>
             Last updated: <strong>[To be set before publication]</strong>
           </p>
+          <Separator className="mt-3" />
         </header>
 
-        <aside
-          role="note"
-          className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm leading-6 text-muted-foreground"
-        >
-          Draft for service-owner and legal review. Complete every bracketed
-          placeholder and confirm the statements against the production service
-          before publishing. This document is not legal advice or a guarantee
-          of compliance with any law.
-        </aside>
+        <Alert role="note">
+          <AlertDescription className="leading-6">
+            Draft for service-owner and legal review. Complete every bracketed
+            placeholder and confirm the statements against the production service
+            before publishing. This document is not legal advice or a guarantee
+            of compliance with any law.
+          </AlertDescription>
+        </Alert>
 
         {children}
       </article>
