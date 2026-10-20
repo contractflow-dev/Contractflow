@@ -24,17 +24,29 @@ services:
       - key: DATABASE_URL
         sync: false
 
-      - key: JWT_SECRET
-        generateValue: true
-
       - key: WEB_URL
         value: https://contractflow-web-o6yz.onrender.com
 
       - key: CORS_ORIGIN
         value: https://contractflow-web-o6yz.onrender.com
 
+      - key: JWT_SECRET
+        generateValue: true
+
       - key: MAIL_PROVIDER
         value: smtp
+
+      - key: SMTP_HOST
+        sync: false
+
+      - key: SMTP_PORT
+        sync: false
+
+      - key: SMTP_USER
+        sync: false
+
+      - key: SMTP_PASS
+        sync: false
 
   # ContractFlow Web
   - type: web
