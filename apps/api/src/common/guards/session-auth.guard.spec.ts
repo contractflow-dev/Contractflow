@@ -13,6 +13,7 @@ describe('SessionAuthGuard', () => {
     id: '01JUSER0000000000000000000',
     email: 'user@example.com',
     emailVerifiedAt: new Date(),
+    isPlatformAdmin: false,
   };
   const reflector = {
     getAllAndOverride: vi.fn<

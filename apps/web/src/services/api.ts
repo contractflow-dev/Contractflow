@@ -10,10 +10,14 @@ const baseQuery = fetchBaseQuery({
 });
 
 function isProtectedRoute(pathname: string): boolean {
-  return pathname === "/dashboards" ||
+  return (
+    pathname === "/dashboards" ||
     pathname.startsWith("/dashboards/") ||
     pathname === "/onboarding" ||
-    pathname.startsWith("/onboarding/");
+    pathname.startsWith("/onboarding/") ||
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/")
+  );
 }
 
 /**
@@ -46,6 +50,9 @@ export const api = createApi({
     "Onboarding",
     "Company",
     "Dashboard",
+    "Admin",
+    "CompanyMember",
+    "CompanyInvitation",
   ],
   endpoints: () => ({}),
 });

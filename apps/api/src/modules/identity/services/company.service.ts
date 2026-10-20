@@ -1,143 +1,78 @@
 import {
   ForbiddenException,
   Injectable,
-  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { DataSource, IsNull, Repository } from 'typeorm';
 import {
+  EContractStatus,
   ECompanyRole,
   ECompanyStatus,
   ECompanyUserStatus,
   EUserStatus,
 } from '@contractflow/contracts-schema';
-import { DataSource, Repository } from 'typeorm';
-import { CreateCompanyRequestDto } from '../dto/company/create-company-request.dto';
 import { AppUser } from '../entities/app-user.entity';
 import { Company } from '../entities/company.entity';
 import { CompanyUser } from '../entities/company-user.entity';
+import { CompanyInvitationRepository } from '../repositories/company-invitation.repository';
+import { Contract } from '../../contract/entities/contract.entity';
+import { ContractParty } from '../../contract/entities/contract-party.entity';
+import { CompanyResponseDto } from '../dto/company/responses/company-response.dto';
+import { CreateCompanyRequestDto } from '../dto/company/requests/create-company-request.dto';
 
-export interface CompanyProfileResponse {
-  id: string;
-  name: string;
-  legalName: string;
-  registrationNumber: string;
-  taxIdentificationNumber: string;
-  email: string;
-  phoneNumber: string;
-  website: string;
-  addressLine1: string;
-  addressLine2: string;
-  city: string;
-  stateRegion: string;
-  postalCode: string;
-  countryCode: string;
-  defaultCurrencyCode: string;
-  status: ECompanyStatus;
-}
-
-export interface CompanyMembershipResponse {
-  id: string;
-  companyId: string;
-  companyRole: ECompanyRole;
-  status: ECompanyUserStatus;
-  canManageCompany: boolean;
-}
-
-export interface CompanyAccessResponse {
-  company: CompanyProfileResponse;
-  membership: CompanyMembershipResponse;
-}
-
-export interface CompanyDashboardResponse extends CompanyAccessResponse {
-  summary: {
-    activeMembershipCount: number;
-  };
-}
-
-function companyProfile(company: Company): CompanyProfileResponse {
-  return {
-    id: company.id,
-    name: company.name,
-    legalName: company.legalName,
-    registrationNumber: company.registrationNumber,
-    taxIdentificationNumber: company.taxIdentificationNumber,
-    email: company.email,
-    phoneNumber: company.phoneNumber,
-    website: company.website,
-    addressLine1: company.addressLine1,
-    addressLine2: company.addressLine2,
-    city: company.city,
-    stateRegion: company.stateRegion,
-    postalCode: company.postalCode,
-    countryCode: company.countryCode,
-    defaultCurrencyCode: company.defaultCurrencyCode,
-    status: company.status,
-  };
-}
-
-function membershipResponse(
-  membership: CompanyUser,
-): CompanyMembershipResponse {
-  return {
-    id: membership.id,
-    companyId: membership.companyId,
-    companyRole: membership.companyRole,
-    status: membership.status,
-    canManageCompany:
-      membership.companyRole === ECompanyRole.COMPANY_ADMIN &&
-      membership.status === ECompanyUserStatus.ACTIVE,
-  };
-}
-
-function accessResponse(membership: CompanyUser): CompanyAccessResponse {
-  return {
-    company: companyProfile(membership.company),
-    membership: membershipResponse(membership),
-  };
-}
+import type {
+  ICompanyAccessResponse,
+  ICompanyDashboardResponse,
+  ICompanyMembershipResponse,
+  ICompanyProfileResponse,
+} from '@contractflow/contracts-schema';
 
 @Injectable()
 export class CompanyService {
   constructor(
     private readonly dataSource: DataSource,
     @InjectRepository(CompanyUser)
-    private readonly memberships: Repository<CompanyUser>,
+    private readonly companyUserRepository: Repository<CompanyUser>,
+    private readonly invitationRepository: CompanyInvitationRepository,
+    @InjectRepository(ContractParty)
+    private readonly contractPartyRepository: Repository<ContractParty>,
   ) {}
 
   async create(
     userId: string,
-    input: CreateCompanyRequestDto,
-  ): Promise<CompanyAccessResponse> {
-    return this.dataSource.transaction(async (manager) => {
-      const user = await manager.getRepository(AppUser).findOne({
+    dto: CreateCompanyRequestDto,
+  ): Promise<ICompanyAccessResponse> {
+    const result = await this.dataSource.transaction(async (manager) => {
+      const users = manager.getRepository(AppUser);
+      const user = await users.findOne({
         where: { id: userId },
-        lock: { mode: 'pessimistic_read' },
       });
-      if (!user || user.status !== EUserStatus.ACTIVE) {
+
+      if (!user) {
         throw new UnauthorizedException('Authentication required.');
       }
-      if (!user.emailVerifiedAt) {
+
+      if (user.status !== EUserStatus.ACTIVE || !user.emailVerifiedAt) {
         throw new ForbiddenException(
-          'Verify your email before creating a company.',
+          'Only verified, active accounts can create companies.',
         );
       }
 
       const companyRepository = manager.getRepository(Company);
-      const company = await companyRepository.save(
+      const savedCompany = await companyRepository.save(
         companyRepository.create({
-          ...input,
-          website: input.website ?? '',
-          addressLine2: input.addressLine2 ?? '',
+          ...dto,
+          website: dto.website ?? '',
+          addressLine2: dto.addressLine2 ?? '',
           status: ECompanyStatus.ACTIVE,
-          verifiedAt: null,
         }),
       );
 
       const membershipRepository = manager.getRepository(CompanyUser);
-      const membership = await membershipRepository.save(
+      const savedMembership = await membershipRepository.save(
         membershipRepository.create({
-          companyId: company.id,
+          companyId: savedCompany.id,
           userId: user.id,
           companyRole: ECompanyRole.COMPANY_ADMIN,
           jobTitle: 'Company Administrator',
@@ -146,80 +81,183 @@ export class CompanyService {
           leftAt: null,
         }),
       );
-      membership.company = company;
 
-      return accessResponse(membership);
+      return {
+        company: savedCompany,
+        membership: savedMembership,
+      };
     });
+
+    return {
+      company: CompanyResponseDto.fromEntity(result.company),
+      membership: this.mapMembership(result.membership),
+    };
   }
 
-  async listForUser(userId: string): Promise<CompanyAccessResponse[]> {
-    const memberships = await this.memberships.find({
-      where: { userId, status: ECompanyUserStatus.ACTIVE },
+  async listForUser(userId: string): Promise<ICompanyAccessResponse[]> {
+    const memberships = await this.companyUserRepository.find({
+      where: {
+        userId,
+        status: ECompanyUserStatus.ACTIVE,
+        leftAt: IsNull(),
+      },
+      order: { joinedAt: 'DESC' },
       relations: { company: true },
-      order: { createdAt: 'ASC' },
     });
-    return memberships
-      .filter(({ company }) => company.status === ECompanyStatus.ACTIVE)
-      .map(accessResponse);
+
+    return memberships.map((membership) => ({
+      company: CompanyResponseDto.fromEntity(membership.company),
+      membership: this.mapMembership(membership),
+    }));
   }
 
-  async getCurrent(userId: string): Promise<CompanyAccessResponse> {
-    const [company] = await this.listForUser(userId);
-    if (!company) {
-      throw new NotFoundException('No active company membership was found.');
+  async getCurrent(userId: string): Promise<ICompanyProfileResponse> {
+    const membership = await this.companyUserRepository.findOne({
+      where: {
+        userId,
+        status: ECompanyUserStatus.ACTIVE,
+        leftAt: IsNull(),
+      },
+      order: { joinedAt: 'DESC' },
+      relations: { company: true },
+    });
+
+    if (!membership?.company) {
+      throw new ForbiddenException('Active company membership is required');
     }
-    return company;
+
+    return CompanyResponseDto.fromEntity(membership.company);
   }
 
   async getMembership(
     userId: string,
     companyId: string,
-  ): Promise<CompanyMembershipResponse> {
-    const membership = await this.findActiveMembership(userId, companyId);
-    return membershipResponse(membership);
+  ): Promise<ICompanyAccessResponse> {
+    const membership = await this.companyUserRepository.findOne({
+      where: {
+        userId,
+        companyId,
+        status: ECompanyUserStatus.ACTIVE,
+        leftAt: IsNull(),
+      },
+      relations: { company: true },
+    });
+
+    if (!membership?.company) {
+      throw new ForbiddenException('Active company membership is required.');
+    }
+
+    return {
+      company: CompanyResponseDto.fromEntity(membership.company),
+      membership: this.mapMembership(membership),
+    };
   }
 
   async getDashboard(
     userId: string,
     companyId: string,
-  ): Promise<CompanyDashboardResponse> {
-    const membership = await this.findActiveMembership(userId, companyId);
-    if (membership.companyRole !== ECompanyRole.COMPANY_ADMIN) {
-      throw new ForbiddenException(
-        'Company administrator access is required.',
-      );
-    }
-
-    const activeMembershipCount = await this.memberships.count({
-      where: {
-        companyId,
-        status: ECompanyUserStatus.ACTIVE,
-      },
-    });
-    return {
-      ...accessResponse(membership),
-      summary: { activeMembershipCount },
-    };
-  }
-
-  private async findActiveMembership(
-    userId: string,
-    companyId: string,
-  ): Promise<CompanyUser> {
-    const membership = await this.memberships.findOne({
+  ): Promise<ICompanyDashboardResponse> {
+    const membership = await this.companyUserRepository.findOne({
       where: {
         userId,
         companyId,
         status: ECompanyUserStatus.ACTIVE,
+        leftAt: IsNull(),
       },
       relations: { company: true },
     });
-    if (
-      !membership ||
-      membership.company.status !== ECompanyStatus.ACTIVE
-    ) {
-      throw new NotFoundException('Company membership was not found.');
+
+    if (!membership?.company) {
+      throw new ForbiddenException('Active company membership is required.');
     }
-    return membership;
+
+    if (membership.companyRole !== ECompanyRole.COMPANY_ADMIN) {
+      throw new ForbiddenException(
+        'Only company administrators can access dashboard data.',
+      );
+    }
+
+    const activeMembershipCount = await this.companyUserRepository.count({
+      where: {
+        companyId,
+        status: ECompanyUserStatus.ACTIVE,
+        leftAt: IsNull(),
+      },
+    });
+
+    const pendingInvitationCount = await this.invitationRepository.countPending(
+      { companyId },
+      new Date(),
+    );
+
+    const activeContractCount = await this.countCompanyContracts(
+      companyId,
+      EContractStatus.ACTIVE,
+    );
+    const expiringContractCount =
+      await this.countExpiringCompanyContracts(companyId);
+
+    return {
+      company: CompanyResponseDto.fromEntity(membership.company),
+      membership: this.mapMembership(membership),
+      summary: {
+        activeMembershipCount,
+        pendingInvitationCount,
+        activeContractCount,
+        expiringContractCount,
+      },
+    };
+  }
+
+  private async countCompanyContracts(
+    companyId: string,
+    status: EContractStatus,
+  ): Promise<number> {
+    const result = await this.contractPartyRepository
+      .createQueryBuilder('party')
+      .innerJoin(Contract, 'contract', 'contract.id = party.contractId')
+      .select('COUNT(DISTINCT contract.id)', 'count')
+      .where('party.companyId = :companyId', { companyId })
+      .andWhere('contract.status = :status', { status })
+      .getRawOne<{ count: string }>();
+
+    return Number(result?.count ?? 0);
+  }
+
+  private async countExpiringCompanyContracts(
+    companyId: string,
+  ): Promise<number> {
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const expiryLimit = new Date(today);
+    expiryLimit.setUTCDate(expiryLimit.getUTCDate() + 30);
+    const todayDate = today.toISOString().slice(0, 10);
+    const expiryDate = expiryLimit.toISOString().slice(0, 10);
+
+    const result = await this.contractPartyRepository
+      .createQueryBuilder('party')
+      .innerJoin(Contract, 'contract', 'contract.id = party.contractId')
+      .select('COUNT(DISTINCT contract.id)', 'count')
+      .where('party.companyId = :companyId', { companyId })
+      .andWhere('contract.status = :status', {
+        status: EContractStatus.ACTIVE,
+      })
+      .andWhere('contract.endDate >= :today', { today: todayDate })
+      .andWhere('contract.endDate <= :expiryLimit', {
+        expiryLimit: expiryDate,
+      })
+      .getRawOne<{ count: string }>();
+
+    return Number(result?.count ?? 0);
+  }
+
+  private mapMembership(membership: CompanyUser): ICompanyMembershipResponse {
+    return {
+      id: membership.id,
+      companyId: membership.companyId,
+      companyRole: membership.companyRole,
+      status: membership.status,
+      canManageCompany: membership.companyRole === ECompanyRole.COMPANY_ADMIN,
+    };
   }
 }

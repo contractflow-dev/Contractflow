@@ -20,7 +20,7 @@ import { LoginAppUserDto } from '../dto/app-user/requests/login-app-user-request
 import { AppUser } from '../entities/app-user.entity';
 import { EmailVerificationToken } from '../entities/email-verification-token.entity';
 import { UserSession } from '../entities/user-session.entity';
-import { AppUserResponseDto } from '../dto/app-user/responses/app-user-resonse.dto';
+import { AppUserResponseDto } from '../dto/app-user/responses/app-user-response.dto';
 import { MailService } from '../../mail/mail.service';
 
 const scrypt = promisify(scryptCallback);
@@ -37,6 +37,7 @@ export interface AuthenticatedUser {
   id: string;
   email: string;
   emailVerifiedAt: Date | null;
+  isPlatformAdmin: boolean;
 }
 
 export interface AuthenticatedSession {
@@ -298,6 +299,7 @@ export class AuthService {
         id: session.user.id,
         email: session.user.email,
         emailVerifiedAt: session.user.emailVerifiedAt,
+        isPlatformAdmin: Boolean(session.user.isPlatformAdmin),
       },
       sessionId: session.id,
     };

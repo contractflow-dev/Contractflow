@@ -20,12 +20,43 @@ export class MailService {
     const verificationUrl = new URL('/auth/verify-email', webUrl);
     verificationUrl.searchParams.set('token', token);
     const text = `Verify your email address by opening this link: ${verificationUrl.toString()}\n\nThis link expires in 30 minutes and can only be used once.`;
+    await this.sendEmail(email, 'Verify your ContractFlow email', text);
+  }
+
+  async sendCompanyInvitationEmail(
+    email: string,
+    companyName: string,
+    role: string,
+    token: string,
+  ): Promise<void> {
+    const isProduction = this.config.get<string>('NODE_ENV') === 'production';
+    const webUrl =
+      this.config.get<string>('WEB_URL') ??
+      (isProduction ? undefined : 'http://localhost:3000');
+    if (!webUrl) {
+      throw new ServiceUnavailableException(
+        'Email delivery is not configured. Set WEB_URL.',
+      );
+    }
+
+    const invitationUrl = new URL('/invitations/respond', webUrl);
+    invitationUrl.searchParams.set('token', token);
+    const text = `You have been invited to join ${companyName} on ContractFlow as ${role}.\n\nSign in or create an account using this email address, then review the invitation here: ${invitationUrl.toString()}\n\nThis invitation expires in 7 days and can only be used once.`;
+    await this.sendEmail(email, `Invitation to join ${companyName}`, text);
+  }
+
+  private async sendEmail(
+    email: string,
+    subject: string,
+    text: string,
+  ): Promise<void> {
+    const isProduction = this.config.get<string>('NODE_ENV') === 'production';
     const provider =
       this.config.get<string>('MAIL_PROVIDER') ??
       (isProduction ? 'resend' : 'smtp');
 
     if (provider === 'smtp') {
-      await this.sendSmtpEmail(email, text);
+      await this.sendSmtpEmail(email, subject, text);
       return;
     }
 
@@ -54,7 +85,7 @@ export class MailService {
         body: JSON.stringify({
           from,
           to: [email],
-          subject: 'Verify your ContractFlow email',
+          subject,
           text,
         }),
       });
@@ -72,7 +103,11 @@ export class MailService {
     }
   }
 
-  private async sendSmtpEmail(email: string, text: string): Promise<void> {
+  private async sendSmtpEmail(
+    email: string,
+    subject: string,
+    text: string,
+  ): Promise<void> {
     const host = this.config.get<string>('SMTP_HOST') ?? 'localhost';
     const port = Number(this.config.get<string>('SMTP_PORT') ?? '1025');
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -96,7 +131,7 @@ export class MailService {
           this.config.get<string>('EMAIL_FROM') ??
           'ContractFlow <no-reply@contractflow.local>',
         to: email,
-        subject: 'Verify your ContractFlow email',
+        subject,
         text,
       });
     } catch (error) {

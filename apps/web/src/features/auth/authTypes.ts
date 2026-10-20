@@ -9,6 +9,7 @@ export interface AuthUser {
   phoneNumber?: string;
   timezone?: string;
   status?: EUserStatus;
+  isPlatformAdmin?: boolean;
 }
 
 export interface AuthState {
