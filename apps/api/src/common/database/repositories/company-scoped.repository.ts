@@ -6,9 +6,7 @@ import type {
   SelectQueryBuilder,
 } from 'typeorm';
 import { BaseRepository } from './base.repository';
-import type {
-  ICompanyScope,
-} from './company-scope.interface';
+import type { ICompanyScope } from './company-scope.interface';
 
 /**
  * `companyId` is an explicit argument, never read from ambient request
@@ -58,7 +56,7 @@ export abstract class CompanyScopedRepository<
   }
 }
 
-function requireCompanyId(scope: { companyId?: string }): string {
+export function requireCompanyId(scope: { companyId?: string }): string {
   const companyId = scope?.companyId?.trim();
   if (!companyId) {
     throw new BadRequestException('Company context is required');

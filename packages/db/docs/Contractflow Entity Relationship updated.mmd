@@ -1,0 +1,608 @@
+erDiagram
+    APP_USER ||--o{ USER_SESSION : "signs in with"
+    COMPANY ||--o{ COMPANY_USER : "employs"
+    APP_USER ||--o{ COMPANY_USER : "is member as"
+    COMPANY ||--o{ COMPANY_INVITATION : "issues"
+    COMPANY_USER ||--o{ COMPANY_INVITATION : "sends"
+    CONTRACT ||--|{ CONTRACT_PARTY : "has parties"
+    COMPANY ||--o{ CONTRACT_PARTY : "participates as"
+    CONTRACT_PARTY ||--o{ CONTRACT_ROLE_ASSIGNMENT : "has"
+    COMPANY_USER ||--o{ CONTRACT_ROLE_ASSIGNMENT : "is assigned"
+    CONTRACT ||--o{ CONTRACT_STATUS_HISTORY : "records"
+    CONTRACT ||--o{ CONTRACT_SITE : "is executed at"
+    CONTRACT ||--o{ CONTRACT_STAGE : "is phased into"
+    CONTRACT ||--o{ MILESTONE : "tracks"
+    CONTRACT_STAGE |o--o{ MILESTONE : "groups"
+    CONTRACT ||--o{ CONTRACT_VARIATION : "is changed by"
+    CONTRACT_PARTY ||--o{ CONTRACT_VARIATION : "raises"
+    CONTRACT ||--o{ INVOICE : "is billed through"
+    CONTRACT_PARTY ||--o{ INVOICE : "issues"
+    CONTRACT_PARTY ||--o{ INVOICE : "is billed"
+    INVOICE ||--|{ INVOICE_LINE_ITEM : "itemises"
+    MILESTONE |o--o{ INVOICE_LINE_ITEM : "is claimed in"
+    INVOICE ||--o{ INVOICE_ADJUSTMENT : "is adjusted by"
+    INVOICE ||--o{ PAYMENT : "is settled by"
+    CONTRACT ||--o{ PAYMENT : "scopes"
+    CONTRACT ||--o{ COMPLIANCE_REQUIREMENT : "requires"
+    COMPLIANCE_REQUIREMENT ||--o{ COMPLIANCE_RECORD : "is evidenced by"
+    CONTRACT_PARTY ||--o{ COMPLIANCE_RECORD : "submits"
+    CONTRACT ||--o{ COMPLIANCE_RECORD : "scopes"
+    CONTRACT |o--o{ DOCUMENT : "files"
+    COMPANY ||--o{ DOCUMENT : "owns"
+    DOCUMENT ||--|{ DOCUMENT_VERSION : "has versions"
+    DOCUMENT ||--o{ DOCUMENT_LINK : "is attached via"
+    CONTRACT_SITE ||--o{ SITE_DAILY_LOG : "is logged in"
+    CONTRACT_PARTY ||--o{ SITE_DAILY_LOG : "files"
+    CONTRACT ||--o{ SITE_DAILY_LOG : "scopes"
+    SITE_DAILY_LOG ||--o{ SITE_DAILY_LOG_LABOUR : "counts labour in"
+    SITE_DAILY_LOG ||--o{ SITE_DAILY_LOG_EQUIPMENT : "lists plant in"
+    SITE_DAILY_LOG ||--o{ SITE_DAILY_LOG_VISITOR : "records"
+    CONTRACT ||--o{ INVENTORY_ITEM : "stocks"
+    CONTRACT_SITE |o--o{ INVENTORY_ITEM : "stores"
+    CONTRACT_PARTY ||--o{ INVENTORY_ITEM : "owns stock of"
+    INVENTORY_ITEM ||--o{ INVENTORY_TRANSACTION : "moves through"
+    SITE_DAILY_LOG |o--o{ INVENTORY_TRANSACTION : "references"
+    CONTRACT ||--o{ INVENTORY_TRANSACTION : "scopes"
+    CONTRACT ||--o{ HSE_INCIDENT : "scopes"
+    CONTRACT_SITE ||--o{ HSE_INCIDENT : "is scene of"
+    HSE_INCIDENT ||--o{ HSE_INCIDENT_PERSON : "involves"
+    CONTRACT ||--o{ HSE_INSPECTION : "scopes"
+    CONTRACT_SITE ||--o{ HSE_INSPECTION : "is inspected in"
+    COMPANY_USER |o--o{ HSE_INSPECTION : "conducts"
+    HSE_INSPECTION ||--o{ HSE_INSPECTION_FINDING : "produces"
+    HSE_INCIDENT |o--o{ HSE_CORRECTIVE_ACTION : "triggers"
+    HSE_INSPECTION_FINDING |o--o{ HSE_CORRECTIVE_ACTION : "triggers"
+    COMPANY_USER ||--o{ HSE_CORRECTIVE_ACTION : "is responsible for"
+    CONTRACT ||--o{ HSE_CORRECTIVE_ACTION : "scopes"
+    CONTRACT |o--o{ ACTIVITY_LOG : "is audited in"
+    COMPANY |o--o{ ACTIVITY_LOG : "is acted for in"
+    APP_USER |o--o{ ACTIVITY_LOG : "performs"
+    APP_USER ||--o{ NOTIFICATION : "receives"
+    CONTRACT |o--o{ NOTIFICATION : "is about"
+    CONTRACT ||--o{ CONVERSATION : "has conversations"
+    COMPANY_USER ||--o{ CONVERSATION : "creates"
+    CONVERSATION ||--o{ CONVERSATION_PARTICIPANT : "has participants"
+    COMPANY_USER ||--o{ CONVERSATION_PARTICIPANT : "participates in"
+    CONVERSATION ||--o{ MESSAGE : "contains messages"
+    COMPANY_USER ||--o{ MESSAGE : "sends"
+    CONTRACT ||--o{ COMMENT : "is discussed in"
+    COMPANY_USER ||--o{ COMMENT : "writes"
+    APP_USER {
+        uuid id PK
+        citext email UK "case-insensitive"
+        varchar(100) first_name
+        varchar(100) last_name
+        varchar(100) middle_name "nullable"
+        varchar(20) phone_number "nullable, E.164"
+        varchar(255) password_hash "nullable, argon2id"
+        enum status "PENDING | ACTIVE | SUSPENDED | DEACTIVATED"
+        boolean is_platform_admin
+        boolean mfa_enabled
+        varchar(64) timezone "IANA, e.g. Africa/Lagos"
+        timestamptz email_verified_at "nullable"
+        timestamptz last_login_at "nullable"
+    }
+    USER_SESSION {
+        uuid id PK
+        uuid user_id FK
+        varchar(255) refresh_token_hash UK "never the raw token"
+        inet ip_address "nullable"
+        text user_agent "nullable"
+        timestamptz expires_at
+        timestamptz revoked_at "nullable"
+    }
+    COMPANY {
+        uuid id PK
+        varchar(255) name "trading name"
+        varchar(255) legal_name
+        varchar(64) registration_number "e.g. CAC RC number"
+        varchar(64) tax_identification_number "nullable"
+        citext email
+        varchar(20) phone_number "E.164"
+        varchar(255) website "nullable"
+        varchar(255) address_line1
+        varchar(255) address_line2 "nullable"
+        varchar(100) city
+        varchar(100) state_region
+        varchar(20) postal_code "nullable"
+        char(2) country_code "ISO 3166-1 alpha-2"
+        char(3) default_currency_code "ISO 4217, validated by the app's currency registry"
+        enum status "PENDING_VERIFICATION | ACTIVE | SUSPENDED"
+        timestamptz verified_at "nullable"
+    }
+    COMPANY_USER {
+        uuid id PK
+        uuid company_id FK
+        uuid user_id FK
+        enum company_role "OWNER | ADMIN | MEMBER"
+        varchar(150) job_title "nullable"
+        enum status "INVITED | ACTIVE | SUSPENDED | LEFT"
+        timestamptz joined_at "nullable"
+        timestamptz left_at "nullable"
+    }
+    COMPANY_INVITATION {
+        uuid id PK
+        uuid company_id FK
+        uuid invited_by_company_user_id FK
+        citext email
+        varchar(100) first_name
+        varchar(100) last_name
+        enum company_role "OWNER | ADMIN | MEMBER"
+        varchar(255) token_hash UK
+        enum status "PENDING | ACCEPTED | EXPIRED | REVOKED"
+        timestamptz expires_at
+        timestamptz accepted_at "nullable"
+    }
+    CONTRACT {
+        uuid id PK
+        varchar(40) reference_number UK "e.g. CTR-2026-00012"
+        varchar(255) title
+        text description "nullable"
+        enum contract_type "CONSTRUCTION | SUPPLY | SERVICE | …"
+        enum status "DRAFT | PENDING_SIGNATURE | ACTIVE | …"
+        uuid parent_contract_id FK "nullable, self-ref: subcontract of"
+        bigint original_value_minor "minor units, immutable once ACTIVE"
+        bigint current_value_minor "cached: original + approved variations"
+        char(3) currency_code "ISO 4217, validated by the app's currency registry"
+        int retention_rate_bps "basis points, 500 = 5%"
+        int advance_payment_rate_bps "nullable"
+        int payment_terms_days "e.g. 30"
+        bigint liquidated_damages_per_day_minor "nullable"
+        date award_date
+        date start_date
+        date end_date "planned completion"
+        date revised_end_date "nullable, after approved time extensions"
+        date actual_completion_date "nullable"
+        int defects_liability_days "e.g. 365"
+        varchar(64) timezone "IANA, decides what 'today' means for due dates"
+    }
+    CONTRACT_PARTY {
+        uuid id PK
+        uuid contract_id FK
+        uuid company_id FK
+        enum party_type "AWARDING | AWARDED"
+        varchar(100) signatory_first_name "nullable"
+        varchar(100) signatory_last_name "nullable"
+        varchar(150) signatory_title "nullable"
+        timestamptz signed_at "nullable"
+    }
+    CONTRACT_ROLE_ASSIGNMENT {
+        uuid id PK
+        uuid contract_party_id FK
+        uuid company_user_id FK
+        uuid company_id FK "composite FK to both parents"
+        enum role "CONTRACT_MANAGER | PROJECT_MANAGER | …"
+        timestamptz assigned_at
+        uuid assigned_by_id FK "→ company_user"
+        timestamptz revoked_at "nullable"
+        uuid revoked_by_id FK "nullable, → company_user"
+    }
+    CONTRACT_STATUS_HISTORY {
+        uuid id PK
+        uuid contract_id FK
+        enum from_status "nullable, DRAFT | PENDING_SIGNATURE | ACTIVE | …"
+        enum to_status "DRAFT | PENDING_SIGNATURE | ACTIVE | …"
+        text reason "nullable"
+        uuid changed_by_id FK "→ company_user"
+        timestamptz changed_at "append-only"
+    }
+    CONTRACT_SITE {
+        uuid id PK
+        uuid contract_id FK
+        varchar(255) name
+        varchar(40) site_code "nullable"
+        varchar(255) address_line1
+        varchar(100) city
+        varchar(100) state_region
+        char(2) country_code
+        int latitude_e6 "nullable, degrees x 1,000,000"
+        int longitude_e6 "nullable, degrees x 1,000,000"
+        enum status "PLANNED | ACTIVE | CLOSED"
+    }
+    CONTRACT_STAGE {
+        uuid id PK
+        uuid contract_id FK
+        varchar(255) name "e.g. Mobilisation, Substructure"
+        text description "nullable"
+        int sequence
+        enum status "NOT_STARTED | IN_PROGRESS | ON_HOLD | …"
+        int weight_bps "share of contract progress"
+        date planned_start_date
+        date planned_end_date
+        date actual_start_date "nullable"
+        date actual_end_date "nullable"
+    }
+    MILESTONE {
+        uuid id PK
+        uuid contract_id FK
+        uuid contract_stage_id FK "nullable"
+        varchar(255) title
+        text description "nullable"
+        int sequence
+        enum status "PENDING | IN_PROGRESS | SUBMITTED | APPROVED | …"
+        int progress_bps "0 to 10000"
+        int weight_bps "share of stage progress"
+        boolean is_payment_milestone
+        bigint amount_minor "nullable, payable on approval"
+        char(3) currency_code "nullable, = contract currency"
+        date due_date
+        date revised_due_date "nullable"
+        date completed_date "nullable"
+        timestamptz submitted_at "nullable"
+        uuid submitted_by_id FK "nullable, → company_user"
+        timestamptz approved_at "nullable"
+        uuid approved_by_id FK "nullable, → company_user"
+        text rejection_reason "nullable"
+    }
+    CONTRACT_VARIATION {
+        uuid id PK
+        uuid contract_id FK
+        uuid raised_by_party_id FK
+        varchar(40) reference_number "e.g. VO-003"
+        varchar(255) title
+        text description
+        enum variation_type "ADDITION | OMISSION | SUBSTITUTION | …"
+        enum status "DRAFT | SUBMITTED | UNDER_REVIEW | APPROVED | …"
+        bigint amount_delta_minor "signed, negative for omissions"
+        char(3) currency_code "= contract currency"
+        int time_extension_days "0 if none"
+        timestamptz submitted_at "nullable"
+        uuid submitted_by_id FK "nullable, → company_user"
+        timestamptz decided_at "nullable"
+        uuid decided_by_id FK "nullable, → company_user"
+        text decision_note "nullable"
+    }
+    INVOICE {
+        uuid id PK
+        uuid contract_id FK
+        uuid issued_by_party_id FK "the AWARDED party"
+        uuid billed_to_party_id FK "the AWARDING party"
+        varchar(40) invoice_number
+        enum invoice_type "ADVANCE | INTERIM | MILESTONE | FINAL | …"
+        enum status "DRAFT | SUBMITTED | UNDER_REVIEW | CERTIFIED | …"
+        date issue_date
+        date due_date
+        date period_start "nullable, interim valuations"
+        date period_end "nullable"
+        char(3) currency_code "ISO 4217, validated by the app's currency registry"
+        bigint gross_amount_minor "sum of line items"
+        bigint adjustments_total_minor "signed sum of adjustments"
+        bigint net_payable_minor "gross + adjustments"
+        bigint amount_paid_minor "cached sum of COMPLETED payments"
+        timestamptz submitted_at "nullable"
+        uuid submitted_by_id FK "nullable, → company_user"
+        timestamptz certified_at "nullable"
+        uuid certified_by_id FK "nullable, → company_user"
+        text rejection_reason "nullable"
+    }
+    INVOICE_LINE_ITEM {
+        uuid id PK
+        uuid invoice_id FK
+        uuid milestone_id FK "nullable"
+        int line_number
+        varchar(500) description
+        bigint quantity_milli "quantity x 1000"
+        varchar(20) unit_of_measure "e.g. m3, tonne, lot"
+        bigint unit_price_minor
+        bigint amount_minor
+        char(3) currency_code "= invoice currency"
+    }
+    INVOICE_ADJUSTMENT {
+        uuid id PK
+        uuid invoice_id FK
+        enum adjustment_type "RETENTION | ADVANCE_RECOVERY | VAT | …"
+        varchar(255) description "nullable"
+        int rate_bps "nullable, 750 = 7.5%"
+        bigint base_amount_minor "nullable, amount the rate applied to"
+        bigint amount_minor "signed, negative = deduction"
+        char(3) currency_code "= invoice currency"
+    }
+    PAYMENT {
+        uuid id PK
+        uuid contract_id FK "scope, → contract"
+        uuid invoice_id FK
+        varchar(40) payment_reference UK
+        varchar(64) idempotency_key UK
+        bigint amount_minor "what was actually paid"
+        char(3) currency_code "ISO 4217, currency actually paid"
+        bigint invoice_amount_minor "value applied to the invoice"
+        char(3) invoice_currency_code "= invoice currency"
+        char(3) fx_base_currency_code "nullable, the '1 unit' side of the rate"
+        bigint fx_rate_micro "nullable, other ccy per 1 base x 1,000,000"
+        varchar(64) fx_rate_source "nullable, which rate API supplied it"
+        timestamptz fx_rate_at "nullable, when the rate was quoted"
+        enum payment_method "BANK_TRANSFER | CHEQUE | CASH | CARD | OTHER"
+        enum status "PENDING | PROCESSING | COMPLETED | FAILED | …"
+        date payment_date
+        varchar(100) external_reference "nullable, bank or gateway ref"
+        uuid recorded_by_id FK "→ company_user"
+        timestamptz approved_at "nullable"
+        uuid approved_by_id FK "nullable, → company_user"
+        timestamptz receipt_confirmed_at "nullable"
+        uuid receipt_confirmed_by_id FK "nullable, payee side, → company_user"
+        text notes "nullable"
+    }
+    COMPLIANCE_REQUIREMENT {
+        uuid id PK
+        uuid contract_id FK
+        varchar(255) name "e.g. Performance bond"
+        text description "nullable"
+        enum category "INSURANCE | BOND_GUARANTEE | PERMIT_LICENCE | …"
+        enum applies_to_party_type "AWARDING | AWARDED"
+        boolean is_mandatory
+        enum frequency "ONE_TIME | MONTHLY | QUARTERLY | ANNUALLY"
+        date first_due_date "nullable"
+    }
+    COMPLIANCE_RECORD {
+        uuid id PK
+        uuid contract_id FK "scope, → contract"
+        uuid compliance_requirement_id FK
+        uuid contract_party_id FK "party providing the evidence"
+        varchar(100) reference_number "nullable, policy or permit no."
+        varchar(255) issuing_authority "nullable"
+        date issue_date "nullable"
+        date expiry_date "nullable, drives reminders"
+        bigint covered_amount_minor "nullable, bond or insurance cover"
+        char(3) currency_code "nullable, ISO 4217"
+        enum status "PENDING | SUBMITTED | VERIFIED | REJECTED | …"
+        timestamptz verified_at "nullable"
+        uuid verified_by_id FK "nullable, → company_user"
+        text remarks "nullable"
+    }
+    DOCUMENT {
+        uuid id PK
+        uuid contract_id FK "nullable, null = company-level file"
+        uuid owner_company_id FK
+        varchar(255) title
+        varchar(60) document_number "nullable"
+        enum category "AGREEMENT | DRAWING | SPECIFICATION | …"
+        enum visibility "ALL_PARTIES | OWNER_COMPANY_ONLY"
+        enum status "ACTIVE | SUPERSEDED | ARCHIVED"
+    }
+    DOCUMENT_VERSION {
+        uuid id PK
+        uuid document_id FK
+        int version_number
+        varchar(512) storage_key "object-store key, never a public URL"
+        varchar(255) file_name
+        varchar(127) mime_type
+        bigint size_bytes
+        char(64) checksum_sha256
+        text change_note "nullable"
+        uuid uploaded_by_id FK "→ company_user"
+        timestamptz uploaded_at "immutable row"
+    }
+    DOCUMENT_LINK {
+        uuid id PK
+        uuid document_id FK
+        enum entity_type "CONTRACT | MILESTONE | CONTRACT_VARIATION | …"
+        uuid entity_id "polymorphic, no database FK"
+        varchar(255) caption "nullable"
+    }
+    SITE_DAILY_LOG {
+        uuid id PK
+        uuid contract_id FK "scope, → contract"
+        uuid contract_site_id FK
+        uuid contract_party_id FK "party filing the log"
+        date log_date
+        enum weather_condition "SUNNY | CLOUDY | RAINY | STORMY | WINDY | …"
+        smallint temperature_celsius "nullable"
+        int weather_delay_minutes "working time lost"
+        text work_performed
+        text work_planned_next "nullable"
+        text issues_and_delays "nullable"
+        enum status "DRAFT | SUBMITTED | APPROVED | REJECTED"
+        timestamptz submitted_at "nullable"
+        uuid submitted_by_id FK "nullable, → company_user"
+        timestamptz approved_at "nullable"
+        uuid approved_by_id FK "nullable, → company_user"
+        text rejection_reason "nullable"
+    }
+    SITE_DAILY_LOG_LABOUR {
+        uuid id PK
+        uuid site_daily_log_id FK
+        varchar(100) trade "e.g. Mason, Welder"
+        int worker_count
+        int minutes_worked "total man-minutes, feeds HSE rates"
+        text remarks "nullable"
+    }
+    SITE_DAILY_LOG_EQUIPMENT {
+        uuid id PK
+        uuid site_daily_log_id FK
+        varchar(150) equipment_name
+        varchar(60) equipment_tag "nullable"
+        int quantity
+        int minutes_operated
+        int minutes_idle
+        enum condition "OPERATIONAL | UNDER_REPAIR | BROKEN_DOWN"
+        text remarks "nullable"
+    }
+    SITE_DAILY_LOG_VISITOR {
+        uuid id PK
+        uuid site_daily_log_id FK
+        varchar(100) first_name
+        varchar(100) last_name
+        varchar(255) organisation "nullable"
+        varchar(255) purpose
+        timestamptz time_in
+        timestamptz time_out "nullable"
+    }
+    INVENTORY_ITEM {
+        uuid id PK
+        uuid contract_id FK
+        uuid contract_site_id FK "nullable"
+        uuid contract_party_id FK "party that owns the stock"
+        varchar(60) item_code
+        varchar(255) name
+        varchar(100) category "nullable"
+        varchar(20) unit_of_measure "e.g. bag, m3, tonne"
+        bigint quantity_on_hand_milli "cached, the ledger is the truth"
+        bigint reorder_level_milli "nullable"
+    }
+    INVENTORY_TRANSACTION {
+        uuid id PK
+        uuid contract_id FK "scope, → contract"
+        uuid inventory_item_id FK
+        uuid site_daily_log_id FK "nullable"
+        enum transaction_type "RECEIPT | ISSUE | RETURN | TRANSFER_IN | …"
+        bigint quantity_milli "signed, quantity x 1000"
+        bigint unit_cost_minor "nullable"
+        char(3) currency_code "nullable, ISO 4217"
+        varchar(100) reference_number "nullable, waybill or GRN"
+        varchar(255) counterparty_name "nullable, supplier or recipient"
+        timestamptz transaction_at "append-only"
+        uuid performed_by_id FK "→ company_user"
+        text remarks "nullable"
+    }
+    HSE_INCIDENT {
+        uuid id PK
+        uuid contract_id FK "scope, → contract"
+        uuid contract_site_id FK
+        varchar(40) reference_number "e.g. INC-2026-0007"
+        enum incident_type "NEAR_MISS | FIRST_AID | MEDICAL_TREATMENT | …"
+        enum severity "LOW | MEDIUM | HIGH | CRITICAL"
+        enum status "REPORTED | UNDER_INVESTIGATION | …"
+        timestamptz occurred_at
+        varchar(255) location_detail
+        text description
+        text immediate_action_taken "nullable"
+        text root_cause "nullable"
+        text investigation_summary "nullable"
+        int lost_time_days
+        bigint estimated_cost_minor "nullable, damage estimate"
+        char(3) currency_code "nullable, ISO 4217"
+        boolean is_notifiable "must go to the regulator"
+        timestamptz authority_notified_at "nullable"
+        timestamptz reported_at
+        uuid reported_by_id FK "→ company_user"
+        uuid investigated_by_id FK "nullable, → company_user"
+        timestamptz closed_at "nullable"
+        uuid closed_by_id FK "nullable, → company_user"
+    }
+    HSE_INCIDENT_PERSON {
+        uuid id PK
+        uuid hse_incident_id FK
+        uuid company_user_id FK "nullable, → company_user if a system user"
+        varchar(100) first_name
+        varchar(100) last_name
+        enum involvement "INJURED | WITNESS | INVOLVED | …"
+        varchar(255) employer_name "nullable"
+        varchar(150) job_title "nullable"
+        varchar(20) phone_number "nullable"
+        text injury_description "nullable, sensitive: encrypt"
+        varchar(100) body_part_affected "nullable"
+        text treatment_given "nullable"
+        text statement "nullable, witness statement"
+    }
+    HSE_INSPECTION {
+        uuid id PK
+        uuid contract_id FK "scope, → contract"
+        uuid contract_site_id FK
+        uuid inspector_company_user_id FK "nullable, internal inspector"
+        varchar(40) reference_number
+        enum inspection_type "ROUTINE | SCHEDULED | UNANNOUNCED | …"
+        enum status "SCHEDULED | IN_PROGRESS | COMPLETED | …"
+        date scheduled_date
+        timestamptz conducted_at "nullable"
+        varchar(100) external_inspector_first_name "nullable"
+        varchar(100) external_inspector_last_name "nullable"
+        varchar(255) external_inspector_organisation "nullable"
+        enum overall_result "nullable, SATISFACTORY | NEEDS_IMPROVEMENT | …"
+        int score_bps "nullable, 0 to 10000"
+        text summary "nullable"
+    }
+    HSE_INSPECTION_FINDING {
+        uuid id PK
+        uuid hse_inspection_id FK
+        int item_number
+        varchar(100) category "e.g. PPE, scaffolding, electrical"
+        text description
+        enum result "COMPLIANT | NON_COMPLIANT | OBSERVATION | …"
+        enum risk_level "nullable, LOW | MEDIUM | HIGH | CRITICAL"
+        text recommendation "nullable"
+    }
+    HSE_CORRECTIVE_ACTION {
+        uuid id PK
+        uuid contract_id FK "scope, → contract"
+        uuid hse_incident_id FK "nullable"
+        uuid hse_inspection_finding_id FK "nullable, exactly one source"
+        uuid assigned_to_company_user_id FK
+        text description
+        enum priority "LOW | MEDIUM | HIGH | URGENT"
+        enum status "OPEN | IN_PROGRESS | COMPLETED | VERIFIED | …"
+        date due_date
+        timestamptz completed_at "nullable"
+        timestamptz verified_at "nullable"
+        uuid verified_by_id FK "nullable, → company_user"
+        text closure_note "nullable"
+    }
+    ACTIVITY_LOG {
+        uuid id PK
+        uuid contract_id FK "nullable, scope, → contract"
+        uuid company_id FK "nullable, company acted for"
+        uuid actor_user_id FK "nullable, null = system"
+        varchar(100) action "e.g. invoice.certified"
+        varchar(60) entity_type
+        uuid entity_id "polymorphic, no database FK"
+        varchar(500) summary
+        jsonb changes "nullable, before and after diff"
+        jsonb metadata "nullable"
+        inet ip_address "nullable"
+        text user_agent "nullable"
+        uuid request_id "nullable, correlation id"
+        timestamptz occurred_at "append-only"
+    }
+    NOTIFICATION {
+        uuid id PK
+        uuid recipient_user_id FK
+        uuid contract_id FK "nullable"
+        varchar(100) notification_type "e.g. compliance.expiring"
+        varchar(255) title
+        text body
+        varchar(60) entity_type "nullable"
+        uuid entity_id "nullable, polymorphic"
+        enum channel "IN_APP | EMAIL | SMS | PUSH"
+        enum status "PENDING | SENT | FAILED"
+        timestamptz sent_at "nullable"
+        timestamptz read_at "nullable"
+    }
+    COMMENT {
+        uuid id PK
+        uuid contract_id FK
+        uuid author_company_user_id FK
+        uuid parent_comment_id FK "nullable, self-ref: reply to"
+        enum entity_type "CONTRACT | MILESTONE | CONTRACT_VARIATION | …"
+        uuid entity_id "polymorphic, no database FK"
+        text body
+        enum visibility "ALL_PARTIES | OWNER_COMPANY_ONLY"
+    }
+    CONVERSATION {
+        uuid id PK
+        enum conversation_type "DIRECT | WORKSPACE_CHANNEL | CONTRACT_GROUP"
+        uuid contract_id FK "nullable for DIRECT, required otherwise"
+        enum workspace "nullable, PROJECT | HSE | FINANCE — only for WORKSPACE_CHANNEL"
+        varchar(255) title "nullable"
+        timestamptz created_at
+        uuid created_by_id FK "→ company_user"
+    }
+    CONVERSATION_PARTICIPANT {
+        uuid id PK
+        uuid conversation_id FK
+        uuid company_user_id FK
+        timestamptz joined_at
+        timestamptz left_at "nullable, auto-set when the backing CONTRACT_ROLE_ASSIGNMENT is revoked"
+        timestamptz last_read_at "nullable, drives unread counts"
+    }
+    MESSAGE {
+        uuid id PK
+        uuid conversation_id FK
+        uuid sender_company_user_id FK
+        text body
+        jsonb attachments "nullable, document_id references"
+        enum thread_entity_type "nullable, MILESTONE | CONTRACT_VARIATION | INVOICE | SITE_DAILY_LOG | HSE_INCIDENT | …"
+        uuid thread_entity_id "nullable, polymorphic"
+        timestamptz sent_at "append-only"
+        timestamptz edited_at "nullable"
+        timestamptz deleted_at "nullable, soft delete"
+    }
+

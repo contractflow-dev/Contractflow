@@ -90,7 +90,7 @@ export default function LoginPage() {
                   type="email"
                   autoComplete="email"
                   aria-invalid={!!errors.email}
-                  className="h-11"
+                  className="h-11 rounded-md"
                   {...register("email")}
                 />
                 {errors.email && (
@@ -106,7 +106,7 @@ export default function LoginPage() {
                   type="password"
                   autoComplete="current-password"
                   aria-invalid={!!errors.password}
-                  className="h-11"
+                  className="h-11 rounded-md"
                   {...register("password")}
                 />
                 {errors.password && (
@@ -115,7 +115,11 @@ export default function LoginPage() {
                   </FieldError>
                 )}
               </Field>
-              <Button type="submit" disabled={isSubmitting} className="h-11 w-full">
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="h-11 w-full rounded-md"
+              >
                 {isSubmitting ? "Signing in…" : "Sign in"}
               </Button>
             </FieldGroup>
@@ -124,7 +128,7 @@ export default function LoginPage() {
             New to ContractFlow?{" "}
             <Link
               href="/auth/register"
-              className="font-medium text-foreground underline underline-offset-4"
+              className="font-medium text-foreground underline underline-offset-4 rounded-md"
             >
               Create an account
             </Link>
