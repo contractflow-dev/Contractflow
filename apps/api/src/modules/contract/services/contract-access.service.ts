@@ -57,10 +57,11 @@ export class ContractAccessService {
       throw new ForbiddenException('Active company membership is required');
     }
 
-    const parties = await this.parties.findForContract(contract, {
+    const party = await this.parties.findByCompany(company, {
+      contractId: contract,
       companyId: company,
     });
-    if (parties.length === 0) {
+    if (!party) {
       throw new NotFoundException('Contract was not found');
     }
 

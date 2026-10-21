@@ -4,21 +4,21 @@ import { ContractService } from './contract.service';
 
 describe('ContractService', () => {
   const scopeFor = { forUser: vi.fn() };
-  const parties = { findForContract: vi.fn() };
-  const history = { findForContract: vi.fn() };
+  const parties = { findByCompany: vi.fn(), findAllWithCompany: vi.fn() };
+  const history = { findPage: vi.fn() };
   const contracts = { findById: vi.fn(), searchPage: vi.fn() };
-  const partyRows = { find: vi.fn() };
   let service: ContractService;
 
   beforeEach(() => {
     vi.resetAllMocks();
     scopeFor.forUser.mockResolvedValue({ companyId: 'co-1' });
+    parties.findByCompany.mockResolvedValue({ id: 'p-1' });
+    parties.findAllWithCompany.mockResolvedValue([]);
     service = new ContractService(
       scopeFor as never,
       parties as never,
       history as never,
       contracts as never,
-      partyRows as never,
     );
   });
 
@@ -36,7 +36,7 @@ describe('ContractService', () => {
   });
 
   it('hides contracts the company is not a party to', async () => {
-    parties.findForContract.mockResolvedValue([]);
+    parties.findByCompany.mockResolvedValue(null);
 
     await expect(service.get('u', 'co-1', 'c-9')).rejects.toBeInstanceOf(
       NotFoundException,
@@ -48,13 +48,13 @@ describe('ContractService', () => {
       service.listParties('u', 'co-1', 'c-9'),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(contracts.findById).not.toHaveBeenCalled();
-    expect(history.findForContract).not.toHaveBeenCalled();
-    expect(partyRows.find).not.toHaveBeenCalled();
+    expect(history.findPage).not.toHaveBeenCalled();
+    expect(parties.findAllWithCompany).not.toHaveBeenCalled();
   });
 
   it('returns a contract for a party company', async () => {
     const party = { id: 'p-1' };
-    parties.findForContract.mockResolvedValue([party]);
+    parties.findByCompany.mockResolvedValue(party);
     contracts.findById.mockResolvedValue({ id: 'c-1' });
 
     await expect(service.get('u', 'co-1', 'c-1')).resolves.toEqual({
@@ -64,15 +64,14 @@ describe('ContractService', () => {
     expect(contracts.findById).toHaveBeenCalledWith('c-1', {
       companyId: 'co-1',
     });
-    expect(parties.findForContract).toHaveBeenCalledWith('c-1', {
+    expect(parties.findByCompany).toHaveBeenCalledWith('co-1', {
+      contractId: 'c-1',
       companyId: 'co-1',
     });
   });
 
   it('exposes only minimal counterparty details', async () => {
-    parties.findForContract.mockResolvedValue([{ id: 'p-1' }]);
-    contracts.findById.mockResolvedValue({ id: 'c-1' });
-    partyRows.find.mockResolvedValue([
+    parties.findAllWithCompany.mockResolvedValue([
       {
         id: 'p-2',
         companyId: 'co-2',
@@ -94,15 +93,18 @@ describe('ContractService', () => {
         signedAt: new Date(0),
       },
     ]);
+    expect(parties.findAllWithCompany).toHaveBeenCalledWith({
+      contractId: 'c-1',
+      companyId: 'co-1',
+    });
   });
 
   it('scopes status history to the contract and the verified company', async () => {
-    parties.findForContract.mockResolvedValue([{ id: 'p-1' }]);
-    history.findForContract.mockResolvedValue({ items: [], total: 0 });
+    history.findPage.mockResolvedValue({ items: [], total: 0 });
 
     await service.listStatusHistory('u', 'co-1', 'c-1', { page: 3, limit: 10 });
 
-    expect(history.findForContract).toHaveBeenCalledWith(
+    expect(history.findPage).toHaveBeenCalledWith(
       { contractId: 'c-1', companyId: 'co-1' },
       { skip: 20, take: 10 },
     );

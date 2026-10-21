@@ -1,109 +1,151 @@
 import type {
-  EContractType,
   EContractStatus,
-} from '@contractflow/contracts-schema';
-import { api } from './api';
+  EContractType,
+  EFromStatus,
+  EPartyType,
+  EToStatus,
+} from "@contractflow/contracts-schema";
+import { api } from "./api";
 
 export interface Contract {
   id: string;
   referenceNumber: string;
   title: string;
-  description?: string;
+  description: string;
   contractType: EContractType;
   status: EContractStatus;
-  parentContractId?: string;
-  originalValueMinor: number;
-  currentValueMinor: number;
+  parentContractId: string | null;
+  originalValueMinor: number | string;
+  currentValueMinor: number | string;
   currencyCode: string;
-  retentionRateBps?: number;
-  advancePaymentRateBps?: number;
-  paymentTermsDays?: number;
-  liquidatedDamagesPerDayMinor?: number;
-  awardDate?: string;
-  startDate?: string;
-  endDate?: string;
-  revisedEndDate?: string;
-  actualCompletionDate?: string;
-  defectsLiabilityDays?: number;
-  timezone?: string;
+  retentionRateBps: number;
+  advancePaymentRateBps: number;
+  paymentTermsDays: number;
+  liquidatedDamagesPerDayMinor: number | string;
+  awardDate: string;
+  startDate: string;
+  endDate: string;
+  revisedEndDate: string;
+  actualCompletionDate: string;
+  defectsLiabilityDays: number;
+  timezone: string;
   createdAt: string;
   updatedAt: string;
 }
 
+export interface ContractPage<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export interface ContractFilterParams {
   status?: EContractStatus;
-  contractType?: EContractType;
   search?: string;
   page?: number;
   limit?: number;
 }
 
-export interface CreateContractRequest {
-  referenceNumber: string;
-  title: string;
-  description?: string;
-  contractType: EContractType;
-  status?: EContractStatus;
-  parentContractId?: string;
-  originalValueMinor: number;
-  currentValueMinor?: number;
-  currencyCode: string;
-  startDate?: string;
-  endDate?: string;
-  timezone?: string;
+export interface ContractPartySummary {
+  id: string;
+  companyId: string;
+  companyName: string;
+  partyType: EPartyType;
+  signedAt: string | null;
 }
 
-export interface UpdateContractRequest {
+export interface ContractMembership {
   id: string;
-  title?: string;
-  description?: string;
-  status?: EContractStatus;
-  currentValueMinor?: number;
-  revisedEndDate?: string;
-  actualCompletionDate?: string;
+  companyId: string;
+  partyType: EPartyType;
+  signedAt: string | null;
+}
+
+export interface ContractDetail {
+  contract: Contract;
+  membership: ContractMembership;
+}
+
+export interface ContractStatusHistory {
+  id: string;
+  contractId: string;
+  fromStatus: EFromStatus;
+  toStatus: EToStatus;
+  reason: string;
+  changedById: string;
+  changedAt: string;
+}
+
+export interface CompanyContractQuery extends ContractFilterParams {
+  companyId: string;
+}
+
+export interface CompanyContractDetailQuery {
+  companyId: string;
+  contractId: string;
+}
+
+export interface CompanyContractHistoryQuery
+  extends CompanyContractDetailQuery {
+  page?: number;
+  limit?: number;
+}
+
+function contractsUrl(companyId: string): string {
+  return `/companies/${encodeURIComponent(companyId)}/contracts`;
 }
 
 export const contractApi = api.injectEndpoints({
   endpoints: (builder) => ({
-    getContracts: builder.query<Contract[], ContractFilterParams | void>({
-      query: (params) => ({
-        url: '/contract',
-        params: params || undefined,
+    getContracts: builder.query<ContractPage<Contract>, CompanyContractQuery>({
+      query: ({ companyId, ...params }) => ({
+        url: contractsUrl(companyId),
+        params,
       }),
       providesTags: (result) =>
         result
           ? [
-              ...result.map(({ id }) => ({ type: 'Contract' as const, id })),
-              { type: 'Contract', id: 'LIST' },
+              ...result.items.map(({ id }) => ({
+                type: "Contract" as const,
+                id,
+              })),
+              { type: "Contract", id: "LIST" },
             ]
-          : [{ type: 'Contract', id: 'LIST' }],
+          : [{ type: "Contract", id: "LIST" }],
     }),
 
-    getContractById: builder.query<Contract, string>({
-      query: (id) => ({
-        url: `/contract/${id}`,
+    getContractById: builder.query<ContractDetail, CompanyContractDetailQuery>({
+      query: ({ companyId, contractId }) => ({
+        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}`,
       }),
-      providesTags: (_result, _error, id) => [{ type: 'Contract', id }],
+      providesTags: (_result, _error, { contractId }) => [
+        { type: "Contract", id: contractId },
+      ],
     }),
 
-    createContract: builder.mutation<Contract, CreateContractRequest>({
-      query: (data) => ({
-        url: '/contract',
-        method: 'POST',
-        body: data,
+    getContractParties: builder.query<
+      ContractPartySummary[],
+      CompanyContractDetailQuery
+    >({
+      query: ({ companyId, contractId }) => ({
+        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/parties`,
       }),
-      invalidatesTags: [{ type: 'Contract', id: 'LIST' }],
+      providesTags: (_result, _error, { contractId }) => [
+        { type: "Contract", id: contractId },
+      ],
     }),
 
-    updateContract: builder.mutation<Contract, UpdateContractRequest>({
-      query: ({ id, ...patch }) => ({
-        url: `/contract/${id}`,
-        method: 'PATCH',
-        body: patch,
+    getContractStatusHistory: builder.query<
+      ContractPage<ContractStatusHistory>,
+      CompanyContractHistoryQuery
+    >({
+      query: ({ companyId, contractId, page, limit }) => ({
+        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/status-history`,
+        params: { page, limit },
       }),
-      invalidatesTags: (_result, _error, { id }) => [
-        { type: 'Contract', id },
-        { type: 'Contract', id: 'LIST' },
+      providesTags: (_result, _error, { contractId }) => [
+        { type: "Contract", id: contractId },
       ],
     }),
   }),
@@ -113,6 +155,6 @@ export const contractApi = api.injectEndpoints({
 export const {
   useGetContractsQuery,
   useGetContractByIdQuery,
-  useCreateContractMutation,
-  useUpdateContractMutation,
+  useGetContractPartiesQuery,
+  useGetContractStatusHistoryQuery,
 } = contractApi;

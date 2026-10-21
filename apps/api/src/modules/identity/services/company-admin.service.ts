@@ -380,7 +380,9 @@ export class CompanyAdminService {
   async getInvitationByToken(
     token: string,
   ): Promise<CompanyInvitationPublicResponseDto> {
-    const invitation = await this.invitations.findByTokenHash(hashToken(token));
+    const invitation = await this.invitations.findByTokenHashUnscoped(
+      hashToken(token),
+    );
     if (!invitation) {
       throw new NotFoundException('Invitation was not found.');
     }

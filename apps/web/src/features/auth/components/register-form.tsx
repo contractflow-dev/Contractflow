@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -37,6 +38,9 @@ import {
 
 import { registerSchema, type RegisterValues } from "../registerSchema";
 import { PasswordInput } from "./password-input";
+import { getApiErrorMessage, getApiErrorStatus } from "@/lib/apiError";
+import { useRegisterMutation } from "@/services/authApi";
+import type { RegisterRequest } from "@/services/authApi";
 
 const labelClass =
   "text-[11px] font-semibold uppercase tracking-wide text-muted-foreground";
@@ -48,10 +52,20 @@ const nameFields = [
 ] as const;
 
 export function RegisterForm() {
-  const timezones = useMemo(() => Intl.supportedValuesOf("timeZone"), []);
+  const router = useRouter();
+  const [registerUser] = useRegisterMutation();
+
+  const timezones = useMemo(() => {
+    const supported =
+      typeof Intl.supportedValuesOf === "function"
+        ? Intl.supportedValuesOf("timeZone")
+        : [];
+    return ["UTC", ...supported.filter((timezone) => timezone !== "UTC")];
+  }, []);
 
   const form = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
+    mode: "onTouched",
     defaultValues: {
       firstName: "",
       middleName: "",
@@ -65,13 +79,50 @@ export function RegisterForm() {
     },
   });
 
-  useEffect(() => {
-    form.setValue("timezone", Intl.DateTimeFormat().resolvedOptions().timeZone);
-  }, [form]);
+  const { getValues, setValue } = form;
 
-  function onSubmit(values: RegisterValues) {
-    // TODO: call the RTK Query register mutation, then advance the onboarding slice
-    console.log(values);
+  // Resolve the browser timezone after hydration and preserve any selection.
+  useEffect(() => {
+    if (!getValues("timezone")) {
+      const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      setValue(
+        "timezone",
+        timezones.includes(detectedTimezone) ? detectedTimezone : "UTC",
+      );
+    }
+  }, [getValues, setValue, timezones]);
+
+  function applyServerError(err: unknown) {
+    if (getApiErrorStatus(err) === 409) {
+      form.setError("email", {
+        type: "server",
+        message: "An account with this email already exists.",
+      });
+      return;
+    }
+
+    form.setError("root.server", {
+      message: getApiErrorMessage(err, "Registration failed. Please try again."),
+    });
+  }
+
+  async function onSubmit(values: RegisterValues) {
+    const payload: RegisterRequest = {
+      email: values.email.trim().toLowerCase(),
+      password: values.password,
+      firstName: values.firstName,
+      middleName: values.middleName?.trim() || undefined,
+      lastName: values.lastName,
+      phoneNumber: values.phone?.trim() ?? "",
+      timezone: values.timezone,
+    };
+
+    try {
+      await registerUser(payload).unwrap();
+      router.push("/auth/verification-pending");
+    } catch (err) {
+      applyServerError(err);
+    }
   }
 
   return (
@@ -111,6 +162,7 @@ export function RegisterForm() {
                       placeholder={placeholder}
                       aria-label={placeholder}
                       aria-invalid={fieldState.invalid}
+                      maxLength={100}
                       className="text-xs"
                     />
                     {fieldState.invalid && (
@@ -275,12 +327,15 @@ export function RegisterForm() {
               <FieldLabel htmlFor="acceptTerms" className="text-xs font-normal">
                 <span>
                   I agree to the{" "}
-                  <Link href="/terms" className="underline underline-offset-4">
+                  <Link
+                    href="/terms-of-service"
+                    className="underline underline-offset-4"
+                  >
                     Terms of Service
                   </Link>{" "}
                   and{" "}
                   <Link
-                    href="/privacy"
+                    href="/privacy-policy"
                     className="underline underline-offset-4"
                   >
                     Privacy Policy
@@ -293,13 +348,17 @@ export function RegisterForm() {
         />
       </FieldGroup>
 
+      {form.formState.errors.root?.server && (
+        <FieldError errors={[form.formState.errors.root.server]} />
+      )}
+
       <Button
         type="submit"
         size="lg"
         className="w-full"
         disabled={form.formState.isSubmitting}
       >
-        Continue
+        {form.formState.isSubmitting ? "Creating account…" : "Continue"}
         <RiArrowRightLine data-icon="inline-end" className="rtl:rotate-180" />
       </Button>
 

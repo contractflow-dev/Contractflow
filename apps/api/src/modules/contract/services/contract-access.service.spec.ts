@@ -6,7 +6,7 @@ import { ContractResourceReader } from './contract-resource-reader';
 
 describe('ContractAccessService', () => {
   const users = { findActiveMember: vi.fn() };
-  const parties = { findForContract: vi.fn() };
+  const parties = { findByCompany: vi.fn() };
   let service: ContractAccessService;
 
   beforeEach(() => {
@@ -15,7 +15,7 @@ describe('ContractAccessService', () => {
       id: 'm1',
       companyRole: ECompanyRole.FINANCE_OFFICER,
     });
-    parties.findForContract.mockResolvedValue([{ id: 'p1' }]);
+    parties.findByCompany.mockResolvedValue({ id: 'p1' });
     service = new ContractAccessService(users as never, parties as never);
   });
 
@@ -26,7 +26,8 @@ describe('ContractAccessService', () => {
     expect(users.findActiveMember).toHaveBeenCalledWith('u1', {
       companyId: 'co1',
     });
-    expect(parties.findForContract).toHaveBeenCalledWith('c1', {
+    expect(parties.findByCompany).toHaveBeenCalledWith('co1', {
+      contractId: 'c1',
       companyId: 'co1',
     });
   });
@@ -36,11 +37,11 @@ describe('ContractAccessService', () => {
     await expect(
       service.authorize('u1', 'co1', 'c1', 'finance'),
     ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(parties.findForContract).not.toHaveBeenCalled();
+    expect(parties.findByCompany).not.toHaveBeenCalled();
   });
 
   it('hides contracts the company is not a party to', async () => {
-    parties.findForContract.mockResolvedValue([]);
+    parties.findByCompany.mockResolvedValue(null);
     await expect(
       service.authorize('u1', 'co1', 'other', 'finance'),
     ).rejects.toBeInstanceOf(NotFoundException);

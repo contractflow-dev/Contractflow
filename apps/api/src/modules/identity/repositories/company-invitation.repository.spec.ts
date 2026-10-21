@@ -1,5 +1,6 @@
 import type { Repository } from 'typeorm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { EInvitationStatus } from '@contractflow/contracts-schema';
 import { CompanyInvitation } from '../entities/company-invitation.entity';
 import { CompanyInvitationRepository } from './company-invitation.repository';
 
@@ -13,7 +14,7 @@ describe('CompanyInvitationRepository', () => {
 
   beforeEach(() => {
     queryBuilder = {
-      alias: 'invitation',
+      alias: 'e',
       andWhere: vi.fn(),
       getCount: vi.fn().mockResolvedValue(2),
     };
@@ -35,17 +36,17 @@ describe('CompanyInvitationRepository', () => {
 
     expect(queryBuilder.andWhere).toHaveBeenNthCalledWith(
       1,
-      'invitation.companyId = :__scopeCompanyId',
+      'e.companyId = :__scopeCompanyId',
       { __scopeCompanyId: 'company-1' },
     );
     expect(queryBuilder.andWhere).toHaveBeenNthCalledWith(
       2,
-      'invitation.status = :status',
-      { status: 'pending' },
+      'e.status = :status',
+      { status: EInvitationStatus.PENDING },
     );
     expect(queryBuilder.andWhere).toHaveBeenNthCalledWith(
       3,
-      'invitation.expiresAt > :at',
+      'e.expiresAt > :at',
       { at },
     );
   });

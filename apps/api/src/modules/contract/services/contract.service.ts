@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import type { EContractStatus } from '@contractflow/contracts-schema';
+import type { IContractScope } from '../../../common/database/repositories/contract-scope.interface';
+import type { ICompanyScope } from '../../../common/database/repositories/company-scope.interface';
 import { CompanyScopeService } from '../../identity/services/company-scope.service';
 import { Contract } from '../entities/contract.entity';
 import { ContractParty } from '../entities/contract-party.entity';
@@ -14,6 +14,34 @@ export interface Page<T> {
   total: number;
   page: number;
   limit: number;
+}
+
+export interface PageQuery {
+  page: number;
+  limit: number;
+}
+
+export interface ListContractsQuery extends PageQuery {
+  search?: string;
+  status?: EContractStatus;
+}
+
+export interface ContractPartySummary {
+  id: string;
+  companyId: string;
+  companyName: string;
+  partyType: ContractParty['partyType'];
+  signedAt: Date | null;
+}
+
+/** Everything a contract-level read needs once membership is proven. */
+interface ContractAccess {
+  /** For company-scoped repositories (e.g. ContractRepository). */
+  companyScope: ICompanyScope;
+  /** For contract-scoped repositories (e.g. status history). */
+  contractScope: IContractScope;
+  /** The acting company's party row on this contract. */
+  membership: ContractParty;
 }
 
 /**
@@ -31,28 +59,21 @@ export class ContractService {
     private readonly parties: ContractPartyRepository,
     private readonly statusHistory: ContractStatusHistoryRepository,
     private readonly contracts: ContractRepository,
-    @InjectRepository(ContractParty)
-    private readonly partyRows: Repository<ContractParty>,
   ) {}
 
   async list(
     userId: string,
     companyId: string,
-    query: {
-      search?: string;
-      status?: EContractStatus;
-      page: number;
-      limit: number;
-    },
+    query: ListContractsQuery,
   ): Promise<Page<Contract>> {
     const scope = await this.companyScope.forUser(userId, companyId);
-    const { items, total } = await this.contracts.searchPage(scope, {
+    const result = await this.contracts.searchPage(scope, {
       search: query.search,
       status: query.status,
-      skip: (query.page - 1) * query.limit,
+      skip: offset(query),
       take: query.limit,
     });
-    return { items, total, page: query.page, limit: query.limit };
+    return toPage(result, query);
   }
 
   async get(
@@ -60,16 +81,15 @@ export class ContractService {
     companyId: string,
     contractId: string,
   ): Promise<{ contract: Contract; membership: ContractParty }> {
-    const scope = await this.companyScope.forUser(userId, companyId);
-    // Not-found for both "no such contract" and "not your contract".
-    const [membership] = await this.parties.findForContract(contractId, scope);
-    if (!membership) {
-      throw new NotFoundException('Contract was not found');
-    }
+    const { companyScope, membership } = await this.requireMembership(
+      userId,
+      companyId,
+      contractId,
+    );
 
-    const contract = await this.contracts.findById(contractId, scope);
+    const contract = await this.contracts.findById(contractId, companyScope);
     if (!contract) {
-      throw new NotFoundException('Contract was not found');
+      throw contractNotFound();
     }
     return { contract, membership };
   }
@@ -78,46 +98,99 @@ export class ContractService {
     userId: string,
     companyId: string,
     contractId: string,
-  ): Promise<
-    {
-      id: string;
-      companyId: string;
-      companyName: string;
-      partyType: ContractParty['partyType'];
-      signedAt: Date;
-    }[]
-  > {
-    await this.get(userId, companyId, contractId);
-    const parties = await this.partyRows.find({
-      where: { contractId },
-      relations: { company: true },
-      order: { createdAt: 'ASC' },
-    });
-    return parties.map((party) => ({
-      id: party.id,
-      companyId: party.companyId,
-      companyName: party.company.name,
-      partyType: party.partyType,
-      signedAt: party.signedAt,
-    }));
+  ): Promise<ContractPartySummary[]> {
+    // Membership must be proven first: the query below is NOT company-scoped.
+    const { contractScope } = await this.requireMembership(
+      userId,
+      companyId,
+      contractId,
+    );
+
+    const parties = await this.parties.findAllWithCompany(contractScope);
+    return parties.map(toPartySummary);
   }
 
   async listStatusHistory(
     userId: string,
     companyId: string,
     contractId: string,
-    query: { page: number; limit: number },
+    query: PageQuery,
   ) {
-    const scope = await this.companyScope.forUser(userId, companyId);
-    const [party] = await this.parties.findForContract(contractId, scope);
-    if (!party) {
-      throw new NotFoundException('Contract was not found');
-    }
-
-    const { items, total } = await this.statusHistory.findForContract(
-      { contractId, companyId: scope.companyId },
-      { skip: (query.page - 1) * query.limit, take: query.limit },
+    const { contractScope } = await this.requireMembership(
+      userId,
+      companyId,
+      contractId,
     );
-    return { items, total, page: query.page, limit: query.limit };
+
+    const result = await this.statusHistory.findPage(contractScope, {
+      skip: offset(query),
+      take: query.limit,
+    });
+    return toPage(result, query);
   }
+
+  // ---------------------------------------------------------------------
+  // Access check (the one place membership is decided)
+  // ---------------------------------------------------------------------
+
+  /**
+   * Verifies the user is an active member of `companyId`, and that company is
+   * a party to `contractId`. The contract-level scope is only built after both
+   * checks pass. Not-found covers both "no such contract" and "not your
+   * contract", so existence is never leaked.
+   */
+  private async requireMembership(
+    userId: string,
+    companyId: string,
+    contractId: string,
+  ): Promise<ContractAccess> {
+    const companyScope = await this.companyScope.forUser(userId, companyId);
+    const contractScope: IContractScope = {
+      contractId,
+      companyId: companyScope.companyId,
+    };
+    // The query is the proof: it matches only if THIS company is a party to THIS contract.
+    const membership = await this.parties.findByCompany(
+      companyScope.companyId,
+      contractScope,
+    );
+    if (!membership) {
+      throw contractNotFound();
+    }
+    return { companyScope, membership, contractScope };
+  }
+}
+
+// -----------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------
+
+function contractNotFound(): NotFoundException {
+  return new NotFoundException('Contract was not found');
+}
+
+function offset(query: PageQuery): number {
+  return (query.page - 1) * query.limit;
+}
+
+function toPage<T>(
+  result: { items: T[]; total: number },
+  query: PageQuery,
+): Page<T> {
+  return {
+    items: result.items,
+    total: result.total,
+    page: query.page,
+    limit: query.limit,
+  };
+}
+
+function toPartySummary(party: ContractParty): ContractPartySummary {
+  return {
+    id: party.id,
+    companyId: party.companyId,
+    companyName: party.company.name,
+    partyType: party.partyType,
+    signedAt: party.signedAt,
+  };
 }

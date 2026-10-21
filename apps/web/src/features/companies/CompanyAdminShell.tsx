@@ -181,6 +181,15 @@ export function CompanyAdminShell({
           >
             Overview
           </Link>
+          <Link
+            href={`/dashboards/contracts${companyQuery}`}
+            aria-current={
+              pathname.startsWith("/dashboards/contracts") ? "page" : undefined
+            }
+            className={navLinkClass(pathname.startsWith("/dashboards/contracts"))}
+          >
+            Contracts
+          </Link>
           {adminLinks.map(({ href, label }) => (
             <Link
               key={href.split("?")[0]}

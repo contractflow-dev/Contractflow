@@ -42,9 +42,10 @@ export class CompanyInvitationRepository extends CompanyScopedRepository<Company
       .getMany();
   }
 
-  countPending(scope: ICompanyScope): Promise<number> {
+  countPending(scope: ICompanyScope, at = new Date()): Promise<number> {
     return this.scopedQuery(scope)
-      .andWhere('e.status = :s', { s: 'PENDING' })
+      .andWhere('e.status = :status', { status: EInvitationStatus.PENDING })
+      .andWhere('e.expiresAt > :at', { at })
       .getCount();
   }
 

@@ -187,7 +187,6 @@ export class CompanyService {
 
     const pendingInvitationCount = await this.invitationRepository.countPending(
       { companyId },
-      new Date(),
     );
 
     const activeContractCount = await this.countCompanyContracts(

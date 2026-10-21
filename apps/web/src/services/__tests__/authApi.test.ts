@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
 import { api } from "@/services/api";
 import { authApi } from "@/services/authApi";
+import { getApiBaseUrl } from "@/lib/apiBaseUrl";
 import { companiesApi } from "@/features/companies/companiesApi";
 import { getApiErrorMessage, getApiErrorStatus } from "@/lib/apiError";
 import { EInvitationRole } from "@contractflow/contracts-schema";
@@ -29,6 +30,16 @@ describe("RTK Query authentication and company API contracts", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("normalizes a Render host into an HTTPS API base URL", () => {
+    expect(getApiBaseUrl("contractflow-api.onrender.com")).toBe(
+      "https://contractflow-api.onrender.com/api",
+    );
+    expect(getApiBaseUrl("https://api.example.com/api/")).toBe(
+      "https://api.example.com/api",
+    );
+    expect(getApiBaseUrl()).toBe("http://localhost:3001/api");
   });
 
   it("posts registration data to the expected route with cookie credentials enabled", async () => {

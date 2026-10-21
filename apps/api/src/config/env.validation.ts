@@ -29,6 +29,13 @@ const toBool = ({ value }: { value: unknown }) =>
     ? undefined
     : value === true || value === 'true';
 
+const normalizeHttpUrl = ({ value }: { value: unknown }) => {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  if (!trimmed || /^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+};
+
 export class EnvVars {
   @IsEnum(NodeEnv)
   NODE_ENV: NodeEnv = NodeEnv.Development;
@@ -53,10 +60,12 @@ export class EnvVars {
   @IsBoolean()
   DB_SSL: boolean = false;
 
+  @Transform(normalizeHttpUrl)
   @IsUrl({ require_tld: false })
   WEB_URL!: string;
 
   @IsOptional()
+  @Transform(normalizeHttpUrl)
   @IsString()
   CORS_ORIGIN?: string;
 
