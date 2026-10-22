@@ -14,17 +14,13 @@ export function ThemeToggle() {
       variant="outline"
       onClick={toggleTheme}
       aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}
-      aria-pressed={isDark}
-      className="size-11 shrink-0 sm:w-auto sm:px-3"
+      className="size-8 shrink-0"
     >
       {isDark ? (
         <RiSunLine className="size-4" aria-hidden="true" />
       ) : (
         <RiMoonLine className="size-4" aria-hidden="true" />
       )}
-      <span className="hidden text-sm font-medium sm:inline">
-        {isDark ? "Light mode" : "Dark mode"}
-      </span>
     </Button>
   );
 }
