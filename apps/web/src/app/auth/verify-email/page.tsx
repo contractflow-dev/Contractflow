@@ -3,10 +3,16 @@
 import Link from "next/link";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { Alert, AlertDescription } from "@workspace/ui/components/alert";
+import { buttonVariants } from "@workspace/ui/components/button";
+import { Skeleton } from "@workspace/ui/components/skeleton";
+import { cn } from "@/lib/utils";
 import { useVerifyEmailMutation } from "@/services/authApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { HeroMetrics } from "@/components/auth/HeroMetrics";
+
+const LINK_BUTTON_CLASS = "h-auto min-h-11 w-full whitespace-normal py-2 text-center";
 
 type VerificationState = "verifying" | "verified" | "failed";
 
@@ -93,15 +99,14 @@ function VerifyEmailContent() {
                 <h1 className="text-2xl font-semibold tracking-tight">
                   Verification link is incomplete
                 </h1>
-                <p
-                  role="alert"
-                  className="break-words text-sm text-destructive"
-                >
-                  Open the complete verification link from your email.
-                </p>
+                <Alert variant="destructive" className="break-words">
+                  <AlertDescription>
+                    Open the complete verification link from your email.
+                  </AlertDescription>
+                </Alert>
                 <Link
                   href="/auth/verification-pending"
-                  className="inline-flex min-h-11 w-full items-center justify-center whitespace-normal rounded-md border px-4 py-2 text-center text-sm font-medium hover:bg-muted"
+                  className={cn(buttonVariants({ variant: "outline" }), LINK_BUTTON_CLASS)}
                 >
                   Request another verification email
                 </Link>
@@ -116,7 +121,7 @@ function VerifyEmailContent() {
                 </p>
                 <Link
                   href="/login"
-                  className="inline-flex min-h-11 w-full items-center justify-center whitespace-normal rounded-md bg-primary px-4 py-2 text-center text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                  className={cn(buttonVariants(), LINK_BUTTON_CLASS)}
                 >
                   Continue to sign in
                 </Link>
@@ -126,15 +131,12 @@ function VerifyEmailContent() {
                 <h1 className="text-2xl font-semibold tracking-tight">
                   We couldn’t verify this link
                 </h1>
-                <p
-                  role="alert"
-                  className="break-words text-sm text-destructive"
-                >
-                  {message}
-                </p>
+                <Alert variant="destructive" className="break-words">
+                  <AlertDescription>{message}</AlertDescription>
+                </Alert>
                 <Link
                   href="/auth/verification-pending"
-                  className="inline-flex min-h-11 w-full items-center justify-center whitespace-normal rounded-md border px-4 py-2 text-center text-sm font-medium hover:bg-muted"
+                  className={cn(buttonVariants({ variant: "outline" }), LINK_BUTTON_CLASS)}
                 >
                   Request another verification email
                 </Link>
@@ -152,9 +154,12 @@ export default function VerifyEmailPage() {
     <Suspense
       fallback={
         <main className="grid min-h-svh min-w-0 place-items-center bg-muted/30 p-4 sm:p-6">
-          <p role="status" className="text-sm text-muted-foreground">
-            Loading verification link…
-          </p>
+          <div className="flex flex-col items-center gap-3">
+            <Skeleton className="h-4 w-48" aria-hidden="true" />
+            <p role="status" className="text-sm text-muted-foreground">
+              Loading verification link…
+            </p>
+          </div>
         </main>
       }
     >

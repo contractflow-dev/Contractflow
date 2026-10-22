@@ -16,6 +16,23 @@ import {
   COUNTRY_CURRENCY_MAP,
 } from "@contractflow/contracts-schema";
 import { countryCodes, countryOptions } from "@/lib/countries";
+import { Alert, AlertDescription } from "@workspace/ui/components/alert";
+import { Button, buttonVariants } from "@workspace/ui/components/button";
+import { Card } from "@workspace/ui/components/card";
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "@workspace/ui/components/field";
+import { Input } from "@workspace/ui/components/input";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@workspace/ui/components/native-select";
+import { Separator } from "@workspace/ui/components/separator";
 
 const currencyCodes = Object.values(ECurrencyCode);
 
@@ -63,9 +80,6 @@ const companySchema = z.object({
 
 type CompanyFormValues = z.infer<typeof companySchema>;
 
-const inputClass =
-  "h-11 w-full rounded-md border border-input bg-background px-3 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 aria-invalid:border-destructive disabled:opacity-60";
-
 function CompanyField({
   id,
   label,
@@ -78,17 +92,11 @@ function CompanyField({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-1.5">
-      <label htmlFor={id} className="text-sm font-medium">
-        {label}
-      </label>
+    <Field data-invalid={!!error} className="gap-1.5">
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
       {children}
-      {error && (
-        <p role="alert" className="text-xs text-destructive">
-          {error}
-        </p>
-      )}
-    </div>
+      <FieldError>{error}</FieldError>
+    </Field>
   );
 }
 
@@ -182,7 +190,7 @@ export default function OnboardingPage() {
   if (createdCompany) {
     return (
       <main className="grid min-h-svh place-items-center bg-muted/30 p-6">
-        <section className="w-full max-w-xl space-y-5 rounded-xl border bg-card p-8 shadow-sm">
+        <Card className="w-full max-w-xl gap-5 p-8">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-primary">ContractFlow</p>
             <ThemeToggle />
@@ -198,11 +206,11 @@ export default function OnboardingPage() {
           </p>
           <Link
             href={`/dashboards?companyId=${encodeURIComponent(createdCompany.id)}`}
-            className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            className={buttonVariants({ size: "lg", className: "h-11 px-4" })}
           >
             Open company dashboard
           </Link>
-        </section>
+        </Card>
       </main>
     );
   }
@@ -235,18 +243,21 @@ export default function OnboardingPage() {
     }
     return (
       <main className="grid min-h-svh place-items-center bg-muted/30 p-6">
-        <section className="w-full max-w-lg space-y-4 rounded-xl border bg-card p-8">
-          <p role="alert" className="text-sm text-destructive">
-            {getApiErrorMessage(userError, "Unable to confirm your account.")}
-          </p>
-          <button
+        <Card className="w-full max-w-lg gap-4 p-8">
+          <Alert variant="destructive">
+            <AlertDescription>
+              {getApiErrorMessage(userError, "Unable to confirm your account.")}
+            </AlertDescription>
+          </Alert>
+          <Button
             type="button"
+            variant="link"
             onClick={() => void refetchUser()}
-            className="text-sm font-medium text-primary underline underline-offset-4"
+            className="self-start px-0"
           >
             Try again
-          </button>
-        </section>
+          </Button>
+        </Card>
       </main>
     );
   }
@@ -263,7 +274,7 @@ export default function OnboardingPage() {
 
   return (
     <main className="min-h-svh bg-muted/30 px-4 py-10 sm:px-6">
-      <section className="mx-auto max-w-4xl space-y-8 rounded-xl border bg-card p-6 shadow-sm sm:p-9">
+      <Card className="mx-auto max-w-4xl gap-8 p-6 sm:p-9">
         <header className="space-y-2">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-primary">ContractFlow</p>
@@ -287,27 +298,23 @@ export default function OnboardingPage() {
           className="space-y-8"
         >
           {serverError && (
-            <p
-              role="alert"
-              className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-            >
-              {serverError}
-            </p>
+            <Alert variant="destructive" className="border-destructive/30 bg-destructive/10">
+              <AlertDescription className="text-destructive">
+                {serverError}
+              </AlertDescription>
+            </Alert>
           )}
 
-          <fieldset className="space-y-4">
-            <legend className="text-base font-semibold">
-              Company information
-            </legend>
-            <div className="grid gap-4 sm:grid-cols-2">
+          <FieldSet>
+            <FieldLegend>Company information</FieldLegend>
+            <FieldGroup className="grid gap-4 sm:grid-cols-2">
               <CompanyField
                 id="name"
                 label="Company name"
                 error={errors.name?.message}
               >
-                <input
+                <Input
                   id="name"
-                  className={inputClass}
                   aria-invalid={!!errors.name}
                   {...register("name")}
                 />
@@ -317,9 +324,8 @@ export default function OnboardingPage() {
                 label="Legal name"
                 error={errors.legalName?.message}
               >
-                <input
+                <Input
                   id="legalName"
-                  className={inputClass}
                   aria-invalid={!!errors.legalName}
                   {...register("legalName")}
                 />
@@ -329,9 +335,8 @@ export default function OnboardingPage() {
                 label="Registration number"
                 error={errors.registrationNumber?.message}
               >
-                <input
+                <Input
                   id="registrationNumber"
-                  className={inputClass}
                   aria-invalid={!!errors.registrationNumber}
                   {...register("registrationNumber")}
                 />
@@ -341,9 +346,8 @@ export default function OnboardingPage() {
                 label="Tax identification number"
                 error={errors.taxIdentificationNumber?.message}
               >
-                <input
+                <Input
                   id="taxIdentificationNumber"
-                  className={inputClass}
                   aria-invalid={!!errors.taxIdentificationNumber}
                   {...register("taxIdentificationNumber")}
                 />
@@ -353,11 +357,10 @@ export default function OnboardingPage() {
                 label="Company email"
                 error={errors.email?.message}
               >
-                <input
+                <Input
                   id="email"
                   type="email"
                   autoComplete="email"
-                  className={inputClass}
                   aria-invalid={!!errors.email}
                   {...register("email")}
                 />
@@ -367,11 +370,10 @@ export default function OnboardingPage() {
                 label="Phone number"
                 error={errors.phoneNumber?.message}
               >
-                <input
+                <Input
                   id="phoneNumber"
                   type="tel"
                   autoComplete="tel"
-                  className={inputClass}
                   aria-invalid={!!errors.phoneNumber}
                   {...register("phoneNumber")}
                 />
@@ -381,32 +383,28 @@ export default function OnboardingPage() {
                 label="Website"
                 error={errors.website?.message}
               >
-                <input
+                <Input
                   id="website"
                   type="url"
                   placeholder="https://example.com"
-                  className={inputClass}
                   aria-invalid={!!errors.website}
                   {...register("website")}
                 />
               </CompanyField>
-            </div>
-          </fieldset>
+            </FieldGroup>
+          </FieldSet>
 
-          <fieldset className="space-y-4">
-            <legend className="text-base font-semibold">
-              Business address
-            </legend>
-            <div className="grid gap-4 sm:grid-cols-2">
+          <FieldSet>
+            <FieldLegend>Business address</FieldLegend>
+            <FieldGroup className="grid gap-4 sm:grid-cols-2">
               <CompanyField
                 id="addressLine1"
                 label="Address line 1"
                 error={errors.addressLine1?.message}
               >
-                <input
+                <Input
                   id="addressLine1"
                   autoComplete="address-line1"
-                  className={inputClass}
                   aria-invalid={!!errors.addressLine1}
                   {...register("addressLine1")}
                 />
@@ -416,19 +414,17 @@ export default function OnboardingPage() {
                 label="Address line 2"
                 error={errors.addressLine2?.message}
               >
-                <input
+                <Input
                   id="addressLine2"
                   autoComplete="address-line2"
-                  className={inputClass}
                   aria-invalid={!!errors.addressLine2}
                   {...register("addressLine2")}
                 />
               </CompanyField>
               <CompanyField id="city" label="City" error={errors.city?.message}>
-                <input
+                <Input
                   id="city"
                   autoComplete="address-level2"
-                  className={inputClass}
                   aria-invalid={!!errors.city}
                   {...register("city")}
                 />
@@ -438,10 +434,9 @@ export default function OnboardingPage() {
                 label="State or region"
                 error={errors.stateRegion?.message}
               >
-                <input
+                <Input
                   id="stateRegion"
                   autoComplete="address-level1"
-                  className={inputClass}
                   aria-invalid={!!errors.stateRegion}
                   {...register("stateRegion")}
                 />
@@ -451,10 +446,9 @@ export default function OnboardingPage() {
                 label="Postal code"
                 error={errors.postalCode?.message}
               >
-                <input
+                <Input
                   id="postalCode"
                   autoComplete="postal-code"
-                  className={inputClass}
                   aria-invalid={!!errors.postalCode}
                   {...register("postalCode")}
                 />
@@ -464,29 +458,29 @@ export default function OnboardingPage() {
                 label="Country"
                 error={errors.countryCode?.message}
               >
-                <select
+                <NativeSelect
                   id="countryCode"
                   autoComplete="country"
-                  className={inputClass}
+                  className="w-full"
                   aria-invalid={!!errors.countryCode}
                   {...register("countryCode")}
                 >
-                  <option value="">Select a country</option>
+                  <NativeSelectOption value="">Select a country</NativeSelectOption>
                   {countryOptions.map(({ code, name }) => (
-                    <option key={code} value={code}>
+                    <NativeSelectOption key={code} value={code}>
                       {name}
-                    </option>
+                    </NativeSelectOption>
                   ))}
-                </select>
+                </NativeSelect>
               </CompanyField>
               <CompanyField
                 id="defaultCurrencyCode"
                 label="Default currency code"
                 error={errors.defaultCurrencyCode?.message}
               >
-                <select
+                <NativeSelect
                   id="defaultCurrencyCode"
-                  className={inputClass}
+                  className="w-full"
                   aria-invalid={!!errors.defaultCurrencyCode}
                   value={watch("defaultCurrencyCode")}
                   onChange={(event) =>
@@ -495,34 +489,36 @@ export default function OnboardingPage() {
                     })
                   }
                 >
-                  <option value="">Select a currency</option>
+                  <NativeSelectOption value="">Select a currency</NativeSelectOption>
                   {currencyCodes.map((currency) => (
-                    <option key={currency} value={currency}>
+                    <NativeSelectOption key={currency} value={currency}>
                       {currency}
-                    </option>
+                    </NativeSelectOption>
                   ))}
-                </select>
+                </NativeSelect>
               </CompanyField>
-            </div>
-          </fieldset>
+            </FieldGroup>
+          </FieldSet>
 
-          <div className="flex flex-col-reverse gap-3 border-t pt-5 sm:flex-row sm:items-center sm:justify-between">
+          <Separator />
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Link
               href="/login"
               className="text-center text-sm text-muted-foreground underline underline-offset-4 sm:text-left"
             >
               Sign out and return to sign in
             </Link>
-            <button
+            <Button
               type="submit"
+              size="lg"
               disabled={isSubmitting}
-              className="h-11 rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-11 px-5"
             >
               {isSubmitting ? "Creating company…" : "Create company"}
-            </button>
+            </Button>
           </div>
         </form>
-      </section>
+      </Card>
     </main>
   );
 }

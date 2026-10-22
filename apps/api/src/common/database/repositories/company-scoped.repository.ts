@@ -6,18 +6,19 @@ import type {
   SelectQueryBuilder,
 } from 'typeorm';
 import { BaseRepository } from './base.repository';
-import type {
-  ICompanyScope,
-  ICompanyScopedEntity,
-} from './company-scope.interface';
+import type { ICompanyScope } from './company-scope.interface';
 
 /**
  * `companyId` is an explicit argument, never read from ambient request
  * context, so a missing context can't fail open and return every tenant's rows.
+ *
+ * Subclasses whose rows carry no `companyId` column (for example
+ * `ContractScopedRepository`) override the scope hooks. A direct subclass must
+ * have a `companyId` property, since the default hooks filter on it.
  */
 export abstract class CompanyScopedRepository<
-  Entity extends ObjectLiteral & ICompanyScopedEntity,
-  Scope extends ICompanyScope = ICompanyScope,
+  Entity extends ObjectLiteral & { id: string },
+  Scope extends { companyId?: string } = ICompanyScope,
 > extends BaseRepository<Entity, Scope> {
   protected override applyScope(
     qb: SelectQueryBuilder<Entity>,
@@ -29,11 +30,15 @@ export abstract class CompanyScopedRepository<
   }
 
   protected override scopeWhere(scope: Scope): FindOptionsWhere<Entity> {
-    return { companyId: requireCompanyId(scope) } as FindOptionsWhere<Entity>;
+    return {
+      companyId: requireCompanyId(scope),
+    } as unknown as FindOptionsWhere<Entity>;
   }
 
   protected override scopeValues(scope: Scope): DeepPartial<Entity> {
-    return { companyId: requireCompanyId(scope) } as DeepPartial<Entity>;
+    return {
+      companyId: requireCompanyId(scope),
+    } as unknown as DeepPartial<Entity>;
   }
 
   override async save(entity: Entity, scope: Scope): Promise<Entity> {
@@ -51,7 +56,7 @@ export abstract class CompanyScopedRepository<
   }
 }
 
-function requireCompanyId(scope: ICompanyScope): string {
+export function requireCompanyId(scope: { companyId?: string }): string {
   const companyId = scope?.companyId?.trim();
   if (!companyId) {
     throw new BadRequestException('Company context is required');

@@ -1,14 +1,41 @@
 "use client";
 
 import { useState } from "react";
-import type { FormEvent, ReactNode } from "react";
+import type { FormEvent } from "react";
 import {
   ECompanyRole,
   ECompanyUserStatus,
   EInvitationRole,
   EInvitationStatus,
 } from "@contractflow/contracts-schema";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@workspace/ui/components/alert";
+import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
+import { Field, FieldGroup, FieldLabel } from "@workspace/ui/components/field";
+import { Input } from "@workspace/ui/components/input";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@workspace/ui/components/native-select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@workspace/ui/components/table";
 import {
   useChangeCompanyMemberRoleMutation,
   useGetCompanyInvitationsQuery,
@@ -172,84 +199,89 @@ function TeamContent({ companyId }: { companyId: string }) {
         </p>
       </header>
 
-      <section className="rounded-xl border bg-card p-5 shadow-sm sm:p-6">
-        <h3 className="font-heading text-lg font-semibold">
-          Invite a team member
-        </h3>
-        <form
-          onSubmit={(event) => void submitInvitation(event)}
-          className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5"
-        >
-          <Field label="First name">
-            <input
-              required
-              maxLength={100}
-              value={firstName}
-              onChange={(event) => setFirstName(event.target.value)}
-              className={inputClass}
-              autoComplete="given-name"
-            />
-          </Field>
-          <Field label="Last name">
-            <input
-              required
-              maxLength={100}
-              value={lastName}
-              onChange={(event) => setLastName(event.target.value)}
-              className={inputClass}
-              autoComplete="family-name"
-            />
-          </Field>
-          <Field label="Email">
-            <input
-              required
-              type="email"
-              maxLength={254}
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className={inputClass}
-              autoComplete="email"
-            />
-          </Field>
-          <Field label="Company role">
-            <select
-              value={role}
-              onChange={(event) =>
-                setRole(event.target.value as EInvitationRole)
-              }
-              className={inputClass}
-            >
-              {invitationRoles.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <div className="flex items-end">
-            <Button
-              type="submit"
-              disabled={inviteState.isLoading}
-              className="w-full"
-            >
-              {inviteState.isLoading ? "Sending…" : "Send invitation"}
-            </Button>
-          </div>
-        </form>
-        {inviteError && (
-          <p role="alert" className="mt-3 text-sm text-destructive">
-            {inviteError}
-          </p>
-        )}
-        {inviteSuccess && (
-          <p
-            role="status"
-            className="mt-3 text-sm text-emerald-700 dark:text-emerald-400"
-          >
-            {inviteSuccess}
-          </p>
-        )}
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            <h3 className="text-lg">Invite a team member</h3>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <form onSubmit={(event) => void submitInvitation(event)}>
+            <FieldGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              <Field>
+                <FieldLabel htmlFor="invite-first-name">First name</FieldLabel>
+                <Input
+                  id="invite-first-name"
+                  required
+                  maxLength={100}
+                  value={firstName}
+                  onChange={(event) => setFirstName(event.target.value)}
+                  autoComplete="given-name"
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="invite-last-name">Last name</FieldLabel>
+                <Input
+                  id="invite-last-name"
+                  required
+                  maxLength={100}
+                  value={lastName}
+                  onChange={(event) => setLastName(event.target.value)}
+                  autoComplete="family-name"
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="invite-email">Email</FieldLabel>
+                <Input
+                  id="invite-email"
+                  required
+                  type="email"
+                  maxLength={254}
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  autoComplete="email"
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="invite-role">Company role</FieldLabel>
+                <NativeSelect
+                  id="invite-role"
+                  className="w-full"
+                  value={role}
+                  onChange={(event) =>
+                    setRole(event.target.value as EInvitationRole)
+                  }
+                >
+                  {invitationRoles.map((option) => (
+                    <NativeSelectOption key={option} value={option}>
+                      {option}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              </Field>
+              <div className="flex items-end">
+                <Button
+                  type="submit"
+                  disabled={inviteState.isLoading}
+                  className="w-full"
+                >
+                  {inviteState.isLoading ? "Sending…" : "Send invitation"}
+                </Button>
+              </div>
+            </FieldGroup>
+          </form>
+          {inviteError && (
+            <Alert variant="destructive">
+              <AlertDescription>{inviteError}</AlertDescription>
+            </Alert>
+          )}
+          {inviteSuccess && (
+            <Alert role="status">
+              <AlertDescription>{inviteSuccess}</AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
 
       <section className="space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -262,10 +294,10 @@ function TeamContent({ companyId }: { companyId: string }) {
             </p>
           </div>
           <div className="grid gap-2 sm:grid-cols-[minmax(12rem,1fr)_auto]">
-            <label className="sr-only" htmlFor="member-search">
+            <FieldLabel className="sr-only" htmlFor="member-search">
               Search members
-            </label>
-            <input
+            </FieldLabel>
+            <Input
               id="member-search"
               type="search"
               value={search}
@@ -274,53 +306,49 @@ function TeamContent({ companyId }: { companyId: string }) {
                 setPage(1);
               }}
               placeholder="Search name or email"
-              className={inputClass}
             />
-            <label className="sr-only" htmlFor="member-status">
+            <FieldLabel className="sr-only" htmlFor="member-status">
               Membership status
-            </label>
-            <select
+            </FieldLabel>
+            <NativeSelect
               id="member-status"
               value={status}
               onChange={(event) => {
                 setStatus(event.target.value as ECompanyUserStatus | "");
                 setPage(1);
               }}
-              className={inputClass}
             >
-              <option value="">All statuses</option>
-              <option value={ECompanyUserStatus.ACTIVE}>Active</option>
-              <option value={ECompanyUserStatus.INACTIVE}>Inactive</option>
-            </select>
+              <NativeSelectOption value="">All statuses</NativeSelectOption>
+              <NativeSelectOption value={ECompanyUserStatus.ACTIVE}>
+                Active
+              </NativeSelectOption>
+              <NativeSelectOption value={ECompanyUserStatus.INACTIVE}>
+                Inactive
+              </NativeSelectOption>
+            </NativeSelect>
           </div>
         </div>
         {actionError && (
-          <p
-            role="alert"
-            className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
-          >
-            {actionError}
-          </p>
+          <Alert variant="destructive">
+            <AlertDescription>{actionError}</AlertDescription>
+          </Alert>
         )}
 
         {membersLoading ? (
-          <p
-            role="status"
-            className="rounded-xl border bg-card p-6 text-sm text-muted-foreground"
-          >
-            Loading company members…
-          </p>
+          <Alert role="status">
+            <AlertDescription>Loading company members…</AlertDescription>
+          </Alert>
         ) : membersError ? (
           <ErrorPanel
             error={membersError}
             message="Company members could not be loaded."
           />
         ) : !members?.items.length ? (
-          <p className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
-            No members match this search.
-          </p>
+          <Alert role="status">
+            <AlertDescription>No members match this search.</AlertDescription>
+          </Alert>
         ) : (
-          <div className="overflow-hidden rounded-xl border bg-card">
+          <Card className="gap-0 py-0">
             <div className="divide-y md:hidden">
               {members.items.map((member) => (
                 <MemberCard
@@ -332,42 +360,46 @@ function TeamContent({ companyId }: { companyId: string }) {
                 />
               ))}
             </div>
-            <div className="hidden overflow-x-auto md:block">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
-                  <tr>
-                    <th className="px-4 py-3">Member</th>
-                    <th className="px-4 py-3">Role</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Joined</th>
-                    <th className="px-4 py-3">
+            <div className="hidden md:block">
+              <Table>
+                <TableHeader className="bg-muted/50 text-xs uppercase tracking-wide">
+                  <TableRow>
+                    <TableHead className="px-4">Member</TableHead>
+                    <TableHead className="px-4">Role</TableHead>
+                    <TableHead className="px-4">Status</TableHead>
+                    <TableHead className="px-4">Joined</TableHead>
+                    <TableHead className="px-4">
                       <span className="sr-only">Actions</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {members.items.map((member) => (
-                    <tr key={member.id}>
-                      <td className="px-4 py-3">
+                    <TableRow key={member.id}>
+                      <TableCell className="px-4 py-3">
                         <p className="font-medium">
                           {member.firstName} {member.lastName}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {member.email}
                         </p>
-                      </td>
-                      <td className="px-4 py-3">
+                      </TableCell>
+                      <TableCell className="px-4 py-3">
                         <MemberRoleSelect
                           member={member}
                           busy={busyMemberId === member.id}
                           onChange={(value) => void updateRole(member, value)}
                         />
-                      </td>
-                      <td className="px-4 py-3 capitalize">{member.status}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      </TableCell>
+                      <TableCell className="px-4 py-3">
+                        <Badge variant="secondary" className="capitalize">
+                          {member.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="px-4 py-3">
                         {new Date(member.joinedAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-3 text-right">
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-right">
                         {member.status === ECompanyUserStatus.ACTIVE && (
                           <Button
                             variant="outline"
@@ -378,13 +410,13 @@ function TeamContent({ companyId }: { companyId: string }) {
                             {busyMemberId === member.id ? "Saving…" : "Remove"}
                           </Button>
                         )}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
-            <div className="flex items-center justify-between border-t px-4 py-3 text-sm">
+            <CardFooter className="justify-between border-t py-3 text-sm">
               <span className="text-muted-foreground">
                 Page {members.page} of{" "}
                 {Math.max(1, Math.ceil(members.total / members.limit))}
@@ -407,8 +439,8 @@ function TeamContent({ companyId }: { companyId: string }) {
                   Next
                 </Button>
               </div>
-            </div>
-          </div>
+            </CardFooter>
+          </Card>
         )}
       </section>
 
@@ -420,52 +452,53 @@ function TeamContent({ companyId }: { companyId: string }) {
           </p>
         </div>
         {invitationsLoading ? (
-          <p
-            role="status"
-            className="rounded-xl border bg-card p-6 text-sm text-muted-foreground"
-          >
-            Loading invitations…
-          </p>
+          <Alert role="status">
+            <AlertDescription>Loading invitations…</AlertDescription>
+          </Alert>
         ) : invitationsError ? (
           <ErrorPanel
             error={invitationsError}
             message="Invitations could not be loaded."
           />
         ) : !invitations?.items.length ? (
-          <p className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
-            No invitations have been sent.
-          </p>
+          <Alert role="status">
+            <AlertDescription>No invitations have been sent.</AlertDescription>
+          </Alert>
         ) : (
-          <div className="overflow-x-auto rounded-xl border bg-card">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3">Recipient</th>
-                  <th className="px-4 py-3">Role</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Expires</th>
-                  <th className="px-4 py-3">
+          <Card className="py-0">
+            <Table>
+              <TableHeader className="bg-muted/50 text-xs uppercase tracking-wide">
+                <TableRow>
+                  <TableHead className="px-4">Recipient</TableHead>
+                  <TableHead className="px-4">Role</TableHead>
+                  <TableHead className="px-4">Status</TableHead>
+                  <TableHead className="px-4">Expires</TableHead>
+                  <TableHead className="px-4">
                     <span className="sr-only">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {invitations.items.map((invitation) => (
-                  <tr key={invitation.id}>
-                    <td className="px-4 py-3">
+                  <TableRow key={invitation.id}>
+                    <TableCell className="px-4 py-3">
                       {invitation.firstName} {invitation.lastName}
                       <p className="text-xs text-muted-foreground">
                         {invitation.email}
                       </p>
-                    </td>
-                    <td className="px-4 py-3">{invitation.companyRole}</td>
-                    <td className="px-4 py-3 capitalize">
-                      {invitation.status}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    </TableCell>
+                    <TableCell className="px-4 py-3">
+                      {invitation.companyRole}
+                    </TableCell>
+                    <TableCell className="px-4 py-3">
+                      <Badge variant="secondary" className="capitalize">
+                        {invitation.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="px-4 py-3">
                       {new Date(invitation.expiresAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-4 py-3 text-right">
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-right">
                       {invitation.status === EInvitationStatus.PENDING &&
                         new Date(invitation.expiresAt) > new Date() && (
                           <Button
@@ -481,12 +514,12 @@ function TeamContent({ companyId }: { companyId: string }) {
                               : "Revoke"}
                           </Button>
                         )}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+            </Table>
+          </Card>
         )}
       </section>
     </div>
@@ -506,19 +539,19 @@ function MemberRoleSelect({
     return <span>{member.companyRole}</span>;
   }
   return (
-    <select
+    <NativeSelect
       aria-label={`Role for ${member.firstName} ${member.lastName}`}
       disabled={busy}
       value={member.companyRole}
       onChange={(event) => onChange(event.target.value)}
-      className="h-9 max-w-64 rounded-md border border-input bg-background px-2 text-xs"
+      className="max-w-64"
     >
       {memberRoles.map((option) => (
-        <option key={option} value={option}>
+        <NativeSelectOption key={option} value={option}>
           {option}
-        </option>
+        </NativeSelectOption>
       ))}
-    </select>
+    </NativeSelect>
   );
 }
 
@@ -562,25 +595,13 @@ function MemberCard({
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <label className="space-y-1.5 text-sm font-medium">
-      {label}
-      {children}
-    </label>
-  );
-}
-
 function ErrorPanel({ error, message }: { error: unknown; message: string }) {
   return (
-    <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
-      <p className="font-medium text-destructive">{message}</p>
-      <p role="alert" className="mt-1 text-sm text-muted-foreground">
+    <Alert variant="destructive">
+      <AlertTitle>{message}</AlertTitle>
+      <AlertDescription>
         {getApiErrorMessage(error, "Please try again.")}
-      </p>
-    </div>
+      </AlertDescription>
+    </Alert>
   );
 }
-
-const inputClass =
-  "h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40";

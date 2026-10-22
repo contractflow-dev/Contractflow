@@ -1,11 +1,9 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { clearUser } from "@/features/auth/authSlice";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
+import { getApiBaseUrl } from "@/lib/apiBaseUrl";
 
 const baseQuery = fetchBaseQuery({
-  baseUrl: API_BASE_URL,
+  baseUrl: getApiBaseUrl(),
   credentials: "include",
 });
 

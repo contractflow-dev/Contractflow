@@ -5,6 +5,11 @@ import { IdentityModule } from './modules/identity/identity.module';
 import { ContractModule } from './modules/contract/contract-module';
 import { CrossCuttingModule } from './modules/cross-cutting/cross-cutting.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { ComplianceModule } from './modules/compliance/compliance-module';
+import { DeliveryModule } from './modules/delivery/delivery.module';
+import { FinancialModule } from './modules/financial/financial.module';
+import { HseModule } from './modules/hse/hse.module';
+import { SiteOperationsModule } from './modules/site-operations/site-operations.module';
 import { EnvVars, NodeEnv, validateEnv } from './config/env.validation';
 import { HealthController } from './health.controller';
 
@@ -34,6 +39,11 @@ import { HealthController } from './health.controller';
     ContractModule,
     CrossCuttingModule,
     AdminModule,
+    ComplianceModule,
+    DeliveryModule,
+    FinancialModule,
+    HseModule,
+    SiteOperationsModule,
   ],
   controllers: [HealthController],
 })

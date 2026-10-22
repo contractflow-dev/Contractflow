@@ -22,6 +22,8 @@ import {
   RiExternalLinkLine,
 } from "@remixicon/react";
 import { Badge } from "@workspace/ui/components/badge";
+import { Button } from "@workspace/ui/components/button";
+import { Separator } from "@workspace/ui/components/separator";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
@@ -149,7 +151,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
     <div className="flex h-full flex-col justify-between">
       {/* Brand & Header */}
       <div>
-        <div className="flex h-16 items-center justify-between border-b px-5">
+        <div className="flex h-16 items-center justify-between px-5">
           <Link href="/admin" className="flex items-center gap-2.5">
             <div className="grid size-8 place-items-center rounded-lg bg-brand text-brand-foreground font-bold text-sm tracking-tight shadow-sm">
               CF
@@ -165,15 +167,18 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
           </Link>
 
           {/* Close button for mobile drawer */}
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             onClick={onClose}
-            className="md:hidden rounded-md p-1.5 text-muted-foreground hover:bg-muted"
+            className="md:hidden text-muted-foreground"
             aria-label="Close menu"
           >
             <RiCloseLine className="size-5" />
-          </button>
+          </Button>
         </div>
+        <Separator />
 
         {/* Navigation list */}
         <nav className="space-y-6 px-3 py-4 overflow-y-auto max-h-[calc(100vh-8rem)]">
@@ -238,7 +243,9 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
       </div>
 
       {/* Footer / Tenant return link */}
-      <div className="border-t p-3 bg-muted/20">
+      <div className="bg-muted/20">
+        <Separator />
+        <div className="p-3">
         <Link
           href="/dashboards"
           className="flex items-center justify-between rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
@@ -249,6 +256,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
           </div>
           <RiExternalLinkLine className="size-3.5 text-muted-foreground" />
         </Link>
+        </div>
       </div>
     </div>
   );

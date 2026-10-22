@@ -22,6 +22,8 @@ import { CompanyRepository } from './repositories/company.repository';
 import { CompanyInvitationRepository } from './repositories/company-invitation.repository';
 import { CompanyScopeService } from './services/company-scope.service';
 import { CompanyUserRepository } from './repositories/company-user.respository';
+import { CompanyAuditLog } from './entities/company-audit-log.entity';
+import { CompanyAuditLogRepository } from './repositories/company-audit-log.repository';
 import { Contract } from '../contract/entities/contract.entity';
 import { ContractParty } from '../contract/entities/contract-party.entity';
 
@@ -32,6 +34,7 @@ import { ContractParty } from '../contract/entities/contract-party.entity';
       Company,
       CompanyUser,
       CompanyInvitation,
+      CompanyAuditLog,
       Contract,
       ContractParty,
       UserSession,
@@ -51,6 +54,7 @@ import { ContractParty } from '../contract/entities/contract-party.entity';
     CompanyService,
     CompanyAdminService,
     CompanyUserRepository,
+    CompanyAuditLogRepository,
     CompanyRepository,
     CompanyInvitationRepository,
     CompanyScopeService,
@@ -62,6 +66,7 @@ import { ContractParty } from '../contract/entities/contract-party.entity';
     CompanyScopeService,
     CompanyService,
     CompanyUserRepository,
+    CompanyAuditLogRepository,
   ],
 })
 export class IdentityModule {}

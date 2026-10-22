@@ -1,27 +1,24 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import type {
-  DeepPartial,
-  FindOptionsWhere,
-  Repository,
-  SelectQueryBuilder,
-} from 'typeorm';
-import type { ICompanyScope } from '../../../common/database/repositories/company-scope.interface';
-import { BaseRepository } from '../../../common/database/repositories/base.repository';
-import { ContractParty } from '../../contract/entities/contract-party.entity';
+import type { DeepPartial, FindOptionsWhere, Repository } from 'typeorm';
+import { ContractScopedRepository } from '../../../common/database/repositories/contract-scoped.repository';
+import type { IContractCompanyScope } from '../../../common/database/repositories/contract-scope.interface';
 import { Document } from '../entities/document.entity';
+import {
+  CompanyScopedRepository,
+  requireCompanyId,
+} from '../../../common/database/repositories/company-scoped.repository';
+import { SelectQueryBuilder } from 'typeorm/browser';
+import { ICompanyScope } from '../../../common/database/repositories/company-scope.interface';
 
+/**
+ * Documents belong to one contract and are owned by one party company. Both
+ * boundaries apply: the company must be a party to the contract, and only
+ * documents it owns are visible.
+ */
 @Injectable()
-export class DocumentRepository extends BaseRepository<
-  Document,
-  ICompanyScope
-> {
-  constructor(
-    @InjectRepository(Document)
-    repository: Repository<Document>,
-    @InjectRepository(ContractParty)
-    private readonly contractParties: Repository<ContractParty>,
-  ) {
+export class DocumentRepository extends CompanyScopedRepository<Document> {
+  constructor(@InjectRepository(Document) repository: Repository<Document>) {
     super(repository);
   }
 
@@ -29,59 +26,56 @@ export class DocumentRepository extends BaseRepository<
     qb: SelectQueryBuilder<Document>,
     scope: ICompanyScope,
   ): void {
-    qb.andWhere(`${qb.alias}.ownerCompanyId = :__scopeCompanyId`, {
-      __scopeCompanyId: requireCompanyId(scope),
+    qb.andWhere(`${qb.alias}.ownerCompanyId = :__scopeOwnerCompanyId`, {
+      __scopeOwnerCompanyId: requireCompanyId(scope),
     });
   }
 
   protected override scopeWhere(
     scope: ICompanyScope,
   ): FindOptionsWhere<Document> {
-    return { ownerCompanyId: requireCompanyId(scope) };
+    return {
+      ownerCompanyId: requireCompanyId(scope),
+    } as unknown as FindOptionsWhere<Document>;
   }
 
-  protected override scopeValues(
-    scope: ICompanyScope,
-  ): DeepPartial<Document> {
-    return { ownerCompanyId: requireCompanyId(scope) };
+  protected override scopeValues(scope: ICompanyScope): DeepPartial<Document> {
+    return {
+      ownerCompanyId: requireCompanyId(scope),
+    } as unknown as DeepPartial<Document>;
   }
 
-  override async findById(
-    id: string,
-    scope: ICompanyScope,
-  ): Promise<Document | null> {
-    return this.repository.findOne({
-      where: { id, ...this.scopeWhere(scope) },
+  findByContract(contractId: string, scope: ICompanyScope) {
+    return this.findAll(scope, {
+      where: { contractId } as FindOptionsWhere<Document>,
+      order: { createdAt: 'DESC' } as any,
     });
   }
 
-  async createForContract(
-    data: DeepPartial<Document>,
-    scope: ICompanyScope,
-  ): Promise<Document> {
-    const companyId = requireCompanyId(scope);
-    if (!data.contractId) {
-      throw new BadRequestException('A contract is required for a document');
-    }
+  /** Company-level files: contract_id is null. */
+  findCompanyLevel(scope: ICompanyScope) {
+    return this.scopedQuery(scope)
+      .andWhere('e.contractId IS NULL')
+      .orderBy('e.createdAt', 'DESC')
+      .getMany();
+  }
 
-    const party = await this.contractParties.findOne({
-      where: { contractId: data.contractId, companyId },
-      select: { id: true },
+  findByCategory(category: Document['category'], scope: ICompanyScope) {
+    return this.findAll(scope, {
+      where: { category } as FindOptionsWhere<Document>,
     });
-    if (!party) {
-      throw new BadRequestException(
-        'The company must be a party to the document contract',
-      );
-    }
-
-    return this.save(this.create(data, scope), scope);
   }
-}
 
-function requireCompanyId(scope: ICompanyScope): string {
-  const companyId = scope?.companyId?.trim();
-  if (!companyId) {
-    throw new BadRequestException('Company context is required');
+  findByStatus(status: Document['status'], scope: ICompanyScope) {
+    return this.findAll(scope, {
+      where: { status } as FindOptionsWhere<Document>,
+    });
   }
-  return companyId;
+
+  findByDocumentNumber(documentNumber: string, scope: ICompanyScope) {
+    return this.findOne(
+      { where: { documentNumber } as FindOptionsWhere<Document> },
+      scope,
+    );
+  }
 }

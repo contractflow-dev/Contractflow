@@ -1,5 +1,6 @@
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api';
+import { getApiBaseUrl } from './apiBaseUrl';
+
+const API_URL = getApiBaseUrl();
 
 /**
  * Generic lightweight fetch wrapper for server-side requests in Server Components.

@@ -255,10 +255,9 @@ describe('CompanyService', () => {
         leftAt: expect.anything(),
       },
     });
-    expect(invitationRepository.countPending).toHaveBeenCalledWith(
-      { companyId: companyData.id },
-      expect.any(Date),
-    );
+    expect(invitationRepository.countPending).toHaveBeenCalledWith({
+      companyId: companyData.id,
+    });
     expect(contractPartyRepository.createQueryBuilder).toHaveBeenCalledTimes(2);
     expect(
       contractPartyRepository.createQueryBuilder.mock.results[0].value.where,

@@ -7,6 +7,21 @@ import {
   RiUserFollowLine,
 } from "@remixicon/react";
 import { Badge } from "@workspace/ui/components/badge";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@workspace/ui/components/empty";
 import type { AdminAttentionSummary } from "@/services/adminApi";
 
 interface AttentionItemsCardProps {
@@ -29,37 +44,44 @@ export function AttentionItemsCard({ attention }: AttentionItemsCardProps) {
   };
 
   return (
-    <div className="flex flex-col rounded-xl border bg-card p-6 shadow-sm">
-      <div className="flex items-center justify-between pb-4 border-b">
-        <div>
-          <h2 className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
-            <RiAlarmWarningLine className="size-4 text-amber-500" />
-            Operational Attention
-          </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Pending lifecycle events and verifications requiring oversight
-          </p>
-        </div>
+    <Card className="flex flex-col">
+      <CardHeader className="border-b">
+        <CardTitle
+          role="heading"
+          aria-level={2}
+          className="flex items-center gap-2 text-base font-semibold tracking-tight"
+        >
+          <RiAlarmWarningLine className="size-4 text-amber-500" />
+          Operational Attention
+        </CardTitle>
+        <CardDescription className="text-xs">
+          Pending lifecycle events and verifications requiring oversight
+        </CardDescription>
         {items.length > 0 && (
-          <Badge variant="outline" className="text-xs font-normal">
-            {items.length} item{items.length === 1 ? "" : "s"}
-          </Badge>
+          <CardAction>
+            <Badge variant="outline" className="text-xs font-normal">
+              {items.length} item{items.length === 1 ? "" : "s"}
+            </Badge>
+          </CardAction>
         )}
-      </div>
+      </CardHeader>
 
-      <div className="mt-4 flex-1">
+      <CardContent className="flex-1">
         {items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 text-center">
-            <div className="grid size-10 place-items-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-              <RiCheckDoubleLine className="size-5" />
-            </div>
-            <p className="mt-3 text-sm font-medium text-foreground">
-              Everything is on track
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground max-w-xs">
-              No contracts are expiring soon, and no invitation or user verification backlogs are pending.
-            </p>
-          </div>
+          <Empty className="p-6">
+            <EmptyHeader>
+              <EmptyMedia
+                variant="icon"
+                className="rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              >
+                <RiCheckDoubleLine />
+              </EmptyMedia>
+              <EmptyTitle className="text-sm">Everything is on track</EmptyTitle>
+              <EmptyDescription className="text-xs">
+                No contracts are expiring soon, and no invitation or user verification backlogs are pending.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         ) : (
           <div className="space-y-3">
             {items.map((item) => {
@@ -84,7 +106,7 @@ export function AttentionItemsCard({ attention }: AttentionItemsCardProps) {
                   </div>
                   <Badge
                     variant="outline"
-                    className={`shrink-0 capitalize text-[10px] uppercase font-semibold px-2 py-0.5 ${
+                    className={`shrink-0 text-[10px] uppercase font-semibold ${
                       urgencyStyles[item.urgency]
                     }`}
                   >
@@ -95,7 +117,7 @@ export function AttentionItemsCard({ attention }: AttentionItemsCardProps) {
             })}
           </div>
         )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

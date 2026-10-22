@@ -1,19 +1,22 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Injectable } from '@nestjs/common';
+import { ContractAccessService } from '../../contract/services/contract-access.service';
+import { ContractResourceReader } from '../../contract/services/contract-resource-reader';
 import { ComplianceRecord } from '../entities/compliance-record.entity';
 import { ComplianceRequirement } from '../entities/compliance-requirement.entity';
+import { ComplianceRecordRepository } from '../repositories/compliance-record.repository';
+import { ComplianceRequirementRepository } from '../repositories/compliance-requirement.repository';
 
 @Injectable()
 export class ComplianceService {
+  readonly requirements: ContractResourceReader<ComplianceRequirement>;
+  readonly records: ContractResourceReader<ComplianceRecord>;
+
   constructor(
-    @InjectRepository(ComplianceRecord)
-    private readonly recordRepo: Repository<ComplianceRecord>,
-    @InjectRepository(ComplianceRequirement)
-    private readonly requirementRepo: Repository<ComplianceRequirement>,
-  ) {}
+    access: ContractAccessService,
+    requirements: ComplianceRequirementRepository,
+    records: ComplianceRecordRepository,
+  ) {
+    this.requirements = new ContractResourceReader(access, requirements, 'general', 'Compliance requirement');
+    this.records = new ContractResourceReader(access, records, 'general', 'Compliance record');
+  }
 }

@@ -3,13 +3,18 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { RiMailLine } from "@remixicon/react";
+import { Alert, AlertDescription } from "@workspace/ui/components/alert";
+import { Button } from "@workspace/ui/components/button";
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+} from "@workspace/ui/components/field";
+import { Input } from "@workspace/ui/components/input";
 import { useResendVerificationEmailMutation } from "@/services/authApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { HeroMetrics } from "@/components/auth/HeroMetrics";
-
-const inputClass =
-  "h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-60";
 
 export default function VerificationPendingPage() {
   const [emailInput, setEmailInput] = useState("");
@@ -79,49 +84,48 @@ export default function VerificationPendingPage() {
             </div>
           </header>
 
-          <form onSubmit={onResend} className="space-y-4">
-            <div className="space-y-1.5">
-              <label
-                htmlFor="verification-email"
-                className="text-sm font-medium"
+          <form onSubmit={onResend}>
+            <FieldGroup className="gap-4">
+              <Field>
+                <FieldLabel htmlFor="verification-email">
+                  Didn’t receive the email? Send a new link
+                </FieldLabel>
+                <Input
+                  id="verification-email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  maxLength={254}
+                  className="h-11"
+                  placeholder="you@company.com"
+                  value={emailInput}
+                  onChange={(event) => setEmailInput(event.target.value)}
+                />
+              </Field>
+
+              {message && (
+                <Alert role="status">
+                  <AlertDescription>{message}</AlertDescription>
+                </Alert>
+              )}
+              {errorMessage && (
+                <Alert variant="destructive" className="break-words">
+                  <AlertDescription>{errorMessage}</AlertDescription>
+                </Alert>
+              )}
+
+              <Button
+                type="submit"
+                disabled={isLoading || cooldownSeconds > 0 || !emailInput.trim()}
+                className="h-11 w-full"
               >
-                Didn’t receive the email? Send a new link
-              </label>
-              <input
-                id="verification-email"
-                type="email"
-                autoComplete="email"
-                required
-                maxLength={254}
-                className={inputClass}
-                placeholder="you@company.com"
-                value={emailInput}
-                onChange={(event) => setEmailInput(event.target.value)}
-              />
-            </div>
-
-            {message && (
-              <p role="status" className="text-sm text-muted-foreground">
-                {message}
-              </p>
-            )}
-            {errorMessage && (
-              <p role="alert" className="break-words text-sm text-destructive">
-                {errorMessage}
-              </p>
-            )}
-
-            <button
-              type="submit"
-              disabled={isLoading || cooldownSeconds > 0 || !emailInput.trim()}
-              className="h-11 w-full rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isLoading
-                ? "Sending…"
-                : cooldownSeconds > 0
-                  ? `Resend available in ${cooldownSeconds}s`
-                  : "Resend verification email"}
-            </button>
+                {isLoading
+                  ? "Sending…"
+                  : cooldownSeconds > 0
+                    ? `Resend available in ${cooldownSeconds}s`
+                    : "Resend verification email"}
+              </Button>
+            </FieldGroup>
           </form>
 
           <p className="text-sm text-muted-foreground">
