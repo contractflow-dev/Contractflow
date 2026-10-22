@@ -27,7 +27,7 @@ import {
 } from "@/features/companies";
 import type { CompanyProfile } from "@/features/companies";
 import { getApiErrorMessage } from "@/lib/apiError";
-import { CompanyAdminWorkspace } from "./company-admin-workspace";
+import { CompanyAdminWorkspace } from "../company-admin-workspace";
 
 const profileSchema = z.object({
   name: z.string().trim().min(1, "Company name is required").max(255),
@@ -86,7 +86,7 @@ const fields: Array<{
   { key: "postalCode", label: "Postal code", autoComplete: "postal-code" },
 ];
 
-export function CompanyProfilePage({
+export function CompanyProfileView({
   initialCompanyId,
 }: {
   initialCompanyId: string;

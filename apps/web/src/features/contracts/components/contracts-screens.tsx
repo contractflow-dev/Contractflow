@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { EContractStatus } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
@@ -27,66 +26,30 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components/table";
-import { CompanyAdminShell } from "@/features/companies/CompanyAdminShell";
 import { getApiErrorMessage } from "@/lib/apiError";
-import {
-  useGetContractByIdQuery,
-  useGetContractPartiesQuery,
-  useGetContractsQuery,
-  useGetContractStatusHistoryQuery,
-} from "@/services/contractApi";
+import { useContractDetails } from "../_hooks/use-contract-details";
+import { useContractsList } from "../_hooks/use-contracts-list";
 
 const pageSize = 20;
 const contractStatuses = Object.values(EContractStatus);
 
-export function CompanyContractsPage() {
-  return (
-    <CompanyAdminShell>
-      {(access) => <ContractList companyId={access.company.id} />}
-    </CompanyAdminShell>
-  );
-}
-
-export function CompanyContractDetailPage({
-  contractId,
-}: {
-  contractId: string;
-}) {
-  return (
-    <CompanyAdminShell>
-      {(access) => (
-        <ContractDetail companyId={access.company.id} contractId={contractId} />
-      )}
-    </CompanyAdminShell>
-  );
-}
-
-function ContractList({ companyId }: { companyId: string }) {
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<EContractStatus | "">("");
-  const [page, setPage] = useState(1);
+export function ContractsList({ companyId }: { companyId: string }) {
   const {
+    searchInput,
+    setSearchInput,
+    status,
+    setStatus,
+    page,
+    setPage,
     currentData,
     error,
     isFetching,
     isLoading,
     refetch,
-  } = useGetContractsQuery({
-    companyId,
-    search: search || undefined,
-    status: status || undefined,
-    page,
-    limit: pageSize,
-  });
-  const pageCount = Math.max(1, Math.ceil((currentData?.total ?? 0) / pageSize));
+    pageCount,
+    submitSearch,
+  } = useContractsList(companyId, pageSize);
   const initialLoading = isLoading || (isFetching && !currentData);
-
-  function submitSearch(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSearch(searchInput.trim());
-    setPage(1);
-  }
 
   return (
     <div className="space-y-6">
@@ -247,7 +210,7 @@ function ContractList({ companyId }: { companyId: string }) {
   );
 }
 
-function ContractDetail({
+export function ContractDetail({
   companyId,
   contractId,
 }: {
@@ -256,21 +219,17 @@ function ContractDetail({
 }) {
   const query = { companyId, contractId };
   const {
-    currentData: detail,
+    detail,
     error: contractError,
     isLoading: contractLoading,
     refetch: refetchContract,
-  } = useGetContractByIdQuery(query);
-  const {
-    currentData: parties,
-    error: partiesError,
-    isLoading: partiesLoading,
-  } = useGetContractPartiesQuery(query);
-  const {
-    currentData: history,
-    error: historyError,
-    isLoading: historyLoading,
-  } = useGetContractStatusHistoryQuery({ ...query, page: 1, limit: 50 });
+    parties,
+    partiesError,
+    partiesLoading,
+    history,
+    historyError,
+    historyLoading,
+  } = useContractDetails(query);
 
   if (contractLoading) {
     return (

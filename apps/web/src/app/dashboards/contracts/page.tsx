@@ -1,5 +1,5 @@
-import { CompanyContractsPage } from "@/features/company-dashboard/company-contracts-page";
+import { ContractsListView } from "@/features/contracts/_views/contracts-list-view";
 
 export default function ContractsPage() {
-  return <CompanyContractsPage />;
+  return <ContractsListView />;
 }

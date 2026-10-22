@@ -2,7 +2,7 @@ import { RegisterForm } from "@/features/auth/components/register-form";
 import { HeroMetrics } from "@/components/auth/HeroMetrics";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
-export default function RegisterPage() {
+export function RegisterView() {
   return (
     <main className="grid min-h-svh min-w-0 grid-cols-1 lg:grid-cols-2">
       <section className="flex min-w-0 items-center justify-center p-4 sm:p-6 lg:p-10">

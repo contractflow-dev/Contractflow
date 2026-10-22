@@ -71,7 +71,7 @@ const summaryCards = [
   },
 ] as const;
 
-export function CompanyDashboardPage({
+export function CompanyDashboardView({
   initialCompanyId,
 }: {
   initialCompanyId: string;

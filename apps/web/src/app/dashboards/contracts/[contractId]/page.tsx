@@ -1,4 +1,4 @@
-import { CompanyContractDetailPage } from "@/features/company-dashboard/company-contracts-page";
+import { ContractDetailsView } from "@/features/contracts/_views/contract-details-view";
 
 export default async function ContractDetailPage({
   params,
@@ -6,5 +6,5 @@ export default async function ContractDetailPage({
   params: Promise<{ contractId: string }>;
 }) {
   const { contractId } = await params;
-  return <CompanyContractDetailPage contractId={contractId} />;
+  return <ContractDetailsView contractId={contractId} />;
 }

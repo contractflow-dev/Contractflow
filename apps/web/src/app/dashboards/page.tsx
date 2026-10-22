@@ -1,4 +1,4 @@
-import { CompanyDashboardPage } from "@/features/company-dashboard/company-dashboard-page";
+import { CompanyDashboardView } from "@/features/company-dashboard/_views/company-dashboard-view";
 
 export default async function DashboardsPage({
   searchParams,
@@ -7,5 +7,5 @@ export default async function DashboardsPage({
 }) {
   const { companyId } = await searchParams;
 
-  return <CompanyDashboardPage initialCompanyId={companyId ?? ""} />;
+  return <CompanyDashboardView initialCompanyId={companyId ?? ""} />;
 }

@@ -18,7 +18,7 @@ import {
 import { getApiErrorMessage, getApiErrorStatus } from "@/lib/apiError";
 import { useGetCurrentUserQuery } from "@/services/authApi";
 
-export function CompanyInvitationResponsePage({ token }: { token: string }) {
+export function InvitationResponseView({ token }: { token: string }) {
   const router = useRouter();
   const [result, setResult] = useState("");
   const [responseError, setResponseError] = useState("");
