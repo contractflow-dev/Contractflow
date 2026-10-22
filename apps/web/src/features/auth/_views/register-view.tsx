@@ -1,19 +1,18 @@
 import { RegisterForm } from "@/features/auth/components/register-form";
 import { HeroMetrics } from "@/components/auth/HeroMetrics";
-import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { AuthTopBar } from "@/components/auth/authTopBar";
 
-export default function RegisterPage() {
+export function RegisterView() {
   return (
     <main className="grid min-h-svh min-w-0 grid-cols-1 lg:grid-cols-2">
-      <section className="flex min-w-0 items-center justify-center p-4 sm:p-6 lg:p-10">
-        <div className="w-full min-w-0 max-w-md space-y-6 py-4 sm:py-6">
-          <div className="flex items-center justify-between">
-            <span className="text-lg font-semibold tracking-tight">
-              ContractFlow
-            </span>
-            <ThemeToggle />
+      <section className="flex min-w-0 flex-col p-4 sm:p-6 lg:p-10">
+        <AuthTopBar />
+
+        {/* Content area: fills remaining height and centers the form */}
+        <div className="flex flex-1 items-center justify-center">
+          <div className="w-full min-w-0 max-w-md space-y-6 py-4 sm:py-6">
+            <RegisterForm />
           </div>
-          <RegisterForm />
         </div>
       </section>
 

@@ -1,4 +1,4 @@
-import { CompanyProfilePage } from "@/features/company-dashboard/company-profile-page";
+import { CompanyProfileView } from "@/features/company-dashboard/_views/company-profile-view";
 
 export default async function ProfilePage({
   searchParams,
@@ -6,5 +6,5 @@ export default async function ProfilePage({
   searchParams: Promise<{ companyId?: string }>;
 }) {
   const { companyId } = await searchParams;
-  return <CompanyProfilePage initialCompanyId={companyId ?? ""} />;
+  return <CompanyProfileView initialCompanyId={companyId ?? ""} />;
 }

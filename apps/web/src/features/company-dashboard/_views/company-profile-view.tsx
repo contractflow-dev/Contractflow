@@ -86,7 +86,7 @@ const fields: Array<{
   { key: "postalCode", label: "Postal code", autoComplete: "postal-code" },
 ];
 
-export function CompanyProfilePage({
+export function CompanyProfileView({
   initialCompanyId,
 }: {
   initialCompanyId: string;

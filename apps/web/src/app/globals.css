@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@source "../../../../../packages/ui/src/**/*.{js,ts,jsx,tsx}";
+@source "../../../../packages/ui/src/**/*.{js,ts,jsx,tsx}";
 @custom-variant dark (&:is(.dark *));
 
 /* ───────────────────────────────────────────────────────────────
@@ -52,10 +52,12 @@
   /* ContractFlow additions */
   --color-field: var(--field);
   --color-brand: var(--brand);
+  --color-brand-foreground: var(--primary-foreground);
   --color-hero-overlay: var(--hero-overlay);
   --color-hero-fade: var(--hero-fade);
   --color-hero-foreground: var(--hero-foreground);
   --color-hero-muted: var(--hero-muted);
+  --color-hero-accent: var(--hero-accent);
 
   /* Charts */
   --color-chart-1: var(--chart-1);
@@ -108,10 +110,14 @@
   --ring: oklch(0.576 0.161 41.8); /* #c4501a */
   --field: oklch(1 0 0); /* #ffffff */
   --brand: oklch(0.509 0.148 41.2); /* #a8400f */
-  --hero-overlay: oklch(0.954 0.01 72.7 / 0.86); /* #f4efe9 @0.86 */
-  --hero-fade: oklch(0.879 0.013 71.3 / 0.9); /* #ddd6ce @0.9 */
-  --hero-foreground: oklch(0.181 0.006 55.9); /* #14110f */
-  --hero-muted: oklch(0.347 0.01 73.6); /* #3d3934 */
+
+  /* Hero: stays dark in BOTH modes (photo + dark overlay, light text) */
+  --hero-overlay: oklch(0.151 0.025 267.1 / 0.7); /* #070b16 @0.7 */
+  --hero-fade: oklch(0.151 0.025 267.1 / 0.9); /* #070b16 @0.9 */
+  --hero-foreground: oklch(1 0 0); /* #ffffff */
+  --hero-muted: oklch(0.9 0.015 263.2); /* soft light grey */
+  --hero-accent: oklch(0.754 0.166 44.6); /* bright orange */
+
   --chart-1: oklch(0.576 0.161 41.8); /* #c4501a */
   --chart-2: oklch(0.68 0.136 74.6); /* #c98a1c */
   --chart-3: oklch(0.528 0.103 251.9); /* #3b6ea5 */
@@ -141,7 +147,7 @@
   --secondary: oklch(0.221 0.041 266.5); /* #121a2e */
   --secondary-foreground: oklch(0.965 0.005 78.3); /* #f5f3f0 */
   --muted: oklch(0.207 0.038 265.1); /* #0f1729 */
-  --muted-foreground: oklch(0.656 0.035 266); /* #8791a7 */
+  --muted-foreground: oklch(0.75 0.03 266); /* brighter for readability */
   --accent: oklch(0.242 0.04 266.8); /* #171f33 */
   --accent-foreground: oklch(0.965 0.005 78.3); /* #f5f3f0 */
   --destructive: oklch(0.699 0.162 26.5); /* #f27066 */
@@ -150,10 +156,14 @@
   --ring: oklch(0.654 0.166 44.6); /* #e0682a */
   --field: oklch(0.185 0.034 267.4); /* #0c1222 */
   --brand: oklch(0.654 0.166 44.6); /* #e0682a */
-  --hero-overlay: oklch(0.151 0.025 267.1 / 0.62); /* #070b16 @0.62 */
+
+  /* Hero: same as light so the panel looks identical in both modes */
+  --hero-overlay: oklch(0.151 0.025 267.1 / 0.7); /* #070b16 @0.7 */
   --hero-fade: oklch(0.151 0.025 267.1 / 0.9); /* #070b16 @0.9 */
   --hero-foreground: oklch(1 0 0); /* #ffffff */
-  --hero-muted: oklch(0.794 0.023 263.2); /* #b4bccb */
+  --hero-muted: oklch(0.9 0.015 263.2); /* soft light grey */
+  --hero-accent: oklch(0.754 0.166 44.6); /* bright orange */
+
   --chart-1: oklch(0.654 0.166 44.6); /* #e0682a */
   --chart-2: oklch(0.791 0.134 79.5); /* #e8b04a */
   --chart-3: oklch(0.691 0.101 250.3); /* #6aa0d8 */

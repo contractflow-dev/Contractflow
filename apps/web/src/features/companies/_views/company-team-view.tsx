@@ -46,12 +46,12 @@ import {
 } from "@/features/companies";
 import type { CompanyMember } from "@/features/companies";
 import { getApiErrorMessage } from "@/lib/apiError";
-import { CompanyAdminWorkspace } from "./company-admin-workspace";
+import { CompanyAdminWorkspace } from "../../company-dashboard/_views/company-admin-workspace";
 
 const invitationRoles = Object.values(EInvitationRole);
 const memberRoles = Object.values(ECompanyRole);
 
-export function CompanyTeamPage({
+export function CompanyTeamView({
   initialCompanyId,
 }: {
   initialCompanyId: string;

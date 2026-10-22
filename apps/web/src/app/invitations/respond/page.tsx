@@ -1,4 +1,4 @@
-import { CompanyInvitationResponsePage } from "@/features/company-dashboard/company-invitation-response-page";
+import { InvitationResponseView } from "@/features/companies/_views/invitation-response-view";
 
 export default async function InvitationResponseRoute({
   searchParams,
@@ -6,5 +6,5 @@ export default async function InvitationResponseRoute({
   searchParams: Promise<{ token?: string }>;
 }) {
   const { token } = await searchParams;
-  return <CompanyInvitationResponsePage token={token ?? ""} />;
+  return <InvitationResponseView token={token ?? ""} />;
 }

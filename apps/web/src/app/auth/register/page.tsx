@@ -1,3 +1,3 @@
-import RegisterPage from "@/features/auth/components/register/page";
+import { RegisterView } from "@/features/auth/_views/register-view";
 
-export default RegisterPage;
+export default RegisterView;

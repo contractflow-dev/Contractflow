@@ -1,4 +1,4 @@
-import { CompanyTeamPage } from "@/features/company-dashboard/company-team-page";
+import { CompanyTeamView } from "@/features/companies/_views/company-team-view";
 
 export default async function TeamPage({
   searchParams,
@@ -6,5 +6,5 @@ export default async function TeamPage({
   searchParams: Promise<{ companyId?: string }>;
 }) {
   const { companyId } = await searchParams;
-  return <CompanyTeamPage initialCompanyId={companyId ?? ""} />;
+  return <CompanyTeamView initialCompanyId={companyId ?? ""} />;
 }
