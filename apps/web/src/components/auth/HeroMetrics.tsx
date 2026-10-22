@@ -21,21 +21,21 @@ export function HeroMetrics({ className = "" }: { className?: string }) {
     <dl
       aria-label="Platform performance highlights"
       className={cn(
-        "mt-6 grid w-full max-w-xl grid-cols-1 gap-3 xl:mt-8 xl:grid-cols-3 xl:gap-5",
+        "mt-6 grid w-full max-w-xl grid-cols-1 gap-3 xl:mt-8 xl:grid-cols-3 xl:gap-6",
         className,
       )}
     >
       {METRICS.map((metric, index) => (
         <div
           key={metric.label}
-          className="flex min-w-0 flex-col-reverse motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:fill-mode-backwards motion-safe:duration-500"
+          className="flex min-w-0 flex-col-reverse justify-end text-left motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:fill-mode-backwards motion-safe:duration-500"
           style={{ animationDelay: `${index * 100}ms` }}
         >
-          <dt className="mt-1 text-xs leading-snug text-hero-muted sm:text-sm">
+          <dt className="mt-1 text-xs font-medium leading-snug text-hero-foreground text-pretty sm:text-sm">
             {metric.label}
           </dt>
 
-          <dd className="font-heading text-xl font-bold leading-tight tracking-tight text-brand tabular-nums sm:text-2xl xl:text-2xl">
+          <dd className="font-heading text-xl font-bold leading-tight tracking-tight text-hero-accent tabular-nums sm:text-2xl">
             {metric.spokenValue ? (
               <>
                 <span aria-hidden="true">{metric.value}</span>

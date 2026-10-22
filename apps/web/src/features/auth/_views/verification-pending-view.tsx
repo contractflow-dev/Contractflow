@@ -5,15 +5,11 @@ import { useEffect, useState } from "react";
 import { RiMailLine } from "@remixicon/react";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
-import {
-  Field,
-  FieldGroup,
-  FieldLabel,
-} from "@workspace/ui/components/field";
+import { Field, FieldGroup, FieldLabel } from "@workspace/ui/components/field";
 import { Input } from "@workspace/ui/components/input";
 import { useResendVerificationEmailMutation } from "@/services/authApi";
 import { getApiErrorMessage } from "@/lib/apiError";
-import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { AuthTopBar } from "@/components/auth/authTopBar";
 import { HeroMetrics } from "@/components/auth/HeroMetrics";
 
 export function VerificationPendingView() {
@@ -60,15 +56,7 @@ export function VerificationPendingView() {
       <section className="flex min-w-0 items-center justify-center p-4 sm:p-6 lg:p-10">
         <div className="w-full min-w-0 max-w-md space-y-6 py-4 sm:py-6">
           <header className="space-y-5">
-            <div className="flex items-center justify-between">
-              <Link
-                href="/auth/register"
-                className="text-lg font-semibold tracking-tight"
-              >
-                ContractFlow
-              </Link>
-              <ThemeToggle />
-            </div>
+            <AuthTopBar />
             <div className="grid size-12 place-items-center rounded-full bg-primary/10 text-primary">
               <RiMailLine className="size-6" aria-hidden="true" />
             </div>
@@ -116,7 +104,9 @@ export function VerificationPendingView() {
 
               <Button
                 type="submit"
-                disabled={isLoading || cooldownSeconds > 0 || !emailInput.trim()}
+                disabled={
+                  isLoading || cooldownSeconds > 0 || !emailInput.trim()
+                }
                 className="h-11 w-full"
               >
                 {isLoading

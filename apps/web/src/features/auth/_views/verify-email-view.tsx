@@ -9,10 +9,11 @@ import { Skeleton } from "@workspace/ui/components/skeleton";
 import { cn } from "@/lib/utils";
 import { useVerifyEmailMutation } from "@/services/authApi";
 import { getApiErrorMessage } from "@/lib/apiError";
-import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { HeroMetrics } from "@/components/auth/HeroMetrics";
+import { AuthTopBar } from "@/components/auth/authTopBar";
 
-const LINK_BUTTON_CLASS = "h-auto min-h-11 w-full whitespace-normal py-2 text-center";
+const LINK_BUTTON_CLASS =
+  "h-auto min-h-11 w-full whitespace-normal py-2 text-center";
 
 type VerificationState = "verifying" | "verified" | "failed";
 
@@ -22,7 +23,6 @@ function VerifyEmailContent() {
   const [state, setState] = useState<VerificationState>(
     token ? "verifying" : "failed",
   );
-  // ...rest unchanged
   const [message, setMessage] = useState<string | null>(null);
   const [verifyEmail] = useVerifyEmailMutation();
   const started = useRef(false);
@@ -55,6 +55,81 @@ function VerifyEmailContent() {
 
   return (
     <main className="grid min-h-svh min-w-0 grid-cols-1 lg:grid-cols-2">
+      <section className="flex min-w-0 flex-col p-4 sm:p-6 lg:p-10">
+        <AuthTopBar />
+
+        {/* Content area: fills remaining height and centers the card */}
+        <div className="flex flex-1 items-center justify-center">
+          <div className="w-full min-w-0 max-w-md space-y-6 py-4 sm:py-6">
+            <header className="space-y-5">
+              {state === "verifying" ? (
+                <>
+                  <h1 className="text-2xl font-semibold tracking-tight">
+                    Verifying your email
+                  </h1>
+                  <p role="status" className="text-sm text-muted-foreground">
+                    Please wait while we confirm the link with the server.
+                  </p>
+                </>
+              ) : !token ? (
+                <>
+                  <h1 className="text-2xl font-semibold tracking-tight">
+                    Verification link is incomplete
+                  </h1>
+                  <Alert variant="destructive" className="break-words">
+                    <AlertDescription>
+                      Open the complete verification link from your email.
+                    </AlertDescription>
+                  </Alert>
+                  <Link
+                    href="/auth/verification-pending"
+                    className={cn(
+                      buttonVariants({ variant: "outline" }),
+                      LINK_BUTTON_CLASS,
+                    )}
+                  >
+                    Request another verification email
+                  </Link>
+                </>
+              ) : state === "verified" ? (
+                <>
+                  <h1 className="text-2xl font-semibold tracking-tight">
+                    Email verified
+                  </h1>
+                  <p role="status" className="text-sm text-muted-foreground">
+                    {message}
+                  </p>
+                  <Link
+                    href="/login"
+                    className={cn(buttonVariants(), LINK_BUTTON_CLASS)}
+                  >
+                    Continue to sign in
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <h1 className="text-2xl font-semibold tracking-tight">
+                    We couldn’t verify this link
+                  </h1>
+                  <Alert variant="destructive" className="break-words">
+                    <AlertDescription>{message}</AlertDescription>
+                  </Alert>
+                  <Link
+                    href="/auth/verification-pending"
+                    className={cn(
+                      buttonVariants({ variant: "outline" }),
+                      LINK_BUTTON_CLASS,
+                    )}
+                  >
+                    Request another verification email
+                  </Link>
+                </>
+              )}
+            </header>
+          </div>
+        </div>
+      </section>
+
       <aside className="relative hidden min-w-0 flex-col justify-between overflow-hidden bg-auth-hero bg-cover bg-center p-10 text-white lg:sticky lg:top-0 lg:flex lg:min-h-svh lg:self-start">
         <div className="absolute inset-0 bg-black/60" aria-hidden="true" />
 
@@ -78,73 +153,6 @@ function VerifyEmailContent() {
           </p>
         </div>
       </aside>
-      <section className="flex min-w-0 items-center justify-center p-4 sm:p-6 lg:p-10">
-        <div className="w-full min-w-0 max-w-md space-y-6 py-4 sm:py-6">
-          <header className="space-y-5">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-primary">ContractFlow</p>
-              <ThemeToggle />
-            </div>
-            {state === "verifying" ? (
-              <>
-                <h1 className="text-2xl font-semibold tracking-tight">
-                  Verifying your email
-                </h1>
-                <p role="status" className="text-sm text-muted-foreground">
-                  Please wait while we confirm the link with the server.
-                </p>
-              </>
-            ) : !token ? (
-              <>
-                <h1 className="text-2xl font-semibold tracking-tight">
-                  Verification link is incomplete
-                </h1>
-                <Alert variant="destructive" className="break-words">
-                  <AlertDescription>
-                    Open the complete verification link from your email.
-                  </AlertDescription>
-                </Alert>
-                <Link
-                  href="/auth/verification-pending"
-                  className={cn(buttonVariants({ variant: "outline" }), LINK_BUTTON_CLASS)}
-                >
-                  Request another verification email
-                </Link>
-              </>
-            ) : state === "verified" ? (
-              <>
-                <h1 className="text-2xl font-semibold tracking-tight">
-                  Email verified
-                </h1>
-                <p role="status" className="text-sm text-muted-foreground">
-                  {message}
-                </p>
-                <Link
-                  href="/login"
-                  className={cn(buttonVariants(), LINK_BUTTON_CLASS)}
-                >
-                  Continue to sign in
-                </Link>
-              </>
-            ) : (
-              <>
-                <h1 className="text-2xl font-semibold tracking-tight">
-                  We couldn’t verify this link
-                </h1>
-                <Alert variant="destructive" className="break-words">
-                  <AlertDescription>{message}</AlertDescription>
-                </Alert>
-                <Link
-                  href="/auth/verification-pending"
-                  className={cn(buttonVariants({ variant: "outline" }), LINK_BUTTON_CLASS)}
-                >
-                  Request another verification email
-                </Link>
-              </>
-            )}
-          </header>
-        </div>
-      </section>
     </main>
   );
 }
