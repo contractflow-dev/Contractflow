@@ -14,6 +14,10 @@ import {
   'status',
   'expiresAt',
 ])
+@Index('uq_company_invitation_pending_company_email', ['companyId', 'email'], {
+  unique: true,
+  where: `"status" = 'pending'`,
+})
 export class CompanyInvitation
   extends BaseCustomEntity
   implements ICompanyInvitationEntity
@@ -21,7 +25,11 @@ export class CompanyInvitation
   @Column({ name: 'company_id', type: 'varchar', length: 26 })
   companyId!: string;
   @ManyToOne(() => Company, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'company_id', referencedColumnName: 'id' })
+  @JoinColumn({
+    name: 'company_id',
+    referencedColumnName: 'id',
+    foreignKeyConstraintName: 'FK_company_invitation_company',
+  })
   company!: Company;
 
   @Column({ name: 'invited_by_company_user_id', type: 'varchar', length: 26 })
@@ -30,17 +38,18 @@ export class CompanyInvitation
   @JoinColumn({
     name: 'invited_by_company_user_id',
     referencedColumnName: 'id',
+    foreignKeyConstraintName: 'FK_company_invitation_inviter',
   })
   CompanyUser!: CompanyUser;
 
   @Column({ name: 'email', type: 'citext' })
   email!: string;
 
-  @Column({ name: 'first_name', type: 'varchar', length: 100 })
-  firstName!: string;
+  @Column({ name: 'first_name', type: 'varchar', length: 100, nullable: true })
+  firstName!: string | null;
 
-  @Column({ name: 'last_name', type: 'varchar', length: 100 })
-  lastName!: string;
+  @Column({ name: 'last_name', type: 'varchar', length: 100, nullable: true })
+  lastName!: string | null;
 
   @Column({ name: 'company_role', type: 'enum', enum: EInvitationRole })
   companyRole!: EInvitationRole;
@@ -56,8 +65,8 @@ export class CompanyInvitation
 
   @Column({
     name: 'status',
-    type: 'enum',
-    enum: EInvitationStatus,
+    type: 'varchar',
+    length: 20,
     default: EInvitationStatus.PENDING,
   })
   status!: EInvitationStatus;

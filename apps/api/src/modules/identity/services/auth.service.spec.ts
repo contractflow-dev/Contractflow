@@ -190,4 +190,20 @@ describe('AuthService', () => {
     ).rejects.toThrow('Verify your email before signing in.');
     expect(sessions.save).not.toHaveBeenCalled();
   });
+
+  it('revokes an active session and treats repeated logout as a no-op', async () => {
+    const session = { revokedAt: null };
+    sessions.findOne
+      .mockResolvedValueOnce(session)
+      .mockResolvedValueOnce(null);
+
+    await service.logout('session-token');
+    expect(session.revokedAt).toBeInstanceOf(Date);
+    expect(sessions.save).toHaveBeenCalledOnce();
+    expect(sessions.save).toHaveBeenCalledWith(session);
+
+    await expect(service.logout('session-token')).resolves.toBeUndefined();
+    expect(sessions.findOne).toHaveBeenCalledTimes(2);
+    expect(sessions.save).toHaveBeenCalledOnce();
+  });
 });

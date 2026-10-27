@@ -30,10 +30,10 @@ import { TYPEORM_EXECUTION_SAFETY } from './common/database/typeorm-execution-op
           type: 'postgres' as const,
           url: config.getOrThrow<string>('DATABASE_URL'),
           autoLoadEntities: true,
-          ...TYPEORM_EXECUTION_SAFETY,
           synchronize: !isProd || config.get('DB_SYNC') === 'true',
           ssl: isProd ? { rejectUnauthorized: false } : false,
           extra: isProd ? { ssl: { rejectUnauthorized: false } } : {},
+          ...TYPEORM_EXECUTION_SAFETY,
         };
       },
     }),

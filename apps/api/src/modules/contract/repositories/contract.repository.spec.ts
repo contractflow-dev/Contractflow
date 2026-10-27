@@ -1,5 +1,7 @@
 import { ForbiddenException } from '@nestjs/common';
+import { getMetadataArgsStorage } from 'typeorm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Contract } from '../entities/contract.entity';
 import { ContractRepository } from './contract.repository';
 
 function createQb() {
@@ -68,6 +70,34 @@ describe('ContractRepository', () => {
     });
     expect(qb.skip).toHaveBeenCalledWith(5);
     expect(qb.take).toHaveBeenCalledWith(5);
+  });
+
+  it('maps archived-contract creator filtering to the declared creator column', async () => {
+    await repository.searchPage(
+      { companyId: 'co-1' },
+      { includeDeleted: true, creatorCompanyId: 'co-1' },
+    );
+
+    const creatorColumn = getMetadataArgsStorage().columns.find(
+      ({ target, propertyName }) =>
+        target === Contract && propertyName === 'createdByCompanyId',
+    );
+    const creatorRelation = getMetadataArgsStorage().relations.find(
+      ({ target, propertyName }) =>
+        target === Contract && propertyName === 'createdByCompany',
+    );
+    expect(creatorColumn?.options.name).toBe('created_by_company_id');
+    expect(creatorColumn?.options.nullable).toBe(true);
+    expect(creatorRelation?.options).toEqual(
+      expect.objectContaining({ nullable: true, onDelete: 'RESTRICT' }),
+    );
+    expect(qb.andWhere).toHaveBeenCalledWith(
+      'contract.createdByCompanyId = :creatorCompanyId',
+      { creatorCompanyId: 'co-1' },
+    );
+    expect(sub.andWhere).toHaveBeenCalledWith(
+      'scope_party.companyId = :__scopeCompanyId',
+    );
   });
 
   it('refuses a blank company scope', async () => {

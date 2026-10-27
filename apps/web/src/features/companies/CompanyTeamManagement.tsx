@@ -31,11 +31,7 @@ import {
   EmptyDescription,
   EmptyHeader,
 } from "@workspace/ui/components/empty";
-import {
-  Field,
-  FieldGroup,
-  FieldLabel,
-} from "@workspace/ui/components/field";
+import { Field, FieldGroup, FieldLabel } from "@workspace/ui/components/field";
 import { Input } from "@workspace/ui/components/input";
 import {
   NativeSelect,
@@ -70,7 +66,9 @@ const memberName = (member: CompanyMember) =>
 export function CompanyTeamManagement({ companyId }: { companyId: string }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
-  const [roleDrafts, setRoleDrafts] = useState<Record<string, ECompanyRole>>({});
+  const [roleDrafts, setRoleDrafts] = useState<Record<string, ECompanyRole>>(
+    {},
+  );
   const [memberToRemove, setMemberToRemove] = useState<CompanyMember | null>(
     null,
   );
@@ -119,8 +117,6 @@ export function CompanyTeamManagement({ companyId }: { companyId: string }) {
     const formData = new FormData(event.currentTarget);
     const invitation = {
       email: String(formData.get("email") ?? "").trim(),
-      firstName: String(formData.get("firstName") ?? "").trim(),
-      lastName: String(formData.get("lastName") ?? "").trim(),
       companyRole: String(formData.get("companyRole")) as EInvitationRole,
     };
     try {
@@ -163,7 +159,9 @@ export function CompanyTeamManagement({ companyId }: { companyId: string }) {
         companyId,
         membershipId: memberToRemove.id,
       }).unwrap();
-      setFeedback(`${memberName(memberToRemove)} no longer has company access.`);
+      setFeedback(
+        `${memberName(memberToRemove)} no longer has company access.`,
+      );
       setMemberToRemove(null);
     } catch (error) {
       setFailure(getApiErrorMessage(error, "Unable to remove this member."));
@@ -213,7 +211,11 @@ export function CompanyTeamManagement({ companyId }: { companyId: string }) {
 
       <Card>
         <CardHeader>
-          <CardTitle role="heading" aria-level={2} className="text-lg font-semibold">
+          <CardTitle
+            role="heading"
+            aria-level={2}
+            className="text-lg font-semibold"
+          >
             Invite a team member
           </CardTitle>
           <CardDescription>
@@ -225,18 +227,6 @@ export function CompanyTeamManagement({ companyId }: { companyId: string }) {
             onSubmit={(event) => void submitInvitation(event)}
             className="grid gap-4 sm:grid-cols-2"
           >
-            <InviteField
-              id={`${formId}-firstName`}
-              label="First name"
-              name="firstName"
-              required
-            />
-            <InviteField
-              id={`${formId}-lastName`}
-              label="Last name"
-              name="lastName"
-              required
-            />
             <InviteField
               id={`${formId}-email`}
               label="Email"
@@ -275,7 +265,11 @@ export function CompanyTeamManagement({ companyId }: { companyId: string }) {
 
       <Card>
         <CardHeader>
-          <CardTitle role="heading" aria-level={2} className="text-lg font-semibold">
+          <CardTitle
+            role="heading"
+            aria-level={2}
+            className="text-lg font-semibold"
+          >
             Company members
           </CardTitle>
           <CardDescription>
@@ -313,14 +307,19 @@ export function CompanyTeamManagement({ companyId }: { companyId: string }) {
                 <NativeSelectOption value="inactive">
                   Inactive members
                 </NativeSelectOption>
-                <NativeSelectOption value="all">All statuses</NativeSelectOption>
+                <NativeSelectOption value="all">
+                  All statuses
+                </NativeSelectOption>
               </NativeSelect>
             </Field>
           </FieldGroup>
           {membersError ? (
             <Alert variant="destructive">
               <AlertDescription>
-                {getApiErrorMessage(membersError, "Unable to load team members.")}
+                {getApiErrorMessage(
+                  membersError,
+                  "Unable to load team members.",
+                )}
               </AlertDescription>
             </Alert>
           ) : membersFetching && !members ? (
@@ -364,7 +363,10 @@ export function CompanyTeamManagement({ companyId }: { companyId: string }) {
                       <TableCell>
                         {active ? (
                           <div className="flex items-center gap-2">
-                            <label className="sr-only" htmlFor={`role-${member.id}`}>
+                            <label
+                              className="sr-only"
+                              htmlFor={`role-${member.id}`}
+                            >
                               Role for {memberName(member)}
                             </label>
                             <NativeSelect
@@ -373,7 +375,8 @@ export function CompanyTeamManagement({ companyId }: { companyId: string }) {
                               onChange={(event) =>
                                 setRoleDrafts((current) => ({
                                   ...current,
-                                  [member.id]: event.target.value as ECompanyRole,
+                                  [member.id]: event.target
+                                    .value as ECompanyRole,
                                 }))
                               }
                               className="max-w-56"
@@ -438,7 +441,11 @@ export function CompanyTeamManagement({ companyId }: { companyId: string }) {
 
       <Card>
         <CardHeader>
-          <CardTitle role="heading" aria-level={2} className="text-lg font-semibold">
+          <CardTitle
+            role="heading"
+            aria-level={2}
+            className="text-lg font-semibold"
+          >
             Invitations
           </CardTitle>
           <CardDescription>
@@ -464,7 +471,9 @@ export function CompanyTeamManagement({ companyId }: { companyId: string }) {
           ) : !invitations?.length ? (
             <Empty className="border border-dashed">
               <EmptyHeader>
-                <EmptyDescription>No invitations have been sent.</EmptyDescription>
+                <EmptyDescription>
+                  No invitations have been sent.
+                </EmptyDescription>
               </EmptyHeader>
             </Empty>
           ) : (
@@ -475,7 +484,11 @@ export function CompanyTeamManagement({ companyId }: { companyId: string }) {
                   <div className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="font-medium">
-                        {invitation.firstName} {invitation.lastName} ·{" "}
+                        {invitation.firstName || invitation.lastName
+                          ? `${[invitation.firstName, invitation.lastName]
+                              .filter(Boolean)
+                              .join(" ")} · `
+                          : ""}
                         {invitation.email}
                       </p>
                       <p className="text-sm text-muted-foreground">

@@ -1,13 +1,30 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import type { EContractStatus } from '@contractflow/contracts-schema';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { DataSource, IsNull } from 'typeorm';
+import {
+  ECompanyRole,
+  ECompanyUserStatus,
+  type EContractStatus,
+} from '@contractflow/contracts-schema';
 import type { IContractScope } from '../../../common/database/repositories/contract-scope.interface';
 import type { ICompanyScope } from '../../../common/database/repositories/company-scope.interface';
 import { CompanyScopeService } from '../../identity/services/company-scope.service';
+import { CompanyUser } from '../../identity/entities/company-user.entity';
 import { Contract } from '../entities/contract.entity';
 import { ContractParty } from '../entities/contract-party.entity';
+import { ContractWorkspaceEntity } from '../entities/contract-workspace.entity';
 import { ContractPartyRepository } from '../repositories/contract-party.repository';
 import { ContractRepository } from '../repositories/contract.repository';
-import { ContractStatusHistoryRepository } from '../repositories/contract-status-history.repository';
+import {
+  ContractStatusHistoryRepository,
+  type ContractStatusHistoryFilter,
+} from '../repositories/contract-status-history.repository';
+import { ContractStatusHistory } from '../entities/contract-status-history.entity';
+import type { AssignableContractWorkspace } from './contract-workspace';
 
 export interface Page<T> {
   items: T[];
@@ -24,6 +41,14 @@ export interface PageQuery {
 export interface ListContractsQuery extends PageQuery {
   search?: string;
   status?: EContractStatus;
+  includeDeleted?: boolean;
+}
+
+export interface ListContractStatusHistoryQuery extends PageQuery {
+  fromDate?: string;
+  toDate?: string;
+  status?: EContractStatus;
+  userId?: string;
 }
 
 export interface ContractPartySummary {
@@ -59,6 +84,7 @@ export class ContractService {
     private readonly parties: ContractPartyRepository,
     private readonly statusHistory: ContractStatusHistoryRepository,
     private readonly contracts: ContractRepository,
+    private readonly dataSource: DataSource,
   ) {}
 
   async list(
@@ -67,9 +93,28 @@ export class ContractService {
     query: ListContractsQuery,
   ): Promise<Page<Contract>> {
     const scope = await this.companyScope.forUser(userId, companyId);
+    if (query.includeDeleted) {
+      const membership = await this.dataSource
+        .getRepository(CompanyUser)
+        .findOne({
+          where: {
+            userId,
+            companyId: scope.companyId,
+            status: ECompanyUserStatus.ACTIVE,
+            leftAt: IsNull(),
+          },
+        });
+      if (membership?.companyRole !== ECompanyRole.COMPANY_ADMIN) {
+        throw new ForbiddenException(
+          'Only the creating company administrator can list archived contracts.',
+        );
+      }
+    }
     const result = await this.contracts.searchPage(scope, {
       search: query.search,
       status: query.status,
+      includeDeleted: query.includeDeleted,
+      creatorCompanyId: query.includeDeleted ? scope.companyId : undefined,
       skip: offset(query),
       take: query.limit,
     });
@@ -114,7 +159,7 @@ export class ContractService {
     userId: string,
     companyId: string,
     contractId: string,
-    query: PageQuery,
+    query: ListContractStatusHistoryQuery,
   ) {
     const { contractScope } = await this.requireMembership(
       userId,
@@ -122,11 +167,49 @@ export class ContractService {
       contractId,
     );
 
-    const result = await this.statusHistory.findPage(contractScope, {
+    if (
+      query.fromDate &&
+      query.toDate &&
+      new Date(query.fromDate).getTime() > new Date(query.toDate).getTime()
+    ) {
+      throw new BadRequestException(
+        'The history start date must not be after the end date.',
+      );
+    }
+    const filter: ContractStatusHistoryFilter = {
+      fromDate: query.fromDate,
+      toDate: query.toDate
+        ? normalizeEndDate(query.toDate)
+        : undefined,
+      status: query.status,
+      userId: query.userId,
       skip: offset(query),
       take: query.limit,
-    });
-    return toPage(result, query);
+    };
+    const result = await this.statusHistory.searchPage(contractScope, filter);
+    return {
+      ...toPage(result, query),
+      items: result.items.map(toHistorySummary),
+    };
+  }
+
+  async listWorkspaces(
+    userId: string,
+    companyId: string,
+    contractId: string,
+  ): Promise<AssignableContractWorkspace[]> {
+    const { contractScope } = await this.requireMembership(
+      userId,
+      companyId,
+      contractId,
+    );
+    const workspaces = await this.dataSource
+      .getRepository(ContractWorkspaceEntity)
+      .find({
+        where: { contractId: contractScope.contractId },
+        order: { workspace: 'ASC' },
+      });
+    return workspaces.map(({ workspace }) => workspace);
   }
 
   // ---------------------------------------------------------------------
@@ -155,6 +238,10 @@ export class ContractService {
       contractScope,
     );
     if (!membership) {
+      throw contractNotFound();
+    }
+    const contract = await this.contracts.findById(contractId, companyScope);
+    if (!contract) {
       throw contractNotFound();
     }
     return { companyScope, membership, contractScope };
@@ -192,5 +279,30 @@ function toPartySummary(party: ContractParty): ContractPartySummary {
     companyName: party.company.name,
     partyType: party.partyType,
     signedAt: party.signedAt,
+  };
+}
+
+function normalizeEndDate(value: string): string {
+  return value.length === 10
+    ? `${value}T23:59:59.999Z`
+    : value;
+}
+
+function toHistorySummary(history: ContractStatusHistory) {
+  return {
+    id: history.id,
+    contractId: history.contractId,
+    fromStatus: history.fromStatus,
+    toStatus: history.toStatus,
+    reason: history.reason,
+    changedById: history.changedById,
+    changedAt: history.changedAt,
+    changedBy: history.changedBy
+      ? {
+          userId: history.changedBy.userId,
+          firstName: history.changedBy.user?.firstName ?? '',
+          lastName: history.changedBy.user?.lastName ?? '',
+        }
+      : null,
   };
 }

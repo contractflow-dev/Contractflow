@@ -41,8 +41,68 @@ export class MailService {
 
     const invitationUrl = new URL('/invitations/respond', webUrl);
     invitationUrl.searchParams.set('token', token);
-    const text = `You have been invited to join ${companyName} on ContractFlow as ${role}.\n\nSign in or create an account using this email address, then review the invitation here: ${invitationUrl.toString()}\n\nThis invitation expires in 7 days and can only be used once.`;
+    const text = `Hello,\n\nYou have been invited to join ${companyName} on ContractFlow as ${role}.\n\nSign in or create an account using this email address, then review the invitation here: ${invitationUrl.toString()}\n\nThis invitation expires in 7 days and can only be used once.`;
     await this.sendEmail(email, `Invitation to join ${companyName}`, text);
+  }
+
+  async sendContractRoleInvitationEmail(
+    email: string,
+    contractTitle: string,
+    role: string,
+    workspace: string,
+    token: string,
+  ): Promise<void> {
+    const isProduction = this.config.get<string>('NODE_ENV') === 'production';
+    const webUrl =
+      this.config.get<string>('WEB_URL') ??
+      (isProduction ? undefined : 'http://localhost:3000');
+    if (!webUrl) {
+      throw new ServiceUnavailableException(
+        'Email delivery is not configured. Set WEB_URL.',
+      );
+    }
+
+    const invitationUrl = new URL('/invitations/contract-role', webUrl);
+    invitationUrl.searchParams.set('token', token);
+    const text =
+      `You have been invited to join the ${workspace} workspace for ${contractTitle} on ContractFlow as ${role}.\n\n` +
+      `Sign in using the invited email address to accept or decline: ${invitationUrl.toString()}\n\n` +
+      'This invitation expires in 7 days and can only be used once.';
+    await this.sendEmail(
+      email,
+      `Contract role invitation for ${contractTitle}`,
+      text,
+    );
+  }
+
+  async sendContractPartyInvitationEmail(
+    email: string,
+    contractTitle: string,
+    invitingCompanyName: string,
+    partyType: string,
+    token: string,
+  ): Promise<void> {
+    const isProduction = this.config.get<string>('NODE_ENV') === 'production';
+    const webUrl =
+      this.config.get<string>('WEB_URL') ??
+      (isProduction ? undefined : 'http://localhost:3000');
+    if (!webUrl) {
+      throw new ServiceUnavailableException(
+        'Email delivery is not configured. Set WEB_URL.',
+      );
+    }
+
+    const invitationUrl = new URL('/invitations/contract-party', webUrl);
+    invitationUrl.searchParams.set('token', token);
+    const text =
+      `${invitingCompanyName} invited your verified company to join ${contractTitle} as ${partyType} on ContractFlow.\n\n` +
+      `A Company Administrator can sign in and review the invitation here: ${invitationUrl.toString()}\n\n` +
+      'This invitation expires in 7 days and can only be used once.';
+    await this.sendEmail(
+      email,
+      `Contract invitation for ${contractTitle}`,
+      text,
+    );
   }
 
   private async sendEmail(

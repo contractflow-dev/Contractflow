@@ -1,6 +1,7 @@
 import {
   Entity,
   Column,
+  Index,
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
@@ -11,6 +12,7 @@ import { IContractPartyEntity } from '../interfaces/contract-party.interface';
 import { EPartyType } from '@contractflow/contracts-schema';
 
 @Entity('contract_party')
+@Index('uq_contract_party_id_company', ['id', 'companyId'], { unique: true })
 export class ContractParty extends BaseCustomEntity implements IContractPartyEntity
 {
   @Column({ name: 'contract_id', type: 'varchar', length: 26 })
@@ -28,15 +30,30 @@ export class ContractParty extends BaseCustomEntity implements IContractPartyEnt
   @Column({ name: 'party_type', type: 'enum', enum: EPartyType })
   partyType!: EPartyType;
 
-  @Column({ name: 'signatory_first_name', type: 'varchar', length: 100 })
-  signatoryFirstName!: string;
+  @Column({
+    name: 'signatory_first_name',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  signatoryFirstName!: string | null;
 
-  @Column({ name: 'signatory_last_name', type: 'varchar', length: 100 })
-  signatoryLastName!: string;
+  @Column({
+    name: 'signatory_last_name',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  signatoryLastName!: string | null;
 
-  @Column({ name: 'signatory_title', type: 'varchar', length: 150 })
-  signatoryTitle!: string;
+  @Column({
+    name: 'signatory_title',
+    type: 'varchar',
+    length: 150,
+    nullable: true,
+  })
+  signatoryTitle!: string | null;
 
-  @Column({ name: 'signed_at', type: 'timestamptz' })
-  signedAt!: Date;
+  @Column({ name: 'signed_at', type: 'timestamptz', nullable: true })
+  signedAt!: Date | null;
 }

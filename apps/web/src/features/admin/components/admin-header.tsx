@@ -1,10 +1,8 @@
 "use client";
 
 import React from "react";
-import { useRouter } from "next/navigation";
 import {
   RiMenuLine,
-  RiLogoutBoxRLine,
   RiShieldCheckLine,
   RiUserLine,
 } from "@remixicon/react";
@@ -13,26 +11,15 @@ import { Button } from "@workspace/ui/components/button";
 import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar";
 import { Separator } from "@workspace/ui/components/separator";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
-import { useGetCurrentUserQuery, useLogoutMutation } from "@/services/authApi";
+import { SignOutAction } from "@/components/auth/sign-out-action";
+import { useGetCurrentUserQuery } from "@/services/authApi";
 
 interface AdminHeaderProps {
   onToggleMobileNav: () => void;
 }
 
 export function AdminHeader({ onToggleMobileNav }: AdminHeaderProps) {
-  const router = useRouter();
   const { data: user } = useGetCurrentUserQuery();
-  const [logout, { isLoading: isLoggingOut }] = useLogoutMutation();
-
-  const handleLogout = async () => {
-    try {
-      await logout().unwrap();
-    } catch {
-      // Ignored: clear session locally regardless
-    } finally {
-      router.replace("/login");
-    }
-  };
 
   const displayName = user
     ? `${user.firstName} ${user.lastName}`.trim()
@@ -89,17 +76,7 @@ export function AdminHeader({ onToggleMobileNav }: AdminHeaderProps) {
 
         <ThemeToggle />
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleLogout}
-          disabled={isLoggingOut}
-          className="gap-1.5 text-xs text-muted-foreground hover:text-destructive hover:border-destructive/30"
-          title="Sign out of ContractFlow"
-        >
-          <RiLogoutBoxRLine className="size-4" />
-          <span className="hidden sm:inline">Sign out</span>
-        </Button>
+        <SignOutAction />
       </div>
     </header>
   );

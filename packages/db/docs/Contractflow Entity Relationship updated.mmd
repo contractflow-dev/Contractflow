@@ -3,6 +3,7 @@ erDiagram
     COMPANY ||--o{ COMPANY_USER : "employs"
     APP_USER ||--o{ COMPANY_USER : "is member as"
     COMPANY ||--o{ COMPANY_INVITATION : "issues"
+    COMPANY ||--o{ CONTRACT : "creates"
     COMPANY_USER ||--o{ COMPANY_INVITATION : "sends"
     CONTRACT ||--|{ CONTRACT_PARTY : "has parties"
     COMPANY ||--o{ CONTRACT_PARTY : "participates as"
@@ -155,6 +156,7 @@ erDiagram
         date actual_completion_date "nullable"
         int defects_liability_days "e.g. 365"
         varchar(64) timezone "IANA, decides what 'today' means for due dates"
+        varchar(26) created_by_company_id FK "nullable, company that created the contract"
     }
     CONTRACT_PARTY {
         uuid id PK
@@ -605,4 +607,3 @@ erDiagram
         timestamptz edited_at "nullable"
         timestamptz deleted_at "nullable, soft delete"
     }
-

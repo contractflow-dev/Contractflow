@@ -46,6 +46,14 @@ export class EnvVars {
   @Max(65535)
   PORT: number = 3001;
 
+  @Transform(({ value }) =>
+    value === undefined || value === '' ? 30 : Number(value),
+  )
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  COMPANY_DASHBOARD_EXPIRY_WINDOW_DAYS: number = 30;
+
   @Matches(/^postgres(ql)?:\/\//, {
     message: 'DATABASE_URL must start with postgres://',
   })
