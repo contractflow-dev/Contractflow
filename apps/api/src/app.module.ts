@@ -12,6 +12,7 @@ import { HseModule } from './modules/hse/hse.module';
 import { SiteOperationsModule } from './modules/site-operations/site-operations.module';
 import { EnvVars, NodeEnv, validateEnv } from './config/env.validation';
 import { HealthController } from './health.controller';
+import { TYPEORM_EXECUTION_SAFETY } from './common/database/typeorm-execution-options';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { HealthController } from './health.controller';
           type: 'postgres' as const,
           url: config.getOrThrow<string>('DATABASE_URL'),
           autoLoadEntities: true,
+          ...TYPEORM_EXECUTION_SAFETY,
           synchronize: !isProd || config.get('DB_SYNC') === 'true',
           ssl: isProd ? { rejectUnauthorized: false } : false,
           extra: isProd ? { ssl: { rejectUnauthorized: false } } : {},
