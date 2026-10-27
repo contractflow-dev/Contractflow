@@ -2,6 +2,7 @@ import { api } from "@/services/api";
 import type {
   ECompanyUserStatus,
   ECompanyRole,
+  EContractStatus,
   EInvitationRole,
   EInvitationStatus,
 } from "@contractflow/contracts-schema";
@@ -39,12 +40,25 @@ export interface CompanyAccess {
 }
 
 export interface CompanyDashboard extends CompanyAccess {
+  expiryWindowDays: number;
   summary: {
     activeMembershipCount: number;
     pendingInvitationCount: number;
+    totalContractCount: number;
     activeContractCount: number;
     expiringContractCount: number;
   };
+  expiringContracts: CompanyDashboardContract[];
+  recentlyUpdatedContracts: CompanyDashboardContract[];
+}
+
+export interface CompanyDashboardContract {
+  id: string;
+  referenceNumber: string;
+  title: string;
+  status: EContractStatus;
+  endDate: string | null;
+  updatedAt: string;
 }
 
 export type CreateCompanyRequest = Omit<CompanyProfile, "id" | "status">;
@@ -75,8 +89,8 @@ export interface CompanyMembersPage {
 export interface CompanyInvitation {
   id: string;
   email: string;
-  firstName: string;
-  lastName: string;
+  firstName: string | null;
+  lastName: string | null;
   companyRole: EInvitationRole;
   status: EInvitationStatus | "expired" | "revoked";
   expiresAt: string;
@@ -93,8 +107,6 @@ export interface CompanyInvitationsPage {
 
 export interface InviteCompanyMemberRequest {
   email: string;
-  firstName: string;
-  lastName: string;
   companyRole: EInvitationRole;
 }
 
@@ -146,10 +158,7 @@ export const companiesApi = api.injectEndpoints({
           : [{ type: "Company", id: "CURRENT" }],
     }),
 
-    getCompanyMembership: builder.query<
-      CompanyMembership,
-      { companyId: string }
-    >({
+    getCompanyMembership: builder.query<CompanyAccess, { companyId: string }>({
       query: ({ companyId }) =>
         `/companies/${encodeURIComponent(companyId)}/membership`,
       providesTags: (_result, _error, { companyId }) => [
@@ -239,6 +248,8 @@ export const companiesApi = api.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, { companyId }) => [
         { type: "CompanyMember", id: companyId },
+        { type: "Company", id: "LIST" },
+        { type: "Dashboard", id: companyId },
       ],
     }),
 

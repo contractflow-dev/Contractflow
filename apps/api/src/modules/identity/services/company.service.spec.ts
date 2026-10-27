@@ -1,4 +1,5 @@
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import type { ConfigService } from '@nestjs/config';
 import type { DataSource, EntityManager, Repository } from 'typeorm';
 import { getMetadataArgsStorage } from 'typeorm';
 import {
@@ -57,6 +58,8 @@ describe('CompanyService', () => {
   let membershipRepository: Record<string, ReturnType<typeof vi.fn>>;
   let invitationRepository: Record<string, ReturnType<typeof vi.fn>>;
   let contractPartyRepository: Record<string, ReturnType<typeof vi.fn>>;
+  let contractQueryBuilder: Record<string, ReturnType<typeof vi.fn>>;
+  let configService: { get: ReturnType<typeof vi.fn> };
   let transaction: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -87,20 +90,36 @@ describe('CompanyService', () => {
     };
     const queryBuilder = {
       innerJoin: vi.fn(),
+      distinct: vi.fn(),
       select: vi.fn(),
+      addSelect: vi.fn(),
       where: vi.fn(),
       andWhere: vi.fn(),
+      orderBy: vi.fn(),
+      addOrderBy: vi.fn(),
+      take: vi.fn(),
       getRawOne: vi
         .fn()
+        .mockResolvedValueOnce({ count: '7' })
         .mockResolvedValueOnce({ count: '4' })
         .mockResolvedValueOnce({ count: '1' }),
+      getRawMany: vi.fn().mockResolvedValue([]),
     };
     queryBuilder.innerJoin.mockReturnValue(queryBuilder);
+    queryBuilder.distinct.mockReturnValue(queryBuilder);
     queryBuilder.select.mockReturnValue(queryBuilder);
+    queryBuilder.addSelect.mockReturnValue(queryBuilder);
     queryBuilder.where.mockReturnValue(queryBuilder);
     queryBuilder.andWhere.mockReturnValue(queryBuilder);
+    queryBuilder.orderBy.mockReturnValue(queryBuilder);
+    queryBuilder.addOrderBy.mockReturnValue(queryBuilder);
+    queryBuilder.take.mockReturnValue(queryBuilder);
     contractPartyRepository = {
       createQueryBuilder: vi.fn().mockReturnValue(queryBuilder),
+    };
+    contractQueryBuilder = queryBuilder;
+    configService = {
+      get: vi.fn().mockReturnValue(30),
     };
     const manager = {
       getRepository: (
@@ -117,6 +136,7 @@ describe('CompanyService', () => {
         work(manager as unknown as EntityManager),
     );
     service = new CompanyService(
+      configService as unknown as ConfigService,
       { transaction } as unknown as DataSource,
       membershipRepository as unknown as Repository<CompanyUser>,
       invitationRepository as unknown as CompanyInvitationRepository,
@@ -218,6 +238,7 @@ describe('CompanyService', () => {
       }),
     );
     expect(membershipRepository.count).not.toHaveBeenCalled();
+    expect(contractPartyRepository.createQueryBuilder).not.toHaveBeenCalled();
 
     membershipRepository.findOne.mockResolvedValueOnce(null);
     await expect(
@@ -236,6 +257,30 @@ describe('CompanyService', () => {
     });
     membershipRepository.count.mockResolvedValue(3);
 
+    const queryBuilder = contractQueryBuilder;
+    const expiringRows = [
+      {
+        id: 'contract-expiring',
+        referenceNumber: 'CTR-EXP-1',
+        title: 'Expiring contract',
+        status: EContractStatus.ACTIVE,
+        endDate: '2026-11-01',
+        updatedAt: '2026-10-20T09:00:00.000Z',
+      },
+    ];
+    queryBuilder.getRawMany
+      .mockResolvedValueOnce(expiringRows)
+      .mockResolvedValueOnce([
+        {
+          id: 'contract-recent',
+          referenceNumber: 'CTR-RECENT-1',
+          title: 'Recently updated contract',
+          status: EContractStatus.DRAFT,
+          endDate: null,
+          updatedAt: new Date('2026-10-21T09:00:00.000Z'),
+        },
+      ]);
+
     await expect(
       service.getDashboard('admin-user', companyData.id),
     ).resolves.toMatchObject({
@@ -244,9 +289,26 @@ describe('CompanyService', () => {
       summary: {
         activeMembershipCount: 3,
         pendingInvitationCount: 2,
+        totalContractCount: 7,
         activeContractCount: 4,
         expiringContractCount: 1,
       },
+      expiryWindowDays: 30,
+      expiringContracts: [
+        {
+          id: 'contract-expiring',
+          referenceNumber: 'CTR-EXP-1',
+          endDate: '2026-11-01',
+        },
+      ],
+      recentlyUpdatedContracts: [
+        {
+          id: 'contract-recent',
+          referenceNumber: 'CTR-RECENT-1',
+          endDate: null,
+          updatedAt: '2026-10-21T09:00:00.000Z',
+        },
+      ],
     });
     expect(membershipRepository.count).toHaveBeenCalledWith({
       where: {
@@ -258,24 +320,125 @@ describe('CompanyService', () => {
     expect(invitationRepository.countPending).toHaveBeenCalledWith({
       companyId: companyData.id,
     });
-    expect(contractPartyRepository.createQueryBuilder).toHaveBeenCalledTimes(2);
+    expect(contractPartyRepository.createQueryBuilder).toHaveBeenCalledTimes(5);
+    expect(queryBuilder.where).toHaveBeenCalledTimes(5);
+    for (const [index] of queryBuilder.where.mock.calls.entries()) {
+      expect(queryBuilder.where).toHaveBeenNthCalledWith(
+        index + 1,
+        'party.companyId = :companyId',
+        {
+          companyId: companyData.id,
+        },
+      );
+    }
     expect(
       contractPartyRepository.createQueryBuilder.mock.results[0].value.where,
     ).toHaveBeenCalledWith('party.companyId = :companyId', {
       companyId: companyData.id,
     });
-    expect(
-      contractPartyRepository.createQueryBuilder.mock.results[0].value.andWhere,
-    ).toHaveBeenCalledWith('contract.status = :status', {
-      status: EContractStatus.ACTIVE,
+    const expiringCountQuery =
+      contractPartyRepository.createQueryBuilder.mock.results[2].value;
+    expect(expiringCountQuery.andWhere).toHaveBeenCalledWith(
+      'contract.status = :status',
+      {
+        status: EContractStatus.ACTIVE,
+      },
+    );
+    expect(expiringCountQuery.andWhere).toHaveBeenCalledWith(
+      'COALESCE(contract.revisedEndDate, contract.endDate) BETWEEN :today AND :expiryLimit',
+      expect.objectContaining({
+        today: expect.any(String),
+        expiryLimit: expect.any(String),
+      }),
+    );
+    expect(queryBuilder.where).toHaveBeenCalledWith(
+      'party.companyId = :companyId',
+      { companyId: companyData.id },
+    );
+    expect(queryBuilder.orderBy).toHaveBeenCalledWith(
+      'COALESCE(contract.revisedEndDate, contract.endDate)',
+      'ASC',
+    );
+    expect(queryBuilder.take).toHaveBeenCalledWith(5);
+    expect(queryBuilder.take).toHaveBeenCalledTimes(2);
+    const recentQuery =
+      contractPartyRepository.createQueryBuilder.mock.results[4].value;
+    expect(recentQuery.andWhere).toHaveBeenCalledWith(
+      'contract.updatedAt >= :updatedSince',
+      { updatedSince: expect.any(Date) },
+    );
+    expect(recentQuery.orderBy).toHaveBeenCalledWith(
+      'contract.updatedAt',
+      'DESC',
+    );
+  });
+
+  it('returns empty contract lists when the company has no matching contracts', async () => {
+    membershipRepository.findOne.mockResolvedValue({
+      id: 'membership-id',
+      companyId: companyData.id,
+      companyRole: ECompanyRole.COMPANY_ADMIN,
+      status: ECompanyUserStatus.ACTIVE,
+      leftAt: null,
+      company: companyData,
     });
+    membershipRepository.count.mockResolvedValue(1);
+    contractQueryBuilder.getRawOne
+      .mockReset()
+      .mockResolvedValueOnce({ count: '0' })
+      .mockResolvedValueOnce({ count: '0' })
+      .mockResolvedValueOnce({ count: '0' });
+
+    const result = await service.getDashboard('admin-user', companyData.id);
+
+    expect(result.summary.totalContractCount).toBe(0);
+    expect(result.summary.activeContractCount).toBe(0);
+    expect(result.summary.expiringContractCount).toBe(0);
+    expect(result.expiringContracts).toEqual([]);
+    expect(result.recentlyUpdatedContracts).toEqual([]);
+  });
+
+  it('uses the configured contract expiry window in the response and filter', async () => {
+    membershipRepository.findOne.mockResolvedValue({
+      id: 'membership-id',
+      companyId: companyData.id,
+      companyRole: ECompanyRole.COMPANY_ADMIN,
+      status: ECompanyUserStatus.ACTIVE,
+      leftAt: null,
+      company: companyData,
+    });
+    membershipRepository.count.mockResolvedValue(1);
+    configService.get.mockReturnValue(45);
+
+    const result = await service.getDashboard('admin-user', companyData.id);
+    const dateFilter = contractQueryBuilder.andWhere.mock.calls.find(
+      ([condition]) => condition.includes('BETWEEN :today AND :expiryLimit'),
+    );
+    if (!dateFilter) {
+      throw new Error('Expected the dashboard expiry date filter');
+    }
+    const { today, expiryLimit } = dateFilter[1] as {
+      today: string;
+      expiryLimit: string;
+    };
+
+    expect(result.expiryWindowDays).toBe(45);
+    expect(configService.get).toHaveBeenCalledWith(
+      'COMPANY_DASHBOARD_EXPIRY_WINDOW_DAYS',
+      30,
+    );
+    expect(
+      (Date.parse(`${expiryLimit}T00:00:00Z`) -
+        Date.parse(`${today}T00:00:00Z`)) /
+        86400000,
+    ).toBe(45);
   });
 
   it('reports an existing database-level unique membership index', () => {
     const index = getMetadataArgsStorage().indices.find(
       (item) =>
         item.target === CompanyUser &&
-        item.name === 'uq_company_user_company_user',
+        item.name === 'uq_company_user_active_company_user',
     );
     expect(index?.unique).toBe(true);
   });

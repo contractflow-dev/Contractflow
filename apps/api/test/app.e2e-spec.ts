@@ -21,5 +21,5 @@ describe('Health (e2e)', () => {
     request(app.getHttpServer())
       .get('/health')
       .expect(200)
-      .expect({ status: 'ok' }));
+      .expect({ status: 'ok', service: 'contractflow-api' }));
 });

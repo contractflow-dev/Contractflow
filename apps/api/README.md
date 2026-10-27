@@ -53,15 +53,162 @@ authenticated `GET /api/users/me`. Company endpoints are authenticated
 `GET /api/companies/:companyId/membership`, and the administrator-only
 `GET /api/companies/:companyId/dashboard`.
 
+The company-admin dashboard shows active contracts expiring within
+`COMPANY_DASHBOARD_EXPIRY_WINDOW_DAYS` days (default `30`, allowed range `1` to
+`365`) and up to five contracts updated in the last 30 days. Expiry uses the
+revised end date when present, otherwise the scheduled end date; contracts
+without an effective end date are not included in expiry results.
+
+Company Admins can manage active contract-role assignments with
+`GET /api/companies/:companyId/contracts/:contractId/role-assignments?workspace=project|hse|finance`,
+`POST` on the same path, and
+`DELETE /api/companies/:companyId/contracts/:contractId/role-assignments/:assignmentId`.
+The `POST` body contains `companyUserId` and `role`, and the role must belong to
+the selected workspace.
+Assignments are limited to active members of the actor's company and are
+audited; revocation preserves the assignment history. Workspace Admin is a
+separate privilege from representative roles, and contract-role invitations
+are accepted before they create an assignment. Contract creation, editing,
+workspace availability, archiving, restoration, and company-party invitations
+are restricted to a Company Admin of the creating company. Active project
+leads can transition contracts between draft/active/suspended/completed states;
+each transition requires a reason and writes status history and an activity
+event.
+
 The session guard is registered globally and protects routes by default.
 Only controllers or handlers explicitly marked public (currently the auth
 controller) bypass session validation; future API controllers must not opt out
 unless the endpoint is intentionally unauthenticated.
 
 Run `pnpm run migration:run` from `apps/api` to apply the TypeORM migrations
-before deploying schema changes. Company and initial-administrator rows are
-created within one transaction; the database unique index prevents duplicate
-company/user memberships.
+before deploying schema changes. The migration DataSource explicitly disables
+schema synchronization. The execution order is the identity bootstrap,
+authentication and company-admin migrations, the historical domain-schema
+migration, role-assignment corrections and invitation migrations, and finally
+the contract-lifecycle and company-invitation-expiry-index migrations. The
+identity bootstrap verifies the expected
+identity tables, columns, primary keys, foreign keys, and unique keys before it
+no-ops on an existing schema; partial or incompatible schemas fail with an
+actionable error. The later corrections remain after the historical domain
+migration because they depend on its contract tables. Validate migrations only
+against an isolated disposable PostgreSQL database; do not use a development
+or shared database as a migration test target. Company and
+initial-administrator rows are created within one transaction; the database
+unique index prevents duplicate company/user memberships.
+
+### Planning recovery for a mixed migration state
+
+The recovery planner is read-only. It never executes migrations, writes
+migration history, or repairs schema. It is deliberately separate from API
+startup and the normal migration commands.
+
+Set `MIGRATION_RECOVERY_DATABASE_URL` to the deliberate target and invoke the
+planner explicitly:
+
+```powershell
+$env:MIGRATION_RECOVERY_DATABASE_URL = "<operator-supplied-target-url>"
+pnpm --filter @contractflow/api migration:recovery:plan -- --plan
+```
+
+The planner requires both an explicit `MIGRATION_RECOVERY_DATABASE_URL` and a
+configured `DATABASE_URL`; it never uses `DATABASE_URL` as the recovery target.
+It refuses URLs with matching normalized host, port, and database identity,
+and rejects connection parameters that can override those identity fields.
+This is an offline comparison: it cannot resolve DNS aliases, prove that
+different hostnames do not reach the same PostgreSQL server, identify proxies,
+or prove physical server separation. Operators must independently identify the
+target before running the planner.
+
+The planner's DataSource explicitly sets `synchronize: false` and
+`migrationsRun: false`; API runtime and CLI DataSources do the same. The
+planner opens a repeatable-read, read-only transaction and emits sanitized
+target identity, migration history, schema probes, data-precheck counts, and
+the first unresolved migration. Do not put credentials in command arguments
+or logs.
+
+`CONFLICTING_OR_UNKNOWN` means the planner cannot prove every effect of a
+migration from its current manifest. It is not permission to mark the
+migration applied or to run a repair. At present, only
+`NullableActivityRequestContext1791882600002` and
+`CompanyInvitationExpiryIndex1792862700001` and
+`CompanyInvitationOptionalNames1793100000000` have complete structural
+verification. The other eight registered migrations are explicitly marked
+partial, and the planner fails closed for them even when the implemented
+probes pass. An incomplete probe blocks readiness because its result cannot
+prove the migration's full effects. No recovery execution is implemented.
+
+The planner's structural snapshot covers user schemas, relations, column
+definitions/defaults, constraints and validation state, indexes and catalog
+validity flags, enum labels/order, extensions, sequence definitions, and
+TypeORM migration-history structure and rows. It deliberately excludes
+ordinary table data (except migration-history rows), sequence current values,
+functions, triggers, and server-level configuration. A matching snapshot is
+not proof that data transformations or all database behavior are unchanged.
+
+PostgreSQL integration tests create and drop databases. They require deliberate
+configuration of `TEST_POSTGRES_URL`,
+`CONTRACTFLOW_RUN_DISPOSABLE_POSTGRES_TESTS=1`,
+`CONTRACTFLOW_DISPOSABLE_POSTGRES_ALLOWLIST=host:port`, `DATABASE_URL`,
+`CONTRACTFLOW_DISPOSABLE_POSTGRES_SYSTEM_IDENTIFIER`, and
+`CONTRACTFLOW_API_POSTGRES_SYSTEM_IDENTIFIER`. Obtain both PostgreSQL system
+identifiers independently from trusted infrastructure inventory; they must be
+different. Before creating any database, the harness opens a read-only
+transaction to the test endpoint, verifies the connected server's
+`pg_control_system().system_identifier`, and confirms it matches the approved
+disposable identifier and differs from the API server identifier. Failure to
+read or match the identity stops the test before destructive operations.
+
+The allowlisted test endpoint must also differ from the application endpoint.
+Tests create uniquely named `cf_plan_test_*` databases without dropping a
+pre-existing database; cleanup only drops database names successfully created
+and tracked by that test run. Offline hostname comparison cannot detect DNS
+aliases; the server-identifier comparison is an additional guard, not
+authorization to use a development, production, or shared server. The complete
+disposable server must be independently verified and isolated before opting in.
+When no integration-test settings are supplied, the PostgreSQL integration
+suite is skipped; a partially configured environment fails before connecting.
+Type-check the disposable test harness without changing the production build's
+TypeScript inputs by running `pnpm exec tsc -p tsconfig.test.json --noEmit`
+from `apps/api`.
+
+Before a database-specific recovery plan can be considered, independently
+verify a restorable backup, identify the target, and compare its actual schema,
+data preconditions, and migration history with every migration. Record missing,
+conflicting, and already-present effects and review a checkpointed sequence
+with rollback considerations. Any schema or migration-history mutation
+requires separate explicit approval. Do not use `migration:run` as a recovery
+mechanism on a mixed-state database.
+
+Example report fragment (illustrative and sanitized; not produced by a run
+against the configured development database):
+
+```json
+{
+  "mode": "read-only-plan",
+  "target": {
+    "database": "audited_scenario",
+    "schema": "public",
+    "serverAddress": "127.0.0.1",
+    "serverPort": 5432,
+    "databaseUser": "migration_planner"
+  },
+  "migrations": [
+    {
+      "name": "IdentitySchemaBootstrap1749000000000",
+      "recorded": false,
+      "status": "CONFLICTING_OR_UNKNOWN",
+      "limitations": [
+        "Column types, nullability, defaults, every index, enum definitions, and extension ownership are not exhaustively compared."
+      ]
+    }
+  ],
+  "proposedPlan": {
+    "safeToExecute": false,
+    "executionImplemented": false,
+    "stopAt": "IdentitySchemaBootstrap1749000000000"
+  }
+}
+```
 
 ## Project setup
 

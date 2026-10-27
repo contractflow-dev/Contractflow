@@ -10,8 +10,8 @@ export type CompanyInvitationDisplayStatus =
 export interface ICompanyInvitationResponseDto {
   id: string;
   email: string;
-  firstName: string;
-  lastName: string;
+  firstName: string | null;
+  lastName: string | null;
   companyRole: EInvitationRole;
   status: CompanyInvitationDisplayStatus;
   expiresAt: Date;
@@ -22,8 +22,8 @@ export interface ICompanyInvitationResponseDto {
 export class CompanyInvitationResponseDto implements ICompanyInvitationResponseDto {
   id: string;
   email: string;
-  firstName: string;
-  lastName: string;
+  firstName: string | null;
+  lastName: string | null;
   companyRole: EInvitationRole;
   status: CompanyInvitationDisplayStatus;
   expiresAt: Date;

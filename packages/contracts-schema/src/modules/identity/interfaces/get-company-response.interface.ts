@@ -1,4 +1,5 @@
 import {
+  EContractStatus,
   ECompanyRole,
   ECompanyStatus,
   ECompanyUserStatus,
@@ -57,10 +58,23 @@ export interface ICompanyAccessResponse {
 }
 
 export interface ICompanyDashboardResponse extends ICompanyAccessResponse {
+  expiryWindowDays: number;
   summary: {
     activeMembershipCount: number;
     pendingInvitationCount: number;
+    totalContractCount: number;
     activeContractCount: number;
     expiringContractCount: number;
   };
+  expiringContracts: ICompanyDashboardContractResponse[];
+  recentlyUpdatedContracts: ICompanyDashboardContractResponse[];
+}
+
+export interface ICompanyDashboardContractResponse {
+  id: string;
+  referenceNumber: string;
+  title: string;
+  status: EContractStatus;
+  endDate: string | null;
+  updatedAt: string;
 }

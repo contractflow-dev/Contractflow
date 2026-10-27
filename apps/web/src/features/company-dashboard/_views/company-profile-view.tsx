@@ -21,13 +21,10 @@ import {
   NativeSelectOption,
 } from "@workspace/ui/components/native-select";
 import { Separator } from "@workspace/ui/components/separator";
-import {
-  useGetCompanyDashboardQuery,
-  useUpdateCompanyProfileMutation,
-} from "@/features/companies";
+import { useUpdateCompanyProfileMutation } from "@/features/companies";
 import type { CompanyProfile } from "@/features/companies";
 import { getApiErrorMessage } from "@/lib/apiError";
-import { CompanyAdminWorkspace } from "./company-admin-workspace";
+import { CompanyAdminShell } from "@/features/companies/CompanyAdminShell";
 
 const profileSchema = z.object({
   name: z.string().trim().min(1, "Company name is required").max(255),
@@ -86,26 +83,15 @@ const fields: Array<{
   { key: "postalCode", label: "Postal code", autoComplete: "postal-code" },
 ];
 
-export function CompanyProfileView({
-  initialCompanyId,
-}: {
-  initialCompanyId: string;
-}) {
+export function CompanyProfileView() {
   return (
-    <CompanyAdminWorkspace
-      companyId={initialCompanyId}
-      activePath="/dashboards/profile"
-    >
-      {(companyId) => <ProfileContent companyId={companyId} />}
-    </CompanyAdminWorkspace>
+    <CompanyAdminShell>
+      {(access) => <ProfileContent company={access.company} />}
+    </CompanyAdminShell>
   );
 }
 
-function ProfileContent({ companyId }: { companyId: string }) {
-  const { currentData, error, isLoading } = useGetCompanyDashboardQuery({
-    companyId,
-  });
-
+function ProfileContent({ company }: { company: CompanyProfile }) {
   return (
     <section className="mx-auto max-w-4xl space-y-6">
       <header>
@@ -119,40 +105,19 @@ function ProfileContent({ companyId }: { companyId: string }) {
           Update the registered company and contact details.
         </p>
       </header>
-      {isLoading ? (
-        <Alert role="status">
-          <AlertDescription>Loading company profile…</AlertDescription>
-        </Alert>
-      ) : error ? (
-        <Alert variant="destructive">
-          <AlertDescription>
-            {getApiErrorMessage(error, "Company details could not be loaded.")}
-          </AlertDescription>
-        </Alert>
-      ) : currentData ? (
-        <ProfileForm
-          key={companyId}
-          companyId={companyId}
-          company={currentData.company}
-        />
-      ) : null}
+      <ProfileForm key={company.id} company={company} />
     </section>
   );
 }
 
-function ProfileForm({
-  companyId,
-  company,
-}: {
-  companyId: string;
-  company: CompanyProfile;
-}) {
+function ProfileForm({ company }: { company: CompanyProfile }) {
   const [updateProfile, { isLoading }] = useUpdateCompanyProfileMutation();
   const [submitError, setSubmitError] = useState("");
   const [saved, setSaved] = useState(false);
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors, isDirty },
   } = useForm<ProfileValues>({
     resolver: zodResolver(profileSchema),
@@ -178,7 +143,8 @@ function ProfileForm({
     setSubmitError("");
     setSaved(false);
     try {
-      await updateProfile({ companyId, data: values }).unwrap();
+      await updateProfile({ companyId: company.id, data: values }).unwrap();
+      reset(values);
       setSaved(true);
     } catch (error) {
       setSubmitError(

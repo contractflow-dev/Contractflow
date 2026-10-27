@@ -9,11 +9,13 @@ export function useContractsList(companyId: string, pageSize: number) {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<EContractStatus | "">("");
+  const [includeDeleted, setIncludeDeleted] = useState(false);
   const [page, setPage] = useState(1);
   const query = useGetContractsQuery({
     companyId,
     search: search || undefined,
     status: status || undefined,
+    includeDeleted,
     page,
     limit: pageSize,
   });
@@ -34,6 +36,8 @@ export function useContractsList(companyId: string, pageSize: number) {
     setSearchInput,
     status,
     setStatus,
+    includeDeleted,
+    setIncludeDeleted,
     page,
     setPage,
     pageCount,

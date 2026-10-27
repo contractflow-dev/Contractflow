@@ -313,8 +313,6 @@ describe('CompanyAdminService', () => {
     await expect(
       service.inviteMember(actorId, companyId, {
         email: 'new.user@example.com',
-        firstName: 'New',
-        lastName: 'User',
         companyRole: EInvitationRole.FINANCE_OFFICER,
       }),
     ).rejects.toThrow('SMTP unavailable');
@@ -325,6 +323,8 @@ describe('CompanyAdminService', () => {
     expect(invitation.tokenHash).toHaveLength(64);
     expect(invitation.tokenHash).not.toBe(sentToken);
     expect(invitation).not.toHaveProperty('token', sentToken);
+    expect(invitation.firstName).toBeNull();
+    expect(invitation.lastName).toBeNull();
     expect(managerInvitations.save.mock.invocationCallOrder[0]).toBeLessThan(
       mail.sendCompanyInvitationEmail.mock.invocationCallOrder[0],
     );
@@ -336,8 +336,6 @@ describe('CompanyAdminService', () => {
     await expect(
       service.inviteMember(actorId, companyId, {
         email: 'new.user@example.com',
-        firstName: 'New',
-        lastName: 'User',
         companyRole: EInvitationRole.FINANCE_OFFICER,
       }),
     ).rejects.toBeInstanceOf(ConflictException);

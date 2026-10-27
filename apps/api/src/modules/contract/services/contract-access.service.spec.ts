@@ -1,5 +1,5 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
-import { ECompanyRole } from '@contractflow/contracts-schema';
+import { ECompanyRole, EContractRole } from '@contractflow/contracts-schema';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ContractAccessService } from './contract-access.service';
 import { ContractResourceReader } from './contract-resource-reader';
@@ -7,6 +7,9 @@ import { ContractResourceReader } from './contract-resource-reader';
 describe('ContractAccessService', () => {
   const users = { findActiveMember: vi.fn() };
   const parties = { findByCompany: vi.fn() };
+  const roleAssignments = { findActiveByCompanyUser: vi.fn() };
+  const contracts = { findOne: vi.fn() };
+  const workspaces = { findOne: vi.fn() };
   let service: ContractAccessService;
 
   beforeEach(() => {
@@ -16,7 +19,21 @@ describe('ContractAccessService', () => {
       companyRole: ECompanyRole.FINANCE_OFFICER,
     });
     parties.findByCompany.mockResolvedValue({ id: 'p1' });
-    service = new ContractAccessService(users as never, parties as never);
+    roleAssignments.findActiveByCompanyUser.mockResolvedValue([
+      {
+        contractPartyId: 'p1',
+        role: EContractRole.FINANCE_OFFICER,
+      },
+    ]);
+    contracts.findOne.mockResolvedValue({ id: 'c1' });
+    workspaces.findOne.mockResolvedValue({ contractId: 'c1' });
+    service = new ContractAccessService(
+      users as never,
+      parties as never,
+      roleAssignments as never,
+      contracts as never,
+      workspaces as never,
+    );
   });
 
   it('returns a trusted scope for a permitted finance member', async () => {
@@ -30,6 +47,9 @@ describe('ContractAccessService', () => {
       contractId: 'c1',
       companyId: 'co1',
     });
+    expect(roleAssignments.findActiveByCompanyUser).toHaveBeenCalledWith('m1', {
+      companyId: 'co1',
+    });
   });
 
   it('rejects non-members before touching contract data', async () => {
@@ -38,6 +58,7 @@ describe('ContractAccessService', () => {
       service.authorize('u1', 'co1', 'c1', 'finance'),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(parties.findByCompany).not.toHaveBeenCalled();
+    expect(roleAssignments.findActiveByCompanyUser).not.toHaveBeenCalled();
   });
 
   it('hides contracts the company is not a party to', async () => {
@@ -47,19 +68,53 @@ describe('ContractAccessService', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('keeps workspaces separate and gives Company Administrators no workspace access', async () => {
+  it('keeps workspace roles separate', async () => {
     await expect(
       service.authorize('u1', 'co1', 'c1', 'project'),
     ).rejects.toBeInstanceOf(ForbiddenException);
     await expect(
       service.authorize('u1', 'co1', 'c1', 'general'),
     ).resolves.toBeDefined();
+
+    roleAssignments.findActiveByCompanyUser.mockResolvedValue([
+      {
+        contractPartyId: 'p1',
+        role: EContractRole.CONTRACTOR_PROJECT_LEAD,
+      },
+    ]);
+    await expect(
+      service.authorize('u1', 'co1', 'c1', 'project'),
+    ).resolves.toBeDefined();
+    await expect(
+      service.authorize('u1', 'co1', 'c1', 'finance'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('does not grant workspace access from Company Administrator membership alone', async () => {
     users.findActiveMember.mockResolvedValue({
       id: 'm1',
       companyRole: ECompanyRole.COMPANY_ADMIN,
     });
+    roleAssignments.findActiveByCompanyUser.mockResolvedValue([]);
     await expect(
       service.authorize('u1', 'co1', 'c1', 'general'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('denies revoked assignments and assignments for a different contract party', async () => {
+    roleAssignments.findActiveByCompanyUser.mockResolvedValue([]);
+    await expect(
+      service.authorize('u1', 'co1', 'c1', 'finance'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    roleAssignments.findActiveByCompanyUser.mockResolvedValue([
+      {
+        contractPartyId: 'other-party',
+        role: EContractRole.FINANCE_OFFICER,
+      },
+    ]);
+    await expect(
+      service.authorize('u1', 'co1', 'c1', 'finance'),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 

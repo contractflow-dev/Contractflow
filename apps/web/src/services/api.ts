@@ -32,6 +32,7 @@ export const api = createApi({
 
       if (
         typeof window !== "undefined" &&
+        baseQueryApi.endpoint !== "logout" &&
         isProtectedRoute(window.location.pathname)
       ) {
         window.location.replace("/login");
@@ -51,6 +52,9 @@ export const api = createApi({
     "Admin",
     "CompanyMember",
     "CompanyInvitation",
+    "ContractRoleAssignment",
+    "ContractLifecyclePermission",
+    "ContractPartyInvitation",
   ],
   endpoints: () => ({}),
 });

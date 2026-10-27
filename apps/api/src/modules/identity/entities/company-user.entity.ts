@@ -17,9 +17,11 @@ import {
 } from '@contractflow/contracts-schema';
 
 @Entity('company_user')
-@Index('uq_company_user_company_user', ['companyId', 'userId'], {
+@Index('uq_company_user_active_company_user', ['companyId', 'userId'], {
   unique: true,
+  where: '"status" = \'active\' AND "left_at" IS NULL',
 })
+@Index('uq_company_user_id_company', ['id', 'companyId'], { unique: true })
 export class CompanyUser
   extends BaseCustomEntity
   implements ICompanyUserEntity
@@ -28,14 +30,22 @@ export class CompanyUser
   companyId!: string;
 
   @ManyToOne(() => Company, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'company_id', referencedColumnName: 'id' })
+  @JoinColumn({
+    name: 'company_id',
+    referencedColumnName: 'id',
+    foreignKeyConstraintName: 'FK_company_user_company',
+  })
   company!: Company;
 
   @Column({ name: 'user_id', type: 'varchar', length: 26 })
   userId!: string;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'user_id', referencedColumnName: 'id' })
+  @JoinColumn({
+    name: 'user_id',
+    referencedColumnName: 'id',
+    foreignKeyConstraintName: 'FK_company_user_app_user',
+  })
   user!: User;
 
   @Column({ name: 'company_role', type: 'enum', enum: ECompanyRole })

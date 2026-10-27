@@ -67,6 +67,7 @@ import { ContractParty } from '../contract/entities/contract-party.entity';
     CompanyService,
     CompanyUserRepository,
     CompanyAuditLogRepository,
+    MailService,
   ],
 })
 export class IdentityModule {}

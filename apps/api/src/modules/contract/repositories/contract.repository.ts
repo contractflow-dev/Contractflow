@@ -10,6 +10,8 @@ import { ContractParty } from '../entities/contract-party.entity';
 export interface ContractSearch {
   search?: string;
   status?: EContractStatus;
+  includeDeleted?: boolean;
+  creatorCompanyId?: string;
   skip?: number;
   take?: number;
 }
@@ -55,6 +57,7 @@ export class ContractRepository extends BaseRepository<
     scope: ICompanyScope,
   ): Promise<Contract | null> {
     return this.scopedQuery(scope, 'contract')
+      .andWhere('contract.deletedAt IS NULL')
       .andWhere('contract.id = :id', { id })
       .getOne();
   }
@@ -64,6 +67,20 @@ export class ContractRepository extends BaseRepository<
     options: ContractSearch = {},
   ): Promise<{ items: Contract[]; total: number }> {
     const qb = this.scopedQuery(scope, 'contract');
+
+    if (options.includeDeleted) {
+      if (!options.creatorCompanyId?.trim()) {
+        throw new ForbiddenException(
+          'Creator company context is required to list archived contracts',
+        );
+      }
+      qb.andWhere('contract.deletedAt IS NOT NULL');
+      qb.andWhere('contract.createdByCompanyId = :creatorCompanyId', {
+        creatorCompanyId: options.creatorCompanyId,
+      });
+    } else {
+      qb.andWhere('contract.deletedAt IS NULL');
+    }
 
     if (options.status) {
       qb.andWhere('contract.status = :status', { status: options.status });

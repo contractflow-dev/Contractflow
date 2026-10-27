@@ -24,6 +24,7 @@ export const workspaceSlice = createSlice({
     clearActiveWorkspace: (state) => {
       state.activeWorkspaceId = null;
     },
+    resetWorkspace: () => initialState,
   },
   selectors: {
     selectActiveWorkspaceId: (state) => state.activeWorkspaceId,
@@ -35,6 +36,7 @@ export const {
   setActiveWorkspaceId,
   addRecentWorkspaceId,
   clearActiveWorkspace,
+  resetWorkspace,
 } = workspaceSlice.actions;
 
 export const { selectActiveWorkspaceId, selectRecentWorkspaceIds } =

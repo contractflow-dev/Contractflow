@@ -4,6 +4,7 @@ export {
   setActiveWorkspaceId,
   addRecentWorkspaceId,
   clearActiveWorkspace,
+  resetWorkspace,
   selectActiveWorkspaceId,
   selectRecentWorkspaceIds,
 } from './workspaceSlice';
