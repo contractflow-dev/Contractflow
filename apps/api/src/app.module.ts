@@ -29,7 +29,7 @@ import { HealthController } from './health.controller';
           type: 'postgres' as const,
           url: config.getOrThrow<string>('DATABASE_URL'),
           autoLoadEntities: true,
-          synchronize: !isProd,
+          synchronize: !isProd || config.get('DB_SYNC') === 'true',
           ssl: isProd ? { rejectUnauthorized: false } : false,
           extra: isProd ? { ssl: { rejectUnauthorized: false } } : {},
         };
