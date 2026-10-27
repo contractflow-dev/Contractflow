@@ -104,6 +104,7 @@ describe('MailService', () => {
         ),
       }),
     );
+    expect(mocks.sendMail.mock.calls[0][0].text).toContain('Hello,');
   });
 
   it('reports SMTP invitation delivery failures to the calling transaction', async () => {

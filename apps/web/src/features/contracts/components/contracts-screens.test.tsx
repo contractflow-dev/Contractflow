@@ -13,6 +13,14 @@ vi.mock("../_hooks/use-contract-details", () => ({
   useContractDetails: vi.fn(),
 }));
 
+vi.mock("./contract-role-assignment-management", () => ({
+  ContractRoleAssignmentManagement: () => <div>Contract role assignments</div>,
+}));
+
+vi.mock("./contract-lifecycle-management", () => ({
+  ContractLifecycleManagement: () => <div>Contract lifecycle management</div>,
+}));
+
 const contractDetail: ContractDetailResponse = {
   contract: {
     id: "contract-1",

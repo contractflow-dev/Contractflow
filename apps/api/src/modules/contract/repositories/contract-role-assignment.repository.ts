@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import type { EntityManager, Repository } from 'typeorm';
+import { IsNull } from 'typeorm';
+import { EContractRole } from '@contractflow/contracts-schema';
 import type { ICompanyScope } from '../../../common/database/repositories/company-scope.interface';
 import { CompanyScopedRepository } from '../../../common/database/repositories/company-scoped.repository';
 import { ContractRoleAssignment } from '../entities/contract-role-assignment.entity';
@@ -24,6 +26,156 @@ export class ContractRoleAssignmentRepository extends CompanyScopedRepository<Co
         companyUserId,
       })
       .getMany();
+  }
+
+  findActiveForParty(
+    contractPartyId: string,
+    contractId: string,
+    roles: EContractRole[],
+    scope: ICompanyScope,
+    manager: EntityManager = this.repository.manager,
+  ) {
+    return manager
+      .getRepository(ContractRoleAssignment)
+      .createQueryBuilder('assignment')
+      .innerJoin('assignment.contractParty', 'party')
+      .innerJoinAndSelect('assignment.companyUser', 'companyUser')
+      .innerJoinAndSelect('companyUser.user', 'user')
+      .where('assignment.companyId = :companyId', {
+        companyId: scope.companyId,
+      })
+      .andWhere('assignment.contractPartyId = :contractPartyId', {
+        contractPartyId,
+      })
+      .andWhere('party.contractId = :contractId', { contractId })
+      .andWhere('party.companyId = :companyId', {
+        companyId: scope.companyId,
+      })
+      .andWhere('assignment.role IN (:...roles)', { roles })
+      .andWhere('assignment.revokedAt IS NULL')
+      .orderBy('assignment.assignedAt', 'ASC')
+      .addOrderBy('assignment.id', 'ASC')
+      .getMany();
+  }
+
+  findActiveDuplicate(
+    contractPartyId: string,
+    companyUserId: string,
+    role: EContractRole,
+    scope: ICompanyScope,
+    manager: EntityManager,
+  ) {
+    return manager.getRepository(ContractRoleAssignment).findOne({
+      where: {
+        companyId: scope.companyId,
+        contractPartyId,
+        companyUserId,
+        role,
+        revokedAt: IsNull(),
+      },
+    });
+  }
+
+  async hasWorkspaceAdmin(
+    companyUserId: string,
+    contractPartyId: string,
+    roles: EContractRole[],
+    scope: ICompanyScope,
+    manager: EntityManager = this.repository.manager,
+  ): Promise<boolean> {
+    return (
+      (await manager
+        .getRepository(ContractRoleAssignment)
+        .createQueryBuilder('assignment')
+        .where('assignment.companyId = :companyId', {
+          companyId: scope.companyId,
+        })
+        .andWhere('assignment.contractPartyId = :contractPartyId', {
+          contractPartyId,
+        })
+        .andWhere('assignment.companyUserId = :companyUserId', {
+          companyUserId,
+        })
+        .andWhere('assignment.role IN (:...roles)', { roles })
+        .andWhere('assignment.revokedAt IS NULL')
+        .andWhere('assignment.isWorkspaceAdmin = true')
+        .getCount()) > 0
+    );
+  }
+
+  countActiveWorkspaceAdmins(
+    contractPartyId: string,
+    roles: EContractRole[],
+    scope: ICompanyScope,
+    manager: EntityManager,
+  ): Promise<number> {
+    return manager
+      .getRepository(ContractRoleAssignment)
+      .createQueryBuilder('assignment')
+      .where('assignment.companyId = :companyId', {
+        companyId: scope.companyId,
+      })
+      .andWhere('assignment.contractPartyId = :contractPartyId', {
+        contractPartyId,
+      })
+      .andWhere('assignment.role IN (:...roles)', { roles })
+      .andWhere('assignment.revokedAt IS NULL')
+      .andWhere('assignment.isWorkspaceAdmin = true')
+      .getCount();
+  }
+
+  findByIdInPartyForUpdate(
+    id: string,
+    contractPartyId: string,
+    scope: ICompanyScope,
+    manager: EntityManager,
+  ) {
+    return manager
+      .getRepository(ContractRoleAssignment)
+      .createQueryBuilder('assignment')
+      .where('assignment.id = :id', { id })
+      .andWhere('assignment.companyId = :companyId', {
+        companyId: scope.companyId,
+      })
+      .andWhere('assignment.contractPartyId = :contractPartyId', {
+        contractPartyId,
+      })
+      .setLock('pessimistic_write')
+      .getOne();
+  }
+
+  async createInScope(
+    data: Pick<
+      ContractRoleAssignment,
+      | 'contractPartyId'
+      | 'companyUserId'
+      | 'role'
+      | 'isWorkspaceAdmin'
+      | 'assignedAt'
+      | 'assignedById'
+      | 'revokedAt'
+      | 'revokedById'
+    >,
+    scope: ICompanyScope,
+    manager: EntityManager,
+  ): Promise<ContractRoleAssignment> {
+    const repository = manager.getRepository(ContractRoleAssignment);
+    const assignment = repository.create({
+      ...data,
+      companyId: scope.companyId,
+    });
+    return repository.save(assignment);
+  }
+
+  async revokeInScope(
+    assignment: ContractRoleAssignment,
+    revokedAt: Date,
+    revokedById: string,
+    manager: EntityManager,
+  ): Promise<ContractRoleAssignment> {
+    assignment.revokedAt = revokedAt;
+    assignment.revokedById = revokedById;
+    return manager.getRepository(ContractRoleAssignment).save(assignment);
   }
 
   findActiveByParty(contractPartyId: string, scope: ICompanyScope) {

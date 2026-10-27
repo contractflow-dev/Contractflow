@@ -7,8 +7,8 @@ export interface ICompanyInvitationEntity {
   companyId: string;
   invitedByCompanyUserId: string;
   email: string;
-  firstName: string;
-  lastName: string;
+  firstName: string | null;
+  lastName: string | null;
   companyRole: EInvitationRole;
   tokenHash: string;
   status: EInvitationStatus;

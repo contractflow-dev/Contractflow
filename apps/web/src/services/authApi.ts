@@ -83,7 +83,6 @@ export const authApi = api.injectEndpoints({
         url: "/auth/logout",
         method: "POST",
       }),
-      invalidatesTags: ["Auth", "User", "Workspace", "Onboarding"],
     }),
   }),
   overrideExisting: false,

@@ -1,40 +1,30 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { ECompanyRole } from '@contractflow/contracts-schema';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { IsNull, Repository } from 'typeorm';
 import type { IContractCompanyScope } from '../../../common/database/repositories/contract-scope.interface';
 import { CompanyUserRepository } from '../../identity/repositories/company-user.respository';
+import { Contract } from '../entities/contract.entity';
+import { ContractWorkspaceEntity } from '../entities/contract-workspace.entity';
 import { ContractPartyRepository } from '../repositories/contract-party.repository';
+import { ContractRoleAssignmentRepository } from '../repositories/contract-role-assignment.repository';
+import { WORKSPACE_ROLES, type ContractWorkspace } from './contract-workspace';
 
-export type ContractWorkspace = 'project' | 'finance' | 'hse' | 'general';
-
-const PROJECT_ROLES = [
-  ECompanyRole.CONTRACTOR_PROJECT_LEAD,
-  ECompanyRole.CONTRACTOR_SITE_SUPERVISOR,
-  ECompanyRole.CLIENT_PROJECT_MANAGER,
-  ECompanyRole.CLIENT_SITE_ENGINEER,
-];
-const FINANCE_ROLES = [
-  ECompanyRole.FINANCE_OFFICER,
-  ECompanyRole.FINANCE_DIRECTOR,
-];
-const HSE_ROLES = [ECompanyRole.HSE_OFFICER, ECompanyRole.HSE_MANAGER];
-
-/**
- * Interim gate on the member's company role, because
- * ContractRoleAssignment.revokedAt is NOT NULL. Company Administrator is
- * deliberately in no list.
- */
-const WORKSPACE_ROLES: Record<ContractWorkspace, ECompanyRole[]> = {
-  project: PROJECT_ROLES,
-  finance: FINANCE_ROLES,
-  hse: HSE_ROLES,
-  general: [...PROJECT_ROLES, ...FINANCE_ROLES, ...HSE_ROLES],
-};
+export type { ContractWorkspace } from './contract-workspace';
 
 @Injectable()
 export class ContractAccessService {
   constructor(
     private readonly companyUsers: CompanyUserRepository,
     private readonly parties: ContractPartyRepository,
+    private readonly roleAssignments: ContractRoleAssignmentRepository,
+    @InjectRepository(Contract)
+    private readonly contracts: Repository<Contract>,
+    @InjectRepository(ContractWorkspaceEntity)
+    private readonly workspaces: Repository<ContractWorkspaceEntity>,
   ) {}
 
   async authorize(
@@ -64,8 +54,33 @@ export class ContractAccessService {
     if (!party) {
       throw new NotFoundException('Contract was not found');
     }
+    const contractRecord = await this.contracts.findOne({
+      where: { id: contract, deletedAt: IsNull() },
+      select: { id: true },
+    });
+    if (!contractRecord) {
+      throw new NotFoundException('Contract was not found');
+    }
+    if (workspace !== 'general') {
+      const workspaceRecord = await this.workspaces.findOne({
+        where: { contractId: contract, workspace },
+        select: { contractId: true },
+      });
+      if (!workspaceRecord) {
+        throw new ForbiddenException('This contract workspace is unavailable');
+      }
+    }
 
-    if (!WORKSPACE_ROLES[workspace].includes(membership.companyRole)) {
+    const assignments = await this.roleAssignments.findActiveByCompanyUser(
+      membership.id,
+      { companyId: company },
+    );
+    const hasWorkspaceRole = assignments.some(
+      ({ contractPartyId, role }) =>
+        contractPartyId === party.id &&
+        WORKSPACE_ROLES[workspace].includes(role),
+    );
+    if (!hasWorkspaceRole) {
       throw new ForbiddenException(
         'Your role does not have access to this contract workspace',
       );

@@ -6,11 +6,11 @@ import { useRouter } from "next/navigation";
 import {
   RiShieldCrossLine,
   RiArrowRightLine,
-  RiLogoutBoxRLine,
   RiLoader4Line,
 } from "@remixicon/react";
 import { getApiErrorMessage, getApiErrorStatus } from "@/lib/apiError";
-import { useGetCurrentUserQuery, useLogoutMutation } from "@/services/authApi";
+import { useGetCurrentUserQuery } from "@/services/authApi";
+import { SignOutAction } from "@/components/auth/sign-out-action";
 import { Button, buttonVariants } from "@workspace/ui/components/button";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import {
@@ -29,7 +29,6 @@ export function RequirePlatformAdmin({ children }: { children: ReactNode }) {
     undefined,
     { refetchOnMountOrArgChange: true },
   );
-  const [logout, { isLoading: isLoggingOut }] = useLogoutMutation();
 
   const isUnauthorized = getApiErrorStatus(error) === 401;
 
@@ -130,18 +129,7 @@ export function RequirePlatformAdmin({ children }: { children: ReactNode }) {
           </CardContent>
 
           <CardFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-            <Button
-              variant="outline"
-              onClick={async () => {
-                await logout().unwrap();
-                router.replace("/login");
-              }}
-              disabled={isLoggingOut}
-              className="gap-2"
-            >
-              <RiLogoutBoxRLine className="size-4" />
-              Sign out
-            </Button>
+            <SignOutAction />
             <Link
               href="/dashboards"
               className={cn(

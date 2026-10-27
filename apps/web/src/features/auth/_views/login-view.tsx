@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,8 +28,10 @@ type LoginValues = z.infer<typeof loginSchema>;
 
 export function LoginView() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [login] = useLoginMutation();
   const [serverError, setServerError] = useState<string | null>(null);
+  const logoutWarning = searchParams.get("logout") === "failed";
   const {
     register,
     handleSubmit,
@@ -81,6 +83,15 @@ export function LoginView() {
                 {serverError && (
                   <Alert variant="destructive" className="break-words">
                     <AlertDescription>{serverError}</AlertDescription>
+                  </Alert>
+                )}
+                {logoutWarning && (
+                  <Alert variant="destructive" role="alert">
+                    <AlertDescription>
+                      We couldn’t confirm sign out with the server. Your local
+                      session was cleared, but the server may not have revoked
+                      it. Please sign in again, and retry sign out if needed.
+                    </AlertDescription>
                   </Alert>
                 )}
                 <Field data-invalid={!!errors.email}>

@@ -5,7 +5,7 @@ import { ContractService } from './contract.service';
 describe('ContractService', () => {
   const scopeFor = { forUser: vi.fn() };
   const parties = { findByCompany: vi.fn(), findAllWithCompany: vi.fn() };
-  const history = { findPage: vi.fn() };
+  const history = { searchPage: vi.fn() };
   const contracts = { findById: vi.fn(), searchPage: vi.fn() };
   let service: ContractService;
 
@@ -14,6 +14,8 @@ describe('ContractService', () => {
     scopeFor.forUser.mockResolvedValue({ companyId: 'co-1' });
     parties.findByCompany.mockResolvedValue({ id: 'p-1' });
     parties.findAllWithCompany.mockResolvedValue([]);
+    history.searchPage.mockResolvedValue({ items: [], total: 0 });
+    contracts.findById.mockResolvedValue({ id: 'c-1' });
     service = new ContractService(
       scopeFor as never,
       parties as never,
@@ -48,7 +50,7 @@ describe('ContractService', () => {
       service.listParties('u', 'co-1', 'c-9'),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(contracts.findById).not.toHaveBeenCalled();
-    expect(history.findPage).not.toHaveBeenCalled();
+    expect(history.searchPage).not.toHaveBeenCalled();
     expect(parties.findAllWithCompany).not.toHaveBeenCalled();
   });
 
@@ -68,6 +70,22 @@ describe('ContractService', () => {
       contractId: 'c-1',
       companyId: 'co-1',
     });
+  });
+
+  it('hides archived contracts from party, history, and detail reads', async () => {
+    contracts.findById.mockResolvedValue(null);
+
+    await expect(service.get('u', 'co-1', 'c-1')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    await expect(
+      service.listParties('u', 'co-1', 'c-1'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      service.listStatusHistory('u', 'co-1', 'c-1', { page: 1, limit: 10 }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(parties.findAllWithCompany).not.toHaveBeenCalled();
+    expect(history.searchPage).not.toHaveBeenCalled();
   });
 
   it('exposes only minimal counterparty details', async () => {
@@ -100,11 +118,9 @@ describe('ContractService', () => {
   });
 
   it('scopes status history to the contract and the verified company', async () => {
-    history.findPage.mockResolvedValue({ items: [], total: 0 });
-
     await service.listStatusHistory('u', 'co-1', 'c-1', { page: 3, limit: 10 });
 
-    expect(history.findPage).toHaveBeenCalledWith(
+    expect(history.searchPage).toHaveBeenCalledWith(
       { contractId: 'c-1', companyId: 'co-1' },
       { skip: 20, take: 10 },
     );

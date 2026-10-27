@@ -46,23 +46,16 @@ import {
 } from "@/features/companies";
 import type { CompanyMember } from "@/features/companies";
 import { getApiErrorMessage } from "@/lib/apiError";
-import { CompanyAdminWorkspace } from "../../company-dashboard/_views/company-admin-workspace";
+import { CompanyAdminShell } from "../CompanyAdminShell";
 
 const invitationRoles = Object.values(EInvitationRole);
 const memberRoles = Object.values(ECompanyRole);
 
-export function CompanyTeamView({
-  initialCompanyId,
-}: {
-  initialCompanyId: string;
-}) {
+export function CompanyTeamView() {
   return (
-    <CompanyAdminWorkspace
-      companyId={initialCompanyId}
-      activePath="/dashboards/team"
-    >
-      {(companyId) => <TeamContent companyId={companyId} />}
-    </CompanyAdminWorkspace>
+    <CompanyAdminShell>
+      {(access) => <TeamContent companyId={access.company.id} />}
+    </CompanyAdminShell>
   );
 }
 
@@ -75,8 +68,6 @@ function TeamContent({ companyId }: { companyId: string }) {
   const [actionError, setActionError] = useState("");
   const [busyMemberId, setBusyMemberId] = useState("");
   const [busyInvitationId, setBusyInvitationId] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<EInvitationRole>(
     EInvitationRole.CONTRACTOR_PROJECT_LEAD,
@@ -110,16 +101,12 @@ function TeamContent({ companyId }: { companyId: string }) {
       await inviteMember({
         companyId,
         data: {
-          email,
-          firstName,
-          lastName,
+          email: email.trim().toLowerCase(),
           companyRole: role,
         },
       }).unwrap();
       setInviteSuccess(`Invitation sent to ${email.trim()}.`);
       setEmail("");
-      setFirstName("");
-      setLastName("");
     } catch (error) {
       setInviteError(
         getApiErrorMessage(error, "The invitation could not be sent."),
@@ -207,29 +194,7 @@ function TeamContent({ companyId }: { companyId: string }) {
         </CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={(event) => void submitInvitation(event)}>
-            <FieldGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-              <Field>
-                <FieldLabel htmlFor="invite-first-name">First name</FieldLabel>
-                <Input
-                  id="invite-first-name"
-                  required
-                  maxLength={100}
-                  value={firstName}
-                  onChange={(event) => setFirstName(event.target.value)}
-                  autoComplete="given-name"
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="invite-last-name">Last name</FieldLabel>
-                <Input
-                  id="invite-last-name"
-                  required
-                  maxLength={100}
-                  value={lastName}
-                  onChange={(event) => setLastName(event.target.value)}
-                  autoComplete="family-name"
-                />
-              </Field>
+            <FieldGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <Field>
                 <FieldLabel htmlFor="invite-email">Email</FieldLabel>
                 <Input
@@ -482,7 +447,11 @@ function TeamContent({ companyId }: { companyId: string }) {
                 {invitations.items.map((invitation) => (
                   <TableRow key={invitation.id}>
                     <TableCell className="px-4 py-3">
-                      {invitation.firstName} {invitation.lastName}
+                      {invitation.firstName || invitation.lastName
+                        ? [invitation.firstName, invitation.lastName]
+                            .filter(Boolean)
+                            .join(" ")
+                        : "Invitee"}
                       <p className="text-xs text-muted-foreground">
                         {invitation.email}
                       </p>

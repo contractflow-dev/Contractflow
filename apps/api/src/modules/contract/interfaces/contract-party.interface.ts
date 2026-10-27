@@ -4,10 +4,10 @@ export interface IContractPartyEntity {
   contractId: string;
   companyId: string;
   partyType: EPartyType;
-  signatoryFirstName: string;
-  signatoryLastName: string;
-  signatoryTitle: string;
-  signedAt: Date;
+  signatoryFirstName: string | null;
+  signatoryLastName: string | null;
+  signatoryTitle: string | null;
+  signedAt: Date | null;
 }
 
 // IGetUserResponse for interface

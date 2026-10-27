@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ContractLifecycleManagement } from "./contract-lifecycle-management";
 import { EContractStatus } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Badge } from "@workspace/ui/components/badge";
@@ -27,6 +28,9 @@ import {
   TableRow,
 } from "@workspace/ui/components/table";
 import { getApiErrorMessage } from "@/lib/apiError";
+import { CreateContractForm } from "./contract-lifecycle-management";
+import { useRestoreContractMutation } from "@/services/contractApi";
+import { ContractRoleAssignmentManagement } from "./contract-role-assignment-management";
 import { useContractDetails } from "../_hooks/use-contract-details";
 import { useContractsList } from "../_hooks/use-contracts-list";
 
@@ -39,6 +43,8 @@ export function ContractsList({ companyId }: { companyId: string }) {
     setSearchInput,
     status,
     setStatus,
+    includeDeleted,
+    setIncludeDeleted,
     page,
     setPage,
     currentData,
@@ -53,6 +59,7 @@ export function ContractsList({ companyId }: { companyId: string }) {
 
   return (
     <div className="space-y-6">
+      <CreateContractForm companyId={companyId} />
       <header>
         <h2 className="font-heading text-2xl font-semibold tracking-tight">
           Contracts
@@ -75,7 +82,9 @@ export function ContractsList({ companyId }: { companyId: string }) {
             className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_14rem_auto]"
           >
             <Field>
-              <FieldLabel htmlFor="contract-search">Search contracts</FieldLabel>
+              <FieldLabel htmlFor="contract-search">
+                Search contracts
+              </FieldLabel>
               <Input
                 id="contract-search"
                 value={searchInput}
@@ -116,11 +125,24 @@ export function ContractsList({ companyId }: { companyId: string }) {
               </Button>
             </div>
           </form>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={includeDeleted}
+              onChange={(event) => {
+                setIncludeDeleted(event.target.checked);
+                setPage(1);
+              }}
+            />
+            Include archived contracts
+          </label>
 
           {error ? (
             <Alert variant="destructive">
               <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
-                <span>{getApiErrorMessage(error, "Unable to load contracts.")}</span>
+                <span>
+                  {getApiErrorMessage(error, "Unable to load contracts.")}
+                </span>
                 <Button
                   type="button"
                   variant="outline"
@@ -133,7 +155,10 @@ export function ContractsList({ companyId }: { companyId: string }) {
           ) : null}
 
           {initialLoading ? (
-            <p role="status" className="py-8 text-center text-sm text-muted-foreground">
+            <p
+              role="status"
+              className="py-8 text-center text-sm text-muted-foreground"
+            >
               Loading contracts…
             </p>
           ) : currentData?.items.length ? (
@@ -145,27 +170,46 @@ export function ContractsList({ companyId }: { companyId: string }) {
                   <TableHead>Type</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>End date</TableHead>
+                  {includeDeleted ? <TableHead>Actions</TableHead> : null}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {currentData.items.map((contract) => (
                   <TableRow key={contract.id}>
                     <TableCell>
-                      <Link
-                        className="font-medium text-primary underline-offset-4 hover:underline"
-                        href={`/dashboards/contracts/${encodeURIComponent(contract.id)}?companyId=${encodeURIComponent(companyId)}`}
-                      >
-                        {contract.referenceNumber}
-                      </Link>
+                      {contract.deletedAt ? (
+                        contract.referenceNumber
+                      ) : (
+                        <Link
+                          className="font-medium text-primary underline-offset-4 hover:underline"
+                          href={`/dashboards/contracts/${encodeURIComponent(contract.id)}?companyId=${encodeURIComponent(companyId)}`}
+                        >
+                          {contract.referenceNumber}
+                        </Link>
+                      )}
                     </TableCell>
                     <TableCell>{contract.title}</TableCell>
                     <TableCell>{formatLabel(contract.contractType)}</TableCell>
                     <TableCell>
                       <Badge variant="outline">
-                        {formatLabel(contract.status)}
+                        {contract.deletedAt
+                          ? "Archived"
+                          : formatLabel(contract.status)}
                       </Badge>
                     </TableCell>
-                    <TableCell>{formatDate(contract.revisedEndDate || contract.endDate)}</TableCell>
+                    <TableCell>
+                      {formatDate(contract.revisedEndDate || contract.endDate)}
+                    </TableCell>
+                    {includeDeleted ? (
+                      <TableCell>
+                        {contract.deletedAt ? (
+                          <RestoreContractButton
+                            companyId={companyId}
+                            contractId={contract.id}
+                          />
+                        ) : null}
+                      </TableCell>
+                    ) : null}
                   </TableRow>
                 ))}
               </TableBody>
@@ -210,6 +254,33 @@ export function ContractsList({ companyId }: { companyId: string }) {
   );
 }
 
+function RestoreContractButton({
+  companyId,
+  contractId,
+}: {
+  companyId: string;
+  contractId: string;
+}) {
+  const [restore, state] = useRestoreContractMutation();
+  return (
+    <div className="space-y-2">
+      <Button
+        type="button"
+        variant="outline"
+        disabled={state.isLoading}
+        onClick={() => void restore({ companyId, contractId })}
+      >
+        Restore
+      </Button>
+      {state.error ? (
+        <p className="max-w-48 text-xs text-destructive">
+          {getApiErrorMessage(state.error, "Unable to restore contract.")}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function ContractDetail({
   companyId,
   contractId,
@@ -233,7 +304,10 @@ export function ContractDetail({
 
   if (contractLoading) {
     return (
-      <p role="status" className="py-12 text-center text-sm text-muted-foreground">
+      <p
+        role="status"
+        className="py-12 text-center text-sm text-muted-foreground"
+      >
         Loading contract…
       </p>
     );
@@ -251,7 +325,10 @@ export function ContractDetail({
         <Alert variant="destructive">
           <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
             <span>
-              {getApiErrorMessage(contractError, "Unable to load this contract.")}
+              {getApiErrorMessage(
+                contractError,
+                "Unable to load this contract.",
+              )}
             </span>
             {contractError ? (
               <Button
@@ -301,9 +378,18 @@ export function ContractDetail({
           <CardTitle>Contract details</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <DetailValue label="Your party" value={formatLabel(detail.membership.partyType)} />
-          <DetailValue label="Award date" value={formatDate(contract.awardDate)} />
-          <DetailValue label="Start date" value={formatDate(contract.startDate)} />
+          <DetailValue
+            label="Your party"
+            value={formatLabel(detail.membership.partyType)}
+          />
+          <DetailValue
+            label="Award date"
+            value={formatDate(contract.awardDate)}
+          />
+          <DetailValue
+            label="Start date"
+            value={formatDate(contract.startDate)}
+          />
           <DetailValue
             label="End date"
             value={formatDate(contract.revisedEndDate || contract.endDate)}
@@ -311,16 +397,27 @@ export function ContractDetail({
         </CardContent>
       </Card>
 
+      <ContractRoleAssignmentManagement
+        companyId={companyId}
+        contractId={contractId}
+      />
+      <ContractLifecycleManagement companyId={companyId} contract={contract} />
+
       <Card>
         <CardHeader>
           <CardTitle>Contract parties</CardTitle>
-          <CardDescription>Companies recorded as parties to this contract.</CardDescription>
+          <CardDescription>
+            Companies recorded as parties to this contract.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {partiesError ? (
             <Alert variant="destructive">
               <AlertDescription>
-                {getApiErrorMessage(partiesError, "Unable to load contract parties.")}
+                {getApiErrorMessage(
+                  partiesError,
+                  "Unable to load contract parties.",
+                )}
               </AlertDescription>
             </Alert>
           ) : partiesLoading ? (
@@ -341,7 +438,11 @@ export function ContractDetail({
                   <TableRow key={party.id}>
                     <TableCell>{party.companyName}</TableCell>
                     <TableCell>{formatLabel(party.partyType)}</TableCell>
-                    <TableCell>{party.signedAt ? formatDate(party.signedAt) : "Not signed"}</TableCell>
+                    <TableCell>
+                      {party.signedAt
+                        ? formatDate(party.signedAt)
+                        : "Not signed"}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -363,7 +464,10 @@ export function ContractDetail({
           {historyError ? (
             <Alert variant="destructive">
               <AlertDescription>
-                {getApiErrorMessage(historyError, "Unable to load status history.")}
+                {getApiErrorMessage(
+                  historyError,
+                  "Unable to load status history.",
+                )}
               </AlertDescription>
             </Alert>
           ) : historyLoading ? (
@@ -384,9 +488,13 @@ export function ContractDetail({
                 {history.items.map((entry) => (
                   <TableRow key={entry.id}>
                     <TableCell>{formatDate(entry.changedAt)}</TableCell>
-                    <TableCell>{formatLabel(entry.fromStatus)}</TableCell>
+                    <TableCell>
+                      {entry.fromStatus
+                        ? formatLabel(entry.fromStatus)
+                        : "—"}
+                    </TableCell>
                     <TableCell>{formatLabel(entry.toStatus)}</TableCell>
-                    <TableCell>{entry.reason}</TableCell>
+                    <TableCell>{entry.reason || "—"}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -412,12 +520,16 @@ function DetailValue({ label, value }: { label: string; value: string }) {
 }
 
 function formatLabel(value: string): string {
-  return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return value
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function formatDate(value?: string | null): string {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date);
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
+    date,
+  );
 }

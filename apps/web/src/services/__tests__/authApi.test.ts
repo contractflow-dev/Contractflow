@@ -5,7 +5,24 @@ import { authApi } from "@/services/authApi";
 import { getApiBaseUrl } from "@/lib/apiBaseUrl";
 import { companiesApi } from "@/features/companies/companiesApi";
 import { getApiErrorMessage, getApiErrorStatus } from "@/lib/apiError";
-import { EInvitationRole } from "@contractflow/contracts-schema";
+import {
+  ECompanyRole,
+  EInvitationRole,
+  EUserStatus,
+} from "@contractflow/contracts-schema";
+import { clearSignedOutClientState } from "@/features/auth/signOut";
+import {
+  setUser,
+  selectCurrentUser,
+  selectIsAuthenticated,
+} from "@/features/auth";
+import { setSelectedRole, selectSelectedRole } from "@/features/onboarding";
+import {
+  setActiveWorkspaceId,
+  selectActiveWorkspaceId,
+  selectRecentWorkspaceIds,
+} from "@/features/workspace";
+import { openModal, selectActiveModal } from "@/features/ui";
 
 describe("RTK Query authentication and company API contracts", () => {
   const fetchMock =
@@ -70,6 +87,48 @@ describe("RTK Query authentication and company API contracts", () => {
     await expect(request.clone().json()).resolves.toEqual(input);
   });
 
+  it("posts logout with cookies and clears authenticated client state and caches", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    await store.dispatch(authApi.endpoints.logout.initiate()).unwrap();
+
+    const request = fetchMock.mock.calls[0][0] as Request;
+    expect(request.url).toBe("http://localhost:3001/api/auth/logout");
+    expect(request.method).toBe("POST");
+    expect(request.credentials).toBe("include");
+
+    store.dispatch(
+      setUser({
+        id: "01JUSER0000000000000000000",
+        email: "user@example.com",
+        firstName: "User",
+        lastName: "Person",
+        status: EUserStatus.ACTIVE,
+      }),
+    );
+    store.dispatch(setSelectedRole(ECompanyRole.CLIENT_PROJECT_MANAGER));
+    store.dispatch(setActiveWorkspaceId("company-1"));
+    store.dispatch(openModal({ modalId: "CREATE_CONTRACT_MODAL" }));
+    await store.dispatch(authApi.endpoints.getCurrentUser.initiate()).unwrap();
+
+    expect(Object.keys(store.getState().api.queries)).not.toHaveLength(0);
+    clearSignedOutClientState(store.dispatch);
+
+    const state = store.getState();
+    expect(selectCurrentUser(state)).toBeNull();
+    expect(selectIsAuthenticated(state)).toBe(false);
+    expect(selectSelectedRole(state)).toBeNull();
+    expect(selectActiveWorkspaceId(state)).toBeNull();
+    expect(selectRecentWorkspaceIds(state)).toEqual([]);
+    expect(selectActiveModal(state)).toBeNull();
+    expect(state.api.queries).toEqual({});
+    expect(state.api.mutations).toEqual({});
+  });
+
   it("surfaces expired verification responses without reporting success", async () => {
     fetchMock.mockResolvedValueOnce(
       new Response(
@@ -121,7 +180,7 @@ describe("RTK Query authentication and company API contracts", () => {
       postalCode: "00000",
       countryCode: "US",
       defaultCurrencyCode: "USD",
-      status: "active",
+      status: EUserStatus.ACTIVE,
     };
     fetchMock.mockResolvedValueOnce(
       new Response(
@@ -230,8 +289,6 @@ describe("RTK Query authentication and company API contracts", () => {
           companyId: "company-1",
           data: {
             email: "person@example.com",
-            firstName: "Test",
-            lastName: "Person",
             companyRole: EInvitationRole.FINANCE_OFFICER,
           },
         }),

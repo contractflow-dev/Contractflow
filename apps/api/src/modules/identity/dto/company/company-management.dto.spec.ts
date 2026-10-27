@@ -3,6 +3,8 @@ import { validateSync } from 'class-validator';
 import { describe, expect, it } from 'vitest';
 import { UpdateCompanyRequestDto } from './update-company-request.dto';
 import { CreateCompanyInvitationRequestDto } from './create-company-invitation-request.dto';
+import { InviteCompanyMemberRequestDto } from './requests/invite-company-member-request.dto';
+import { EInvitationRole } from '@contractflow/contracts-schema';
 
 describe('Company management DTO validation', () => {
   it('trims allowed company profile fields and strips protected fields', () => {
@@ -41,16 +43,40 @@ describe('Company management DTO validation', () => {
   it('normalizes invitation email and rejects a company-admin invite role', () => {
     const input = plainToInstance(CreateCompanyInvitationRequestDto, {
       email: ' Invitee@Example.com ',
-      firstName: ' New ',
-      lastName: ' Member ',
       companyRole: 'Company Administrator',
     });
 
     const invalidFields = validateSync(input).map(({ property }) => property);
 
     expect(input.email).toBe('invitee@example.com');
-    expect(input.firstName).toBe('New');
-    expect(input.lastName).toBe('Member');
     expect(invalidFields).toContain('companyRole');
+  });
+
+  it('accepts a company invitation with only email and an allowed role', () => {
+    const input = plainToInstance(InviteCompanyMemberRequestDto, {
+      email: ' Invitee@Example.com ',
+      companyRole: EInvitationRole.FINANCE_OFFICER,
+    });
+
+    expect(validateSync(input, { whitelist: true })).toHaveLength(0);
+    expect(input.email).toBe('invitee@example.com');
+  });
+
+  it.each([
+    [{ companyRole: EInvitationRole.FINANCE_OFFICER }, 'email'],
+    [{ email: 'invitee@example.com' }, 'companyRole'],
+    [
+      { email: 'not-an-email', companyRole: EInvitationRole.FINANCE_OFFICER },
+      'email',
+    ],
+    [
+      { email: 'invitee@example.com', companyRole: 'Company Administrator' },
+      'companyRole',
+    ],
+  ])('rejects invalid company invitation payload %#', (payload, field) => {
+    const input = plainToInstance(InviteCompanyMemberRequestDto, payload);
+    const invalidFields = validateSync(input).map(({ property }) => property);
+
+    expect(invalidFields).toContain(field);
   });
 });

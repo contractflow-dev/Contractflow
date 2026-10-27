@@ -18,7 +18,11 @@ export class UserSession
   @Column({ name: 'user_id', type: 'varchar', length: 26 })
   userId!: string;
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'user_id', referencedColumnName: 'id' })
+  @JoinColumn({
+    name: 'user_id',
+    referencedColumnName: 'id',
+    foreignKeyConstraintName: 'FK_user_session_app_user',
+  })
   user!: User;
 
   @Column({
