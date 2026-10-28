@@ -24,7 +24,7 @@ import { TYPEORM_EXECUTION_SAFETY } from './common/database/typeorm-execution-op
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-            useFactory: (config: ConfigService) => {
+      useFactory: (config: ConfigService) => {
         const isProd = config.get('NODE_ENV') === 'production';
         const dbSync = String(config.get('DB_SYNC')).toLowerCase() === 'true';
         console.log(
@@ -40,6 +40,7 @@ import { TYPEORM_EXECUTION_SAFETY } from './common/database/typeorm-execution-op
           extra: isProd ? { ssl: { rejectUnauthorized: false } } : {},
         };
       },
+    }),
     IdentityModule,
     ContractModule,
     CrossCuttingModule,
