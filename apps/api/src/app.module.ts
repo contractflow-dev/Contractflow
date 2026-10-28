@@ -24,19 +24,22 @@ import { TYPEORM_EXECUTION_SAFETY } from './common/database/typeorm-execution-op
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
+            useFactory: (config: ConfigService) => {
         const isProd = config.get('NODE_ENV') === 'production';
+        const dbSync = String(config.get('DB_SYNC')).toLowerCase() === 'true';
+        console.log(
+          `[db-debug] NODE_ENV=${config.get('NODE_ENV')} DB_SYNC=${config.get('DB_SYNC')} synchronize=${!isProd || dbSync}`,
+        );
         return {
           type: 'postgres' as const,
           url: config.getOrThrow<string>('DATABASE_URL'),
           autoLoadEntities: true,
           ...TYPEORM_EXECUTION_SAFETY,
-          synchronize: !isProd || config.get('DB_SYNC') === 'true',
+          synchronize: !isProd || dbSync,
           ssl: isProd ? { rejectUnauthorized: false } : false,
           extra: isProd ? { ssl: { rejectUnauthorized: false } } : {},
         };
       },
-    }),
     IdentityModule,
     ContractModule,
     CrossCuttingModule,
