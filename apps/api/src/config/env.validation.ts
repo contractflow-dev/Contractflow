@@ -1,6 +1,7 @@
 import { plainToInstance, Transform } from 'class-transformer';
 import {
   IsBoolean,
+  IsEmail,
   IsEnum,
   IsInt,
   IsOptional,
@@ -22,6 +23,8 @@ export enum NodeEnv {
 
 export enum MailProvider {
   Smtp = 'smtp',
+  Ses = 'ses',
+  Resend = 'resend',
 }
 
 const toBool = ({ value }: { value: unknown }) =>
@@ -31,8 +34,13 @@ const toBool = ({ value }: { value: unknown }) =>
 
 const normalizeHttpUrl = ({ value }: { value: unknown }) => {
   if (typeof value !== 'string') return value;
+
   const trimmed = value.trim();
-  if (!trimmed || /^https?:\/\//i.test(trimmed)) return trimmed;
+
+  if (!trimmed || /^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
   return `https://${trimmed}`;
 };
 
@@ -82,9 +90,30 @@ export class EnvVars {
   @MinLength(32)
   JWT_SECRET?: string;
 
+  /*
+   * Mail provider
+   */
   @IsEnum(MailProvider)
   MAIL_PROVIDER!: MailProvider;
 
+  /*
+   * Amazon SES
+   */
+  @ValidateIf((o: EnvVars) => o.MAIL_PROVIDER === MailProvider.Ses)
+  @IsString()
+  AWS_REGION?: string;
+
+  @IsOptional()
+  @IsString()
+  AWS_PROFILE?: string;
+
+  @ValidateIf((o: EnvVars) => o.MAIL_PROVIDER === MailProvider.Ses)
+  @IsEmail()
+  SES_FROM_EMAIL?: string;
+
+  /*
+   * SMTP
+   */
   @ValidateIf((o: EnvVars) => o.MAIL_PROVIDER === MailProvider.Smtp)
   @IsString()
   SMTP_HOST?: string;
@@ -92,6 +121,8 @@ export class EnvVars {
   @ValidateIf((o: EnvVars) => o.MAIL_PROVIDER === MailProvider.Smtp)
   @Transform(({ value }) => Number(value))
   @IsInt()
+  @Min(1)
+  @Max(65535)
   SMTP_PORT?: number;
 
   @IsOptional()
@@ -101,18 +132,45 @@ export class EnvVars {
   @IsOptional()
   @IsString()
   SMTP_PASS?: string;
+
+  @IsOptional()
+  @Transform(toBool)
+  @IsBoolean()
+  SMTP_SECURE?: boolean;
+
+  /*
+   * Resend
+   */
+  @ValidateIf((o: EnvVars) => o.MAIL_PROVIDER === MailProvider.Resend)
+  @IsString()
+  RESEND_API_KEY?: string;
+
+  /*
+   * Shared sender configuration
+   */
+  @IsOptional()
+  @IsString()
+  EMAIL_FROM?: string;
 }
 
 export function validateEnv(raw: Record<string, unknown>): EnvVars {
   const config = plainToInstance(EnvVars, raw, {
     enableImplicitConversion: false,
   });
-  const errors = validateSync(config, { skipMissingProperties: false });
+
+  const errors = validateSync(config, {
+    skipMissingProperties: false,
+  });
+
   if (errors.length > 0) {
-    const messages = errors.flatMap((e) => Object.values(e.constraints ?? {}));
+    const messages = errors.flatMap((e) =>
+      Object.values(e.constraints ?? {}),
+    );
+
     throw new Error(
       `Invalid environment configuration:\n - ${messages.join('\n - ')}`,
     );
   }
+
   return config;
 }

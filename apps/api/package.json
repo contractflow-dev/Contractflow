@@ -29,6 +29,7 @@
     "admin:promote": "node dist/scripts/promote-platform-admin.js"
   },
   "dependencies": {
+    "@aws-sdk/client-ses": "^3.1159.0",
     "@nestjs/common": "^12.0.1",
     "@nestjs/config": "^12.0.1",
     "@nestjs/core": "^12.0.1",
