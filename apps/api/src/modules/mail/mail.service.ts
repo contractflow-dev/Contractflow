@@ -1,9 +1,14 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import nodemailer from 'nodemailer';
 
 @Injectable()
 export class MailService {
+  private readonly logger = new Logger(MailService.name);
   constructor(private readonly config: ConfigService) {}
 
   async sendVerificationEmail(email: string, token: string): Promise<void> {
@@ -195,6 +200,10 @@ export class MailService {
         text,
       });
     } catch (error) {
+      // NEW: log the real SMTP error so it shows up in Render Logs
+      this.logger.error(
+        `SMTP send failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
       throw new ServiceUnavailableException(
         'The verification email could not be delivered through SMTP. Please try again later.',
         { cause: error },
