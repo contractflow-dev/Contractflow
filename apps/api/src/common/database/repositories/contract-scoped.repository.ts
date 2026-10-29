@@ -77,8 +77,8 @@ export abstract class ContractScopedRepository<
   }
 
   protected override applyScope(
-    qb: SelectQueryBuilder<Entity>,
     scope: Scope,
+    qb: SelectQueryBuilder<Entity>,
   ): void {
     const { contractId, companyId } = this.resolveScope(scope);
     qb.andWhere(`${qb.alias}.contractId = :__scopeContractId`, {
@@ -137,17 +137,17 @@ export abstract class ContractScopedRepository<
     return this.scopedQuery(scope, alias);
   }
 
-  override async findById(id: string, scope: Scope): Promise<Entity | null> {
+  override async findById(scope: Scope, id: string): Promise<Entity | null> {
     await this.assertScope(scope);
-    return super.findById(id, scope);
+    return super.findById(scope, id);
   }
 
   override async findOne(
-    options: FindOneOptions<Entity>,
     scope: Scope,
+    options: FindOneOptions<Entity>,
   ): Promise<Entity | null> {
     await this.assertScope(scope);
-    return super.findOne(options, scope);
+    return super.findOne(scope, options);
   }
 
   override async findAll(
@@ -175,7 +175,7 @@ export abstract class ContractScopedRepository<
   }
 
   /** Creates a new record under the contract; existing records use update. */
-  override async save(entity: Entity, scope: Scope): Promise<Entity> {
+  override async save(scope: Scope, entity: Entity): Promise<Entity> {
     const { contractId } = await this.assertScope(scope);
     if (entity.id?.trim()) {
       throw new BadRequestException(
@@ -196,16 +196,16 @@ export abstract class ContractScopedRepository<
   }
 
   override async update(
+    scope: Scope,
     id: string,
     data: Omit<DeepPartial<Entity>, 'id'>,
-    scope: Scope,
   ): Promise<Entity> {
     await this.assertScope(scope);
-    return super.update(id, data, scope);
+    return super.update(scope, id, data);
   }
 
-  override async delete(id: string, scope: Scope): Promise<void> {
+  override async delete(scope: Scope, id: string): Promise<void> {
     await this.assertScope(scope);
-    return super.delete(id, scope);
+    return super.delete(scope, id);
   }
 }

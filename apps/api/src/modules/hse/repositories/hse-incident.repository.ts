@@ -14,26 +14,25 @@ export class HseIncidentRepository extends ContractScopedRepository<HseIncident>
     super(repository);
   }
 
-  findByReference(referenceNumber: string, scope: IContractScope) {
-    return this.findOne(
-      { where: { referenceNumber } as FindOptionsWhere<HseIncident> },
-      scope,
-    );
+  findByReference(scope: IContractScope, referenceNumber: string) {
+    return this.findOne(scope, {
+      where: { referenceNumber } as FindOptionsWhere<HseIncident>,
+    });
   }
 
-  findByStatus(status: HseIncident['status'], scope: IContractScope) {
+  findByStatus(scope: IContractScope, status: HseIncident['status']) {
     return this.findAll(scope, {
       where: { status } as FindOptionsWhere<HseIncident>,
     });
   }
 
-  findBySeverity(severity: HseIncident['severity'], scope: IContractScope) {
+  findBySeverity(scope: IContractScope, severity: HseIncident['severity']) {
     return this.findAll(scope, {
       where: { severity } as FindOptionsWhere<HseIncident>,
     });
   }
 
-  findBySite(contractSiteId: string, scope: IContractScope) {
+  findBySite(scope: IContractScope, contractSiteId: string) {
     return this.findAll(scope, {
       where: { contractSiteId } as FindOptionsWhere<HseIncident>,
       order: { occurredAt: 'DESC' } as any,
@@ -48,7 +47,7 @@ export class HseIncidentRepository extends ContractScopedRepository<HseIncident>
       .getMany();
   }
 
-  findOccurredBetween(from: Date, to: Date, scope: IContractScope) {
+  findOccurredBetween(scope: IContractScope, from: Date, to: Date) {
     return this.scopedQuery(scope)
       .andWhere('e.occurredAt >= :from AND e.occurredAt <= :to', { from, to })
       .orderBy('e.occurredAt', 'ASC')

@@ -12,14 +12,14 @@ export class MilestoneRepository extends ContractScopedRepository<Milestone> {
     super(repository);
   }
 
-  findByStage(contractStageId: string, scope: Scope) {
+  findByStage(scope: Scope, contractStageId: string) {
     return this.findAll(scope, {
       where: { contractStageId } as FindOptionsWhere<Milestone>,
       order: { sequence: 'ASC' } as any,
     });
   }
 
-  findByStatus(status: Milestone['status'], scope: Scope) {
+  findByStatus(scope: Scope, status: Milestone['status']) {
     return this.findAll(scope, {
       where: { status } as FindOptionsWhere<Milestone>,
     });
@@ -40,7 +40,7 @@ export class MilestoneRepository extends ContractScopedRepository<Milestone> {
   }
 
   /** Not completed and past its (revised) due date. */
-  findOverdue(today: string, scope: Scope) {
+  findOverdue(scope: Scope, today: string) {
     return this.scopedQuery(scope)
       .andWhere('e.completedDate IS NULL')
       .andWhere('COALESCE(e.revisedDueDate, e.dueDate) < :today', { today })

@@ -15,12 +15,6 @@ export class CompanyRepository extends BaseRepository<Company> {
     super(repository);
   }
 
-  async findById(id: string): Promise<Company | null> {
-    return this.repository.findOne({
-      where: { id },
-    });
-  }
-
   async createCompany(dto: CreateCompanyRequestDto): Promise<Company> {
     const company = this.repository.create({
       ...dto,

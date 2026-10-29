@@ -15,8 +15,8 @@ export class NotificationRepository extends ContractScopedRepository<Notificatio
   }
 
   async findPageForRecipient(
-    recipientUserId: string,
     scope: IContractScope,
+    recipientUserId: string,
     options: { skip?: number; take?: number } = {},
   ): Promise<{ items: Notification[]; total: number }> {
     return this.findPage(scope, {

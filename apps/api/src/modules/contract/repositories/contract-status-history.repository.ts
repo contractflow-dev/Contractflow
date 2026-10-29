@@ -31,7 +31,7 @@ export class ContractStatusHistoryRepository extends AppendOnlyContractScopedRep
   }
 
   findLatest(scope: IContractScope) {
-    return this.findOne({ order: { changedAt: 'DESC' } as any }, scope);
+    return this.findOne(scope, { order: { changedAt: 'DESC' } as any });
   }
 
   async searchPage(

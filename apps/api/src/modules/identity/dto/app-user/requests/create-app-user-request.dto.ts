@@ -8,6 +8,7 @@ import {
   IsTimeZone,
   IsOptional,
 } from 'class-validator';
+import { AppUser } from '../../../entities/app-user.entity';
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
 

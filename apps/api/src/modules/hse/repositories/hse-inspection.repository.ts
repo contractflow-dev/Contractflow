@@ -13,35 +13,34 @@ export class HseInspectionRepository extends ContractScopedRepository<HseInspect
     super(repository);
   }
 
-  findByReference(referenceNumber: string, scope: IContractScope) {
-    return this.findOne(
-      { where: { referenceNumber } as FindOptionsWhere<HseInspection> },
-      scope,
-    );
+  findByReference(scope: IContractScope, referenceNumber: string) {
+    return this.findOne(scope, {
+      where: { referenceNumber } as FindOptionsWhere<HseInspection>,
+    });
   }
 
-  findBySite(contractSiteId: string, scope: IContractScope) {
+  findBySite(scope: IContractScope, contractSiteId: string) {
     return this.findAll(scope, {
       where: { contractSiteId } as FindOptionsWhere<HseInspection>,
       order: { scheduledDate: 'DESC' } as any,
     });
   }
 
-  findByStatus(status: HseInspection['status'], scope: IContractScope) {
+  findByStatus(scope: IContractScope, status: HseInspection['status']) {
     return this.findAll(scope, {
       where: { status } as FindOptionsWhere<HseInspection>,
     });
   }
 
   /** Still SCHEDULED after the scheduled date. */
-  findOverdue(today: string, scope: IContractScope) {
+  findOverdue(scope: IContractScope, today: string) {
     return this.scopedQuery(scope)
       .andWhere('e.status = :s', { s: 'SCHEDULED' })
       .andWhere('e.scheduledDate < :today', { today })
       .getMany();
   }
 
-  findScheduledBetween(from: string, to: string, scope: IContractScope) {
+  findScheduledBetween(scope: IContractScope, from: string, to: string) {
     return this.scopedQuery(scope)
       .andWhere('e.scheduledDate >= :from AND e.scheduledDate <= :to', {
         from,

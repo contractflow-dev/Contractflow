@@ -14,13 +14,13 @@ export class HseCorrectiveActionRepository extends ContractScopedRepository<HseC
     super(repository);
   }
 
-  findByIncident(hseIncidentId: string, scope: IContractScope) {
+  findByIncident(scope: IContractScope, hseIncidentId: string) {
     return this.findAll(scope, {
       where: { hseIncidentId } as FindOptionsWhere<HseCorrectiveAction>,
     });
   }
 
-  findByFinding(hseInspectionFindingId: string, scope: IContractScope) {
+  findByFinding(scope: IContractScope, hseInspectionFindingId: string) {
     return this.findAll(scope, {
       where: {
         hseInspectionFindingId,
@@ -28,7 +28,7 @@ export class HseCorrectiveActionRepository extends ContractScopedRepository<HseC
     });
   }
 
-  findByAssignee(assignedToCompanyUserId: string, scope: IContractScope) {
+  findByAssignee(scope: IContractScope, assignedToCompanyUserId: string) {
     return this.findAll(scope, {
       where: {
         assignedToCompanyUserId,
@@ -44,7 +44,7 @@ export class HseCorrectiveActionRepository extends ContractScopedRepository<HseC
       .getMany();
   }
 
-  findOverdue(today: string, scope: IContractScope) {
+  findOverdue(scope: IContractScope, today: string) {
     return this.scopedQuery(scope)
       .andWhere('e.status IN (:...open)', { open: ['OPEN', 'IN_PROGRESS'] })
       .andWhere('e.dueDate < :today', { today })

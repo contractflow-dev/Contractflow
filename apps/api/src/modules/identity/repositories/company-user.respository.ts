@@ -23,24 +23,21 @@ export class CompanyUserRepository extends CompanyScopedRepository<
 
   /** The user's current membership of the scoped company, or null. */
   findActiveMember(
-    userId: string,
     scope: ICompanyScope,
+    userId: string,
   ): Promise<CompanyUser | null> {
-    return this.findOne(
-      {
-        where: {
-          userId,
-          status: ECompanyUserStatus.ACTIVE,
-          leftAt: IsNull(),
-        },
+    return this.findOne(scope, {
+      where: {
+        userId,
+        status: ECompanyUserStatus.ACTIVE,
+        leftAt: IsNull(),
       },
-      scope,
-    );
+    });
   }
 
   findByRole(
-    companyRole: CompanyUser['companyRole'],
     scope: ICompanyScope,
+    companyRole: CompanyUser['companyRole'],
   ): Promise<CompanyUser[]> {
     return this.findAll(scope, { where: { companyRole } });
   }

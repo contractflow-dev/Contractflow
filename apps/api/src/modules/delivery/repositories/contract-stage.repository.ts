@@ -19,7 +19,7 @@ export class ContractStageRepository extends ContractScopedRepository<ContractSt
     return this.findAll(scope, { order: { sequence: 'ASC' } as any });
   }
 
-  findByStatus(status: ContractStage['status'], scope: Scope) {
+  findByStatus(scope: Scope, status: ContractStage['status']) {
     return this.findAll(scope, {
       where: { status } as FindOptionsWhere<ContractStage>,
     });

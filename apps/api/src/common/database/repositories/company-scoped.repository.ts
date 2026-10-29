@@ -21,8 +21,8 @@ export abstract class CompanyScopedRepository<
   Scope extends { companyId?: string } = ICompanyScope,
 > extends BaseRepository<Entity, Scope> {
   protected override applyScope(
-    qb: SelectQueryBuilder<Entity>,
     scope: Scope,
+    qb: SelectQueryBuilder<Entity>,
   ): void {
     qb.andWhere(`${qb.alias}.companyId = :__scopeCompanyId`, {
       __scopeCompanyId: requireCompanyId(scope),
@@ -41,7 +41,7 @@ export abstract class CompanyScopedRepository<
     } as unknown as DeepPartial<Entity>;
   }
 
-  override async save(entity: Entity, scope: Scope): Promise<Entity> {
+  override async save(scope: Scope, entity: Entity): Promise<Entity> {
     if (entity.id?.trim()) {
       throw new BadRequestException(
         'Scoped save only creates new records; use update for existing records',
@@ -49,8 +49,8 @@ export abstract class CompanyScopedRepository<
     }
 
     const scopedEntity = this.repository.create({
-      ...entity,
       ...this.scopeValues(scope),
+      ...entity,
     } as DeepPartial<Entity>);
     return this.repository.save(scopedEntity);
   }

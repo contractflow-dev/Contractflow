@@ -15,7 +15,7 @@ export class CompanyInvitationRepository extends CompanyScopedRepository<Company
     super(repository);
   }
 
-  findByStatus(status: CompanyInvitation['status'], scope: ICompanyScope) {
+  findByStatus(scope: ICompanyScope, status: CompanyInvitation['status']) {
     return this.findAll(scope, {
       where: { status } as FindOptionsWhere<CompanyInvitation>,
     });
@@ -29,14 +29,14 @@ export class CompanyInvitationRepository extends CompanyScopedRepository<Company
   }
 
   /** Duplicate check before sending another invite to the same address. */
-  findPendingByEmail(email: string, scope: ICompanyScope) {
+  findPendingByEmail(scope: ICompanyScope, email: string) {
     return this.scopedQuery(scope)
       .andWhere('e.email = :email AND e.status = :s', { email, s: 'PENDING' })
       .getOne();
   }
 
   /** PENDING invitations past their expiry; for the expiry job. */
-  findExpired(now: Date, scope: ICompanyScope) {
+  findExpired(scope: ICompanyScope, now: Date) {
     return this.scopedQuery(scope)
       .andWhere('e.status = :s AND e.expiresAt < :now', { s: 'PENDING', now })
       .getMany();

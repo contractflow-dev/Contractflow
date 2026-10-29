@@ -28,15 +28,13 @@ export class ContractRepository extends BaseRepository<
   Contract,
   ICompanyScope
 > {
-  constructor(
-    @InjectRepository(Contract) repository: Repository<Contract>,
-  ) {
+  constructor(@InjectRepository(Contract) repository: Repository<Contract>) {
     super(repository);
   }
 
   protected override applyScope(
-    qb: SelectQueryBuilder<Contract>,
     scope: ICompanyScope,
+    qb: SelectQueryBuilder<Contract>,
   ): void {
     const companyId = scope?.companyId?.trim();
     if (!companyId) {
@@ -53,8 +51,8 @@ export class ContractRepository extends BaseRepository<
   }
 
   override async findById(
-    id: string,
     scope: ICompanyScope,
+    id: string,
   ): Promise<Contract | null> {
     return this.scopedQuery(scope, 'contract')
       .andWhere('contract.deletedAt IS NULL')

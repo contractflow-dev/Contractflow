@@ -21,25 +21,22 @@ export class ContractPartyRepository extends ContractScopedRepository<ContractPa
   }
 
   /** The row that links a company to this contract (used by access checks). */
-  findByCompany(companyId: string, scope: Scope) {
-    return this.findOne(
-      { where: { companyId } as FindOptionsWhere<ContractParty> },
-      scope,
-    );
+  findByCompany(scope: Scope, companyId: string) {
+    return this.findOne(scope, {
+      where: { companyId } as FindOptionsWhere<ContractParty>,
+    });
   }
 
   findAwarding(scope: Scope) {
-    return this.findOne(
-      { where: { partyType: 'client' } as FindOptionsWhere<ContractParty> },
-      scope,
-    );
+    return this.findOne(scope, {
+      where: { partyType: 'client' } as FindOptionsWhere<ContractParty>,
+    });
   }
 
   findAwarded(scope: Scope) {
-    return this.findOne(
-      { where: { partyType: 'contractor' } as FindOptionsWhere<ContractParty> },
-      scope,
-    );
+    return this.findOne(scope, {
+      where: { partyType: 'contractor' } as FindOptionsWhere<ContractParty>,
+    });
   }
 
   /** True once every party has signed (drives PENDING_SIGNATURE -> ACTIVE). */

@@ -23,8 +23,8 @@ export class DocumentRepository extends CompanyScopedRepository<Document> {
   }
 
   protected override applyScope(
-    qb: SelectQueryBuilder<Document>,
     scope: ICompanyScope,
+    qb: SelectQueryBuilder<Document>,
   ): void {
     qb.andWhere(`${qb.alias}.ownerCompanyId = :__scopeOwnerCompanyId`, {
       __scopeOwnerCompanyId: requireCompanyId(scope),
@@ -45,7 +45,7 @@ export class DocumentRepository extends CompanyScopedRepository<Document> {
     } as unknown as DeepPartial<Document>;
   }
 
-  findByContract(contractId: string, scope: ICompanyScope) {
+  findByContract(scope: ICompanyScope, contractId: string) {
     return this.findAll(scope, {
       where: { contractId } as FindOptionsWhere<Document>,
       order: { createdAt: 'DESC' } as any,
@@ -60,22 +60,21 @@ export class DocumentRepository extends CompanyScopedRepository<Document> {
       .getMany();
   }
 
-  findByCategory(category: Document['category'], scope: ICompanyScope) {
+  findByCategory(scope: ICompanyScope, category: Document['category']) {
     return this.findAll(scope, {
       where: { category } as FindOptionsWhere<Document>,
     });
   }
 
-  findByStatus(status: Document['status'], scope: ICompanyScope) {
+  findByStatus(scope: ICompanyScope, status: Document['status']) {
     return this.findAll(scope, {
       where: { status } as FindOptionsWhere<Document>,
     });
   }
 
-  findByDocumentNumber(documentNumber: string, scope: ICompanyScope) {
-    return this.findOne(
-      { where: { documentNumber } as FindOptionsWhere<Document> },
-      scope,
-    );
+  findByDocumentNumber(scope: ICompanyScope, documentNumber: string) {
+    return this.findOne(scope, {
+      where: { documentNumber } as FindOptionsWhere<Document>,
+    });
   }
 }

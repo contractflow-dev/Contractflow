@@ -12,7 +12,7 @@ export class PaymentRepository extends ContractScopedRepository<Payment> {
     super(repository);
   }
 
-  findByInvoice(invoiceId: string, scope: IContractScope) {
+  findByInvoice(scope: IContractScope, invoiceId: string) {
     return this.findAll(scope, {
       where: { invoiceId } as FindOptionsWhere<Payment>,
       order: { paymentDate: 'ASC' } as any,
@@ -20,21 +20,19 @@ export class PaymentRepository extends ContractScopedRepository<Payment> {
   }
 
   findByReference(paymentReference: string, scope: IContractScope) {
-    return this.findOne(
-      { where: { paymentReference } as FindOptionsWhere<Payment> },
-      scope,
-    );
+    return this.findOne(scope, {
+      where: { paymentReference } as FindOptionsWhere<Payment>,
+    });
   }
 
   /** Idempotent create: look up before inserting a retried request. */
-  findByIdempotencyKey(idempotencyKey: string, scope: IContractScope) {
-    return this.findOne(
-      { where: { idempotencyKey } as FindOptionsWhere<Payment> },
-      scope,
-    );
+  findByIdempotencyKey(scope: IContractScope, idempotencyKey: string) {
+    return this.findOne(scope, {
+      where: { idempotencyKey } as FindOptionsWhere<Payment>,
+    });
   }
 
-  findByStatus(status: Payment['status'], scope: IContractScope) {
+  findByStatus(scope: IContractScope, status: Payment['status']) {
     return this.findAll(scope, {
       where: { status } as FindOptionsWhere<Payment>,
     });
@@ -50,8 +48,8 @@ export class PaymentRepository extends ContractScopedRepository<Payment> {
 
   /** Feeds invoice.amount_paid_minor: COMPLETED payments in the invoice's currency. */
   completedAmountForInvoice(
-    invoiceId: string,
     scope: IContractScope,
+    invoiceId: string,
   ): Promise<bigint> {
     return sumBigint(
       this.scopedQuery(scope)
