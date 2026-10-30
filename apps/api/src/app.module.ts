@@ -10,6 +10,7 @@ import { DeliveryModule } from './modules/delivery/delivery.module';
 import { FinancialModule } from './modules/financial/financial.module';
 import { HseModule } from './modules/hse/hse.module';
 import { SiteOperationsModule } from './modules/site-operations/site-operations.module';
+import { MailModule } from './modules/mail/mail.module';
 import { EnvVars, NodeEnv, validateEnv } from './config/env.validation';
 import { HealthController } from './health.controller';
 import { TYPEORM_EXECUTION_SAFETY } from './common/database/typeorm-execution-options';
@@ -22,11 +23,14 @@ import { TYPEORM_EXECUTION_SAFETY } from './common/database/typeorm-execution-op
       envFilePath: ['.env'],
       validate: validateEnv,
     }),
+
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const isProd = config.get('NODE_ENV') === 'production';
-        const dbSync = String(config.get('DB_SYNC')).toLowerCase() === 'true';
+        const dbSync =
+          String(config.get('DB_SYNC')).toLowerCase() === 'true';
+
         return {
           type: 'postgres' as const,
           url: config.getOrThrow<string>('DATABASE_URL'),
@@ -34,10 +38,17 @@ import { TYPEORM_EXECUTION_SAFETY } from './common/database/typeorm-execution-op
           ...TYPEORM_EXECUTION_SAFETY,
           synchronize: !isProd || dbSync,
           ssl: isProd ? { rejectUnauthorized: false } : false,
-          extra: isProd ? { ssl: { rejectUnauthorized: false } } : {},
+          extra: isProd
+            ? {
+                ssl: {
+                  rejectUnauthorized: false,
+                },
+              }
+            : {},
         };
       },
     }),
+
     IdentityModule,
     ContractModule,
     CrossCuttingModule,
@@ -47,7 +58,9 @@ import { TYPEORM_EXECUTION_SAFETY } from './common/database/typeorm-execution-op
     FinancialModule,
     HseModule,
     SiteOperationsModule,
+    MailModule,
   ],
+
   controllers: [HealthController],
 })
 export class AppModule {}
