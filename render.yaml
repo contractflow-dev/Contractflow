@@ -70,4 +70,4 @@ services:
         value: production
 
       - key: NEXT_PUBLIC_API_URL
-        value: https://contractflow-api-5tu7.onrender.com
+        value: https://contractflow-api-5tu7.onrender.com/api

@@ -261,7 +261,14 @@ export class AuthService {
 
     const secure =
       this.config.get('NODE_ENV') === 'production' ? '; Secure' : '';
-    const cookie = `${SESSION_COOKIE}=${sessionToken}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${Math.floor((expiresAt.getTime() - Date.now()) / 1000)}${secure}`;
+
+    const sameSite =
+      this.config.get('NODE_ENV') === 'production'
+        ? 'None'
+        : 'Lax';
+
+    const cookie = `${SESSION_COOKIE}=${sessionToken}; HttpOnly; Path=/; SameSite=${sameSite}; Max-Age=${Math.floor((expiresAt.getTime() - Date.now()) / 1000)}${secure}`;
+    
     return { user: AppUserResponseDto.fromEntity(user), cookie };
   }
 
