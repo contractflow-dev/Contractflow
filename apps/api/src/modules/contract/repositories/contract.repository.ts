@@ -1,7 +1,11 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository, SelectQueryBuilder } from 'typeorm';
-import type { EContractStatus } from '@contractflow/contracts-schema';
+import {
+  EContractSortField,
+  ESortOrder,
+  type EContractStatus,
+} from '@contractflow/contracts-schema';
 import { BaseRepository } from '../../../common/database/repositories/base.repository';
 import type { ICompanyScope } from '../../../common/database/repositories/company-scope.interface';
 import { Contract } from '../entities/contract.entity';
@@ -12,9 +16,21 @@ export interface ContractSearch {
   status?: EContractStatus;
   includeDeleted?: boolean;
   creatorCompanyId?: string;
+  sortBy?: EContractSortField;
+  sortOrder?: ESortOrder;
   skip?: number;
   take?: number;
 }
+
+/** Allowlisted `sortBy` values mapped to columns; never interpolate input. */
+const SORT_COLUMNS: Record<EContractSortField, string> = {
+  [EContractSortField.CREATED_AT]: 'contract.createdAt',
+  [EContractSortField.REFERENCE_NUMBER]: 'contract.referenceNumber',
+  [EContractSortField.TITLE]: 'contract.title',
+  [EContractSortField.STATUS]: 'contract.status',
+  [EContractSortField.START_DATE]: 'contract.startDate',
+  [EContractSortField.END_DATE]: 'contract.endDate',
+};
 
 /**
  * A contract has no company column: a company sees it through its
@@ -91,8 +107,13 @@ export class ContractRepository extends BaseRepository<
       );
     }
 
+    const sortColumn =
+      SORT_COLUMNS[options.sortBy ?? EContractSortField.CREATED_AT];
+    const sortOrder =
+      options.sortOrder === ESortOrder.ASC ? ESortOrder.ASC : ESortOrder.DESC;
+    // `id` is unique, so equal sort values keep a stable order across pages.
     const [items, total] = await qb
-      .orderBy('contract.createdAt', 'DESC')
+      .orderBy(sortColumn, sortOrder)
       .addOrderBy('contract.id', 'ASC')
       .skip(options.skip)
       .take(options.take)

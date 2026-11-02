@@ -12,13 +12,17 @@ describe("dashboard settings route", () => {
     redirectMock.mockClear();
   });
 
-  it("redirects the duplicate settings route to the canonical profile route", async () => {
+  it("removes company context while preserving unrelated query parameters", async () => {
     await DashboardSettingsPage({
-      searchParams: Promise.resolve({ companyId: "company one" }),
+      searchParams: Promise.resolve({
+        companyId: "company one",
+        search: "bridge & road",
+        page: "3",
+      }),
     });
 
     expect(redirectMock).toHaveBeenCalledWith(
-      "/dashboards/profile?companyId=company%20one",
+      "/dashboards/profile?search=bridge+%26+road&page=3",
     );
   });
 

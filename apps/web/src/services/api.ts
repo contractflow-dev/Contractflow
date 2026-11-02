@@ -1,10 +1,50 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { clearUser } from "@/features/auth/authSlice";
+import type { RootState } from "@/store";
 import { getApiBaseUrl } from "@/lib/apiBaseUrl";
+
+const COMPANY_CONTEXT_EXEMPT_ENDPOINTS = new Set([
+  "getCurrentUser",
+  "login",
+  "register",
+  "verifyEmail",
+  "resendVerificationEmail",
+  "logout",
+  "getCompanies",
+  "getCurrentCompany",
+  "createCompany",
+  "getPublicCompanyInvitation",
+  "respondToCompanyInvitation",
+  "getPublicContractPartyInvitation",
+  "respondToContractPartyInvitation",
+  "getPublicContractRoleInvitation",
+  "respondToContractRoleInvitation",
+  "getOnboardingStatus",
+  "submitProfile",
+  "submitRole",
+  "completeOnboarding",
+  "getAdminOverview",
+  "getWorkspaces",
+  "createWorkspace",
+]);
 
 const baseQuery = fetchBaseQuery({
   baseUrl: getApiBaseUrl(),
   credentials: "include",
+  prepareHeaders: (headers, { endpoint, getState }) => {
+    if (COMPANY_CONTEXT_EXEMPT_ENDPOINTS.has(endpoint)) {
+      headers.delete("X-Company-Id");
+      return headers;
+    }
+
+    const companyId = (getState() as RootState).workspace.activeWorkspaceId;
+    if (companyId) {
+      headers.set("X-Company-Id", companyId);
+    } else {
+      headers.delete("X-Company-Id");
+    }
+    return headers;
+  },
 });
 
 function isProtectedRoute(pathname: string): boolean {

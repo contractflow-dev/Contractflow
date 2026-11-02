@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
+import { TypeOrmUnitOfWork } from '../../common/database/typeorm-unit-of-work';
 import { ContractController } from './controllers/contract-controller';
 import { ContractRoleInvitationController } from './controllers/contract-role-invitation.controller';
 import { ContractPartyInvitationController } from './controllers/contract-party-invitation.controller';
@@ -23,6 +25,20 @@ import { ContractPartyRepository } from './repositories/contract-party.repositor
 import { ContractRepository } from './repositories/contract.repository';
 import { ContractRoleAssignmentRepository } from './repositories/contract-role-assignment.repository';
 import { ContractWorkspaceRepository } from './repositories/contract-workspace.repository';
+import { ContractLifecycleContextFactory } from './repositories/contract-lifecycle-context.factory';
+import {
+  CONTRACT_LIFECYCLE_UNIT_OF_WORK,
+  type IContractLifecycleContext,
+} from './interfaces/contract-lifecycle-persistence.interface';
+import {
+  CONTRACT_ROLE_ASSIGNMENT_PERSISTENCE,
+  CONTRACT_ROLE_ASSIGNMENT_UNIT_OF_WORK,
+  type IContractRoleAssignmentTransactionContext,
+} from './interfaces/contract-role-assignment-persistence.interface';
+import {
+  ContractRoleAssignmentTransactionContextFactory,
+  TypeOrmContractRoleAssignmentContext,
+} from './repositories/contract-role-assignment-transaction-context.factory';
 
 @Module({
   imports: [
@@ -55,6 +71,30 @@ import { ContractWorkspaceRepository } from './repositories/contract-workspace.r
     ContractRoleAssignmentRepository,
     ContractWorkspaceRepository,
     ContractStatusHistoryRepository,
+    {
+      provide: CONTRACT_LIFECYCLE_UNIT_OF_WORK,
+      useFactory: (dataSource: DataSource) =>
+        new TypeOrmUnitOfWork<IContractLifecycleContext>(
+          dataSource,
+          new ContractLifecycleContextFactory(),
+        ),
+      inject: [DataSource],
+    },
+    {
+      provide: CONTRACT_ROLE_ASSIGNMENT_PERSISTENCE,
+      useFactory: (dataSource: DataSource) =>
+        new TypeOrmContractRoleAssignmentContext(dataSource.manager),
+      inject: [DataSource],
+    },
+    {
+      provide: CONTRACT_ROLE_ASSIGNMENT_UNIT_OF_WORK,
+      useFactory: (dataSource: DataSource) =>
+        new TypeOrmUnitOfWork<IContractRoleAssignmentTransactionContext>(
+          dataSource,
+          new ContractRoleAssignmentTransactionContextFactory(),
+        ),
+      inject: [DataSource],
+    },
   ],
   exports: [
     ContractAccessService,

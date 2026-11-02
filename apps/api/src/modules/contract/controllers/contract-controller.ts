@@ -7,8 +7,11 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
+import { CurrentCompanyId } from '../../../common/decorators/current-company-id.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { CompanyContextGuard } from '../../../common/guards/company-context.guard';
 import type { AuthenticatedUser } from '../../identity/interface/auth-context.interface';
 import {
   CreateContractRoleAssignmentRequestDto,
@@ -17,9 +20,7 @@ import {
   SetWorkspaceAdminRequestDto,
 } from '../dto/contract-role-assignment.dto';
 import { CreateContractRequestDto } from '../dto/create-contract-request.dto';
-import {
-  CreateContractPartyInvitationRequestDto,
-} from '../dto/contract-party-invitation.dto';
+import { CreateContractPartyInvitationRequestDto } from '../dto/contract-party-invitation.dto';
 import {
   ListContractStatusHistoryRequestDto,
   ListContractsRequestDto,
@@ -32,6 +33,7 @@ import { ContractLifecycleService } from '../services/contract-lifecycle.service
 import { ContractRoleAssignmentService } from '../services/contract-role-assignment.service';
 
 @Controller('companies/:companyId/contracts')
+@UseGuards(CompanyContextGuard)
 export class ContractController {
   constructor(
     private readonly contractService: ContractService,
@@ -42,7 +44,7 @@ export class ContractController {
   @Post()
   create(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Body() body: CreateContractRequestDto,
   ) {
     return this.lifecycle.create(user.id, companyId, body);
@@ -51,7 +53,7 @@ export class ContractController {
   @Get()
   list(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Query() query: ListContractsRequestDto,
   ) {
     return this.contractService.list(user.id, companyId, query);
@@ -60,33 +62,25 @@ export class ContractController {
   @Get(':contractId/workspaces')
   listWorkspaces(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
   ) {
-    return this.contractService.listWorkspaces(
-      user.id,
-      companyId,
-      contractId,
-    );
+    return this.contractService.listWorkspaces(user.id, companyId, contractId);
   }
 
   @Get(':contractId/lifecycle-permissions')
   lifecyclePermissions(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
   ) {
-    return this.lifecycle.managementPermissions(
-      user.id,
-      companyId,
-      contractId,
-    );
+    return this.lifecycle.managementPermissions(user.id, companyId, contractId);
   }
 
   @Patch(':contractId')
   update(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
     @Body() body: UpdateContractRequestDto,
   ) {
@@ -96,7 +90,7 @@ export class ContractController {
   @Patch(':contractId/workspaces')
   updateWorkspaces(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
     @Body() body: UpdateContractWorkspacesRequestDto,
   ) {
@@ -111,7 +105,7 @@ export class ContractController {
   @Post(':contractId/transitions')
   transition(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
     @Body() body: TransitionContractRequestDto,
   ) {
@@ -121,7 +115,7 @@ export class ContractController {
   @Delete(':contractId')
   archive(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
   ) {
     return this.lifecycle.archive(user.id, companyId, contractId);
@@ -130,7 +124,7 @@ export class ContractController {
   @Post(':contractId/restore')
   restore(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
   ) {
     return this.lifecycle.restore(user.id, companyId, contractId);
@@ -139,7 +133,7 @@ export class ContractController {
   @Get(':contractId')
   get(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
   ) {
     return this.contractService.get(user.id, companyId, contractId);
@@ -148,7 +142,7 @@ export class ContractController {
   @Get(':contractId/parties')
   listParties(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
   ) {
     return this.contractService.listParties(user.id, companyId, contractId);
@@ -157,7 +151,7 @@ export class ContractController {
   @Get(':contractId/status-history')
   listStatusHistory(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
     @Query() query: ListContractStatusHistoryRequestDto,
   ) {
@@ -172,35 +166,26 @@ export class ContractController {
   @Get(':contractId/party-invitations')
   listPartyInvitations(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
   ) {
-    return this.lifecycle.listPartyInvitations(
-      user.id,
-      companyId,
-      contractId,
-    );
+    return this.lifecycle.listPartyInvitations(user.id, companyId, contractId);
   }
 
   @Post(':contractId/party-invitations')
   inviteCompany(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
     @Body() body: CreateContractPartyInvitationRequestDto,
   ) {
-    return this.lifecycle.inviteCompany(
-      user.id,
-      companyId,
-      contractId,
-      body,
-    );
+    return this.lifecycle.inviteCompany(user.id, companyId, contractId, body);
   }
 
   @Delete(':contractId/party-invitations/:invitationId')
   revokeCompanyInvitation(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
     @Param('invitationId') invitationId: string,
   ) {
@@ -215,7 +200,7 @@ export class ContractController {
   @Get(':contractId/role-assignments')
   listRoleAssignments(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
     @Query() query: ListContractRoleAssignmentsRequestDto,
   ) {
@@ -230,7 +215,7 @@ export class ContractController {
   @Get(':contractId/role-management')
   roleManagementPermissions(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
     @Query() query: ListContractRoleAssignmentsRequestDto,
   ) {
@@ -245,7 +230,7 @@ export class ContractController {
   @Get(':contractId/role-assignment-members')
   listRoleAssignmentMembers(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
     @Query() query: ListContractRoleAssignmentsRequestDto,
   ) {
@@ -260,7 +245,7 @@ export class ContractController {
   @Post(':contractId/role-assignments')
   assignRole(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
     @Query() query: ListContractRoleAssignmentsRequestDto,
     @Body() body: CreateContractRoleAssignmentRequestDto,
@@ -279,7 +264,7 @@ export class ContractController {
   @Delete(':contractId/role-assignments/:assignmentId')
   revokeRole(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
     @Param('assignmentId') assignmentId: string,
   ) {
@@ -294,7 +279,7 @@ export class ContractController {
   @Patch(':contractId/role-assignments/:assignmentId/workspace-admin')
   setWorkspaceAdmin(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
     @Param('assignmentId') assignmentId: string,
     @Body() body: SetWorkspaceAdminRequestDto,
@@ -311,7 +296,7 @@ export class ContractController {
   @Get(':contractId/role-invitations')
   listRoleInvitations(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
     @Query() query: ListContractRoleAssignmentsRequestDto,
   ) {
@@ -326,7 +311,7 @@ export class ContractController {
   @Post(':contractId/role-invitations')
   inviteContractRole(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
     @Query() query: ListContractRoleAssignmentsRequestDto,
     @Body() body: CreateContractRoleInvitationRequestDto,
@@ -345,7 +330,7 @@ export class ContractController {
   @Delete(':contractId/role-invitations/:invitationId')
   revokeRoleInvitation(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
     @Param('invitationId') invitationId: string,
   ) {

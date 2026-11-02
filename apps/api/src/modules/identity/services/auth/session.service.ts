@@ -1,23 +1,21 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { randomBytes, createHash } from 'node:crypto';
-import { IsNull, Repository } from 'typeorm';
-
 import { EUserStatus } from '@contractflow/contracts-schema';
-
-import { UserSession } from '../../entities/user-session.entity';
 import { AppUser } from '../../entities/app-user.entity';
-
 import {
   RequestMetadata,
   AuthenticatedSession,
 } from '../../interface/auth-context.interface';
+import {
+  USER_SESSION_REPOSITORY,
+  type IUserSessionRepository,
+} from '../../interface/user-session-repository.interface';
 
 @Injectable()
 export class SessionService {
   constructor(
-    @InjectRepository(UserSession)
-    private readonly sessions: Repository<UserSession>,
+    @Inject(USER_SESSION_REPOSITORY)
+    private readonly sessions: IUserSessionRepository,
   ) {}
 
   private hashToken(token: string): string {
@@ -33,16 +31,12 @@ export class SessionService {
 
     const expiresAt = new Date(Date.now() + sessionDays * 24 * 60 * 60 * 1000);
 
-    const session = this.sessions.create({
+    await this.sessions.createSession({
       userId: user.id,
       refreshTokenHash: this.hashToken(sessionToken),
-      ipAddress: metadata.ipAddress,
-      userAgent: metadata.userAgent,
+      metadata,
       expiresAt,
-      revokedAt: null,
     });
-
-    await this.sessions.save(session);
 
     return {
       sessionToken,
@@ -51,15 +45,9 @@ export class SessionService {
   }
 
   async authenticate(sessionToken: string): Promise<AuthenticatedSession> {
-    const session = await this.sessions.findOne({
-      where: {
-        refreshTokenHash: this.hashToken(sessionToken),
-        revokedAt: IsNull(),
-      },
-      relations: {
-        user: true,
-      },
-    });
+    const session = await this.sessions.findActiveWithUser(
+      this.hashToken(sessionToken),
+    );
 
     if (
       !session ||
@@ -85,17 +73,6 @@ export class SessionService {
   async revokeSession(sessionToken: string | undefined): Promise<void> {
     if (!sessionToken) return;
 
-    const session = await this.sessions.findOne({
-      where: {
-        refreshTokenHash: this.hashToken(sessionToken),
-        revokedAt: IsNull(),
-      },
-    });
-
-    if (!session) return;
-
-    session.revokedAt = new Date();
-
-    await this.sessions.save(session);
+    await this.sessions.revokeActive(this.hashToken(sessionToken), new Date());
   }
 }

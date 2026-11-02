@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ContractModule } from '../contract/contract-module';
+import { IdentityModule } from '../identity/identity.module';
 import { SiteOperationsController } from './controllers/site-operations.controller';
 import { ContractSite } from './entities/contract-site.entity';
 import { InventoryItem } from './entities/inventory-item.entity';
@@ -21,6 +22,7 @@ import { SiteOperationsService } from './services/site-operations.service';
       InventoryTransaction,
     ]),
     ContractModule,
+    IdentityModule,
   ],
   controllers: [SiteOperationsController],
   providers: [

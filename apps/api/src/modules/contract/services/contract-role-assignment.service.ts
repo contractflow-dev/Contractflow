@@ -2,41 +2,29 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import {
-  ECompanyRole,
-  ECompanyUserStatus,
-  EContractRole,
-} from '@contractflow/contracts-schema';
+import { ECompanyRole, EContractRole } from '@contractflow/contracts-schema';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import {
-  DataSource,
-  IsNull,
-  LessThanOrEqual,
-  Repository,
-  type EntityManager,
-} from 'typeorm';
-import type { ICompanyScope } from '../../../common/database/repositories/company-scope.interface';
-import { ActivityLog } from '../../cross-cutting/entities/activity-log.entity';
+import type { IUnitOfWork } from '../../../common/application/unit-of-work.interface';
 import { MailService } from '../../mail/mail.service';
-import { CompanyUser } from '../../identity/entities/company-user.entity';
-import { CompanyUserRepository } from '../../identity/repositories/company-user.respository';
-import { Company } from '../../identity/entities/company.entity';
-import { Contract } from '../entities/contract.entity';
-import { ContractParty } from '../entities/contract-party.entity';
-import { ContractRoleAssignment } from '../entities/contract-role-assignment.entity';
-import { ContractRoleInvitation } from '../entities/contract-role-invitation.entity';
-import type { ContractRoleInvitationStatus } from '../entities/contract-role-invitation.entity';
-import { ContractWorkspaceEntity } from '../entities/contract-workspace.entity';
+import {
+  CONTRACT_ROLE_ASSIGNMENT_PERSISTENCE,
+  CONTRACT_ROLE_ASSIGNMENT_UNIT_OF_WORK,
+  type IContractRoleAssignmentRepositories,
+  type IContractRoleAssignmentTransactionContext,
+  type IRoleAssignmentMember,
+  type IRoleAssignmentParty,
+  type IRoleAssignmentRecord,
+  type IRoleInvitationRecord,
+} from '../interfaces/contract-role-assignment-persistence.interface';
 import { ContractRoleAssignmentResponseDto } from '../dto/contract-role-assignment-response.dto';
 import {
   ContractRoleInvitationResponseDto,
   type ContractRoleInvitationPreviewDto,
 } from '../dto/contract-role-invitation-response.dto';
-import { ContractRoleAssignmentRepository } from '../repositories/contract-role-assignment.repository';
 import {
   WORKSPACE_ROLES,
   roleAllowedForParty,
@@ -53,12 +41,11 @@ function hashInvitationToken(token: string): string {
 @Injectable()
 export class ContractRoleAssignmentService {
   constructor(
-    private readonly dataSource: DataSource,
-    private readonly assignments: ContractRoleAssignmentRepository,
-    private readonly companyUsers: CompanyUserRepository,
+    @Inject(CONTRACT_ROLE_ASSIGNMENT_PERSISTENCE)
+    private readonly persistence: IContractRoleAssignmentRepositories,
+    @Inject(CONTRACT_ROLE_ASSIGNMENT_UNIT_OF_WORK)
+    private readonly unitOfWork: IUnitOfWork<IContractRoleAssignmentTransactionContext>,
     private readonly mail: MailService,
-    @InjectRepository(ContractParty)
-    private readonly parties: Repository<ContractParty>,
   ) {}
 
   async managementPermissions(
@@ -67,16 +54,17 @@ export class ContractRoleAssignmentService {
     contractId: string,
     workspace: AssignableContractWorkspace,
   ): Promise<{ canManage: boolean; canGrantWorkspaceAdmin: boolean }> {
-    const membership = await this.companyUsers.findActiveMember(
-      { companyId },
+    const membership = await this.persistence.memberships.findActiveMember(
+      companyId,
       userId,
     );
     if (!membership) {
       throw new ForbiddenException('Active company membership is required.');
     }
-    const party = await this.parties.findOne({
-      where: { contractId, companyId },
-    });
+    const party = await this.persistence.parties.findByContractAndCompany(
+      contractId,
+      companyId,
+    );
     if (!party) {
       throw new NotFoundException('Contract was not found.');
     }
@@ -84,8 +72,8 @@ export class ContractRoleAssignmentService {
       membership.companyRole === ECompanyRole.COMPANY_ADMIN;
     const canManage =
       canGrantWorkspaceAdmin ||
-      (await this.assignments.hasWorkspaceAdmin(
-        { companyId },
+      (await this.persistence.assignments.hasWorkspaceAdmin(
+        companyId,
         membership.id,
         party.id,
         WORKSPACE_ROLES[workspace],
@@ -101,26 +89,14 @@ export class ContractRoleAssignmentService {
   ): Promise<
     Array<{ id: string; firstName: string; lastName: string; email: string }>
   > {
-    await this.resolveAccess(userId, companyId, contractId, workspace);
-    const members = await this.dataSource
-      .getRepository(CompanyUser)
-      .createQueryBuilder('membership')
-      .innerJoinAndSelect('membership.user', 'user')
-      .where('membership.companyId = :companyId', { companyId })
-      .andWhere('membership.status = :active', {
-        active: ECompanyUserStatus.ACTIVE,
-      })
-      .andWhere('membership.leftAt IS NULL')
-      .orderBy('user.lastName', 'ASC')
-      .addOrderBy('user.firstName', 'ASC')
-      .addOrderBy('membership.id', 'ASC')
-      .getMany();
-    return members.map((member) => ({
-      id: member.id,
-      firstName: member.user.firstName,
-      lastName: member.user.lastName,
-      email: member.user.email,
-    }));
+    await this.resolveAccess(
+      this.persistence,
+      userId,
+      companyId,
+      contractId,
+      workspace,
+    );
+    return this.persistence.memberships.listEligible(companyId);
   }
 
   async list(
@@ -130,14 +106,14 @@ export class ContractRoleAssignmentService {
     workspace: AssignableContractWorkspace,
   ): Promise<ContractRoleAssignmentResponseDto[]> {
     const { party } = await this.resolveAccess(
+      this.persistence,
       userId,
       companyId,
       contractId,
       workspace,
     );
-
-    const rows = await this.assignments.findActiveForParty(
-      { companyId },
+    const rows = await this.persistence.assignments.findActiveForParty(
+      companyId,
       party.id,
       contractId,
       WORKSPACE_ROLES[workspace],
@@ -160,25 +136,24 @@ export class ContractRoleAssignmentService {
       );
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    return this.unitOfWork.execute(async (context) => {
       const party = await this.findPartyForUpdate(
-        manager.getRepository(ContractParty),
+        context,
         contractId,
         companyId,
       );
-      await this.assertWorkspaceEnabled(manager, contractId, workspace);
+      await this.assertWorkspaceEnabled(context, contractId, workspace);
       if (!roleAllowedForParty(role, party.partyType)) {
         throw new BadRequestException(
           'The selected contract role is not valid for this company party.',
         );
       }
       const { actor, isCompanyAdmin } = await this.requireManagementActor(
-        manager.getRepository(CompanyUser),
+        context,
         userId,
         companyId,
         party.id,
         workspace,
-        manager,
         companyUserId,
       );
       if (isWorkspaceAdmin && !isCompanyAdmin) {
@@ -186,14 +161,11 @@ export class ContractRoleAssignmentService {
           'Only a Company Admin can grant workspace-admin privileges.',
         );
       }
-      const scope: ICompanyScope = { companyId };
-
-      const duplicate = await this.assignments.findActiveDuplicate(
-        scope,
+      const duplicate = await context.assignments.findActiveDuplicate(
+        companyId,
         party.id,
         companyUserId,
         role,
-        manager,
       );
       if (duplicate) {
         throw new ConflictException(
@@ -202,23 +174,18 @@ export class ContractRoleAssignmentService {
       }
 
       const now = new Date();
-      const assignment = await this.assignments.createInScope(
-        scope,
-        {
-          contractPartyId: party.id,
-          companyUserId,
-          role,
-          isWorkspaceAdmin,
-          assignedAt: now,
-          assignedById: actor.id,
-          revokedAt: null,
-          revokedById: null,
-        },
-        manager,
-      );
-
-      await this.writeActivity(
-        manager,
+      const assignment = await context.assignments.create(companyId, {
+        contractPartyId: party.id,
+        companyUserId,
+        role,
+        isWorkspaceAdmin,
+        assignedAt: now,
+        assignedById: actor.id,
+        revokedAt: null,
+        revokedById: null,
+      });
+      await this.writeAssignmentActivity(
+        context,
         contractId,
         companyId,
         actor.id,
@@ -229,14 +196,8 @@ export class ContractRoleAssignmentService {
         { companyUserId, role, isWorkspaceAdmin },
         now,
       );
-
       return ContractRoleAssignmentResponseDto.fromEntity(
-        await this.loadAssignment(
-          manager.getRepository(ContractRoleAssignment),
-          assignment.id,
-          party.id,
-          companyId,
-        ),
+        await this.loadAssignment(context, assignment.id, party.id, companyId),
       );
     });
   }
@@ -247,17 +208,16 @@ export class ContractRoleAssignmentService {
     contractId: string,
     assignmentId: string,
   ): Promise<ContractRoleAssignmentResponseDto> {
-    return this.dataSource.transaction(async (manager) => {
+    return this.unitOfWork.execute(async (context) => {
       const party = await this.findPartyForUpdate(
-        manager.getRepository(ContractParty),
+        context,
         contractId,
         companyId,
       );
-      const assignment = await this.assignments.findByIdInPartyForUpdate(
-        { companyId },
+      const assignment = await context.assignments.findByIdInPartyForUpdate(
+        companyId,
         assignmentId,
         party.id,
-        manager,
       );
       if (!assignment) {
         throw new NotFoundException('Contract role assignment was not found.');
@@ -267,23 +227,20 @@ export class ContractRoleAssignmentService {
           'This contract role assignment has already been revoked.',
         );
       }
-
       const workspace = workspaceForRole(assignment.role);
       const { actor } = await this.requireManagementActor(
-        manager.getRepository(CompanyUser),
+        context,
         userId,
         companyId,
         party.id,
         workspace,
-        manager,
       );
       if (
         assignment.isWorkspaceAdmin &&
-        (await this.assignments.countActiveWorkspaceAdmins(
-          { companyId },
+        (await context.assignments.countActiveWorkspaceAdmins(
+          companyId,
           party.id,
           WORKSPACE_ROLES[workspace],
-          manager,
         )) <= 1
       ) {
         throw new ConflictException(
@@ -292,14 +249,9 @@ export class ContractRoleAssignmentService {
       }
 
       const revokedAt = new Date();
-      await this.assignments.revokeInScope(
-        assignment,
-        revokedAt,
-        actor.id,
-        manager,
-      );
-      await this.writeActivity(
-        manager,
+      await context.assignments.revoke(assignment, revokedAt, actor.id);
+      await this.writeAssignmentActivity(
+        context,
         contractId,
         companyId,
         actor.id,
@@ -314,14 +266,8 @@ export class ContractRoleAssignmentService {
         null,
         revokedAt,
       );
-
       return ContractRoleAssignmentResponseDto.fromEntity(
-        await this.loadAssignment(
-          manager.getRepository(ContractRoleAssignment),
-          assignment.id,
-          party.id,
-          companyId,
-        ),
+        await this.loadAssignment(context, assignment.id, party.id, companyId),
       );
     });
   }
@@ -333,31 +279,28 @@ export class ContractRoleAssignmentService {
     assignmentId: string,
     isWorkspaceAdmin: boolean,
   ): Promise<ContractRoleAssignmentResponseDto> {
-    return this.dataSource.transaction(async (manager) => {
+    return this.unitOfWork.execute(async (context) => {
       const party = await this.findPartyForUpdate(
-        manager.getRepository(ContractParty),
+        context,
         contractId,
         companyId,
       );
       const { actor, isCompanyAdmin } = await this.requireManagementActor(
-        manager.getRepository(CompanyUser),
+        context,
         userId,
         companyId,
         party.id,
         undefined,
-        manager,
       );
       if (!isCompanyAdmin) {
         throw new ForbiddenException(
           'Only a Company Admin can grant or revoke workspace-admin privileges.',
         );
       }
-
-      const assignment = await this.assignments.findByIdInPartyForUpdate(
-        { companyId },
+      const assignment = await context.assignments.findByIdInPartyForUpdate(
+        companyId,
         assignmentId,
         party.id,
-        manager,
       );
       if (!assignment || assignment.revokedAt) {
         throw new NotFoundException(
@@ -367,34 +310,31 @@ export class ContractRoleAssignmentService {
       if (assignment.isWorkspaceAdmin === isWorkspaceAdmin) {
         return ContractRoleAssignmentResponseDto.fromEntity(
           await this.loadAssignment(
-            manager.getRepository(ContractRoleAssignment),
+            context,
             assignment.id,
             party.id,
             companyId,
           ),
         );
       }
-
       const workspace = workspaceForRole(assignment.role);
       if (
         !isWorkspaceAdmin &&
-        (await this.assignments.countActiveWorkspaceAdmins(
-          { companyId },
+        (await context.assignments.countActiveWorkspaceAdmins(
+          companyId,
           party.id,
           WORKSPACE_ROLES[workspace],
-          manager,
         )) <= 1
       ) {
         throw new ConflictException(
           'Assign another workspace administrator before removing this privilege.',
         );
       }
-
       const before = { isWorkspaceAdmin: assignment.isWorkspaceAdmin };
       assignment.isWorkspaceAdmin = isWorkspaceAdmin;
-      await manager.getRepository(ContractRoleAssignment).save(assignment);
-      await this.writeActivity(
-        manager,
+      await context.assignments.save(assignment);
+      await this.writeAssignmentActivity(
+        context,
         contractId,
         companyId,
         actor.id,
@@ -408,12 +348,7 @@ export class ContractRoleAssignmentService {
         new Date(),
       );
       return ContractRoleAssignmentResponseDto.fromEntity(
-        await this.loadAssignment(
-          manager.getRepository(ContractRoleAssignment),
-          assignment.id,
-          party.id,
-          companyId,
-        ),
+        await this.loadAssignment(context, assignment.id, party.id, companyId),
       );
     });
   }
@@ -425,25 +360,22 @@ export class ContractRoleAssignmentService {
     workspace: AssignableContractWorkspace,
   ): Promise<ContractRoleInvitationResponseDto[]> {
     const { party } = await this.resolveAccess(
+      this.persistence,
       userId,
       companyId,
       contractId,
       workspace,
     );
-    const repository = this.dataSource.getRepository(ContractRoleInvitation);
-    await repository.update(
-      {
-        contractPartyId: party.id,
-        workspace,
-        status: 'pending',
-        expiresAt: LessThanOrEqual(new Date()),
-      },
-      { status: 'expired' },
+    await this.persistence.invitations.expireForParty(
+      party.id,
+      workspace,
+      new Date(),
     );
-    const invitations = await repository.find({
-      where: { contractPartyId: party.id, companyId, workspace },
-      order: { createdAt: 'DESC', id: 'ASC' },
-    });
+    const invitations = await this.persistence.invitations.listForParty(
+      companyId,
+      party.id,
+      workspace,
+    );
     return invitations.map(ContractRoleInvitationResponseDto.fromEntity);
   }
 
@@ -461,26 +393,24 @@ export class ContractRoleAssignmentService {
         'The selected contract role does not belong to this workspace.',
       );
     }
-
-    return this.dataSource.transaction(async (manager) => {
+    return this.unitOfWork.execute(async (context) => {
       const party = await this.findPartyForUpdate(
-        manager.getRepository(ContractParty),
+        context,
         contractId,
         companyId,
       );
-      await this.assertWorkspaceEnabled(manager, contractId, workspace);
+      await this.assertWorkspaceEnabled(context, contractId, workspace);
       if (!roleAllowedForParty(role, party.partyType)) {
         throw new BadRequestException(
           'The selected contract role is not valid for this company party.',
         );
       }
       const { actor, isCompanyAdmin } = await this.requireManagementActor(
-        manager.getRepository(CompanyUser),
+        context,
         userId,
         companyId,
         party.id,
         workspace,
-        manager,
       );
       if (isWorkspaceAdmin && !isCompanyAdmin) {
         throw new ForbiddenException(
@@ -490,50 +420,30 @@ export class ContractRoleAssignmentService {
 
       const normalizedEmail = email.trim().toLowerCase();
       const now = new Date();
-      const invitations = manager.getRepository(ContractRoleInvitation);
-      await invitations.update(
-        {
-          contractPartyId: party.id,
-          email: normalizedEmail,
-          role,
-          status: 'pending',
-          expiresAt: LessThanOrEqual(now),
-        },
-        { status: 'expired' },
+      await context.invitations.expirePending(
+        party.id,
+        normalizedEmail,
+        role,
+        now,
       );
-      const existingInvitation = await invitations.findOne({
-        where: {
-          contractPartyId: party.id,
-          email: normalizedEmail,
-          role,
-          status: 'pending',
-        },
-      });
-      if (existingInvitation) {
+      if (
+        await context.invitations.findPending(party.id, normalizedEmail, role)
+      ) {
         throw new ConflictException(
           'A pending invitation already exists for this email and role.',
         );
       }
-
-      const member = await manager
-        .getRepository(CompanyUser)
-        .createQueryBuilder('membership')
-        .innerJoin('membership.user', 'user')
-        .where('membership.companyId = :companyId', { companyId })
-        .andWhere('membership.status = :active', {
-          active: ECompanyUserStatus.ACTIVE,
-        })
-        .andWhere('membership.leftAt IS NULL')
-        .andWhere('LOWER(user.email) = :email', { email: normalizedEmail })
-        .getOne();
+      const member = await context.memberships.findActiveByEmail(
+        companyId,
+        normalizedEmail,
+      );
       if (
         member &&
-        (await this.assignments.findActiveDuplicate(
-          { companyId },
+        (await context.assignments.findActiveDuplicate(
+          companyId,
           party.id,
           member.id,
           role,
-          manager,
         ))
       ) {
         throw new ConflictException(
@@ -542,7 +452,7 @@ export class ContractRoleAssignmentService {
       }
 
       const token = randomBytes(32).toString('base64url');
-      const invitation = invitations.create({
+      const saved = await context.invitations.create({
         contractPartyId: party.id,
         companyId,
         invitedById: actor.id,
@@ -556,18 +466,11 @@ export class ContractRoleAssignmentService {
         respondedAt: null,
         revokedAt: null,
       });
-      const saved = await invitations.save(invitation);
-      const [contract, company] = await Promise.all([
-        manager.getRepository(Contract).findOne({
-          where: { id: contractId },
-          select: { id: true, title: true },
-        }),
-        manager.getRepository(Company).findOne({
-          where: { id: companyId },
-          select: { id: true, name: true },
-        }),
+      const [contract, companyName] = await Promise.all([
+        context.contracts.findInvitationDetails(contractId),
+        context.companies.findName(companyId),
       ]);
-      if (!contract || !company) {
+      if (!contract || !companyName) {
         throw new NotFoundException('Contract or company was not found.');
       }
       await this.mail.sendContractRoleInvitationEmail(
@@ -578,7 +481,7 @@ export class ContractRoleAssignmentService {
         token,
       );
       await this.writeInvitationActivity(
-        manager,
+        context,
         contractId,
         companyId,
         actor.id,
@@ -596,27 +499,26 @@ export class ContractRoleAssignmentService {
     contractId: string,
     invitationId: string,
   ): Promise<ContractRoleInvitationResponseDto> {
-    return this.dataSource.transaction(async (manager) => {
+    return this.unitOfWork.execute(async (context) => {
       const party = await this.findPartyForUpdate(
-        manager.getRepository(ContractParty),
+        context,
         contractId,
         companyId,
       );
-      const invitations = manager.getRepository(ContractRoleInvitation);
-      const invitation = await invitations.findOne({
-        where: { id: invitationId, contractPartyId: party.id, companyId },
-        lock: { mode: 'pessimistic_write' },
-      });
+      const invitation = await context.invitations.findByIdForUpdate(
+        invitationId,
+        party.id,
+        companyId,
+      );
       if (!invitation) {
         throw new NotFoundException('Contract role invitation was not found.');
       }
       const { actor } = await this.requireManagementActor(
-        manager.getRepository(CompanyUser),
+        context,
         userId,
         companyId,
         party.id,
         invitation.workspace,
-        manager,
       );
       if (invitation.status !== 'pending' || invitation.revokedAt) {
         throw new ConflictException('This invitation is no longer pending.');
@@ -624,14 +526,14 @@ export class ContractRoleAssignmentService {
       const now = new Date();
       if (invitation.expiresAt <= now) {
         invitation.status = 'expired';
-        await invitations.save(invitation);
+        await context.invitations.save(invitation);
         return ContractRoleInvitationResponseDto.fromEntity(invitation);
       }
       invitation.status = 'revoked';
       invitation.revokedAt = now;
-      await invitations.save(invitation);
+      await context.invitations.save(invitation);
       await this.writeInvitationActivity(
-        manager,
+        context,
         contractId,
         companyId,
         actor.id,
@@ -647,9 +549,7 @@ export class ContractRoleAssignmentService {
     token: string,
   ): Promise<ContractRoleInvitationPreviewDto> {
     const hash = hashInvitationToken(token);
-    const invitation = await this.dataSource
-      .getRepository(ContractRoleInvitation)
-      .findOne({ where: { tokenHash: hash } });
+    const invitation = await this.persistence.invitations.findByTokenHash(hash);
     if (!invitation) {
       throw new NotFoundException('Contract role invitation was not found.');
     }
@@ -657,44 +557,31 @@ export class ContractRoleAssignmentService {
       throw new ConflictException('This invitation is no longer active.');
     }
     if (invitation.expiresAt <= new Date()) {
-      await this.dataSource
-        .getRepository(ContractRoleInvitation)
-        .update(
-          { id: invitation.id, status: 'pending' },
-          { status: 'expired' },
-        );
+      await this.persistence.invitations.expireById(invitation.id);
       throw new ConflictException('This invitation has expired.');
     }
-    const party = await this.parties.findOne({
-      where: {
-        id: invitation.contractPartyId,
-        companyId: invitation.companyId,
-      },
-    });
+    const party = await this.persistence.parties.findByIdAndCompany(
+      invitation.contractPartyId,
+      invitation.companyId,
+    );
     if (!party) {
       throw new NotFoundException('Contract role invitation was not found.');
     }
-    const [contract, company] = await Promise.all([
-      this.dataSource.getRepository(Contract).findOne({
-        where: { id: party.contractId, deletedAt: IsNull() },
-        select: { id: true, title: true },
-      }),
-      this.dataSource.getRepository(Company).findOne({
-        where: { id: invitation.companyId },
-        select: { id: true, name: true },
-      }),
+    const [contract, companyName] = await Promise.all([
+      this.persistence.contracts.findInvitationDetails(party.contractId),
+      this.persistence.companies.findName(invitation.companyId),
     ]);
-    if (!contract || !company) {
+    if (!contract || !companyName) {
       throw new NotFoundException('Contract or company was not found.');
     }
     await this.assertWorkspaceEnabled(
-      this.dataSource.manager,
+      this.persistence,
       party.contractId,
       invitation.workspace,
     );
     return {
       contractTitle: contract.title,
-      companyName: company.name,
+      companyName,
       email: invitation.email,
       role: invitation.role,
       workspace: invitation.workspace,
@@ -710,7 +597,7 @@ export class ContractRoleAssignmentService {
     token: string,
     decision: 'accept' | 'decline',
   ): Promise<{
-    status: ContractRoleInvitationStatus;
+    status: 'accepted' | 'rejected';
     assignment?: ContractRoleAssignmentResponseDto;
   }> {
     if (!isEmailVerified) {
@@ -719,42 +606,38 @@ export class ContractRoleAssignmentService {
       );
     }
     const tokenHash = hashInvitationToken(token);
-    const initial = await this.dataSource
-      .getRepository(ContractRoleInvitation)
-      .findOne({ where: { tokenHash } });
+    const initial =
+      await this.persistence.invitations.findByTokenHash(tokenHash);
     if (!initial) {
       throw new NotFoundException('Contract role invitation was not found.');
     }
-
-    const result = await this.dataSource.transaction(async (manager) => {
-      const initialParty = await manager
-        .getRepository(ContractParty)
-        .findOne({ where: { id: initial.contractPartyId } });
+    const result = await this.unitOfWork.execute(async (context) => {
+      const initialParty = await context.parties.findByIdAndCompany(
+        initial.contractPartyId,
+        initial.companyId,
+      );
       if (!initialParty) {
         throw new NotFoundException('Contract role invitation was not found.');
       }
-      const contract = await manager.getRepository(Contract).findOne({
-        where: { id: initialParty.contractId, deletedAt: IsNull() },
-        lock: { mode: 'pessimistic_write' },
-      });
+      const contract = await context.contracts.findActiveForUpdate(
+        initialParty.contractId,
+      );
       if (!contract) {
         throw new NotFoundException('Contract role invitation was not found.');
       }
-      const party = await manager.getRepository(ContractParty).findOne({
-        where: {
-          id: initial.contractPartyId,
-          companyId: initial.companyId,
-        },
-        lock: { mode: 'pessimistic_write' },
-      });
+      const party = await context.parties.findByIdAndCompanyForUpdate(
+        initial.contractPartyId,
+        initial.companyId,
+      );
       if (!party) {
         throw new NotFoundException('Contract role invitation was not found.');
       }
-      const invitations = manager.getRepository(ContractRoleInvitation);
-      const invitation = await invitations.findOne({
-        where: { id: initial.id, tokenHash },
-        lock: { mode: 'pessimistic_write' },
-      });
+      const invitation = await context.invitations.findByIdForUpdate(
+        initial.id,
+        initial.contractPartyId,
+        initial.companyId,
+        tokenHash,
+      );
       if (!invitation) {
         throw new NotFoundException('Contract role invitation was not found.');
       }
@@ -769,34 +652,32 @@ export class ContractRoleAssignmentService {
       const now = new Date();
       if (invitation.expiresAt <= now) {
         invitation.status = 'expired';
-        await invitations.save(invitation);
+        await context.invitations.save(invitation);
         return { status: 'expired' as const };
       }
-
       if (decision === 'decline') {
         invitation.status = 'rejected';
         invitation.respondedAt = now;
-        await invitations.save(invitation);
+        await context.invitations.save(invitation);
         return { status: 'rejected' as const };
       }
-
-      const members = manager.getRepository(CompanyUser);
-      const member = await members.findOne({
-        where: {
-          userId,
-          companyId: invitation.companyId,
-          status: ECompanyUserStatus.ACTIVE,
-          leftAt: IsNull(),
-        },
-        lock: { mode: 'pessimistic_write' },
-      });
-      if (!member) {
+      const member = await context.memberships.findActiveMember(
+        invitation.companyId,
+        userId,
+      );
+      const lockedMember = member
+        ? await context.memberships.findActiveById(
+            invitation.companyId,
+            member.id,
+          )
+        : null;
+      if (!lockedMember) {
         throw new ConflictException(
           'Join this company before accepting its contract role invitation.',
         );
       }
       await this.assertWorkspaceEnabled(
-        manager,
+        context,
         party.contractId,
         invitation.workspace,
       );
@@ -806,12 +687,11 @@ export class ContractRoleAssignmentService {
         );
       }
       if (
-        await this.assignments.findActiveDuplicate(
-          { companyId: invitation.companyId },
+        await context.assignments.findActiveDuplicate(
+          invitation.companyId,
           party.id,
-          member.id,
+          lockedMember.id,
           invitation.role,
-          manager,
         )
       ) {
         throw new ConflictException(
@@ -819,11 +699,11 @@ export class ContractRoleAssignmentService {
         );
       }
 
-      const assignment = await this.assignments.createInScope(
-        { companyId: invitation.companyId },
+      const assignment = await context.assignments.create(
+        invitation.companyId,
         {
           contractPartyId: party.id,
-          companyUserId: member.id,
+          companyUserId: lockedMember.id,
           role: invitation.role,
           isWorkspaceAdmin: invitation.isWorkspaceAdmin,
           assignedAt: now,
@@ -831,19 +711,18 @@ export class ContractRoleAssignmentService {
           revokedAt: null,
           revokedById: null,
         },
-        manager,
       );
-      await this.writeActivity(
-        manager,
+      await this.writeAssignmentActivity(
+        context,
         party.contractId,
         invitation.companyId,
-        member.id,
+        lockedMember.id,
         assignment,
         'contract.role_assigned',
         invitation.workspace,
         null,
         {
-          companyUserId: member.id,
+          companyUserId: lockedMember.id,
           role: invitation.role,
           isWorkspaceAdmin: invitation.isWorkspaceAdmin,
           invitationId: invitation.id,
@@ -852,20 +731,19 @@ export class ContractRoleAssignmentService {
       );
       invitation.status = 'accepted';
       invitation.respondedAt = now;
-      await invitations.save(invitation);
-      const persistedAssignment = await this.loadAssignment(
-        manager.getRepository(ContractRoleAssignment),
-        assignment.id,
-        party.id,
-        invitation.companyId,
-      );
+      await context.invitations.save(invitation);
       return {
         status: 'accepted' as const,
-        assignment:
-          ContractRoleAssignmentResponseDto.fromEntity(persistedAssignment),
+        assignment: ContractRoleAssignmentResponseDto.fromEntity(
+          await this.loadAssignment(
+            context,
+            assignment.id,
+            party.id,
+            invitation.companyId,
+          ),
+        ),
       };
     });
-
     if (result.status === 'expired') {
       throw new ConflictException('This invitation has expired.');
     }
@@ -873,38 +751,35 @@ export class ContractRoleAssignmentService {
   }
 
   private async resolveAccess(
+    repositories: IContractRoleAssignmentRepositories,
     userId: string,
     companyId: string,
     contractId: string,
     workspace: AssignableContractWorkspace,
-  ) {
-    const scope = { companyId };
-    const contract = await this.dataSource.getRepository(Contract).findOne({
-      where: { id: contractId, deletedAt: IsNull() },
-      select: { id: true },
-    });
+  ): Promise<{ party: IRoleAssignmentParty }> {
+    const contract = await repositories.contracts.findActive(contractId);
     if (!contract) {
       throw new NotFoundException('Contract was not found.');
     }
-    await this.assertWorkspaceEnabled(
-      this.dataSource.manager,
-      contractId,
-      workspace,
+    await this.assertWorkspaceEnabled(repositories, contractId, workspace);
+    const membership = await repositories.memberships.findActiveMember(
+      companyId,
+      userId,
     );
-    const membership = await this.companyUsers.findActiveMember(scope, userId);
     if (!membership) {
       throw new ForbiddenException('Active company membership is required.');
     }
-    const party = await this.parties.findOne({
-      where: { contractId, companyId },
-    });
+    const party = await repositories.parties.findByContractAndCompany(
+      contractId,
+      companyId,
+    );
     if (!party) {
       throw new NotFoundException('Contract was not found.');
     }
     if (
       membership.companyRole !== ECompanyRole.COMPANY_ADMIN &&
-      !(await this.assignments.hasWorkspaceAdmin(
-        scope,
+      !(await repositories.assignments.hasWorkspaceAdmin(
+        companyId,
         membership.id,
         party.id,
         WORKSPACE_ROLES[workspace],
@@ -918,22 +793,11 @@ export class ContractRoleAssignmentService {
   }
 
   private async findPartyForUpdate(
-    repository: Repository<ContractParty>,
+    context: IContractRoleAssignmentTransactionContext,
     contractId: string,
     companyId: string,
-  ): Promise<ContractParty> {
-    const contract = await repository.manager.getRepository(Contract).findOne({
-      where: { id: contractId, deletedAt: IsNull() },
-      lock: { mode: 'pessimistic_write' },
-      select: { id: true },
-    });
-    if (!contract) {
-      throw new NotFoundException('Contract was not found.');
-    }
-    const party = await repository.findOne({
-      where: { contractId, companyId },
-      lock: { mode: 'pessimistic_write' },
-    });
+  ): Promise<IRoleAssignmentParty> {
+    const party = await context.parties.findForUpdate(contractId, companyId);
     if (!party) {
       throw new NotFoundException('Contract was not found.');
     }
@@ -941,42 +805,30 @@ export class ContractRoleAssignmentService {
   }
 
   private async assertWorkspaceEnabled(
-    manager: EntityManager,
+    repositories: IContractRoleAssignmentRepositories,
     contractId: string,
     workspace: AssignableContractWorkspace,
   ): Promise<void> {
-    const workspaceRecord = await manager
-      .getRepository(ContractWorkspaceEntity)
-      .findOne({
-        where: { contractId, workspace },
-        select: { contractId: true },
-      });
-    if (!workspaceRecord) {
+    if (!(await repositories.workspaces.exists(contractId, workspace))) {
       throw new NotFoundException('Contract workspace was not found.');
     }
   }
 
   private async requireManagementActor(
-    repository: Repository<CompanyUser>,
+    context: IContractRoleAssignmentTransactionContext,
     actorUserId: string,
     companyId: string,
     contractPartyId: string,
     workspace: AssignableContractWorkspace | undefined,
-    manager: EntityManager,
     targetCompanyUserId?: string,
-  ): Promise<{ actor: CompanyUser; isCompanyAdmin: boolean }> {
-    const actorMembership = await repository.findOne({
-      where: {
-        userId: actorUserId,
-        companyId,
-        status: ECompanyUserStatus.ACTIVE,
-        leftAt: IsNull(),
-      },
-    });
+  ): Promise<{ actor: IRoleAssignmentMember; isCompanyAdmin: boolean }> {
+    const actorMembership = await context.memberships.findActiveMember(
+      companyId,
+      actorUserId,
+    );
     if (!actorMembership) {
       throw new ForbiddenException('Active company membership is required.');
     }
-
     const memberIds = [
       ...new Set(
         [actorMembership.id, targetCompanyUserId].filter((id): id is string =>
@@ -984,20 +836,11 @@ export class ContractRoleAssignmentService {
         ),
       ),
     ].sort();
-    const locked = new Map<string, CompanyUser>();
+    const locked = new Map<string, IRoleAssignmentMember>();
     for (const id of memberIds) {
-      const member = await repository.findOne({
-        where: {
-          id,
-          companyId,
-          status: ECompanyUserStatus.ACTIVE,
-          leftAt: IsNull(),
-        },
-        lock: { mode: 'pessimistic_write' },
-      });
+      const member = await context.memberships.findActiveById(companyId, id);
       if (member) locked.set(id, member);
     }
-
     const actor = locked.get(actorMembership.id);
     if (!actor) {
       throw new ForbiddenException('Active company membership is required.');
@@ -1009,12 +852,11 @@ export class ContractRoleAssignmentService {
     const hasWorkspaceAdmin =
       !isCompanyAdmin &&
       workspace !== undefined &&
-      (await this.assignments.hasWorkspaceAdmin(
-        { companyId },
+      (await context.assignments.hasWorkspaceAdmin(
+        companyId,
         actor.id,
         contractPartyId,
         WORKSPACE_ROLES[workspace],
-        manager,
       ));
     if (!isCompanyAdmin && !hasWorkspaceAdmin) {
       throw new ForbiddenException(
@@ -1026,20 +868,19 @@ export class ContractRoleAssignmentService {
     return { actor, isCompanyAdmin };
   }
 
-  private async writeActivity(
-    manager: EntityManager,
+  private async writeAssignmentActivity(
+    context: IContractRoleAssignmentTransactionContext,
     contractId: string,
     companyId: string,
     actorCompanyUserId: string,
-    assignment: ContractRoleAssignment,
+    assignment: IRoleAssignmentRecord,
     action: string,
     workspace: AssignableContractWorkspace,
     before: Record<string, unknown> | null,
     after: Record<string, unknown> | null,
     occurredAt: Date,
   ): Promise<void> {
-    const repository = manager.getRepository(ActivityLog);
-    const record = repository.create({
+    await context.activities.write({
       contractId,
       companyId,
       actorUserId: actorCompanyUserId,
@@ -1062,62 +903,59 @@ export class ContractRoleAssignmentService {
       requestId: null,
       occurredAt,
     });
-    await repository.save(record);
   }
 
   private async writeInvitationActivity(
-    manager: EntityManager,
+    context: IContractRoleAssignmentTransactionContext,
     contractId: string,
     companyId: string,
     actorCompanyUserId: string,
-    invitation: ContractRoleInvitation,
+    invitation: IRoleInvitationRecord,
     action: string,
     occurredAt: Date,
   ): Promise<void> {
-    const repository = manager.getRepository(ActivityLog);
-    await repository.save(
-      repository.create({
-        contractId,
-        companyId,
-        actorUserId: actorCompanyUserId,
-        action,
-        entityType: 'contract_role_invitation',
-        entityId: randomUUID(),
-        summary: `Created or revoked a ${invitation.workspace} role invitation for ${invitation.email}.`,
-        changes: {
-          before: null,
-          after: {
-            invitationId: invitation.id,
-            email: invitation.email,
-            role: invitation.role,
-            workspace: invitation.workspace,
-            isWorkspaceAdmin: invitation.isWorkspaceAdmin,
-            status: invitation.status,
-          },
-        },
-        metadata: {
+    await context.activities.write({
+      contractId,
+      companyId,
+      actorUserId: actorCompanyUserId,
+      action,
+      entityType: 'contract_role_invitation',
+      entityId: randomUUID(),
+      summary: `Created or revoked a ${invitation.workspace} role invitation for ${invitation.email}.`,
+      changes: {
+        before: null,
+        after: {
           invitationId: invitation.id,
-          contractPartyId: invitation.contractPartyId,
+          email: invitation.email,
+          role: invitation.role,
           workspace: invitation.workspace,
+          isWorkspaceAdmin: invitation.isWorkspaceAdmin,
+          status: invitation.status,
         },
-        ipAddress: null,
-        userAgent: null,
-        requestId: null,
-        occurredAt,
-      }),
-    );
+      },
+      metadata: {
+        invitationId: invitation.id,
+        contractPartyId: invitation.contractPartyId,
+        workspace: invitation.workspace,
+      },
+      ipAddress: null,
+      userAgent: null,
+      requestId: null,
+      occurredAt,
+    });
   }
 
   private async loadAssignment(
-    repository: Repository<ContractRoleAssignment>,
+    context: IContractRoleAssignmentTransactionContext,
     id: string,
     contractPartyId: string,
     companyId: string,
-  ): Promise<ContractRoleAssignment> {
-    const assignment = await repository.findOne({
-      where: { id, contractPartyId, companyId },
-      relations: { companyUser: { user: true } },
-    });
+  ): Promise<IRoleAssignmentRecord> {
+    const assignment = await context.assignments.load(
+      companyId,
+      contractPartyId,
+      id,
+    );
     if (!assignment) {
       throw new NotFoundException('Contract role assignment was not found.');
     }

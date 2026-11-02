@@ -1,12 +1,10 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
-import type { DataSource, EntityManager } from 'typeorm';
 import { EUserStatus } from '@contractflow/contracts-schema';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MailService } from '../../../mail/mail.service';
 import type { AuthenticatedSession } from '../../interface/auth-context.interface';
-import type { AppUserRepository } from '../../repositories/app-user.repository';
-import type { EmailVerificationTokenRepository } from '../../repositories/email-verification-token.repository';
+import type { IAuthTransactionContext } from '../../interface/auth-persistence.interface';
 import { AuthService } from './auth.service';
 import type { PasswordService } from './password.service';
 import type { SessionService } from './session.service';
@@ -20,7 +18,7 @@ describe('AuthService', () => {
   let passwordService: Record<string, ReturnType<typeof vi.fn>>;
   let sessionService: Record<string, ReturnType<typeof vi.fn>>;
   let mail: { sendVerificationEmail: ReturnType<typeof vi.fn> };
-  let transaction: ReturnType<typeof vi.fn>;
+  let execute: ReturnType<typeof vi.fn>;
   let configGet: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -37,14 +35,12 @@ describe('AuthService', () => {
     appUserRepository = {
       findByEmailWithPassword: vi.fn(),
       updateLastLogin: vi.fn().mockResolvedValue(undefined),
-      createInTransaction: vi.fn((_manager, value) => appUsers.create(value)),
-      saveInTransaction: vi.fn((_manager, value) => appUsers.save(value)),
-      findByEmailForUpdate: vi.fn((_manager, email) =>
+      createUser: vi.fn((value) => appUsers.create(value)),
+      saveUser: vi.fn((value) => appUsers.save(value)),
+      findByEmailForUpdate: vi.fn((email) =>
         appUsers.findOne({ where: { email: email.trim().toLowerCase() } }),
       ),
-      findByIdForUpdate: vi.fn((_manager, id) =>
-        appUsers.findOne({ where: { id } }),
-      ),
+      findByIdForUpdate: vi.fn((id) => appUsers.findOne({ where: { id } })),
     };
     tokens = {
       create: vi.fn((value) => value),
@@ -58,18 +54,18 @@ describe('AuthService', () => {
       update: vi.fn(),
     };
     tokenRepository = {
-      createInTransaction: vi.fn((_manager, value) => tokens.create(value)),
-      saveInTransaction: vi.fn((_manager, value) => tokens.save(value)),
-      findByHashForUpdate: vi.fn((_manager, tokenHash) =>
+      createToken: vi.fn((value) => tokens.create(value)),
+      saveToken: vi.fn((value) => tokens.save(value)),
+      findByHashForUpdate: vi.fn((tokenHash) =>
         tokens.findOne({ where: { tokenHash } }),
       ),
-      findLatestForUser: vi.fn((_manager, userId) =>
+      findLatestForUser: vi.fn((userId) =>
         tokens.findOne({
           where: { userId },
           order: { createdAt: 'DESC' },
         }),
       ),
-      invalidateUnusedForUser: vi.fn((_manager, userId, at) =>
+      invalidateUnusedForUser: vi.fn((userId, at) =>
         tokens.update({ userId }, { usedAt: at }),
       ),
     };
@@ -87,12 +83,16 @@ describe('AuthService', () => {
     };
     mail = { sendVerificationEmail: vi.fn().mockResolvedValue(undefined) };
 
-    const manager = {};
-    transaction = vi.fn(
-      async <T>(work: (manager: EntityManager) => Promise<T>) =>
-        work(manager as unknown as EntityManager),
+    const context: IAuthTransactionContext = {
+      users: appUserRepository as unknown as IAuthTransactionContext['users'],
+      verificationTokens:
+        tokenRepository as unknown as IAuthTransactionContext['verificationTokens'],
+    };
+    execute = vi.fn(
+      async <T>(work: (context: IAuthTransactionContext) => Promise<T>) =>
+        work(context),
     );
-    const dataSource = { transaction };
+    const unitOfWork = { execute };
     configGet = vi.fn((key: string) => {
       if (key === 'SESSION_TTL_DAYS') return '7';
       return undefined;
@@ -100,11 +100,12 @@ describe('AuthService', () => {
     const config = { get: configGet };
 
     service = new AuthService(
-      dataSource as unknown as DataSource,
+      unitOfWork as unknown as ConstructorParameters<typeof AuthService>[0],
       config as unknown as ConfigService,
       mail as unknown as MailService,
-      appUserRepository as unknown as AppUserRepository,
-      tokenRepository as unknown as EmailVerificationTokenRepository,
+      appUserRepository as unknown as ConstructorParameters<
+        typeof AuthService
+      >[3],
       passwordService as unknown as PasswordService,
       sessionService as unknown as SessionService,
     );
@@ -133,11 +134,11 @@ describe('AuthService', () => {
       savedUser.email,
       expect.any(String),
     );
-    expect(transaction).toHaveBeenCalledOnce();
+    expect(execute).toHaveBeenCalledOnce();
   });
 
   it('maps a duplicate email constraint to a conflict response', async () => {
-    appUserRepository.saveInTransaction.mockRejectedValue({
+    appUsers.save.mockRejectedValue({
       driverError: { code: '23505' },
     });
 
@@ -174,15 +175,9 @@ describe('AuthService', () => {
 
     expect(record.usedAt).toBeInstanceOf(Date);
     expect(user.emailVerifiedAt).toBe(record.usedAt);
-    expect(tokenRepository.saveInTransaction).toHaveBeenCalledWith(
-      expect.any(Object),
-      record,
-    );
-    expect(appUserRepository.saveInTransaction).toHaveBeenCalledWith(
-      expect.any(Object),
-      user,
-    );
-    expect(transaction).toHaveBeenCalledOnce();
+    expect(tokenRepository.saveToken).toHaveBeenCalledWith(record);
+    expect(appUserRepository.saveUser).toHaveBeenCalledWith(user);
+    expect(execute).toHaveBeenCalledOnce();
   });
 
   it.each([
@@ -208,8 +203,8 @@ describe('AuthService', () => {
     await expect(
       service.verifyEmail('test-token-with-enough-length'),
     ).rejects.toBeInstanceOf(BadRequestException);
-    expect(appUserRepository.saveInTransaction).not.toHaveBeenCalled();
-    expect(tokenRepository.saveInTransaction).not.toHaveBeenCalled();
+    expect(appUserRepository.saveUser).not.toHaveBeenCalled();
+    expect(tokenRepository.saveToken).not.toHaveBeenCalled();
   });
 
   it('rate-limits verification resends without invalidating the current token', async () => {
@@ -228,7 +223,7 @@ describe('AuthService', () => {
       service.resendVerification('user@example.com'),
     ).resolves.toHaveProperty('message');
     expect(tokenRepository.invalidateUnusedForUser).not.toHaveBeenCalled();
-    expect(tokenRepository.saveInTransaction).not.toHaveBeenCalled();
+    expect(tokenRepository.saveToken).not.toHaveBeenCalled();
     expect(mail.sendVerificationEmail).not.toHaveBeenCalled();
   });
 
@@ -246,7 +241,6 @@ describe('AuthService', () => {
     ).resolves.toHaveProperty('message');
 
     expect(tokenRepository.invalidateUnusedForUser).toHaveBeenCalledWith(
-      expect.any(Object),
       '01JUSER0000000000000000000',
       expect.any(Date),
     );

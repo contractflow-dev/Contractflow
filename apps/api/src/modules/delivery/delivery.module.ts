@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ContractModule } from '../contract/contract-module';
+import { IdentityModule } from '../identity/identity.module';
 import { DeliveryController } from './controllers/delivery.controller';
 import { ContractStage } from './entities/contract-stage.entity';
 import { ContractVariation } from './entities/contract-variation.entity';
@@ -14,6 +15,7 @@ import { DeliveryService } from './services/delivery.service';
   imports: [
     TypeOrmModule.forFeature([ContractStage, Milestone, ContractVariation]),
     ContractModule,
+    IdentityModule,
   ],
   controllers: [DeliveryController],
   providers: [

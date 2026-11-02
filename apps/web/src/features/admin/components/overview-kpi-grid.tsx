@@ -11,10 +11,10 @@ import {
 } from "@remixicon/react";
 import { Badge } from "@workspace/ui/components/badge";
 import { Card } from "@workspace/ui/components/card";
-import type { AdminOverviewResponse } from "@/services/adminApi";
+import type { IAdminOverviewResponse } from "@contractflow/contracts-schema";
 
 interface OverviewKpiGridProps {
-  data: AdminOverviewResponse;
+  data: IAdminOverviewResponse;
 }
 
 export function OverviewKpiGrid({ data }: OverviewKpiGridProps) {

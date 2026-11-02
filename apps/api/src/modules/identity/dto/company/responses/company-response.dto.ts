@@ -1,5 +1,6 @@
 import {
   ECompanyStatus,
+  ECountryCode,
   ECurrencyCode,
   ICompanyResponseDto,
 } from '@contractflow/contracts-schema';
@@ -19,7 +20,7 @@ export class CompanyResponseDto implements ICompanyResponseDto {
   city: string;
   stateRegion: string;
   postalCode: string;
-  countryCode: string;
+  countryCode: ECountryCode;
   defaultCurrencyCode: ECurrencyCode;
   status: ECompanyStatus;
   verifiedAt: Date | null;

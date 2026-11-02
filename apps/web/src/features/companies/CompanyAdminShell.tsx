@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import {
   RiBuilding4Line,
   RiFileList3Line,
@@ -34,16 +34,24 @@ import {
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { SignOutAction } from "@/components/auth/sign-out-action";
+import { api } from "@/services/api";
 import { useGetCurrentUserQuery } from "@/services/authApi";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
+  clearActiveWorkspace,
   selectActiveWorkspaceId,
   setActiveWorkspaceId,
 } from "@/features/workspace/workspaceSlice";
+import {
+  clearPersistedActiveCompanyId,
+  persistActiveCompanyId,
+  readPersistedActiveCompanyId,
+  resolveActiveCompanyId,
+} from "@/features/workspace";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { cn } from "@/lib/utils";
-import { useGetCompaniesQuery } from "./companiesApi";
-import type { CompanyAccess } from "./companiesApi";
+import { useGetCompaniesQuery } from "@/services/companiesApi";
+import type { ICompanyAccessResponse } from "@contractflow/contracts-schema";
 
 const links = [
   {
@@ -82,13 +90,14 @@ function isActiveRoute(pathname: string, href: string): boolean {
 export function CompanyAdminShell({
   children,
 }: {
-  children: (access: CompanyAccess) => ReactNode;
+  children: (access: ICompanyAccessResponse) => ReactNode;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const activeWorkspaceId = useAppSelector(selectActiveWorkspaceId);
+  const search = searchParams.toString();
   const { data: user } = useGetCurrentUserQuery();
   const {
     currentData: companies,
@@ -96,26 +105,94 @@ export function CompanyAdminShell({
     isFetching,
     refetch,
   } = useGetCompaniesQuery();
-  const requestedCompanyId = searchParams.get("companyId");
+  const availableCompanies = useMemo(
+    () =>
+      (companies ?? []).filter(
+        ({ company, membership }) =>
+          company.status === "active" &&
+          membership.status === "active" &&
+          membership.companyId === company.id,
+      ),
+    [companies],
+  );
+  const availableCompanyIds = useMemo(
+    () => availableCompanies.map(({ company }) => company.id),
+    [availableCompanies],
+  );
   const selectedId =
-    requestedCompanyId ??
-    companies?.find(({ company }) => company.id === activeWorkspaceId)?.company
-      .id ??
-    companies?.[0]?.company.id;
-  const access = companies?.find(({ company }) => company.id === selectedId);
-  const invalidRequestedCompany = Boolean(
-    requestedCompanyId && companies && !access,
+    activeWorkspaceId && availableCompanyIds.includes(activeWorkspaceId)
+      ? activeWorkspaceId
+      : availableCompanyIds[0];
+  const access = availableCompanies.find(
+    ({ company }) => company.id === selectedId,
   );
 
   useEffect(() => {
-    if (access && access.company.id !== activeWorkspaceId) {
-      dispatch(setActiveWorkspaceId(access.company.id));
+    const params = new URLSearchParams(search);
+    if (!params.has("companyId")) return;
+    params.delete("companyId");
+    const remainingQuery = params.toString();
+    router.replace(
+      remainingQuery ? `${pathname}?${remainingQuery}` : pathname,
+      { scroll: false },
+    );
+  }, [pathname, router, search]);
+
+  useEffect(() => {
+    if (!companies || !user?.id) return;
+
+    let persistedCompanyId: string | null = null;
+    try {
+      persistedCompanyId = readPersistedActiveCompanyId(
+        window.localStorage,
+        user.id,
+      );
+    } catch (error) {
+      console.warn("Unable to restore the saved company selection.", error);
     }
-  }, [access, activeWorkspaceId, dispatch]);
+
+    const companyId = resolveActiveCompanyId(
+      availableCompanyIds,
+      activeWorkspaceId,
+      persistedCompanyId,
+    );
+    if (companyId) {
+      if (companyId !== activeWorkspaceId) {
+        dispatch(setActiveWorkspaceId(companyId));
+      }
+      try {
+        persistActiveCompanyId(window.localStorage, user.id, companyId);
+      } catch (error) {
+        console.warn("Unable to persist the active company selection.", error);
+      }
+    } else {
+      if (activeWorkspaceId) dispatch(clearActiveWorkspace());
+      try {
+        clearPersistedActiveCompanyId(window.localStorage, user.id);
+      } catch (error) {
+        console.warn("Unable to clear the saved company selection.", error);
+      }
+    }
+  }, [activeWorkspaceId, availableCompanyIds, companies, dispatch, user?.id]);
 
   function selectCompany(companyId: string) {
+    if (!availableCompanyIds.includes(companyId)) return;
     dispatch(setActiveWorkspaceId(companyId));
-    router.replace(`${pathname}?companyId=${encodeURIComponent(companyId)}`);
+    dispatch(
+      api.util.invalidateTags([
+        { type: "Company", id: companyId },
+        { type: "CompanyMember", id: companyId },
+        { type: "CompanyInvitation", id: companyId },
+        { type: "Dashboard", id: companyId },
+      ]),
+    );
+    if (user?.id) {
+      try {
+        persistActiveCompanyId(window.localStorage, user.id, companyId);
+      } catch (error) {
+        console.warn("Unable to persist the active company selection.", error);
+      }
+    }
   }
 
   if (isFetching && !companies) {
@@ -145,7 +222,7 @@ export function CompanyAdminShell({
     );
   }
 
-  if (!companies?.length) {
+  if (!availableCompanies.length) {
     return (
       <WorkspaceNotice
         title="No active company"
@@ -162,26 +239,28 @@ export function CompanyAdminShell({
     );
   }
 
-  if (invalidRequestedCompany || !access) {
+  if (!access || activeWorkspaceId !== access.company.id) {
     return (
       <WorkspaceNotice
-        title="Company workspace unavailable"
-        description="Your account does not have access to the selected company. Choose one of your active memberships to continue."
+        title="Loading your company workspace"
+        description="Verifying your active company membership."
         action={
-          <NativeSelect
-            aria-label="Select an active company"
-            value=""
-            onChange={(event) => selectCompany(event.target.value)}
-          >
-            <NativeSelectOption value="" disabled>
-              Select a company
-            </NativeSelectOption>
-            {companies.map(({ company }) => (
-              <NativeSelectOption key={company.id} value={company.id}>
-                {company.name}
+          availableCompanies.length > 1 ? (
+            <NativeSelect
+              aria-label="Select an active company"
+              value={activeWorkspaceId ?? ""}
+              onChange={(event) => selectCompany(event.target.value)}
+            >
+              <NativeSelectOption value="" disabled>
+                Select a company
               </NativeSelectOption>
-            ))}
-          </NativeSelect>
+              {availableCompanies.map(({ company }) => (
+                <NativeSelectOption key={company.id} value={company.id}>
+                  {company.name}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          ) : undefined
         }
       />
     );
@@ -199,7 +278,6 @@ export function CompanyAdminShell({
     : "Account";
   const initials =
     `${user?.firstName?.[0] ?? ""}${user?.lastName?.[0] ?? ""}`.toUpperCase();
-  const companyQuery = `?companyId=${encodeURIComponent(access.company.id)}`;
   const linkClass = (active: boolean) =>
     cn(
       "flex shrink-0 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium",
@@ -212,7 +290,7 @@ export function CompanyAdminShell({
     <div className="min-h-svh bg-muted/30">
       <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r bg-card md:flex">
         <Link
-          href={`/dashboards${companyQuery}`}
+          href="/dashboards"
           className="flex h-16 items-center gap-3 border-b px-5"
         >
           <span className="grid size-9 place-items-center rounded-lg bg-primary text-primary-foreground">
@@ -233,7 +311,7 @@ export function CompanyAdminShell({
             return (
               <Link
                 key={href}
-                href={`${href}${companyQuery}`}
+                href={href}
                 aria-current={active ? "page" : undefined}
                 className={linkClass(active)}
               >
@@ -259,14 +337,14 @@ export function CompanyAdminShell({
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {companies.length > 1 && (
+              {availableCompanies.length > 1 && (
                 <NativeSelect
                   aria-label="Select company"
                   className="max-w-40 sm:max-w-56"
                   value={access.company.id}
                   onChange={(event) => selectCompany(event.target.value)}
                 >
-                  {companies.map(({ company }) => (
+                  {availableCompanies.map(({ company }) => (
                     <NativeSelectOption key={company.id} value={company.id}>
                       {company.name}
                     </NativeSelectOption>
@@ -320,7 +398,7 @@ export function CompanyAdminShell({
               return (
                 <Link
                   key={href}
-                  href={`${href}${companyQuery}`}
+                  href={href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
                     "inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-xs",

@@ -50,14 +50,16 @@ apps/
       store/
 packages/
   contracts-schema/
+  db/
   ui/
 infra/
-db/
 ```
 
 Do not assume that packages such as `packages/shared` or `packages/contracts`
 exist. Shared API and domain types belong in `packages/contracts-schema`;
-reusable UI primitives belong in `packages/ui`. Add a new workspace package
+reusable UI primitives belong in `packages/ui`. `packages/db/docs` holds the
+entity relationship diagram and user stories; it is documentation, not a
+workspace package. Add a new workspace package
 only when there is a concrete need and wire it into the workspace and consuming
 applications.
 
@@ -91,19 +93,52 @@ When extending a module:
 - **Entities** describe persistence and relationships; they do not implement
   HTTP or presentation behavior.
 
+The API architecture test scans application service directories and rejects
+TypeORM imports, injection, and direct database operations. Keep persistence
+implementation details in repository and database infrastructure files.
+
 The project has a shared generic repository at
 `apps/api/src/common/database/repositories/base.repository.ts`. It accepts an
-optional scope type and provides scope hooks and scoped CRUD operations. Use
-it when it fits the feature's existing design. Do not assume that dedicated
-`CompanyScopedRepository` or `ContractScopedRepository` base classes exist.
-Some established services use an injected TypeORM repository directly; follow
-the neighboring implementation where that remains the simplest suitable
-pattern, and do not add a repository layer solely for uniformity.
+optional scope type and provides scope hooks and scoped CRUD operations. Every
+method takes the scope as its first argument, and scope conditions are merged
+last so callers cannot override them. Scoped subclasses live beside it:
+
+- `CompanyScopedRepository` filters and stamps `companyId`, and throws when the
+  company context is missing. Use it for company-owned rows such as
+  `CompanyUser`, `CompanyInvitation`, and `Document`.
+- `ContractScopedRepository` filters on `contractId`. When the scope includes
+  a `companyId`, it also verifies that the company is a `ContractParty` of the
+  contract. Use it for contract-owned rows such as delivery, financial, HSE,
+  compliance, and site-operations records.
+- `AppendOnlyContractScopedRepository` is for contract-scoped histories that
+  must not be updated or deleted, such as contract status history and
+  inventory transactions.
+
+Choose the base from the entity's actual ownership columns and relationships.
+`ContractRepository` extends `BaseRepository` directly and overrides its scope
+hooks to restrict contracts to those where the company is a party. Unscoped
+repositories (for example users, sessions, and companies) must be used only
+after explicit authorization checks.
+
+Application services must not import or inject TypeORM objects or perform
+database queries. They depend on application-level persistence ports; TypeORM
+repositories and transaction-context factories implement those ports in the
+infrastructure layer. Keep ports focused on the operations a service needs,
+and do not add repository layers that merely duplicate existing abstractions.
 
 ### Data access and scope
 
 - Enforce authorization in the backend; frontend-supplied company or contract
   IDs are not proof of access.
+- Company-scoped routes use `CompanyContextGuard`. It requires an
+  `X-Company-Id` header containing a ULID, rejects a `companyId` query
+  parameter, rejects a header that differs from a `:companyId` route
+  parameter, and verifies active membership in an active company. Controllers
+  read the validated value with `@CurrentCompanyId()`; never take the company
+  from the request body or query.
+- Contract access goes through `ContractAccessService.authorize`, which checks
+  company membership, contract party status, the contract workspace, and the
+  user's contract role assignment, then returns the contract scope to use.
 - Every company- or contract-scoped read and write must enforce the relevant
   scope. Use the existing repository scope hooks or explicit scoped methods.
 - A contract may be visible through its company-party relationship rather than
@@ -111,9 +146,10 @@ pattern, and do not add a repository layer solely for uniformity.
   flow instead of assuming every contract has direct company ownership.
 - Do not bypass scoping through a generic lookup, update, delete, or join.
 - Use a transaction for multi-record operations that must succeed or fail as a
-  unit. Ensure all participating operations use the transaction's
-  `EntityManager`; use the transaction pattern already established in the
-  affected module.
+  unit. Application services coordinate those operations through the existing
+  Unit of Work and transaction context. The infrastructure creates all
+  transaction-bound repositories from the same transaction; never expose its
+  `EntityManager`, `DataSource`, or `QueryRunner` to a service.
 
 ### Entities and schema changes
 
@@ -181,6 +217,13 @@ apps/web/src/
   `packages/ui` package, following existing usage.
 - Follow the established `services/`, Redux Toolkit, and feature-state
   patterns. Do not introduce a second API or state-management architecture.
+  RTK Query endpoints are added with `api.injectEndpoints()` in a
+  `src/services/*Api.ts` file; import them through the `@/services/...` alias.
+- The base query in `src/services/api.ts` sends `X-Company-Id` from
+  `workspace.activeWorkspaceId`. Endpoints that must not carry company context
+  (authentication, public invitations, onboarding, company listing and
+  creation, platform administration) are listed in
+  `COMPANY_CONTEXT_EXEMPT_ENDPOINTS`; add new endpoints of that kind there.
 - Consume shared transport contracts from `@contractflow/contracts-schema`
   where appropriate. Do not import backend entities or repositories into the
   web app.
@@ -215,8 +258,13 @@ Add or update tests for meaningful behavior changes:
 Use the smallest relevant validation commands, then expand if needed:
 
 - API: `pnpm --filter @contractflow/api test -- <test-selector>`
+- API service boundaries: `pnpm --filter @contractflow/api test:architecture`
+- API integration: `pnpm --filter @contractflow/api test:integration` (requires
+  a PostgreSQL test database)
 - API lint/build: `pnpm --filter @contractflow/api lint` and
-  `pnpm --filter @contractflow/api build`
+  `pnpm --filter @contractflow/api build`. Use the build to type-check the
+  API; `tsc -p tsconfig.json` also checks spec files, which lack Vitest global
+  types and report errors that do not affect the build.
 - Web: `pnpm --filter @contractflow/web test -- <test-selector>`
 - Web lint/build: `pnpm --filter @contractflow/web lint` and
   `pnpm --filter @contractflow/web build`

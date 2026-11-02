@@ -6,7 +6,6 @@ import type {
   Contract,
   ContractDetail,
   ContractLifecyclePermissions,
-  ContractPage,
   ContractPartyInvitation,
   ContractPartyInvitationPreview,
   ContractPartySummary,
@@ -19,6 +18,7 @@ import type {
   CreateContractRequest,
   EContractRole,
   EPartyType,
+  IPaginatedResponse,
 } from "@contractflow/contracts-schema";
 import { api } from "./api";
 
@@ -32,7 +32,6 @@ export type {
   ContractFilterParams,
   ContractLifecyclePermissions,
   ContractMembership,
-  ContractPage,
   ContractPartyInvitation,
   ContractPartyInvitationPreview,
   ContractPartySummary,
@@ -69,7 +68,10 @@ function contractsUrl(companyId: string): string {
 
 export const contractApi = api.injectEndpoints({
   endpoints: (builder) => ({
-    getContracts: builder.query<ContractPage<Contract>, CompanyContractQuery>({
+    getContracts: builder.query<
+      IPaginatedResponse<Contract>,
+      CompanyContractQuery
+    >({
       query: ({ companyId, ...params }) => ({
         url: contractsUrl(companyId),
         params,
@@ -77,7 +79,7 @@ export const contractApi = api.injectEndpoints({
       providesTags: (result) =>
         result
           ? [
-              ...result.items.map(({ id }) => ({
+              ...result.data.map(({ id }) => ({
                 type: "Contract" as const,
                 id,
               })),
@@ -108,7 +110,7 @@ export const contractApi = api.injectEndpoints({
     }),
 
     getContractStatusHistory: builder.query<
-      ContractPage<ContractStatusHistory>,
+      IPaginatedResponse<ContractStatusHistory>,
       CompanyContractHistoryQuery
     >({
       query: ({

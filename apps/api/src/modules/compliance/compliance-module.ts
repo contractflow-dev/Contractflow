@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ContractModule } from '../contract/contract-module';
+import { IdentityModule } from '../identity/identity.module';
 import { ComplianceController } from './controllers/compliance-controller';
 import { ComplianceRequirement } from './entities/compliance-requirement.entity';
 import { ComplianceRecord } from './entities/compliance-record.entity';
@@ -12,6 +13,7 @@ import { ComplianceService } from './services/compliance-service';
   imports: [
     TypeOrmModule.forFeature([ComplianceRecord, ComplianceRequirement]),
     ContractModule,
+    IdentityModule,
   ],
   controllers: [ComplianceController],
   providers: [

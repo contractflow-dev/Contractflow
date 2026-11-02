@@ -71,6 +71,76 @@ export class ContractPartyRepository extends ContractScopedRepository<ContractPa
     return Number(result?.count ?? 0);
   }
 
+  async countCompanyContracts(
+    companyId: string,
+    status?: EContractStatus,
+  ): Promise<number> {
+    const query = this.repository
+      .createQueryBuilder('party')
+      .innerJoin('party.contract', 'contract')
+      .where('party.companyId = :companyId', { companyId })
+      .select('COUNT(DISTINCT contract.id)', 'count');
+    if (status) {
+      query.andWhere('contract.status = :status', { status });
+    }
+    const result = await query.getRawOne<{ count: string }>();
+    return Number(result?.count ?? 0);
+  }
+
+  async countExpiringCompanyContracts(
+    companyId: string,
+    today: string,
+    expiryLimit: string,
+  ): Promise<number> {
+    const result = await this.repository
+      .createQueryBuilder('party')
+      .innerJoin('party.contract', 'contract')
+      .where('party.companyId = :companyId', { companyId })
+      .andWhere('contract.status = :status', {
+        status: EContractStatus.ACTIVE,
+      })
+      .andWhere(
+        'COALESCE(contract.revisedEndDate, contract.endDate) BETWEEN :today AND :expiryLimit',
+        { today, expiryLimit },
+      )
+      .select('COUNT(DISTINCT contract.id)', 'count')
+      .getRawOne<{ count: string }>();
+    return Number(result?.count ?? 0);
+  }
+
+  async findExpiringCompanyContracts(
+    companyId: string,
+    today: string,
+    expiryLimit: string,
+    limit: number,
+  ): Promise<DashboardContractRow[]> {
+    return this.findDashboardContracts(companyId)
+      .andWhere('contract.status = :status', {
+        status: EContractStatus.ACTIVE,
+      })
+      .andWhere(
+        'COALESCE(contract.revisedEndDate, contract.endDate) BETWEEN :today AND :expiryLimit',
+        { today, expiryLimit },
+      )
+      .orderBy('COALESCE(contract.revisedEndDate, contract.endDate)', 'ASC')
+      .addOrderBy('contract.id', 'ASC')
+      .take(limit)
+      .getRawMany<DashboardContractRow>();
+  }
+
+  async findRecentlyUpdatedCompanyContracts(
+    companyId: string,
+    updatedSince: Date,
+    limit: number,
+  ): Promise<DashboardContractRow[]> {
+    return this.findDashboardContracts(companyId)
+      .andWhere('contract.updatedAt >= :updatedSince', { updatedSince })
+      .orderBy('contract.updatedAt', 'DESC')
+      .addOrderBy('contract.id', 'ASC')
+      .take(limit)
+      .getRawMany<DashboardContractRow>();
+  }
+
   async countExpiringContracts(
     companyId: string,
     days: number,
@@ -135,6 +205,22 @@ export class ContractPartyRepository extends ContractScopedRepository<ContractPa
         'contract.title AS title',
         'contract.status AS status',
         'contract.endDate AS "endDate"',
+        'contract.updatedAt AS "updatedAt"',
+      ])
+      .distinct(true);
+  }
+
+  private findDashboardContracts(companyId: string) {
+    return this.repository
+      .createQueryBuilder('party')
+      .innerJoin('party.contract', 'contract')
+      .where('party.companyId = :companyId', { companyId })
+      .select([
+        'contract.id AS id',
+        'contract.referenceNumber AS "referenceNumber"',
+        'contract.title AS title',
+        'contract.status AS status',
+        'COALESCE(contract.revisedEndDate, contract.endDate) AS "endDate"',
         'contract.updatedAt AS "updatedAt"',
       ])
       .distinct(true);

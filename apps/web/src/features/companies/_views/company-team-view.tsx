@@ -44,7 +44,10 @@ import {
   useRemoveCompanyMemberMutation,
   useRevokeCompanyInvitationMutation,
 } from "@/features/companies";
-import type { CompanyMember } from "@/features/companies";
+import type { ICompanyMember } from "@contractflow/contracts-schema";
+import { DataPagination } from "@/components/pagination/data-pagination";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useKeepPageInRange, usePagination } from "@/hooks/use-pagination";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { CompanyAdminShell } from "../CompanyAdminShell";
 
@@ -62,7 +65,16 @@ export function CompanyTeamView() {
 function TeamContent({ companyId }: { companyId: string }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<ECompanyUserStatus | "">("");
-  const [page, setPage] = useState(1);
+  const memberPages = usePagination();
+  const invitationPages = usePagination(10);
+  const debouncedSearch = useDebouncedValue(search.trim());
+  const [appliedSearch, setAppliedSearch] = useState(debouncedSearch);
+  // A new search term restarts at page 1 in the same render that applies it,
+  // so no request is made for the new term on the old page.
+  if (appliedSearch !== debouncedSearch) {
+    setAppliedSearch(debouncedSearch);
+    memberPages.resetPage();
+  }
   const [inviteError, setInviteError] = useState("");
   const [inviteSuccess, setInviteSuccess] = useState("");
   const [actionError, setActionError] = useState("");
@@ -75,19 +87,30 @@ function TeamContent({ companyId }: { companyId: string }) {
   const {
     currentData: members,
     error: membersError,
-    isLoading: membersLoading,
+    isLoading: membersInitialLoading,
+    isFetching: membersFetching,
   } = useGetCompanyMembersQuery({
     companyId,
-    page,
-    limit: 20,
-    search: search.trim() || undefined,
+    page: memberPages.page,
+    limit: memberPages.limit,
+    search: appliedSearch || undefined,
     status: status || undefined,
   });
+  const membersLoading = membersInitialLoading || (membersFetching && !members);
+  useKeepPageInRange(members?.meta, memberPages.setPage);
   const {
     currentData: invitations,
     error: invitationsError,
-    isLoading: invitationsLoading,
-  } = useGetCompanyInvitationsQuery({ companyId, page: 1, limit: 50 });
+    isLoading: invitationsInitialLoading,
+    isFetching: invitationsFetching,
+  } = useGetCompanyInvitationsQuery({
+    companyId,
+    page: invitationPages.page,
+    limit: invitationPages.limit,
+  });
+  const invitationsLoading =
+    invitationsInitialLoading || (invitationsFetching && !invitations);
+  useKeepPageInRange(invitations?.meta, invitationPages.setPage);
   const [inviteMember, inviteState] = useInviteCompanyMemberMutation();
   const [changeRole] = useChangeCompanyMemberRoleMutation();
   const [removeMember] = useRemoveCompanyMemberMutation();
@@ -114,7 +137,7 @@ function TeamContent({ companyId }: { companyId: string }) {
     }
   }
 
-  async function updateRole(member: CompanyMember, value: string) {
+  async function updateRole(member: ICompanyMember, value: string) {
     if (!memberRoles.includes(value as ECompanyRole)) return;
     setActionError("");
     setBusyMemberId(member.id);
@@ -133,7 +156,7 @@ function TeamContent({ companyId }: { companyId: string }) {
     }
   }
 
-  async function remove(member: CompanyMember) {
+  async function remove(member: ICompanyMember) {
     if (
       !window.confirm(
         `Remove ${member.firstName} ${member.lastName} from this company? Their user account will not be deleted.`,
@@ -255,7 +278,8 @@ function TeamContent({ companyId }: { companyId: string }) {
               Company members
             </h3>
             <p className="text-sm text-muted-foreground">
-              {members?.total ?? 0} membership{members?.total === 1 ? "" : "s"}
+              {members?.meta.totalItems ?? 0} membership
+              {members?.meta.totalItems === 1 ? "" : "s"}
             </p>
           </div>
           <div className="grid gap-2 sm:grid-cols-[minmax(12rem,1fr)_auto]">
@@ -266,10 +290,7 @@ function TeamContent({ companyId }: { companyId: string }) {
               id="member-search"
               type="search"
               value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-                setPage(1);
-              }}
+              onChange={(event) => setSearch(event.target.value)}
               placeholder="Search name or email"
             />
             <FieldLabel className="sr-only" htmlFor="member-status">
@@ -280,7 +301,7 @@ function TeamContent({ companyId }: { companyId: string }) {
               value={status}
               onChange={(event) => {
                 setStatus(event.target.value as ECompanyUserStatus | "");
-                setPage(1);
+                memberPages.resetPage();
               }}
             >
               <NativeSelectOption value="">All statuses</NativeSelectOption>
@@ -308,14 +329,14 @@ function TeamContent({ companyId }: { companyId: string }) {
             error={membersError}
             message="Company members could not be loaded."
           />
-        ) : !members?.items.length ? (
+        ) : !members?.data.length ? (
           <Alert role="status">
             <AlertDescription>No members match this search.</AlertDescription>
           </Alert>
         ) : (
           <Card className="gap-0 py-0">
             <div className="divide-y md:hidden">
-              {members.items.map((member) => (
+              {members.data.map((member) => (
                 <MemberCard
                   key={member.id}
                   member={member}
@@ -339,7 +360,7 @@ function TeamContent({ companyId }: { companyId: string }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {members.items.map((member) => (
+                  {members.data.map((member) => (
                     <TableRow key={member.id}>
                       <TableCell className="px-4 py-3">
                         <p className="font-medium">
@@ -381,29 +402,15 @@ function TeamContent({ companyId }: { companyId: string }) {
                 </TableBody>
               </Table>
             </div>
-            <CardFooter className="justify-between border-t py-3 text-sm">
-              <span className="text-muted-foreground">
-                Page {members.page} of{" "}
-                {Math.max(1, Math.ceil(members.total / members.limit))}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage((n) => n - 1)}
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page * members.limit >= members.total}
-                  onClick={() => setPage((n) => n + 1)}
-                >
-                  Next
-                </Button>
-              </div>
+            <CardFooter className="border-t py-3">
+              <DataPagination
+                className="w-full"
+                meta={members.meta}
+                itemLabel="members"
+                isFetching={membersFetching}
+                onPageChange={memberPages.setPage}
+                onPageSizeChange={memberPages.setLimit}
+              />
             </CardFooter>
           </Card>
         )}
@@ -425,7 +432,7 @@ function TeamContent({ companyId }: { companyId: string }) {
             error={invitationsError}
             message="Invitations could not be loaded."
           />
-        ) : !invitations?.items.length ? (
+        ) : !invitations?.data.length ? (
           <Alert role="status">
             <AlertDescription>No invitations have been sent.</AlertDescription>
           </Alert>
@@ -444,7 +451,7 @@ function TeamContent({ companyId }: { companyId: string }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {invitations.items.map((invitation) => (
+                {invitations.data.map((invitation) => (
                   <TableRow key={invitation.id}>
                     <TableCell className="px-4 py-3">
                       {invitation.firstName || invitation.lastName
@@ -488,6 +495,16 @@ function TeamContent({ companyId }: { companyId: string }) {
                 ))}
               </TableBody>
             </Table>
+            <CardFooter className="border-t py-3">
+              <DataPagination
+                className="w-full"
+                meta={invitations.meta}
+                itemLabel="invitations"
+                isFetching={invitationsFetching}
+                onPageChange={invitationPages.setPage}
+                onPageSizeChange={invitationPages.setLimit}
+              />
+            </CardFooter>
           </Card>
         )}
       </section>
@@ -500,7 +517,7 @@ function MemberRoleSelect({
   busy,
   onChange,
 }: {
-  member: CompanyMember;
+  member: ICompanyMember;
   busy: boolean;
   onChange: (value: string) => void;
 }) {
@@ -530,7 +547,7 @@ function MemberCard({
   onRoleChange,
   onRemove,
 }: {
-  member: CompanyMember;
+  member: ICompanyMember;
   busy: boolean;
   onRoleChange: (value: string) => void;
   onRemove: () => void;

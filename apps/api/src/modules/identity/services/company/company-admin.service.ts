@@ -2,30 +2,30 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomBytes } from 'node:crypto';
-import {
-  DataSource,
-  EntityManager,
-  IsNull,
-  LessThanOrEqual,
-  Repository,
-} from 'typeorm';
 import {
   ECompanyRole,
   ECompanyUserStatus,
   EInvitationRole,
   EInvitationStatus,
+  type IPaginatedResponse,
 } from '@contractflow/contracts-schema';
+import { toPaginatedResponse } from '../../../../common/application/pagination';
+import type { IPageQuery } from '../../../../common/application/pagination.interface';
 import type { ICompanyScope } from '../../../../common/database/repositories/company-scope.interface';
-import { Company } from '../../entities/company.entity';
-import { CompanyInvitation } from '../../entities/company-invitation.entity';
-import { CompanyUser } from '../../entities/company-user.entity';
-import { AppUser } from '../../entities/app-user.entity';
-import { CompanyInvitationRepository } from '../../repositories/company-invitation.repository';
+import type { Company } from '../../entities/company.entity';
+import type { CompanyUser } from '../../entities/company-user.entity';
+import {
+  COMPANY_ADMIN_READ_REPOSITORY,
+  COMPANY_ADMIN_UNIT_OF_WORK,
+  type ICompanyAdminReadRepository,
+  type ICompanyAdminTransactionContext,
+  type ICompanyAdminUnitOfWork,
+} from '../../interface/company-admin-persistence.interface';
 import { CompanyScopeService } from './company-scope.service';
 import { MailService } from '../../../mail/mail.service';
 import { CompanyResponseDto } from '../../dto/company/responses/company-response.dto';
@@ -42,7 +42,6 @@ import type { InviteCompanyMemberRequestDto } from '../../dto/company/requests/i
 import type { ListCompanyMembersRequestDto } from '../../dto/company/requests/list-company-members-request.dto';
 import type { UpdateCompanyMemberRoleRequestDto } from '../../dto/company/requests/update-company-member-role-request.dto';
 import type { UpdateCompanyProfileRequestDto } from '../../dto/company/requests/update-company-profile-request.dto';
-
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 function hashToken(token: string): string {
@@ -69,60 +68,31 @@ function roleForMembership(role: EInvitationRole): ECompanyRole {
 @Injectable()
 export class CompanyAdminService {
   constructor(
-    private readonly dataSource: DataSource,
     private readonly companyScope: CompanyScopeService,
-    private readonly invitations: CompanyInvitationRepository,
     private readonly mail: MailService,
-    @InjectRepository(CompanyUser)
-    private readonly companyUsers: Repository<CompanyUser>,
+    @Inject(COMPANY_ADMIN_READ_REPOSITORY)
+    private readonly reads: ICompanyAdminReadRepository,
+    @Inject(COMPANY_ADMIN_UNIT_OF_WORK)
+    private readonly unitOfWork: ICompanyAdminUnitOfWork,
   ) {}
 
   async listMembers(
     userId: string,
     companyId: string,
     query: ListCompanyMembersRequestDto,
-  ): Promise<{
-    items: ICompanyMemberResponseDto[];
-    total: number;
-    page: number;
-    limit: number;
-  }> {
+  ): Promise<IPaginatedResponse<ICompanyMemberResponseDto>> {
     const scope = await this.requireCompanyAdmin(userId, companyId);
-    const builder = this.companyUsers
-      .createQueryBuilder('membership')
-      .innerJoinAndSelect('membership.user', 'user')
-      .where('membership.companyId = :companyId', {
-        companyId: scope.companyId,
-      });
+    const { items, total } = await this.reads.listMembers(scope, {
+      status: query.status,
+      search: query.search,
+      page: query.page,
+      limit: query.limit,
+    });
 
-    if (query.status) {
-      builder.andWhere('membership.status = :status', {
-        status: query.status,
-      });
-    }
-
-    if (query.search) {
-      const search = query.search.replace(/[\\%_]/g, '\\$&');
-      builder.andWhere(
-        '(user.firstName ILIKE :search OR user.lastName ILIKE :search OR user.email ILIKE :search)',
-        { search: `%${search}%` },
-      );
-    }
-
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 50;
-    const [members, total] = await builder
-      .orderBy('membership.joinedAt', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit)
-      .getManyAndCount();
-
-    return {
-      items: members.map(CompanyMemberResponseDto.fromEntity),
-      total,
-      page,
-      limit,
-    };
+    return toPaginatedResponse(
+      { items: items.map(CompanyMemberResponseDto.fromEntity), total },
+      query,
+    );
   }
 
   async updateMemberRole(
@@ -131,18 +101,9 @@ export class CompanyAdminService {
     membershipId: string,
     dto: UpdateCompanyMemberRoleRequestDto,
   ): Promise<ICompanyMemberResponseDto> {
-    return this.dataSource.transaction(async (manager) => {
-      const { scope } = await this.lockCompanyAdmin(manager, userId, companyId);
-      const members = manager.getRepository(CompanyUser);
-      const target = await members.findOne({
-        where: {
-          id: membershipId,
-          companyId: scope.companyId,
-          status: ECompanyUserStatus.ACTIVE,
-          leftAt: IsNull(),
-        },
-        lock: { mode: 'pessimistic_write' },
-      });
+    return this.unitOfWork.execute(async (context) => {
+      const { scope } = await this.lockCompanyAdmin(context, userId, companyId);
+      const target = await context.members.lockActiveById(scope, membershipId);
 
       if (!target) {
         throw new NotFoundException('Active company member was not found.');
@@ -150,7 +111,7 @@ export class CompanyAdminService {
 
       if (
         target.companyRole === ECompanyRole.COMPANY_ADMIN &&
-        (await this.countActiveAdmins(members, scope.companyId)) <= 1
+        (await context.members.countActiveAdmins(scope)) <= 1
       ) {
         throw new ConflictException(
           'Assign another Company Administrator before changing this role.',
@@ -158,10 +119,8 @@ export class CompanyAdminService {
       }
 
       target.companyRole = dto.companyRole;
-      const saved = await members.save(target);
-      const user = await manager.getRepository(AppUser).findOneBy({
-        id: saved.userId,
-      });
+      const saved = await context.members.save(target);
+      const user = await context.users.findById(saved.userId);
       if (!user) {
         throw new NotFoundException('Company member user was not found.');
       }
@@ -174,25 +133,16 @@ export class CompanyAdminService {
     companyId: string,
     membershipId: string,
   ): Promise<void> {
-    await this.dataSource.transaction(async (manager) => {
-      const { scope } = await this.lockCompanyAdmin(manager, userId, companyId);
-      const members = manager.getRepository(CompanyUser);
-      const target = await members.findOne({
-        where: {
-          id: membershipId,
-          companyId: scope.companyId,
-          status: ECompanyUserStatus.ACTIVE,
-          leftAt: IsNull(),
-        },
-        lock: { mode: 'pessimistic_write' },
-      });
+    await this.unitOfWork.execute(async (context) => {
+      const { scope } = await this.lockCompanyAdmin(context, userId, companyId);
+      const target = await context.members.lockActiveById(scope, membershipId);
 
       if (!target) {
         throw new NotFoundException('Active company member was not found.');
       }
       if (
         target.companyRole === ECompanyRole.COMPANY_ADMIN &&
-        (await this.countActiveAdmins(members, scope.companyId)) <= 1
+        (await context.members.countActiveAdmins(scope)) <= 1
       ) {
         throw new ConflictException(
           'Assign another Company Administrator before removing this member.',
@@ -201,67 +151,51 @@ export class CompanyAdminService {
 
       target.status = ECompanyUserStatus.INACTIVE;
       target.leftAt = new Date();
-      await members.save(target);
+      await context.members.save(target);
     });
   }
 
   async listInvitations(
     userId: string,
     companyId: string,
-    page = 1,
-    limit = 50,
-  ): Promise<{
-    items: ICompanyInvitationResponseDto[];
-    total: number;
-    page: number;
-    limit: number;
-  }> {
+    query: IPageQuery,
+  ): Promise<IPaginatedResponse<ICompanyInvitationResponseDto>> {
     const scope = await this.requireCompanyAdmin(userId, companyId);
-    const result = await this.invitations.findPage(scope, {
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const result = await this.reads.listInvitations(scope, query);
 
-    return {
-      items: result.items.map((invitation) =>
-        CompanyInvitationResponseDto.fromEntity(invitation),
-      ),
-      total: result.total,
-      page,
-      limit,
-    };
+    return toPaginatedResponse(
+      {
+        items: result.items.map((invitation) =>
+          CompanyInvitationResponseDto.fromEntity(invitation),
+        ),
+        total: result.total,
+      },
+      query,
+    );
   }
 
+  // NOTE: the email is sent before the unit of work commits. If the commit
+  // fails after delivery, the recipient holds a token for an invitation that
+  // was rolled back. Preserved deliberately; an outbox would remove the risk.
   async inviteMember(
     userId: string,
     companyId: string,
     dto: InviteCompanyMemberRequestDto,
   ): Promise<ICompanyInvitationResponseDto> {
-    return this.dataSource.transaction(async (manager) => {
+    return this.unitOfWork.execute(async (context) => {
       const { company, membership, scope } = await this.lockCompanyAdmin(
-        manager,
+        context,
         userId,
         companyId,
       );
-      const invitationRepository = manager.getRepository(CompanyInvitation);
-      const userRepository = manager.getRepository(AppUser);
-      const memberRepository = manager.getRepository(CompanyUser);
       const now = new Date();
 
-      const invitedUser = await userRepository.findOne({
-        where: { email: dto.email },
-        select: { id: true, email: true },
-      });
+      const invitedUser = await context.users.findIdByEmail(dto.email);
       if (invitedUser) {
-        const existingMembership = await memberRepository.findOne({
-          where: {
-            companyId: scope.companyId,
-            userId: invitedUser.id,
-            status: ECompanyUserStatus.ACTIVE,
-            leftAt: IsNull(),
-          },
-        });
+        const existingMembership = await context.members.findActiveByUser(
+          scope,
+          invitedUser.id,
+        );
         if (existingMembership) {
           throw new ConflictException(
             'This user is already an active member of the company.',
@@ -269,35 +203,21 @@ export class CompanyAdminService {
         }
       }
 
-      const duplicate = await invitationRepository
-        .createQueryBuilder('invitation')
-        .where('invitation.companyId = :companyId', {
-          companyId: scope.companyId,
-        })
-        .andWhere('invitation.email = :email', { email: dto.email })
-        .andWhere('invitation.status = :status', {
-          status: EInvitationStatus.PENDING,
-        })
-        .andWhere('invitation.expiresAt > :now', { now })
-        .getOne();
+      const duplicate = await context.invitations.findActivePendingByEmail(
+        scope,
+        dto.email,
+        now,
+      );
       if (duplicate) {
         throw new ConflictException(
           'An active invitation already exists for this email address.',
         );
       }
 
-      await invitationRepository.update(
-        {
-          companyId: scope.companyId,
-          email: dto.email,
-          status: EInvitationStatus.PENDING,
-          expiresAt: LessThanOrEqual(now),
-        },
-        { status: EInvitationStatus.EXPIRED },
-      );
+      await context.invitations.expirePendingByEmail(scope, dto.email, now);
 
       const token = randomBytes(32).toString('base64url');
-      const invitation = invitationRepository.create({
+      const saved = await context.invitations.create({
         companyId: scope.companyId,
         invitedByCompanyUserId: membership.id,
         email: dto.email,
@@ -310,7 +230,6 @@ export class CompanyAdminService {
         acceptedAt: null,
         revokedAt: null,
       });
-      const saved = await invitationRepository.save(invitation);
 
       await this.mail.sendCompanyInvitationEmail(
         dto.email,
@@ -328,16 +247,12 @@ export class CompanyAdminService {
     companyId: string,
     invitationId: string,
   ): Promise<ICompanyInvitationResponseDto> {
-    return this.dataSource.transaction(async (manager) => {
-      const { scope } = await this.lockCompanyAdmin(manager, userId, companyId);
-      const invitations = manager.getRepository(CompanyInvitation);
-      const invitation = await invitations.findOne({
-        where: {
-          id: invitationId,
-          companyId: scope.companyId,
-        },
-        lock: { mode: 'pessimistic_write' },
-      });
+    return this.unitOfWork.execute(async (context) => {
+      const { scope } = await this.lockCompanyAdmin(context, userId, companyId);
+      const invitation = await context.invitations.lockById(
+        scope,
+        invitationId,
+      );
       if (!invitation) {
         throw new NotFoundException('Company invitation was not found.');
       }
@@ -352,19 +267,12 @@ export class CompanyAdminService {
       }
 
       const revokedAt = new Date();
-      const result = await invitations.update(
-        {
-          id: invitationId,
-          companyId: scope.companyId,
-          status: EInvitationStatus.PENDING,
-          revokedAt: IsNull(),
-        },
-        {
-          status: EInvitationStatus.REVOKED,
-          revokedAt,
-        },
+      const revoked = await context.invitations.revokePending(
+        scope,
+        invitationId,
+        revokedAt,
       );
-      if (result.affected !== 1) {
+      if (!revoked) {
         throw new ConflictException(
           'This invitation is no longer pending and cannot be revoked.',
         );
@@ -380,7 +288,7 @@ export class CompanyAdminService {
   async getInvitationByToken(
     token: string,
   ): Promise<CompanyInvitationPublicResponseDto> {
-    const invitation = await this.invitations.findByTokenHashUnscoped(
+    const invitation = await this.reads.findInvitationByTokenHash(
       hashToken(token),
     );
     if (!invitation) {
@@ -393,18 +301,14 @@ export class CompanyAdminService {
       throw new ConflictException('This invitation is no longer active.');
     }
     if (invitation.expiresAt <= new Date()) {
-      await this.invitations.update(
+      await this.reads.expireInvitation(
         { companyId: invitation.companyId },
         invitation.id,
-        { status: EInvitationStatus.EXPIRED },
       );
       throw new ConflictException('This invitation has expired.');
     }
 
-    const company = await this.dataSource.getRepository(Company).findOne({
-      where: { id: invitation.companyId },
-      select: { id: true, name: true },
-    });
+    const company = await this.reads.findCompanyName(invitation.companyId);
     if (!company) {
       throw new NotFoundException('Invitation company was not found.');
     }
@@ -429,16 +333,10 @@ export class CompanyAdminService {
       );
     }
 
-    const outcome = await this.dataSource.transaction(async (manager) => {
-      const invitations = manager.getRepository(CompanyInvitation);
-      const invitation = await invitations
-        .createQueryBuilder('invitation')
-        .addSelect('invitation.tokenHash')
-        .where('invitation.tokenHash = :tokenHash', {
-          tokenHash: hashToken(token),
-        })
-        .setLock('pessimistic_write')
-        .getOne();
+    const outcome = await this.unitOfWork.execute(async (context) => {
+      const invitation = await context.invitations.lockByTokenHash(
+        hashToken(token),
+      );
 
       if (!invitation) {
         throw new NotFoundException('Invitation was not found.');
@@ -456,24 +354,24 @@ export class CompanyAdminService {
       }
       if (invitation.expiresAt <= new Date()) {
         invitation.status = EInvitationStatus.EXPIRED;
-        await invitations.save(invitation);
+        await context.invitations.save(invitation);
         return { status: EInvitationStatus.EXPIRED as const };
       }
 
       if (decision === 'decline') {
         invitation.status = EInvitationStatus.DECLINED;
-        await invitations.save(invitation);
+        await context.invitations.save(invitation);
         return { status: EInvitationStatus.DECLINED as const };
       }
 
-      const members = manager.getRepository(CompanyUser);
-      const existingMembership = await members.findOne({
-        where: {
-          companyId: invitation.companyId,
-          userId,
-        },
-        lock: { mode: 'pessimistic_write' },
+      // The company comes from the token-matched row, never from the request.
+      const scope: ICompanyScope = Object.freeze({
+        companyId: invitation.companyId,
       });
+      const existingMembership = await context.members.lockAnyByUser(
+        scope,
+        userId,
+      );
       if (
         existingMembership?.status === ECompanyUserStatus.ACTIVE &&
         !existingMembership.leftAt
@@ -490,24 +388,22 @@ export class CompanyAdminService {
         existingMembership.status = ECompanyUserStatus.ACTIVE;
         existingMembership.joinedAt = new Date();
         existingMembership.leftAt = null;
-        await members.save(existingMembership);
+        await context.members.save(existingMembership);
       } else {
-        await members.save(
-          members.create({
-            companyId: invitation.companyId,
-            userId,
-            companyRole: membershipRole,
-            jobTitle: invitation.companyRole,
-            status: ECompanyUserStatus.ACTIVE,
-            joinedAt: new Date(),
-            leftAt: null,
-          }),
-        );
+        await context.members.create({
+          companyId: invitation.companyId,
+          userId,
+          companyRole: membershipRole,
+          jobTitle: invitation.companyRole,
+          status: ECompanyUserStatus.ACTIVE,
+          joinedAt: new Date(),
+          leftAt: null,
+        });
       }
 
       invitation.status = EInvitationStatus.ACCEPTED;
       invitation.acceptedAt = new Date();
-      await invitations.save(invitation);
+      await context.invitations.save(invitation);
       return { status: EInvitationStatus.ACCEPTED as const };
     });
 
@@ -526,18 +422,14 @@ export class CompanyAdminService {
       throw new BadRequestException('At least one company field is required.');
     }
 
-    return this.dataSource.transaction(async (manager) => {
-      const { scope } = await this.lockCompanyAdmin(manager, userId, companyId);
-      const companies = manager.getRepository(Company);
-      const company = await companies.findOne({
-        where: { id: scope.companyId },
-        lock: { mode: 'pessimistic_write' },
-      });
+    return this.unitOfWork.execute(async (context) => {
+      const { scope } = await this.lockCompanyAdmin(context, userId, companyId);
+      const company = await context.companies.lockById(scope);
       if (!company) {
         throw new NotFoundException('Company was not found.');
       }
       Object.assign(company, dto);
-      const saved = await companies.save(company);
+      const saved = await context.companies.save(company);
       return CompanyResponseDto.fromEntity(saved);
     });
   }
@@ -547,16 +439,8 @@ export class CompanyAdminService {
     companyId: string,
   ): Promise<ICompanyScope> {
     const scope = await this.companyScope.forUser(userId, companyId);
-    const membership = await this.companyUsers.findOne({
-      where: {
-        userId,
-        companyId: scope.companyId,
-        status: ECompanyUserStatus.ACTIVE,
-        leftAt: IsNull(),
-      },
-      select: { id: true, companyRole: true },
-    });
-    if (membership?.companyRole !== ECompanyRole.COMPANY_ADMIN) {
+    const role = await this.reads.findActiveRole(scope, userId);
+    if (role !== ECompanyRole.COMPANY_ADMIN) {
       throw new ForbiddenException(
         'Only company administrators can manage this company.',
       );
@@ -565,7 +449,7 @@ export class CompanyAdminService {
   }
 
   private async lockCompanyAdmin(
-    manager: EntityManager,
+    context: ICompanyAdminTransactionContext,
     userId: string,
     companyId: string,
   ): Promise<{
@@ -574,50 +458,23 @@ export class CompanyAdminService {
     scope: ICompanyScope;
   }> {
     const normalizedCompanyId = companyId?.trim();
-    const companies = manager.getRepository(Company);
+    const scope: ICompanyScope = Object.freeze({
+      companyId: normalizedCompanyId,
+    });
     const company = normalizedCompanyId
-      ? await companies.findOne({
-          where: { id: normalizedCompanyId },
-          lock: { mode: 'pessimistic_write' },
-        })
+      ? await context.companies.lockById(scope)
       : null;
     if (!company) {
       throw new ForbiddenException('Active company membership is required.');
     }
 
-    const membership = await manager.getRepository(CompanyUser).findOne({
-      where: {
-        userId,
-        companyId: normalizedCompanyId,
-        status: ECompanyUserStatus.ACTIVE,
-        leftAt: IsNull(),
-      },
-      lock: { mode: 'pessimistic_write' },
-    });
+    const membership = await context.members.lockActiveByUser(scope, userId);
     if (!membership || membership.companyRole !== ECompanyRole.COMPANY_ADMIN) {
       throw new ForbiddenException(
         'Only company administrators can manage this company.',
       );
     }
 
-    return {
-      company,
-      membership,
-      scope: Object.freeze({ companyId: normalizedCompanyId }),
-    };
-  }
-
-  private async countActiveAdmins(
-    members: Repository<CompanyUser>,
-    companyId: string,
-  ): Promise<number> {
-    return members.count({
-      where: {
-        companyId,
-        companyRole: ECompanyRole.COMPANY_ADMIN,
-        status: ECompanyUserStatus.ACTIVE,
-        leftAt: IsNull(),
-      },
-    });
+    return { company, membership, scope };
   }
 }

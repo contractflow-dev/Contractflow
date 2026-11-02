@@ -1,274 +1,170 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { IAdminOverviewRepository } from '../interfaces/admin-overview-repository.interface';
 import { AdminOverviewController } from './admin-overview.controller';
 import { AdminOverviewService } from '../services/admin-overview.service';
-import { AdminOverviewResponseDto } from '../dto/admin-overview-response.dto';
-import { Repository } from 'typeorm';
-import { Company } from '../../identity/entities/company.entity';
-import { AppUser } from '../../identity/entities/app-user.entity';
-import { Contract } from '../../contract/entities/contract.entity';
-import { CompanyInvitation } from '../../identity/entities/company-invitation.entity';
-import { ActivityLog } from '../../cross-cutting/entities/activity-log.entity';
 
-describe('AdminOverviewController & AdminOverviewService', () => {
+describe('AdminOverviewController and AdminOverviewService', () => {
   let controller: AdminOverviewController;
   let service: AdminOverviewService;
-
-  let companyRepo: Record<string, any>;
-  let userRepo: Record<string, any>;
-  let contractRepo: Record<string, any>;
-  let invitationRepo: Record<string, any>;
-  let activityLogRepo: Record<string, any>;
-
-  const mockOverviewResponse: AdminOverviewResponseDto = {
-    companies: { total: 10, active: 8, inactive: 2, newThisMonth: 3 },
-    users: { total: 45, active: 40, inactive: 5, pendingVerification: 4, platformAdmins: 2 },
-    contracts: { total: 15, active: 10, draft: 3, suspended: 1, completed: 1, expiringSoon: 2 },
-    invitations: { total: 20, pending: 5, accepted: 12, declined: 3, expired: 1 },
-    attention: {
-      expiringContractsCount: 2,
-      pendingInvitationsCount: 5,
-      unverifiedUsersCount: 4,
-      items: [],
-    },
-    recentActivity: [
-      {
-        id: '01JLOG0000000000000000000',
-        action: 'contract.created',
-        entityType: 'contract',
-        entityId: '01JCNT0000000000000000000',
-        summary: 'Contract created: CTR-2026-001',
-        actorName: 'John Doe',
-        companyName: 'Acme Energy',
-        occurredAt: new Date().toISOString(),
-      },
-    ],
-    generatedAt: new Date().toISOString(),
-  };
+  let overview: Record<string, ReturnType<typeof vi.fn>>;
 
   beforeEach(() => {
-    companyRepo = {
-      createQueryBuilder: vi.fn(),
-    };
-    userRepo = {
-      createQueryBuilder: vi.fn(),
-    };
-    contractRepo = {
-      createQueryBuilder: vi.fn(),
-    };
-    invitationRepo = {
-      createQueryBuilder: vi.fn(),
-    };
-    activityLogRepo = {
-      createQueryBuilder: vi.fn(),
+    overview = {
+      getCompanyMetrics: vi.fn().mockResolvedValue({
+        total: 10,
+        active: 8,
+        inactive: 2,
+        newThisMonth: 3,
+      }),
+      getUserMetrics: vi.fn().mockResolvedValue({
+        total: 45,
+        active: 40,
+        inactive: 5,
+        pendingVerification: 4,
+        platformAdmins: 2,
+      }),
+      getContractMetrics: vi.fn().mockResolvedValue({
+        total: 15,
+        active: 10,
+        draft: 3,
+        suspended: 1,
+        completed: 1,
+        expiringSoon: 2,
+      }),
+      getInvitationMetrics: vi.fn().mockResolvedValue({
+        total: 20,
+        pending: 5,
+        accepted: 12,
+        declined: 3,
+        expired: 1,
+      }),
+      findExpiringContracts: vi.fn().mockResolvedValue([]),
+      findUrgentInvitations: vi.fn().mockResolvedValue([]),
+      findRecentActivity: vi.fn().mockResolvedValue([]),
     };
 
     service = new AdminOverviewService(
-      companyRepo as unknown as Repository<Company>,
-      userRepo as unknown as Repository<AppUser>,
-      contractRepo as unknown as Repository<Contract>,
-      invitationRepo as unknown as Repository<CompanyInvitation>,
-      activityLogRepo as unknown as Repository<ActivityLog>,
+      overview as unknown as IAdminOverviewRepository,
     );
-
     controller = new AdminOverviewController(service);
   });
 
-  describe('AdminOverviewController', () => {
-    it('returns overview data from service', async () => {
-      vi.spyOn(service, 'getOverview').mockResolvedValue(mockOverviewResponse);
+  it('returns overview data from the service', async () => {
+    const result = await controller.getOverview();
 
-      const result = await controller.getOverview();
-      expect(result).toEqual(mockOverviewResponse);
-      expect(result.companies.total).toBe(10);
-      expect(result.users.total).toBe(45);
-      expect(result.contracts.active).toBe(10);
-    });
+    expect(result.companies.total).toBe(10);
+    expect(result.users.total).toBe(45);
+    expect(result.contracts.active).toBe(10);
+    expect(result.invitations.pending).toBe(5);
   });
 
-  describe('AdminOverviewService query logic', () => {
-    it('aggregates metrics correctly and handles empty database states', async () => {
-      // Mock raw queries returning null/empty
-      companyRepo.createQueryBuilder.mockReturnValue({
-        select: vi.fn().mockReturnThis(),
-        addSelect: vi.fn().mockReturnThis(),
-        setParameter: vi.fn().mockReturnThis(),
-        getRawOne: vi.fn().mockResolvedValue(null),
-      });
+  it('loads aggregate and recent records through the persistence port', async () => {
+    const overviewResponse = await service.getOverview();
 
-      userRepo.createQueryBuilder.mockReturnValue({
-        select: vi.fn().mockReturnThis(),
-        addSelect: vi.fn().mockReturnThis(),
-        setParameter: vi.fn().mockReturnThis(),
-        getRawOne: vi.fn().mockResolvedValue(null),
-      });
-
-      contractRepo.createQueryBuilder.mockReturnValue({
-        select: vi.fn().mockReturnThis(),
-        addSelect: vi.fn().mockReturnThis(),
-        setParameter: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
-        andWhere: vi.fn().mockReturnThis(),
-        orderBy: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockReturnThis(),
-        getRawOne: vi.fn().mockResolvedValue(null),
-        getMany: vi.fn().mockResolvedValue([]),
-      });
-
-      invitationRepo.createQueryBuilder.mockReturnValue({
-        select: vi.fn().mockReturnThis(),
-        addSelect: vi.fn().mockReturnThis(),
-        setParameter: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
-        andWhere: vi.fn().mockReturnThis(),
-        orderBy: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockReturnThis(),
-        getRawOne: vi.fn().mockResolvedValue(null),
-        getMany: vi.fn().mockResolvedValue([]),
-      });
-
-      activityLogRepo.createQueryBuilder.mockReturnValue({
-        leftJoinAndSelect: vi.fn().mockReturnThis(),
-        orderBy: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockReturnThis(),
-        getMany: vi.fn().mockResolvedValue([]),
-      });
-
-      const overview = await service.getOverview();
-
-      expect(overview.companies).toEqual({
-        total: 0,
-        active: 0,
-        inactive: 0,
-        newThisMonth: 0,
-      });
-      expect(overview.users).toEqual({
-        total: 0,
-        active: 0,
-        inactive: 0,
-        pendingVerification: 0,
-        platformAdmins: 0,
-      });
-      expect(overview.contracts).toEqual({
-        total: 0,
-        active: 0,
-        draft: 0,
-        suspended: 0,
-        completed: 0,
-        expiringSoon: 0,
-      });
-      expect(overview.invitations).toEqual({
-        total: 0,
-        pending: 0,
-        accepted: 0,
-        declined: 0,
-        expired: 0,
-      });
-      expect(overview.recentActivity).toEqual([]);
-      expect(overview.attention.items).toEqual([]);
-      expect(overview.generatedAt).toBeDefined();
+    expect(overviewResponse).toMatchObject({
+      companies: { total: 10, active: 8, inactive: 2, newThisMonth: 3 },
+      users: {
+        total: 45,
+        active: 40,
+        inactive: 5,
+        pendingVerification: 4,
+        platformAdmins: 2,
+      },
+      contracts: {
+        total: 15,
+        active: 10,
+        draft: 3,
+        suspended: 1,
+        completed: 1,
+        expiringSoon: 2,
+      },
+      invitations: {
+        total: 20,
+        pending: 5,
+        accepted: 12,
+        declined: 3,
+        expired: 1,
+      },
+      attention: {
+        expiringContractsCount: 2,
+        pendingInvitationsCount: 5,
+        unverifiedUsersCount: 4,
+      },
     });
+    expect(overview.getCompanyMetrics).toHaveBeenCalledWith(expect.any(Date));
+    expect(overview.getContractMetrics).toHaveBeenCalledWith(
+      expect.any(Date),
+      expect.any(Date),
+    );
+    expect(overview.getInvitationMetrics).toHaveBeenCalledWith(
+      expect.any(Date),
+    );
+    expect(overview.findRecentActivity).toHaveBeenCalledOnce();
+    expect(overviewResponse.generatedAt).toBeDefined();
+  });
 
-    it('processes attention items for expiring contracts and urgent invitations', async () => {
-      companyRepo.createQueryBuilder.mockReturnValue({
-        select: vi.fn().mockReturnThis(),
-        addSelect: vi.fn().mockReturnThis(),
-        setParameter: vi.fn().mockReturnThis(),
-        getRawOne: vi.fn().mockResolvedValue({ total: '5', active: '5', inactive: '0', newThisMonth: '1' }),
-      });
-
-      userRepo.createQueryBuilder.mockReturnValue({
-        select: vi.fn().mockReturnThis(),
-        addSelect: vi.fn().mockReturnThis(),
-        setParameter: vi.fn().mockReturnThis(),
-        getRawOne: vi.fn().mockResolvedValue({ total: '10', active: '8', inactive: '2', pendingVerification: '3', platformAdmins: '1' }),
-      });
-
-      const futureDate = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
-      const expiringContract = {
-        id: '01JCNT1111111111111111111',
+  it('creates attention items for expiring contracts, invitations, and unverified users', async () => {
+    const futureDate = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+    const expiredDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    overview.findExpiringContracts.mockResolvedValue([
+      {
+        id: 'contract-1',
         referenceNumber: 'CTR-EXP-001',
-        title: 'Offshore Supply Agreement',
+        title: 'Bridge works',
         endDate: futureDate,
-        revisedEndDate: null,
-      };
+      },
+    ]);
+    overview.findUrgentInvitations.mockResolvedValue([
+      {
+        id: 'invitation-1',
+        email: 'member@example.com',
+        firstName: 'Member',
+        lastName: 'Person',
+        companyRole: 'Site Engineer',
+        expiresAt: expiredDate,
+      },
+    ]);
+    overview.findRecentActivity.mockResolvedValue([
+      {
+        id: 'activity-1',
+        action: 'contract.created',
+        entityType: 'contract',
+        entityId: 'contract-1',
+        summary: 'Contract created',
+        actorName: 'Jane Doe',
+        companyName: 'Acme',
+        occurredAt: futureDate,
+      },
+    ]);
 
-      const contractQuery = {
-        select: vi.fn().mockReturnThis(),
-        addSelect: vi.fn().mockReturnThis(),
-        setParameter: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
-        andWhere: vi.fn().mockReturnThis(),
-        orderBy: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockReturnThis(),
-        getRawOne: vi.fn().mockResolvedValue({ total: '2', active: '1', draft: '1', suspended: '0', completed: '0', expiringSoon: '1' }),
-        getMany: vi.fn().mockResolvedValue([expiringContract]),
-      };
-      contractRepo.createQueryBuilder.mockReturnValue(contractQuery);
+    const result = await service.getOverview();
 
-      const urgentInvite = {
-        id: '01JINV2222222222222222222',
-        email: 'engineer@contractor.com',
-        firstName: 'Jane',
-        lastName: 'Smith',
-        companyRole: 'Client Site Engineer',
-        expiresAt: futureDate,
-      };
-
-      const inviteQuery = {
-        select: vi.fn().mockReturnThis(),
-        addSelect: vi.fn().mockReturnThis(),
-        setParameter: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
-        andWhere: vi.fn().mockReturnThis(),
-        orderBy: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockReturnThis(),
-        getRawOne: vi.fn().mockResolvedValue({ total: '1', pending: '1', accepted: '0', declined: '0', expired: '0' }),
-        getMany: vi.fn().mockResolvedValue([urgentInvite]),
-      };
-      invitationRepo.createQueryBuilder.mockReturnValue(inviteQuery);
-
-      const activityLog = {
-        id: '01JACT3333333333333333333',
-        action: 'company.registered',
-        entityType: 'company',
-        entityId: '01JCOMP444444444444444444',
-        summary: 'New company onboarded: Delta Operations',
-        actorUser: {
-          user: { firstName: 'Alice', lastName: 'Admin' },
-        },
-        company: { name: 'Delta Operations' },
-        occurredAt: new Date(),
-      };
-
-      activityLogRepo.createQueryBuilder.mockReturnValue({
-        leftJoinAndSelect: vi.fn().mockReturnThis(),
-        orderBy: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockReturnThis(),
-        getMany: vi.fn().mockResolvedValue([activityLog]),
-      });
-
-      const overview = await service.getOverview();
-
-      expect(overview.companies.total).toBe(5);
-      expect(overview.users.total).toBe(10);
-      expect(overview.users.pendingVerification).toBe(3);
-      expect(overview.contracts.expiringSoon).toBe(1);
-      expect(overview.recentActivity).toHaveLength(1);
-      expect(overview.recentActivity[0].actorName).toBe('Alice Admin');
-      expect(overview.recentActivity[0].companyName).toBe('Delta Operations');
-
-      expect(overview.attention.items.length).toBeGreaterThanOrEqual(3);
-      const contractItem = overview.attention.items.find((i) => i.category === 'contract_expiry');
-      expect(contractItem).toBeDefined();
-      expect(contractItem?.title).toContain('CTR-EXP-001');
-
-      const inviteItem = overview.attention.items.find((i) => i.category === 'invitation_pending');
-      expect(inviteItem).toBeDefined();
-      expect(inviteItem?.title).toContain('engineer@contractor.com');
-
-      const userItem = overview.attention.items.find((i) => i.category === 'user_verification');
-      expect(userItem).toBeDefined();
-      expect(userItem?.description).toContain('3 registered user accounts');
-    });
+    expect(result.attention.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'contract-exp-contract-1',
+          category: 'contract_expiry',
+          urgency: 'high',
+        }),
+        expect.objectContaining({
+          id: 'invite-urg-invitation-1',
+          category: 'invitation_pending',
+          title: 'Expired Invitation: member@example.com',
+          urgency: 'high',
+        }),
+        expect.objectContaining({
+          id: 'unverified-users-summary',
+          category: 'user_verification',
+          urgency: 'low',
+        }),
+      ]),
+    );
+    expect(result.recentActivity).toEqual([
+      expect.objectContaining({
+        id: 'activity-1',
+        actorName: 'Jane Doe',
+        companyName: 'Acme',
+      }),
+    ]);
   });
 });

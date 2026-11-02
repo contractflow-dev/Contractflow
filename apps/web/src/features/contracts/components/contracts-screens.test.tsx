@@ -70,6 +70,9 @@ describe("ContractDetail query states", () => {
       history: undefined,
       historyError: { status: 500, data: {} },
       historyLoading: false,
+      historyFetching: false,
+      setHistoryPage: vi.fn(),
+      setHistoryPageSize: vi.fn(),
     });
   });
 
@@ -96,6 +99,9 @@ describe("ContractDetail query states", () => {
       history: undefined,
       historyError: undefined,
       historyLoading: true,
+      historyFetching: true,
+      setHistoryPage: vi.fn(),
+      setHistoryPageSize: vi.fn(),
     });
 
     const markup = renderToStaticMarkup(

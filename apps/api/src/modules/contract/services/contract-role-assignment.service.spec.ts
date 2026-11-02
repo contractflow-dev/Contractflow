@@ -11,12 +11,12 @@ import {
   EPartyType,
 } from '@contractflow/contracts-schema';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ActivityLog } from '../../cross-cutting/entities/activity-log.entity';
-import { CompanyUser } from '../../identity/entities/company-user.entity';
-import { Contract } from '../entities/contract.entity';
-import { ContractParty } from '../entities/contract-party.entity';
-import { ContractRoleAssignment } from '../entities/contract-role-assignment.entity';
-import { ContractWorkspaceEntity } from '../entities/contract-workspace.entity';
+import type {
+  IContractRoleAssignmentRepositories,
+  IContractRoleAssignmentTransactionContext,
+  IRoleAssignmentRecord,
+  IRoleInvitationRecord,
+} from '../interfaces/contract-role-assignment-persistence.interface';
 import { ContractRoleAssignmentService } from './contract-role-assignment.service';
 
 describe('ContractRoleAssignmentService', () => {
@@ -40,8 +40,8 @@ describe('ContractRoleAssignmentService', () => {
     companyId: 'company-1',
     partyType: EPartyType.CONTRACTOR,
   };
-  const assignment = {
-    id: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+  const assignment: IRoleAssignmentRecord = {
+    id: 'assignment-1',
     companyId: 'company-1',
     contractPartyId: party.id,
     companyUserId: target.id,
@@ -59,110 +59,113 @@ describe('ContractRoleAssignmentService', () => {
       },
     },
   };
+  const invitation: IRoleInvitationRecord = {
+    id: 'invitation-1',
+    contractPartyId: party.id,
+    companyId: party.companyId,
+    invitedById: actor.id,
+    email: 'casey@example.test',
+    tokenHash: 'token-hash',
+    status: 'pending',
+    workspace: 'finance',
+    role: EContractRole.FINANCE_OFFICER,
+    isWorkspaceAdmin: false,
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    expiresAt: new Date('2027-01-01T00:00:00.000Z'),
+    respondedAt: null,
+    revokedAt: null,
+  };
 
-  const companyUsers = { findActiveMember: vi.fn() };
-  const parties = { findOne: vi.fn() };
-  const assignments = {
-    findActiveForParty: vi.fn(),
-    hasWorkspaceAdmin: vi.fn(),
-    countActiveWorkspaceAdmins: vi.fn(),
-    findActiveDuplicate: vi.fn(),
-    createInScope: vi.fn(),
-    findByIdInPartyForUpdate: vi.fn(),
-    revokeInScope: vi.fn(),
-  };
-  const repositories = new Map<
-    unknown,
-    Record<string, ReturnType<typeof vi.fn>>
-  >();
-  const manager = {
-    getRepository: vi.fn((entity: unknown) => repositories.get(entity)),
-  };
-  const dataSource = {
-    manager,
-    getRepository: vi.fn((entity: unknown) => repositories.get(entity)),
-    transaction: vi.fn(
-      (callback: (transactionManager: typeof manager) => Promise<unknown>) =>
-        callback(manager),
-    ),
-  };
-  const mail = { sendContractRoleInvitationEmail: vi.fn() };
+  let persistence: IContractRoleAssignmentRepositories;
+  let transactionContext: IContractRoleAssignmentTransactionContext;
+  let execute: ReturnType<typeof vi.fn>;
+  let mail: { sendContractRoleInvitationEmail: ReturnType<typeof vi.fn> };
   let service: ContractRoleAssignmentService;
 
-  beforeEach(() => {
-    vi.resetAllMocks();
-    repositories.clear();
-    manager.getRepository.mockImplementation((entity: unknown) =>
-      repositories.get(entity),
-    );
-    dataSource.getRepository.mockImplementation((entity: unknown) =>
-      repositories.get(entity),
-    );
-    dataSource.transaction.mockImplementation(
-      (callback: (transactionManager: typeof manager) => Promise<unknown>) =>
-        callback(manager),
-    );
-    companyUsers.findActiveMember.mockResolvedValue(actor);
-    parties.findOne.mockResolvedValue(party);
-    assignments.findActiveForParty.mockResolvedValue([]);
-    assignments.hasWorkspaceAdmin.mockResolvedValue(false);
-    assignments.findActiveDuplicate.mockResolvedValue(null);
-    assignments.createInScope.mockImplementation(async (_scope, data) => ({
-      ...assignment,
-      ...data,
-    }));
-    assignments.findByIdInPartyForUpdate.mockResolvedValue(assignment);
-    assignments.revokeInScope.mockImplementation(
-      async (record, revokedAt, revokedById) => {
-        record.revokedAt = revokedAt;
-        record.revokedById = revokedById;
-        return record;
+  function createPorts(): IContractRoleAssignmentRepositories {
+    return {
+      memberships: {
+        findActiveMember: vi.fn(async (_companyId, userId) =>
+          userId === actor.userId
+            ? actor
+            : userId === target.userId
+              ? target
+              : null,
+        ),
+        findActiveById: vi.fn(async (_companyId, id) =>
+          id === actor.id ? actor : id === target.id ? target : null,
+        ),
+        findActiveByEmail: vi.fn(async () => null),
+        listEligible: vi.fn(async () => []),
       },
+      parties: {
+        findByContractAndCompany: vi.fn(async () => party),
+        findByIdAndCompany: vi.fn(async () => party),
+        findByIdAndCompanyForUpdate: vi.fn(async () => party),
+        findForUpdate: vi.fn(async () => party),
+      },
+      contracts: {
+        findActive: vi.fn(async () => ({ id: 'contract-1' })),
+        findActiveForUpdate: vi.fn(async () => ({ id: 'contract-1' })),
+        findInvitationDetails: vi.fn(async () => ({
+          id: 'contract-1',
+          title: 'Sample contract',
+        })),
+      },
+      companies: { findName: vi.fn(async () => 'Sample company') },
+      workspaces: { exists: vi.fn(async () => true) },
+      assignments: {
+        findActiveForParty: vi.fn(async () => []),
+        hasWorkspaceAdmin: vi.fn(async () => false),
+        countActiveWorkspaceAdmins: vi.fn(async () => 2),
+        findActiveDuplicate: vi.fn(async () => null),
+        create: vi.fn(async () => assignment),
+        findByIdInPartyForUpdate: vi.fn(async () => assignment),
+        revoke: vi.fn(async (record, at, actorId) => ({
+          ...record,
+          revokedAt: at,
+          revokedById: actorId,
+        })),
+        save: vi.fn(async (record) => record),
+        load: vi.fn(async () => assignment),
+      },
+      invitations: {
+        expireForParty: vi.fn(async () => undefined),
+        listForParty: vi.fn(async () => []),
+        findByTokenHash: vi.fn(async () => invitation),
+        expirePending: vi.fn(async () => undefined),
+        findPending: vi.fn(async () => null),
+        create: vi.fn(async () => invitation),
+        findByIdForUpdate: vi.fn(async () => invitation),
+        expireById: vi.fn(async () => undefined),
+        save: vi.fn(async (record) => record),
+      },
+      activities: { write: vi.fn(async () => undefined) },
+    };
+  }
+
+  beforeEach(() => {
+    persistence = createPorts();
+    transactionContext = createPorts();
+    execute = vi.fn(
+      (
+        operation: (
+          context: IContractRoleAssignmentTransactionContext,
+        ) => Promise<unknown>,
+      ) => operation(transactionContext),
     );
-
-    const companyUserRepository = {
-      findOne: vi.fn(async ({ where }: { where: Record<string, unknown> }) => {
-        if (where.userId === 'actor-user') return actor;
-        if (where.id === actor.id) return actor;
-        if (where.id === target.id) return target;
-        return null;
-      }),
-    };
-    const partyRepository = {
-      findOne: vi.fn().mockResolvedValue(party),
-      manager,
-    };
-    const contractRepository = {
-      findOne: vi.fn().mockResolvedValue({ id: 'contract-1' }),
-    };
-    const workspaceRepository = {
-      findOne: vi.fn().mockResolvedValue({ contractId: 'contract-1' }),
-    };
-    const assignmentRepository = {
-      findOne: vi.fn().mockResolvedValue(assignment),
-    };
-    const activityRepository = {
-      create: vi.fn((data) => data),
-      save: vi.fn(async (record) => record),
-    };
-    repositories.set(CompanyUser, companyUserRepository);
-    repositories.set(Contract, contractRepository);
-    repositories.set(ContractParty, partyRepository);
-    repositories.set(ContractRoleAssignment, assignmentRepository);
-    repositories.set(ContractWorkspaceEntity, workspaceRepository);
-    repositories.set(ActivityLog, activityRepository);
-
+    mail = { sendContractRoleInvitationEmail: vi.fn(async () => undefined) };
     service = new ContractRoleAssignmentService(
-      dataSource as never,
-      assignments as never,
-      companyUsers as never,
+      persistence,
+      { execute } as never,
       mail as never,
-      parties as never,
     );
   });
 
-  it('lists assignments only for an active Company Admin and the selected workspace', async () => {
-    assignments.findActiveForParty.mockResolvedValue([assignment]);
+  it('lists only scoped assignments after active membership and workspace checks', async () => {
+    persistence.assignments.findActiveForParty = vi
+      .fn()
+      .mockResolvedValue([assignment]);
 
     const result = await service.list(
       'actor-user',
@@ -171,12 +174,12 @@ describe('ContractRoleAssignmentService', () => {
       'finance',
     );
 
-    expect(companyUsers.findActiveMember).toHaveBeenCalledWith(
-      { companyId: 'company-1' },
+    expect(persistence.memberships.findActiveMember).toHaveBeenCalledWith(
+      'company-1',
       'actor-user',
     );
-    expect(assignments.findActiveForParty).toHaveBeenCalledWith(
-      { companyId: 'company-1' },
+    expect(persistence.assignments.findActiveForParty).toHaveBeenCalledWith(
+      'company-1',
       party.id,
       'contract-1',
       [EContractRole.FINANCE_OFFICER, EContractRole.FINANCE_DIRECTOR],
@@ -189,19 +192,16 @@ describe('ContractRoleAssignmentService', () => {
     });
   });
 
-  it('does not expose assignments to non-admin company members', async () => {
-    companyUsers.findActiveMember.mockResolvedValue({
-      ...target,
-      companyRole: ECompanyRole.FINANCE_OFFICER,
-    });
+  it('rejects inactive company membership before listing assignments', async () => {
+    persistence.memberships.findActiveMember = vi.fn(async () => null);
 
     await expect(
-      service.list('target-user', 'company-1', 'contract-1', 'finance'),
+      service.list('actor-user', 'company-1', 'contract-1', 'finance'),
     ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(assignments.findActiveForParty).not.toHaveBeenCalled();
+    expect(persistence.assignments.findActiveForParty).not.toHaveBeenCalled();
   });
 
-  it('rejects roles that do not belong to the selected workspace', async () => {
+  it('rejects roles outside the selected workspace without opening a unit of work', async () => {
     await expect(
       service.assign(
         'actor-user',
@@ -212,10 +212,15 @@ describe('ContractRoleAssignmentService', () => {
         EContractRole.FINANCE_OFFICER,
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
-    expect(dataSource.transaction).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
   });
 
-  it('rejects a role that is incompatible with the contract party type', async () => {
+  it('preserves party-type validation before creating an assignment', async () => {
+    transactionContext.parties.findForUpdate = vi.fn(async () => ({
+      ...party,
+      partyType: EPartyType.CONTRACTOR,
+    }));
+
     await expect(
       service.assign(
         'actor-user',
@@ -226,56 +231,21 @@ describe('ContractRoleAssignmentService', () => {
         EContractRole.CLIENT_PROJECT_MANAGER,
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
-    expect(assignments.createInScope).not.toHaveBeenCalled();
+    expect(transactionContext.assignments.create).not.toHaveBeenCalled();
   });
 
-  it('allows a workspace admin to manage assignments only within that workspace', async () => {
-    const companyUserRepository = repositories.get(CompanyUser)!;
-    companyUserRepository.findOne.mockImplementation(
-      async ({ where }: { where: Record<string, unknown> }) => {
-        if (where.userId === 'actor-user' || where.id === actor.id) {
-          return { ...actor, companyRole: ECompanyRole.FINANCE_OFFICER };
-        }
-        if (where.id === target.id) return target;
-        return null;
-      },
+  it('allows workspace admins only within their workspace and not to grant admin privileges', async () => {
+    transactionContext.memberships.findActiveMember = vi.fn(
+      async (_companyId, userId) =>
+        userId === 'target-user'
+          ? { ...target, companyRole: ECompanyRole.FINANCE_OFFICER }
+          : null,
     );
-    assignments.hasWorkspaceAdmin.mockResolvedValue(true);
-
-    await service.assign(
-      'actor-user',
-      'company-1',
-      'contract-1',
-      'finance',
-      target.id,
-      EContractRole.FINANCE_OFFICER,
-    );
-
-    expect(assignments.hasWorkspaceAdmin).toHaveBeenCalledWith(
-      { companyId: 'company-1' },
-      actor.id,
-      party.id,
-      [EContractRole.FINANCE_OFFICER, EContractRole.FINANCE_DIRECTOR],
-      manager,
-    );
-    expect(assignments.createInScope).toHaveBeenCalledWith(
-      { companyId: 'company-1' },
-      expect.objectContaining({ isWorkspaceAdmin: false }),
-      manager,
-    );
-  });
-
-  it('does not allow a workspace admin to grant workspace-admin privileges', async () => {
-    const companyUserRepository = repositories.get(CompanyUser)!;
-    companyUserRepository.findOne.mockImplementation(
-      async ({ where }: { where: Record<string, unknown> }) => {
-        if (where.userId === 'target-user' || where.id === target.id) {
-          return target;
-        }
-        return null;
-      },
-    );
-    assignments.hasWorkspaceAdmin.mockResolvedValue(true);
+    transactionContext.memberships.findActiveById = vi.fn(async () => ({
+      ...target,
+      companyRole: ECompanyRole.FINANCE_OFFICER,
+    }));
+    transactionContext.assignments.hasWorkspaceAdmin = vi.fn(async () => true);
 
     await expect(
       service.assign(
@@ -288,45 +258,12 @@ describe('ContractRoleAssignmentService', () => {
         true,
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(assignments.createInScope).not.toHaveBeenCalled();
+    expect(transactionContext.assignments.create).not.toHaveBeenCalled();
   });
 
-  it('requires a Company Admin and an active company member to assign a role', async () => {
-    const companyUserRepository = repositories.get(CompanyUser)!;
-    companyUserRepository.findOne.mockImplementation(
-      async ({ where }: { where: Record<string, unknown> }) => {
-        if (where.userId === 'actor-user') {
-          return { ...actor, companyRole: ECompanyRole.FINANCE_OFFICER };
-        }
-        if (where.id === actor.id) {
-          return { ...actor, companyRole: ECompanyRole.FINANCE_OFFICER };
-        }
-        if (where.id === target.id) return target;
-        return null;
-      },
-    );
-
-    await expect(
-      service.assign(
-        'actor-user',
-        'company-1',
-        'contract-1',
-        'finance',
-        target.id,
-        EContractRole.FINANCE_OFFICER,
-      ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(assignments.createInScope).not.toHaveBeenCalled();
-  });
-
-  it('rejects targets who are no longer active company members', async () => {
-    const companyUserRepository = repositories.get(CompanyUser)!;
-    companyUserRepository.findOne.mockImplementation(
-      async ({ where }: { where: Record<string, unknown> }) => {
-        if (where.userId === 'actor-user' || where.id === actor.id)
-          return actor;
-        return null;
-      },
+  it('rejects an inactive target membership in the requesting company', async () => {
+    transactionContext.memberships.findActiveById = vi.fn(
+      async (_companyId, id) => (id === actor.id ? actor : null),
     );
 
     await expect(
@@ -339,11 +276,49 @@ describe('ContractRoleAssignmentService', () => {
         EContractRole.FINANCE_OFFICER,
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
-    expect(assignments.createInScope).not.toHaveBeenCalled();
+    expect(transactionContext.assignments.create).not.toHaveBeenCalled();
+  });
+
+  it('commits assignment and activity through the same unit-of-work context', async () => {
+    const result = await service.assign(
+      'actor-user',
+      'company-1',
+      'contract-1',
+      'finance',
+      target.id,
+      EContractRole.FINANCE_OFFICER,
+    );
+
+    expect(execute).toHaveBeenCalledOnce();
+    expect(transactionContext.assignments.create).toHaveBeenCalledWith(
+      'company-1',
+      expect.objectContaining({
+        contractPartyId: party.id,
+        companyUserId: target.id,
+        role: EContractRole.FINANCE_OFFICER,
+        assignedById: actor.id,
+        revokedAt: null,
+      }),
+    );
+    expect(transactionContext.activities.write).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'contract.role_assigned',
+        contractId: 'contract-1',
+        companyId: 'company-1',
+      }),
+    );
+    expect(persistence.assignments.create).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      id: assignment.id,
+      revokedAt: null,
+      role: EContractRole.FINANCE_OFFICER,
+    });
   });
 
   it('rejects duplicate active assignments', async () => {
-    assignments.findActiveDuplicate.mockResolvedValue(assignment);
+    transactionContext.assignments.findActiveDuplicate = vi
+      .fn()
+      .mockResolvedValue(assignment);
 
     await expect(
       service.assign(
@@ -355,87 +330,13 @@ describe('ContractRoleAssignmentService', () => {
         EContractRole.FINANCE_OFFICER,
       ),
     ).rejects.toBeInstanceOf(ConflictException);
-    expect(assignments.createInScope).not.toHaveBeenCalled();
+    expect(transactionContext.assignments.create).not.toHaveBeenCalled();
   });
 
-  it('assigns an active company member and writes an audit event in the transaction', async () => {
-    const result = await service.assign(
-      'actor-user',
-      'company-1',
-      'contract-1',
-      'finance',
-      target.id,
-      EContractRole.FINANCE_OFFICER,
-    );
-    const activityRepository = repositories.get(ActivityLog)!;
-
-    expect(assignments.createInScope).toHaveBeenCalledWith(
-      { companyId: 'company-1' },
-      expect.objectContaining({
-        contractPartyId: party.id,
-        companyUserId: target.id,
-        role: EContractRole.FINANCE_OFFICER,
-        assignedById: actor.id,
-        revokedAt: null,
-      }),
-      manager,
-    );
-    expect(activityRepository.save).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: 'contract.role_assigned',
-        contractId: 'contract-1',
-        companyId: 'company-1',
-      }),
-    );
-    expect(result).toMatchObject({
-      id: assignment.id,
-      revokedAt: null,
-      role: EContractRole.FINANCE_OFFICER,
-    });
-  });
-
-  it('revokes a scoped assignment and records the change', async () => {
-    const result = await service.revoke(
-      'actor-user',
-      'company-1',
-      'contract-1',
-      assignment.id,
-    );
-    const activityRepository = repositories.get(ActivityLog)!;
-
-    expect(assignments.findByIdInPartyForUpdate).toHaveBeenCalledWith(
-      { companyId: 'company-1' },
-      assignment.id,
-      party.id,
-      manager,
-    );
-    expect(assignments.revokeInScope).toHaveBeenCalledWith(
-      assignment,
-      expect.any(Date),
-      actor.id,
-      manager,
-    );
-    expect(activityRepository.save).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'contract.role_revoked' }),
-    );
-    expect(result.revokedById).toBe(actor.id);
-  });
-
-  it('prevents revoking the sole active workspace administrator', async () => {
-    assignments.findByIdInPartyForUpdate.mockResolvedValue({
-      ...assignment,
-      isWorkspaceAdmin: true,
-    });
-    assignments.countActiveWorkspaceAdmins.mockResolvedValue(1);
-
-    await expect(
-      service.revoke('actor-user', 'company-1', 'contract-1', assignment.id),
-    ).rejects.toBeInstanceOf(ConflictException);
-    expect(assignments.revokeInScope).not.toHaveBeenCalled();
-  });
-
-  it('returns not found when an assignment is outside the company party', async () => {
-    assignments.findByIdInPartyForUpdate.mockResolvedValue(null);
+  it('revokes only an assignment scoped to the company contract party', async () => {
+    transactionContext.assignments.findByIdInPartyForUpdate = vi
+      .fn()
+      .mockResolvedValue(null);
 
     await expect(
       service.revoke(
@@ -445,18 +346,95 @@ describe('ContractRoleAssignmentService', () => {
         'foreign-assignment',
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
-    expect(assignments.revokeInScope).not.toHaveBeenCalled();
+    expect(
+      transactionContext.assignments.findByIdInPartyForUpdate,
+    ).toHaveBeenCalledWith('company-1', 'foreign-assignment', party.id);
+    expect(transactionContext.assignments.revoke).not.toHaveBeenCalled();
   });
 
-  it('rejects a repeated revocation', async () => {
-    assignments.findByIdInPartyForUpdate.mockResolvedValue({
-      ...assignment,
-      revokedAt: new Date('2026-02-01T00:00:00.000Z'),
-    });
+  it('prevents revoking the sole active workspace administrator', async () => {
+    transactionContext.assignments.findByIdInPartyForUpdate = vi.fn(
+      async () => ({
+        ...assignment,
+        isWorkspaceAdmin: true,
+      }),
+    );
+    transactionContext.assignments.countActiveWorkspaceAdmins = vi
+      .fn()
+      .mockResolvedValue(1);
 
     await expect(
       service.revoke('actor-user', 'company-1', 'contract-1', assignment.id),
     ).rejects.toBeInstanceOf(ConflictException);
-    expect(assignments.revokeInScope).not.toHaveBeenCalled();
+    expect(transactionContext.assignments.revoke).not.toHaveBeenCalled();
+  });
+
+  it('accepts an invitation with membership, invitation, assignment and activity in one unit of work', async () => {
+    transactionContext.memberships.findActiveMember = vi.fn(
+      async (_companyId, userId) => (userId === target.userId ? target : null),
+    );
+    transactionContext.memberships.findActiveById = vi.fn(async () => target);
+    transactionContext.assignments.load = vi.fn(async () => assignment);
+
+    const result = await service.respondToInvitation(
+      target.userId,
+      invitation.email,
+      true,
+      'raw-token',
+      'accept',
+    );
+
+    expect(
+      transactionContext.parties.findByIdAndCompanyForUpdate,
+    ).toHaveBeenCalledWith(invitation.contractPartyId, invitation.companyId);
+    expect(transactionContext.memberships.findActiveById).toHaveBeenCalledWith(
+      invitation.companyId,
+      target.id,
+    );
+    expect(transactionContext.assignments.create).toHaveBeenCalledWith(
+      invitation.companyId,
+      expect.objectContaining({
+        companyUserId: target.id,
+        assignedById: invitation.invitedById,
+      }),
+    );
+    expect(transactionContext.invitations.save).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'accepted' }),
+    );
+    expect(transactionContext.activities.write).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'contract.role_assigned' }),
+    );
+    expect(result).toMatchObject({
+      status: 'accepted',
+      assignment: { id: assignment.id },
+    });
+  });
+
+  it('rejects expired or reused invitation tokens without accepting them', async () => {
+    transactionContext.invitations.findByTokenHash = vi.fn(async () => ({
+      ...invitation,
+      status: 'accepted',
+    }));
+
+    await expect(
+      service.respondToInvitation(
+        target.userId,
+        invitation.email,
+        true,
+        'used-token',
+        'accept',
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(execute).toHaveBeenCalledOnce();
+    expect(transactionContext.assignments.create).not.toHaveBeenCalled();
+  });
+
+  it('does not disclose a token preview when the invitation is invalid', async () => {
+    persistence.invitations.findByTokenHash = vi.fn(async () => null);
+
+    await expect(
+      service.previewInvitation('invalid-token'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(persistence.invitations.expireById).not.toHaveBeenCalled();
   });
 });

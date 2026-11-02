@@ -1,27 +1,20 @@
 import type {
+  EContractSortField,
   EContractStatus,
   EPartyType,
+  ESortOrder,
 } from '@contractflow/contracts-schema';
+import type { IPageQuery } from '../../../common/application/pagination.interface';
 
-export interface Page<T> {
-  items: T[];
-  total: number;
-  page: number;
-  limit: number;
-}
-
-export interface PageQuery {
-  page: number;
-  limit: number;
-}
-
-export interface ListContractsQuery extends PageQuery {
+export interface ListContractsQuery extends IPageQuery {
   search?: string;
   status?: EContractStatus;
   includeDeleted?: boolean;
+  sortBy?: EContractSortField;
+  sortOrder?: ESortOrder;
 }
 
-export interface ListContractStatusHistoryQuery extends PageQuery {
+export interface ListContractStatusHistoryQuery extends IPageQuery {
   fromDate?: string;
   toDate?: string;
   status?: EContractStatus;

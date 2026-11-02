@@ -162,7 +162,16 @@ describe('ContractResourceReader', () => {
       { contractId: 'c1', companyId: 'co1' },
       { order: { createdAt: 'DESC', id: 'ASC' }, skip: 20, take: 10 },
     );
-    expect(result).toMatchObject({ total: 1, page: 3, limit: 10 });
+    expect(result).toEqual({
+      data: [{ id: 'i1' }],
+      meta: {
+        totalItems: 1,
+        itemCount: 1,
+        itemsPerPage: 10,
+        totalPages: 1,
+        currentPage: 3,
+      },
+    });
   });
 
   it('returns not found for records outside the scope', async () => {

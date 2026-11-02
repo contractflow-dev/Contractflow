@@ -1,142 +1,26 @@
 import { api } from "@/services/api";
 import type {
-  ECompanyUserStatus,
   ECompanyRole,
-  EContractStatus,
-  EInvitationRole,
-  EInvitationStatus,
+  ECompanyUserStatus,
+  ICompanyAccessResponse,
+  ICompanyDashboardResponse,
+  ICompanyInvitation,
+  ICompanyInvitationResponseRequest,
+  ICompanyInvitationResponseResult,
+  ICompanyMember,
+  ICompanyProfileResponse,
+  ICreateCompanyRequest,
+  ICreateCompanyResponse,
+  IInviteCompanyMemberRequest,
+  IPaginatedResponse,
+  IPaginationQuery,
+  IPublicCompanyInvitation,
+  IUpdateCompanyProfileRequest,
 } from "@contractflow/contracts-schema";
-
-export interface CompanyProfile {
-  id: string;
-  name: string;
-  legalName: string;
-  registrationNumber: string;
-  taxIdentificationNumber: string;
-  email: string;
-  phoneNumber: string;
-  website: string;
-  addressLine1: string;
-  addressLine2: string;
-  city: string;
-  stateRegion: string;
-  postalCode: string;
-  countryCode: string;
-  defaultCurrencyCode: string;
-  status: string;
-}
-
-export interface CompanyMembership {
-  id: string;
-  companyId: string;
-  companyRole: string;
-  status: string;
-  canManageCompany: boolean;
-}
-
-export interface CompanyAccess {
-  company: CompanyProfile;
-  membership: CompanyMembership;
-}
-
-export interface CompanyDashboard extends CompanyAccess {
-  expiryWindowDays: number;
-  summary: {
-    activeMembershipCount: number;
-    pendingInvitationCount: number;
-    totalContractCount: number;
-    activeContractCount: number;
-    expiringContractCount: number;
-  };
-  expiringContracts: CompanyDashboardContract[];
-  recentlyUpdatedContracts: CompanyDashboardContract[];
-}
-
-export interface CompanyDashboardContract {
-  id: string;
-  referenceNumber: string;
-  title: string;
-  status: EContractStatus;
-  endDate: string | null;
-  updatedAt: string;
-}
-
-export type CreateCompanyRequest = Omit<CompanyProfile, "id" | "status">;
-
-export interface CreateCompanyResponse extends CompanyAccess {
-  message?: string;
-}
-
-export interface CompanyMember {
-  id: string;
-  userId: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  companyRole: ECompanyRole;
-  status: ECompanyUserStatus;
-  joinedAt: string;
-  leftAt: string | null;
-}
-
-export interface CompanyMembersPage {
-  items: CompanyMember[];
-  total: number;
-  page: number;
-  limit: number;
-}
-
-export interface CompanyInvitation {
-  id: string;
-  email: string;
-  firstName: string | null;
-  lastName: string | null;
-  companyRole: EInvitationRole;
-  status: EInvitationStatus | "expired" | "revoked";
-  expiresAt: string;
-  acceptedAt: string | null;
-  createdAt: string;
-}
-
-export interface CompanyInvitationsPage {
-  items: CompanyInvitation[];
-  total: number;
-  page: number;
-  limit: number;
-}
-
-export interface InviteCompanyMemberRequest {
-  email: string;
-  companyRole: EInvitationRole;
-}
-
-export interface UpdateCompanyProfileRequest {
-  name?: string;
-  legalName?: string;
-  registrationNumber?: string;
-  taxIdentificationNumber?: string;
-  email?: string;
-  phoneNumber?: string;
-  website?: string;
-  addressLine1?: string;
-  addressLine2?: string;
-  city?: string;
-  stateRegion?: string;
-  postalCode?: string;
-  countryCode?: string;
-  defaultCurrencyCode?: string;
-}
-
-export interface PublicCompanyInvitation {
-  companyName: string;
-  email: string;
-  companyRole: EInvitationRole;
-  expiresAt: string;
-}
 
 export const companiesApi = api.injectEndpoints({
   endpoints: (builder) => ({
-    getCompanies: builder.query<CompanyAccess[], void>({
+    getCompanies: builder.query<ICompanyAccessResponse[], void>({
       query: () => "/companies",
       providesTags: (result) =>
         result
@@ -150,7 +34,7 @@ export const companiesApi = api.injectEndpoints({
           : [{ type: "Company", id: "LIST" }],
     }),
 
-    getCurrentCompany: builder.query<CompanyProfile, void>({
+    getCurrentCompany: builder.query<ICompanyProfileResponse, void>({
       query: () => "/companies/current",
       providesTags: (result) =>
         result
@@ -158,7 +42,10 @@ export const companiesApi = api.injectEndpoints({
           : [{ type: "Company", id: "CURRENT" }],
     }),
 
-    getCompanyMembership: builder.query<CompanyAccess, { companyId: string }>({
+    getCompanyMembership: builder.query<
+      ICompanyAccessResponse,
+      { companyId: string }
+    >({
       query: ({ companyId }) =>
         `/companies/${encodeURIComponent(companyId)}/membership`,
       providesTags: (_result, _error, { companyId }) => [
@@ -166,22 +53,21 @@ export const companiesApi = api.injectEndpoints({
       ],
     }),
 
-    getCompanyDashboard: builder.query<CompanyDashboard, { companyId: string }>(
-      {
-        query: ({ companyId }) =>
-          `/companies/${encodeURIComponent(companyId)}/dashboard`,
-        providesTags: (_result, _error, { companyId }) => [
-          { type: "Dashboard", id: companyId },
-        ],
-      },
-    ),
+    getCompanyDashboard: builder.query<
+      ICompanyDashboardResponse,
+      { companyId: string }
+    >({
+      query: ({ companyId }) =>
+        `/companies/${encodeURIComponent(companyId)}/dashboard`,
+      providesTags: (_result, _error, { companyId }) => [
+        { type: "Dashboard", id: companyId },
+      ],
+    }),
 
     getCompanyMembers: builder.query<
-      CompanyMembersPage,
-      {
+      IPaginatedResponse<ICompanyMember>,
+      IPaginationQuery & {
         companyId: string;
-        page?: number;
-        limit?: number;
         search?: string;
         status?: ECompanyUserStatus;
       }
@@ -196,8 +82,8 @@ export const companiesApi = api.injectEndpoints({
     }),
 
     getCompanyInvitations: builder.query<
-      CompanyInvitationsPage,
-      { companyId: string; page?: number; limit?: number }
+      IPaginatedResponse<ICompanyInvitation>,
+      IPaginationQuery & { companyId: string }
     >({
       query: ({ companyId, ...params }) => ({
         url: `/companies/${encodeURIComponent(companyId)}/invitations`,
@@ -209,8 +95,8 @@ export const companiesApi = api.injectEndpoints({
     }),
 
     inviteCompanyMember: builder.mutation<
-      CompanyInvitation,
-      { companyId: string; data: InviteCompanyMemberRequest }
+      ICompanyInvitation,
+      { companyId: string; data: IInviteCompanyMemberRequest }
     >({
       query: ({ companyId, data }) => ({
         url: `/companies/${encodeURIComponent(companyId)}/invitations`,
@@ -224,7 +110,7 @@ export const companiesApi = api.injectEndpoints({
     }),
 
     revokeCompanyInvitation: builder.mutation<
-      CompanyInvitation,
+      ICompanyInvitation,
       { companyId: string; invitationId: string }
     >({
       query: ({ companyId, invitationId }) => ({
@@ -238,7 +124,7 @@ export const companiesApi = api.injectEndpoints({
     }),
 
     changeCompanyMemberRole: builder.mutation<
-      CompanyMember,
+      ICompanyMember,
       { companyId: string; membershipId: string; companyRole: ECompanyRole }
     >({
       query: ({ companyId, membershipId, companyRole }) => ({
@@ -269,8 +155,8 @@ export const companiesApi = api.injectEndpoints({
     }),
 
     updateCompanyProfile: builder.mutation<
-      CompanyProfile,
-      { companyId: string; data: UpdateCompanyProfileRequest }
+      ICompanyProfileResponse,
+      { companyId: string; data: IUpdateCompanyProfileRequest }
     >({
       query: ({ companyId, data }) => ({
         url: `/companies/${encodeURIComponent(companyId)}/profile`,
@@ -286,7 +172,7 @@ export const companiesApi = api.injectEndpoints({
     }),
 
     getPublicCompanyInvitation: builder.query<
-      PublicCompanyInvitation,
+      IPublicCompanyInvitation,
       { token: string }
     >({
       query: (body) => ({
@@ -297,8 +183,8 @@ export const companiesApi = api.injectEndpoints({
     }),
 
     respondToCompanyInvitation: builder.mutation<
-      { status: EInvitationStatus },
-      { token: string; decision: "accept" | "decline" }
+      ICompanyInvitationResponseResult,
+      ICompanyInvitationResponseRequest
     >({
       query: (body) => ({
         url: "/invitations/respond",
@@ -308,8 +194,8 @@ export const companiesApi = api.injectEndpoints({
     }),
 
     createCompany: builder.mutation<
-      CreateCompanyResponse,
-      CreateCompanyRequest
+      ICreateCompanyResponse,
+      ICreateCompanyRequest
     >({
       query: (data) => ({
         url: "/companies",

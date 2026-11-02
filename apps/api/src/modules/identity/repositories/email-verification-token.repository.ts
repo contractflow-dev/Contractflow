@@ -1,54 +1,47 @@
 import { Injectable } from '@nestjs/common';
-import type { EntityManager } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull } from 'typeorm';
+import type { Repository } from 'typeorm';
 import { EmailVerificationToken } from '../entities/email-verification-token.entity';
+import type { IEmailVerificationTokenRepository } from '../interface/auth-persistence.interface';
 
 @Injectable()
-export class EmailVerificationTokenRepository {
-  createInTransaction(
-    manager: EntityManager,
+export class EmailVerificationTokenRepository implements IEmailVerificationTokenRepository {
+  constructor(
+    @InjectRepository(EmailVerificationToken)
+    private readonly repository: Repository<EmailVerificationToken>,
+  ) {}
+
+  createToken(
     token: Pick<
       EmailVerificationToken,
       'userId' | 'tokenHash' | 'expiresAt' | 'usedAt'
     >,
   ): EmailVerificationToken {
-    return manager.getRepository(EmailVerificationToken).create(token);
+    return this.repository.create(token);
   }
 
   findByHashForUpdate(
-    manager: EntityManager,
     tokenHash: string,
   ): Promise<EmailVerificationToken | null> {
-    return manager.getRepository(EmailVerificationToken).findOne({
+    return this.repository.findOne({
       where: { tokenHash },
       lock: { mode: 'pessimistic_write' },
     });
   }
 
-  findLatestForUser(
-    manager: EntityManager,
-    userId: string,
-  ): Promise<EmailVerificationToken | null> {
-    return manager.getRepository(EmailVerificationToken).findOne({
+  findLatestForUser(userId: string): Promise<EmailVerificationToken | null> {
+    return this.repository.findOne({
       where: { userId },
       order: { createdAt: 'DESC' },
     });
   }
 
-  async invalidateUnusedForUser(
-    manager: EntityManager,
-    userId: string,
-    at: Date,
-  ): Promise<void> {
-    await manager
-      .getRepository(EmailVerificationToken)
-      .update({ userId, usedAt: IsNull() }, { usedAt: at });
+  async invalidateUnusedForUser(userId: string, at: Date): Promise<void> {
+    await this.repository.update({ userId, usedAt: IsNull() }, { usedAt: at });
   }
 
-  saveInTransaction(
-    manager: EntityManager,
-    token: EmailVerificationToken,
-  ): Promise<EmailVerificationToken> {
-    return manager.getRepository(EmailVerificationToken).save(token);
+  saveToken(token: EmailVerificationToken): Promise<EmailVerificationToken> {
+    return this.repository.save(token);
   }
 }

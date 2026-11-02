@@ -1,13 +1,14 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomBytes, createHash } from 'node:crypto';
-import { DataSource } from 'typeorm';
 import { EUserStatus } from '@contractflow/contracts-schema';
+import type { IUnitOfWork } from '../../../../common/application/unit-of-work.interface';
 import { AppUserResponseDto } from '../../dto/app-user/responses/app-user-response.dto';
 import { CreateAppUserRequestDto } from '../../dto/app-user/requests/create-app-user-request.dto';
 import { LoginAppUserDto } from '../../dto/app-user/requests/login-app-user-request.dto';
@@ -18,8 +19,12 @@ import type {
   RequestMetadata,
 } from '../../interface/auth-context.interface';
 import type { AuthLoginResult } from '../../interface/auth-login-result.interface';
-import { AppUserRepository } from '../../repositories/app-user.repository';
-import { EmailVerificationTokenRepository } from '../../repositories/email-verification-token.repository';
+import {
+  APP_USER_REPOSITORY,
+  AUTH_UNIT_OF_WORK,
+  type IAppUserRepository,
+  type IAuthTransactionContext,
+} from '../../interface/auth-persistence.interface';
 import { PasswordService } from './password.service';
 import { SessionService } from './session.service';
 
@@ -44,11 +49,12 @@ function isUniqueConstraintViolation(error: unknown): boolean {
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly dataSource: DataSource,
+    @Inject(AUTH_UNIT_OF_WORK)
+    private readonly unitOfWork: IUnitOfWork<IAuthTransactionContext>,
     private readonly config: ConfigService,
     private readonly mailService: MailService,
-    private readonly appUserRepository: AppUserRepository,
-    private readonly emailVerificationTokenRepository: EmailVerificationTokenRepository,
+    @Inject(APP_USER_REPOSITORY)
+    private readonly appUserRepository: IAppUserRepository,
     private readonly passwordService: PasswordService,
     private readonly sessionService: SessionService,
   ) {}
@@ -59,38 +65,36 @@ export class AuthService {
     let user: AppUser;
 
     try {
-      user = await this.dataSource.transaction(async (manager) => {
-        const created = this.appUserRepository.createInTransaction(manager, {
-          email: input.email.trim().toLowerCase(),
-          firstName: input.firstName.trim(),
-          middleName: input.middleName?.trim() ?? '',
-          lastName: input.lastName.trim(),
-          phoneNumber: input.phoneNumber.trim(),
-          timezone: input.timezone,
-          passwordHash,
-          status: EUserStatus.ACTIVE,
-          isPlatformAdmin: false,
-          mfaEnabled: false,
-          emailVerifiedAt: null,
-          lastLoginAt: null,
-        });
-        const savedUser = await this.appUserRepository.saveInTransaction(
-          manager,
-          created,
-        );
+      user = await this.unitOfWork.execute(
+        async ({ users, verificationTokens }) => {
+          const created = users.createUser({
+            email: input.email.trim().toLowerCase(),
+            firstName: input.firstName.trim(),
+            middleName: input.middleName?.trim() ?? '',
+            lastName: input.lastName.trim(),
+            phoneNumber: input.phoneNumber.trim(),
+            timezone: input.timezone,
+            passwordHash,
+            status: EUserStatus.ACTIVE,
+            isPlatformAdmin: false,
+            mfaEnabled: false,
+            emailVerifiedAt: null,
+            lastLoginAt: null,
+          });
+          const savedUser = await users.saveUser(created);
 
-        await this.emailVerificationTokenRepository.saveInTransaction(
-          manager,
-          this.emailVerificationTokenRepository.createInTransaction(manager, {
-            userId: savedUser.id,
-            tokenHash: hashToken(rawToken),
-            expiresAt: new Date(Date.now() + VERIFICATION_TTL_MS),
-            usedAt: null,
-          }),
-        );
+          await verificationTokens.saveToken(
+            verificationTokens.createToken({
+              userId: savedUser.id,
+              tokenHash: hashToken(rawToken),
+              expiresAt: new Date(Date.now() + VERIFICATION_TTL_MS),
+              usedAt: null,
+            }),
+          );
 
-        return savedUser;
-      });
+          return savedUser;
+        },
+      );
     } catch (error) {
       if (isUniqueConstraintViolation(error)) {
         throw new ConflictException(
@@ -105,12 +109,10 @@ export class AuthService {
   }
 
   async verifyEmail(token: string): Promise<{ message: string }> {
-    await this.dataSource.transaction(async (manager) => {
-      const record =
-        await this.emailVerificationTokenRepository.findByHashForUpdate(
-          manager,
-          hashToken(token),
-        );
+    await this.unitOfWork.execute(async ({ users, verificationTokens }) => {
+      const record = await verificationTokens.findByHashForUpdate(
+        hashToken(token),
+      );
 
       if (
         !record ||
@@ -122,10 +124,7 @@ export class AuthService {
         );
       }
 
-      const user = await this.appUserRepository.findByIdForUpdate(
-        manager,
-        record.userId,
-      );
+      const user = await users.findByIdForUpdate(record.userId);
       if (!user || user.status !== EUserStatus.ACTIVE) {
         throw new BadRequestException('This account cannot be verified.');
       }
@@ -133,11 +132,8 @@ export class AuthService {
       const verifiedAt = new Date();
       record.usedAt = verifiedAt;
       user.emailVerifiedAt = verifiedAt;
-      await this.emailVerificationTokenRepository.saveInTransaction(
-        manager,
-        record,
-      );
-      await this.appUserRepository.saveInTransaction(manager, user);
+      await verificationTokens.saveToken(record);
+      await users.saveUser(user);
     });
 
     return { message: 'Your email address is verified.' };
@@ -145,44 +141,38 @@ export class AuthService {
 
   async resendVerification(email: string): Promise<{ message: string }> {
     const rawToken = randomBytes(32).toString('base64url');
-    const deliveryEmail = await this.dataSource.transaction(async (manager) => {
-      const user = await this.appUserRepository.findByEmailForUpdate(
-        manager,
-        email,
-      );
-      if (!user || user.status !== EUserStatus.ACTIVE || user.emailVerifiedAt) {
-        return null;
-      }
+    const deliveryEmail = await this.unitOfWork.execute(
+      async ({ users, verificationTokens }) => {
+        const user = await users.findByEmailForUpdate(email);
+        if (
+          !user ||
+          user.status !== EUserStatus.ACTIVE ||
+          user.emailVerifiedAt
+        ) {
+          return null;
+        }
 
-      const latest =
-        await this.emailVerificationTokenRepository.findLatestForUser(
-          manager,
-          user.id,
+        const latest = await verificationTokens.findLatestForUser(user.id);
+        if (
+          latest &&
+          Date.now() - latest.createdAt.getTime() < RESEND_COOLDOWN_MS
+        ) {
+          return null;
+        }
+
+        const now = new Date();
+        await verificationTokens.invalidateUnusedForUser(user.id, now);
+        await verificationTokens.saveToken(
+          verificationTokens.createToken({
+            userId: user.id,
+            tokenHash: hashToken(rawToken),
+            expiresAt: new Date(now.getTime() + VERIFICATION_TTL_MS),
+            usedAt: null,
+          }),
         );
-      if (
-        latest &&
-        Date.now() - latest.createdAt.getTime() < RESEND_COOLDOWN_MS
-      ) {
-        return null;
-      }
-
-      const now = new Date();
-      await this.emailVerificationTokenRepository.invalidateUnusedForUser(
-        manager,
-        user.id,
-        now,
-      );
-      await this.emailVerificationTokenRepository.saveInTransaction(
-        manager,
-        this.emailVerificationTokenRepository.createInTransaction(manager, {
-          userId: user.id,
-          tokenHash: hashToken(rawToken),
-          expiresAt: new Date(now.getTime() + VERIFICATION_TTL_MS),
-          usedAt: null,
-        }),
-      );
-      return user.email;
-    });
+        return user.email;
+      },
+    );
 
     if (deliveryEmail) {
       await this.mailService.sendVerificationEmail(deliveryEmail, rawToken);

@@ -28,7 +28,7 @@ import {
 } from "@workspace/ui/components/native-select";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { getApiErrorMessage } from "@/lib/apiError";
-import { useGetCompanyMembershipQuery } from "@/features/companies/companiesApi";
+import { useGetCompanyMembershipQuery } from "@/services/companiesApi";
 import {
   useArchiveContractMutation,
   useCreateContractMutation,
@@ -548,9 +548,7 @@ export function ContractLifecycleManagement({
                   ) {
                     const result = await archiveContract(query);
                     if (!("error" in result)) {
-                      router.push(
-                        `/dashboards/contracts?companyId=${encodeURIComponent(companyId)}`,
-                      );
+                      router.push("/dashboards/contracts");
                     }
                   }
                 }}

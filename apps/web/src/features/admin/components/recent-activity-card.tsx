@@ -23,10 +23,10 @@ import {
   EmptyTitle,
 } from "@workspace/ui/components/empty";
 import { Separator } from "@workspace/ui/components/separator";
-import type { AdminRecentActivityItem } from "@/services/adminApi";
+import type { IAdminRecentActivityItem } from "@contractflow/contracts-schema";
 
 interface RecentActivityCardProps {
-  activity: AdminRecentActivityItem[];
+  activity: IAdminRecentActivityItem[];
 }
 
 function formatDate(isoString: string): string {

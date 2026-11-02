@@ -4,18 +4,17 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource, IsNull } from 'typeorm';
-import {
-  ECompanyRole,
-  ECompanyUserStatus,
+import { ECompanyRole } from '@contractflow/contracts-schema';
+import type {
+  Contract as ContractApiResponse,
+  ContractDetail,
+  ContractMembership,
+  IPaginatedResponse,
 } from '@contractflow/contracts-schema';
 import type { IContractScope } from '../../../common/database/repositories/contract-scope.interface';
-import type { ICompanyScope } from '../../../common/database/repositories/company-scope.interface';
 import { CompanyScopeService } from '../../identity/services/company/company-scope.service';
-import { CompanyUser } from '../../identity/entities/company-user.entity';
 import { Contract } from '../entities/contract.entity';
 import { ContractParty } from '../entities/contract-party.entity';
-import { ContractWorkspaceEntity } from '../entities/contract-workspace.entity';
 import { ContractPartyRepository } from '../repositories/contract-party.repository';
 import { ContractRepository } from '../repositories/contract.repository';
 import {
@@ -23,23 +22,27 @@ import {
   type ContractStatusHistoryFilter,
 } from '../repositories/contract-status-history.repository';
 import { ContractStatusHistory } from '../entities/contract-status-history.entity';
+import { CompanyUserRepository } from '../../identity/repositories/company-user.respository';
+import { ContractWorkspaceRepository } from '../repositories/contract-workspace.repository';
 import type { AssignableContractWorkspace } from './contract-workspace';
 import type {
   ContractPartySummary,
   ListContractStatusHistoryQuery,
   ListContractsQuery,
-  Page,
-  PageQuery,
 } from '../interfaces/contract-listing.interface';
+import {
+  pageOffset,
+  toPaginatedResponse,
+} from '../../../common/application/pagination';
 
 /** Everything a contract-level read needs once membership is proven. */
 interface ContractAccess {
-  /** For company-scoped repositories (e.g. ContractRepository). */
-  companyScope: ICompanyScope;
   /** For contract-scoped repositories (e.g. status history). */
   contractScope: IContractScope;
   /** The acting company's party row on this contract. */
   membership: ContractParty;
+  /** The visible, non-archived contract. */
+  contract: Contract;
 }
 
 /**
@@ -57,27 +60,22 @@ export class ContractService {
     private readonly parties: ContractPartyRepository,
     private readonly statusHistory: ContractStatusHistoryRepository,
     private readonly contracts: ContractRepository,
-    private readonly dataSource: DataSource,
+    private readonly companyUsers: CompanyUserRepository,
+    private readonly workspaces: ContractWorkspaceRepository,
   ) {}
 
   async list(
     userId: string,
     companyId: string,
     query: ListContractsQuery,
-  ): Promise<Page<Contract>> {
+  ): Promise<IPaginatedResponse<ContractApiResponse>> {
     const scope = await this.companyScope.forUser(userId, companyId);
     if (query.includeDeleted) {
-      const membership = await this.dataSource
-        .getRepository(CompanyUser)
-        .findOne({
-          where: {
-            userId,
-            companyId: scope.companyId,
-            status: ECompanyUserStatus.ACTIVE,
-            leftAt: IsNull(),
-          },
-        });
-      if (membership?.companyRole !== ECompanyRole.COMPANY_ADMIN) {
+      const companyRole = await this.companyUsers.findActiveRoleForUser(
+        userId,
+        scope.companyId,
+      );
+      if (companyRole !== ECompanyRole.COMPANY_ADMIN) {
         throw new ForbiddenException(
           'Only the creating company administrator can list archived contracts.',
         );
@@ -88,28 +86,31 @@ export class ContractService {
       status: query.status,
       includeDeleted: query.includeDeleted,
       creatorCompanyId: query.includeDeleted ? scope.companyId : undefined,
-      skip: offset(query),
+      sortBy: query.sortBy,
+      sortOrder: query.sortOrder,
+      skip: pageOffset(query),
       take: query.limit,
     });
-    return toPage(result, query);
+    return toPaginatedResponse(
+      { ...result, items: result.items.map(toContractResponse) },
+      query,
+    );
   }
 
   async get(
     userId: string,
     companyId: string,
     contractId: string,
-  ): Promise<{ contract: Contract; membership: ContractParty }> {
-    const { companyScope, membership } = await this.requireMembership(
+  ): Promise<ContractDetail> {
+    const { contract, membership } = await this.requireMembership(
       userId,
       companyId,
       contractId,
     );
-
-    const contract = await this.contracts.findById(companyScope, contractId);
-    if (!contract) {
-      throw contractNotFound();
-    }
-    return { contract, membership };
+    return {
+      contract: toContractResponse(contract),
+      membership: toMembershipResponse(membership),
+    };
   }
 
   async listParties(
@@ -154,14 +155,14 @@ export class ContractService {
       toDate: query.toDate ? normalizeEndDate(query.toDate) : undefined,
       status: query.status,
       userId: query.userId,
-      skip: offset(query),
+      skip: pageOffset(query),
       take: query.limit,
     };
     const result = await this.statusHistory.searchPage(contractScope, filter);
-    return {
-      ...toPage(result, query),
-      items: result.items.map(toHistorySummary),
-    };
+    return toPaginatedResponse(
+      { ...result, items: result.items.map(toHistorySummary) },
+      query,
+    );
   }
 
   async listWorkspaces(
@@ -169,18 +170,15 @@ export class ContractService {
     companyId: string,
     contractId: string,
   ): Promise<AssignableContractWorkspace[]> {
-    const { contractScope } = await this.requireMembership(
+    const { contractScope, membership } = await this.requireMembership(
       userId,
       companyId,
       contractId,
     );
-    const workspaces = await this.dataSource
-      .getRepository(ContractWorkspaceEntity)
-      .find({
-        where: { contractId: contractScope.contractId },
-        order: { workspace: 'ASC' },
-      });
-    return workspaces.map(({ workspace }) => workspace);
+    return this.workspaces.findWorkspaces({
+      contractId: contractScope.contractId,
+      companyId: membership.companyId,
+    });
   }
 
   // ---------------------------------------------------------------------
@@ -215,7 +213,7 @@ export class ContractService {
     if (!contract) {
       throw contractNotFound();
     }
-    return { companyScope, membership, contractScope };
+    return { membership, contractScope, contract };
   }
 }
 
@@ -227,22 +225,6 @@ function contractNotFound(): NotFoundException {
   return new NotFoundException('Contract was not found');
 }
 
-function offset(query: PageQuery): number {
-  return (query.page - 1) * query.limit;
-}
-
-function toPage<T>(
-  result: { items: T[]; total: number },
-  query: PageQuery,
-): Page<T> {
-  return {
-    items: result.items,
-    total: result.total,
-    page: query.page,
-    limit: query.limit,
-  };
-}
-
 function toPartySummary(party: ContractParty): ContractPartySummary {
   return {
     id: party.id,
@@ -251,6 +233,52 @@ function toPartySummary(party: ContractParty): ContractPartySummary {
     partyType: party.partyType,
     signedAt: party.signedAt,
   };
+}
+
+function toContractResponse(contract: Contract): ContractApiResponse {
+  return {
+    id: contract.id,
+    referenceNumber: contract.referenceNumber,
+    title: contract.title,
+    description: contract.description,
+    contractType: contract.contractType,
+    status: contract.status,
+    parentContractId: contract.parentContractId,
+    originalValueMinor: contract.originalValueMinor,
+    currentValueMinor: contract.currentValueMinor,
+    currencyCode: contract.currencyCode,
+    retentionRateBps: contract.retentionRateBps,
+    advancePaymentRateBps: contract.advancePaymentRateBps,
+    paymentTermsDays: contract.paymentTermsDays,
+    liquidatedDamagesPerDayMinor: contract.liquidatedDamagesPerDayMinor,
+    awardDate: toApiDate(contract.awardDate),
+    startDate: toApiDate(contract.startDate),
+    endDate: toApiDate(contract.endDate),
+    revisedEndDate: contract.revisedEndDate
+      ? toApiDate(contract.revisedEndDate)
+      : null,
+    actualCompletionDate: contract.actualCompletionDate
+      ? toApiDate(contract.actualCompletionDate)
+      : null,
+    defectsLiabilityDays: contract.defectsLiabilityDays,
+    timezone: contract.timezone,
+    createdAt: toApiDate(contract.createdAt),
+    updatedAt: toApiDate(contract.updatedAt),
+    deletedAt: contract.deletedAt ? toApiDate(contract.deletedAt) : null,
+  };
+}
+
+function toMembershipResponse(party: ContractParty): ContractMembership {
+  return {
+    id: party.id,
+    companyId: party.companyId,
+    partyType: party.partyType,
+    signedAt: party.signedAt ? toApiDate(party.signedAt) : null,
+  };
+}
+
+function toApiDate(value: Date | string): string {
+  return value instanceof Date ? value.toISOString() : value;
 }
 
 function normalizeEndDate(value: string): string {

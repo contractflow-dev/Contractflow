@@ -1,11 +1,10 @@
 import {
   ForbiddenException,
+  Inject,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, IsNull, Repository } from 'typeorm';
 import {
   EContractStatus,
   ECompanyRole,
@@ -13,15 +12,17 @@ import {
   ECompanyUserStatus,
   EUserStatus,
 } from '@contractflow/contracts-schema';
-import { AppUser } from '../../entities/app-user.entity';
-import { Company } from '../../entities/company.entity';
 import { CompanyUser } from '../../entities/company-user.entity';
 import { CompanyInvitationRepository } from '../../repositories/company-invitation.repository';
-import { Contract } from '../../../contract/entities/contract.entity';
-import { ContractParty } from '../../../contract/entities/contract-party.entity';
+import { ContractPartyRepository } from '../../../contract/repositories/contract-party.repository';
 import type { DashboardContractRow } from '../../../contract/interfaces/dashboard-contract-row.interface';
 import { CompanyResponseDto } from '../../dto/company/responses/company-response.dto';
 import { CreateCompanyRequestDto } from '../../dto/company/requests/create-company-request.dto';
+import { CompanyUserRepository } from '../../repositories/company-user.respository';
+import {
+  COMPANY_CREATION_UNIT_OF_WORK,
+  type ICompanyCreationUnitOfWork,
+} from '../../interface/company-creation-persistence.interface';
 
 import type {
   ICompanyAccessResponse,
@@ -38,23 +39,19 @@ const COMPANY_DASHBOARD_CONTRACT_LIMIT = 5;
 export class CompanyService {
   constructor(
     private readonly configService: ConfigService,
-    private readonly dataSource: DataSource,
-    @InjectRepository(CompanyUser)
-    private readonly companyUserRepository: Repository<CompanyUser>,
+    @Inject(COMPANY_CREATION_UNIT_OF_WORK)
+    private readonly companyCreation: ICompanyCreationUnitOfWork,
+    private readonly companyUserRepository: CompanyUserRepository,
     private readonly invitationRepository: CompanyInvitationRepository,
-    @InjectRepository(ContractParty)
-    private readonly contractPartyRepository: Repository<ContractParty>,
+    private readonly contractPartyRepository: ContractPartyRepository,
   ) {}
 
   async create(
     userId: string,
     dto: CreateCompanyRequestDto,
   ): Promise<ICompanyAccessResponse> {
-    const result = await this.dataSource.transaction(async (manager) => {
-      const users = manager.getRepository(AppUser);
-      const user = await users.findOne({
-        where: { id: userId },
-      });
+    const result = await this.companyCreation.execute(async (context) => {
+      const user = await context.findUserById(userId);
 
       if (!user) {
         throw new UnauthorizedException('Authentication required.');
@@ -66,28 +63,23 @@ export class CompanyService {
         );
       }
 
-      const companyRepository = manager.getRepository(Company);
-      const savedCompany = await companyRepository.save(
-        companyRepository.create({
-          ...dto,
-          website: dto.website ?? '',
-          addressLine2: dto.addressLine2 ?? '',
-          status: ECompanyStatus.ACTIVE,
-        }),
-      );
+      const savedCompany = await context.createCompany({
+        ...dto,
+        website: dto.website ?? '',
+        addressLine2: dto.addressLine2 ?? '',
+        status: ECompanyStatus.ACTIVE,
+        verifiedAt: null,
+      });
 
-      const membershipRepository = manager.getRepository(CompanyUser);
-      const savedMembership = await membershipRepository.save(
-        membershipRepository.create({
-          companyId: savedCompany.id,
-          userId: user.id,
-          companyRole: ECompanyRole.COMPANY_ADMIN,
-          jobTitle: 'Company Administrator',
-          status: ECompanyUserStatus.ACTIVE,
-          joinedAt: new Date(),
-          leftAt: null,
-        }),
-      );
+      const savedMembership = await context.createMembership({
+        companyId: savedCompany.id,
+        userId: user.id,
+        companyRole: ECompanyRole.COMPANY_ADMIN,
+        jobTitle: 'Company Administrator',
+        status: ECompanyUserStatus.ACTIVE,
+        joinedAt: new Date(),
+        leftAt: null,
+      });
 
       return {
         company: savedCompany,
@@ -102,34 +94,27 @@ export class CompanyService {
   }
 
   async listForUser(userId: string): Promise<ICompanyAccessResponse[]> {
-    const memberships = await this.companyUserRepository.find({
-      where: {
-        userId,
-        status: ECompanyUserStatus.ACTIVE,
-        leftAt: IsNull(),
-      },
-      order: { joinedAt: 'DESC' },
-      relations: { company: true },
-    });
+    const memberships =
+      await this.companyUserRepository.findActiveMembershipsForUser(userId);
 
-    return memberships.map((membership) => ({
-      company: CompanyResponseDto.fromEntity(membership.company),
-      membership: this.mapMembership(membership),
-    }));
+    return memberships
+      .filter(
+        (membership) => membership.company.status === ECompanyStatus.ACTIVE,
+      )
+      .map((membership) => ({
+        company: CompanyResponseDto.fromEntity(membership.company),
+        membership: this.mapMembership(membership),
+      }));
   }
 
   async getCurrent(userId: string): Promise<ICompanyProfileResponse> {
-    const membership = await this.companyUserRepository.findOne({
-      where: {
-        userId,
-        status: ECompanyUserStatus.ACTIVE,
-        leftAt: IsNull(),
-      },
-      order: { joinedAt: 'DESC' },
-      relations: { company: true },
-    });
+    const membership =
+      await this.companyUserRepository.findCurrentMembershipWithCompany(userId);
 
-    if (!membership?.company) {
+    if (
+      !membership?.company ||
+      membership.company.status !== ECompanyStatus.ACTIVE
+    ) {
       throw new ForbiddenException('Active company membership is required');
     }
 
@@ -140,17 +125,16 @@ export class CompanyService {
     userId: string,
     companyId: string,
   ): Promise<ICompanyAccessResponse> {
-    const membership = await this.companyUserRepository.findOne({
-      where: {
+    const membership =
+      await this.companyUserRepository.findActiveMembershipWithCompany(
         userId,
         companyId,
-        status: ECompanyUserStatus.ACTIVE,
-        leftAt: IsNull(),
-      },
-      relations: { company: true },
-    });
+      );
 
-    if (!membership?.company) {
+    if (
+      !membership?.company ||
+      membership.company.status !== ECompanyStatus.ACTIVE
+    ) {
       throw new ForbiddenException('Active company membership is required.');
     }
 
@@ -164,17 +148,16 @@ export class CompanyService {
     userId: string,
     companyId: string,
   ): Promise<ICompanyDashboardResponse> {
-    const membership = await this.companyUserRepository.findOne({
-      where: {
+    const membership =
+      await this.companyUserRepository.findActiveMembershipWithCompany(
         userId,
         companyId,
-        status: ECompanyUserStatus.ACTIVE,
-        leftAt: IsNull(),
-      },
-      relations: { company: true },
-    });
+      );
 
-    if (!membership?.company) {
+    if (
+      !membership?.company ||
+      membership.company.status !== ECompanyStatus.ACTIVE
+    ) {
       throw new ForbiddenException('Active company membership is required.');
     }
 
@@ -184,21 +167,19 @@ export class CompanyService {
       );
     }
 
-    const activeMembershipCount = await this.companyUserRepository.count({
-      where: {
-        companyId,
-        status: ECompanyUserStatus.ACTIVE,
-        leftAt: IsNull(),
-      },
-    });
+    const activeMembershipCount =
+      await this.companyUserRepository.countActiveMembers(companyId);
 
     const pendingInvitationCount = await this.invitationRepository.countPending(
       { companyId },
     );
 
     const [totalContractCount, activeContractCount] = await Promise.all([
-      this.countCompanyContracts(companyId),
-      this.countCompanyContracts(companyId, EContractStatus.ACTIVE),
+      this.contractPartyRepository.countCompanyContracts(companyId),
+      this.contractPartyRepository.countCompanyContracts(
+        companyId,
+        EContractStatus.ACTIVE,
+      ),
     ]);
     const expiryWindowDays = this.configService.get<number>(
       'COMPANY_DASHBOARD_EXPIRY_WINDOW_DAYS',
@@ -212,13 +193,29 @@ export class CompanyService {
     const todayDate = today.toISOString().slice(0, 10);
     const expiryDate = expiryLimit.toISOString().slice(0, 10);
     const [expiringContractCount, expiringContracts] = await Promise.all([
-      this.countExpiringCompanyContracts(companyId, todayDate, expiryDate),
-      this.findExpiringContracts(companyId, todayDate, expiryDate),
+      this.contractPartyRepository.countExpiringCompanyContracts(
+        companyId,
+        todayDate,
+        expiryDate,
+      ),
+      this.contractPartyRepository
+        .findExpiringCompanyContracts(
+          companyId,
+          todayDate,
+          expiryDate,
+          COMPANY_DASHBOARD_CONTRACT_LIMIT,
+        )
+        .then((rows) => rows.map(mapDashboardContract)),
     ]);
-    const recentlyUpdatedContracts = await this.findRecentlyUpdatedContracts(
-      companyId,
-      new Date(now.getTime() - COMPANY_DASHBOARD_RECENT_WINDOW_DAYS * 86400000),
-    );
+    const recentlyUpdatedContracts = (
+      await this.contractPartyRepository.findRecentlyUpdatedCompanyContracts(
+        companyId,
+        new Date(
+          now.getTime() - COMPANY_DASHBOARD_RECENT_WINDOW_DAYS * 86400000,
+        ),
+        COMPANY_DASHBOARD_CONTRACT_LIMIT,
+      )
+    ).map(mapDashboardContract);
 
     return {
       company: CompanyResponseDto.fromEntity(membership.company),
@@ -234,106 +231,6 @@ export class CompanyService {
       expiringContracts,
       recentlyUpdatedContracts,
     };
-  }
-
-  private async countCompanyContracts(
-    companyId: string,
-    status?: EContractStatus,
-  ): Promise<number> {
-    const query = this.contractPartyRepository
-      .createQueryBuilder('party')
-      .innerJoin(Contract, 'contract', 'contract.id = party.contractId')
-      .select('COUNT(DISTINCT contract.id)', 'count')
-      .where('party.companyId = :companyId', { companyId });
-    if (status) {
-      query.andWhere('contract.status = :status', { status });
-    }
-    const result = await query.getRawOne<{ count: string }>();
-
-    return Number(result?.count ?? 0);
-  }
-
-  private async countExpiringCompanyContracts(
-    companyId: string,
-    today: string,
-    expiryLimit: string,
-  ): Promise<number> {
-    const result = await this.contractPartyRepository
-      .createQueryBuilder('party')
-      .innerJoin(Contract, 'contract', 'contract.id = party.contractId')
-      .select('COUNT(DISTINCT contract.id)', 'count')
-      .where('party.companyId = :companyId', { companyId })
-      .andWhere('contract.status = :status', {
-        status: EContractStatus.ACTIVE,
-      })
-      .andWhere(
-        'COALESCE(contract.revisedEndDate, contract.endDate) BETWEEN :today AND :expiryLimit',
-        { today, expiryLimit },
-      )
-      .getRawOne<{ count: string }>();
-
-    return Number(result?.count ?? 0);
-  }
-
-  private async findExpiringContracts(
-    companyId: string,
-    today: string,
-    expiryLimit: string,
-  ): Promise<ICompanyDashboardContractResponse[]> {
-    const rows = await this.contractPartyRepository
-      .createQueryBuilder('party')
-      .innerJoin(Contract, 'contract', 'contract.id = party.contractId')
-      .distinct(true)
-      .select('contract.id', 'id')
-      .addSelect('contract.referenceNumber', 'referenceNumber')
-      .addSelect('contract.title', 'title')
-      .addSelect('contract.status', 'status')
-      .addSelect(
-        'COALESCE(contract.revisedEndDate, contract.endDate)',
-        'endDate',
-      )
-      .addSelect('contract.updatedAt', 'updatedAt')
-      .where('party.companyId = :companyId', { companyId })
-      .andWhere('contract.status = :status', {
-        status: EContractStatus.ACTIVE,
-      })
-      .andWhere(
-        'COALESCE(contract.revisedEndDate, contract.endDate) BETWEEN :today AND :expiryLimit',
-        { today, expiryLimit },
-      )
-      .orderBy('COALESCE(contract.revisedEndDate, contract.endDate)', 'ASC')
-      .addOrderBy('contract.id', 'ASC')
-      .take(COMPANY_DASHBOARD_CONTRACT_LIMIT)
-      .getRawMany<DashboardContractRow>();
-
-    return rows.map(mapDashboardContract);
-  }
-
-  private async findRecentlyUpdatedContracts(
-    companyId: string,
-    updatedSince: Date,
-  ): Promise<ICompanyDashboardContractResponse[]> {
-    const rows = await this.contractPartyRepository
-      .createQueryBuilder('party')
-      .innerJoin(Contract, 'contract', 'contract.id = party.contractId')
-      .distinct(true)
-      .select('contract.id', 'id')
-      .addSelect('contract.referenceNumber', 'referenceNumber')
-      .addSelect('contract.title', 'title')
-      .addSelect('contract.status', 'status')
-      .addSelect(
-        'COALESCE(contract.revisedEndDate, contract.endDate)',
-        'endDate',
-      )
-      .addSelect('contract.updatedAt', 'updatedAt')
-      .where('party.companyId = :companyId', { companyId })
-      .andWhere('contract.updatedAt >= :updatedSince', { updatedSince })
-      .orderBy('contract.updatedAt', 'DESC')
-      .addOrderBy('contract.id', 'ASC')
-      .take(COMPANY_DASHBOARD_CONTRACT_LIMIT)
-      .getRawMany<DashboardContractRow>();
-
-    return rows.map(mapDashboardContract);
   }
 
   private mapMembership(membership: CompanyUser): ICompanyMembershipResponse {

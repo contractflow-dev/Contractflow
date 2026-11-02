@@ -1,5 +1,10 @@
 import type {
+  IPaginationQuery,
+  ISortQuery,
+} from "../../../common/interfaces/pagination.interface.js";
+import type {
   EContractRole,
+  EContractSortField,
   EContractStatus,
   EContractType,
   EFromStatus,
@@ -35,18 +40,11 @@ export interface Contract {
   deletedAt?: string | null;
 }
 
-export interface ContractPage<T> {
-  items: T[];
-  total: number;
-  page: number;
-  limit: number;
-}
-
-export interface ContractFilterParams {
+export interface ContractFilterParams
+  extends IPaginationQuery,
+    ISortQuery<EContractSortField> {
   status?: EContractStatus;
   search?: string;
-  page?: number;
-  limit?: number;
   includeDeleted?: boolean;
 }
 
@@ -90,9 +88,9 @@ export interface CompanyContractDetailQuery {
   contractId: string;
 }
 
-export interface CompanyContractHistoryQuery extends CompanyContractDetailQuery {
-  page?: number;
-  limit?: number;
+export interface CompanyContractHistoryQuery
+  extends CompanyContractDetailQuery,
+    IPaginationQuery {
   fromDate?: string;
   toDate?: string;
   status?: EContractStatus;

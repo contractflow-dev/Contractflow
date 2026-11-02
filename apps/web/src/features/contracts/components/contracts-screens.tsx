@@ -27,14 +27,17 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components/table";
+import { DataPagination } from "@/components/pagination/data-pagination";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { CreateContractForm } from "./contract-lifecycle-management";
 import { useRestoreContractMutation } from "@/services/contractApi";
 import { ContractRoleAssignmentManagement } from "./contract-role-assignment-management";
 import { useContractDetails } from "../_hooks/use-contract-details";
-import { useContractsList } from "../_hooks/use-contracts-list";
+import {
+  contractSortOptions,
+  useContractsList,
+} from "../_hooks/use-contracts-list";
 
-const pageSize = 20;
 const contractStatuses = Object.values(EContractStatus);
 
 export function ContractsList({ companyId }: { companyId: string }) {
@@ -45,16 +48,17 @@ export function ContractsList({ companyId }: { companyId: string }) {
     setStatus,
     includeDeleted,
     setIncludeDeleted,
-    page,
+    sort,
+    setSort,
     setPage,
+    setLimit,
     currentData,
     error,
     isFetching,
     isLoading,
     refetch,
-    pageCount,
     submitSearch,
-  } = useContractsList(companyId, pageSize);
+  } = useContractsList(companyId);
   const initialLoading = isLoading || (isFetching && !currentData);
 
   return (
@@ -73,13 +77,14 @@ export function ContractsList({ companyId }: { companyId: string }) {
         <CardHeader>
           <CardTitle>Contract register</CardTitle>
           <CardDescription>
-            Search by contract title or reference and filter by status.
+            Search by contract title or reference, filter by status, and choose
+            the order.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           <form
             onSubmit={submitSearch}
-            className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_14rem_auto]"
+            className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_12rem_12rem_auto]"
           >
             <Field>
               <FieldLabel htmlFor="contract-search">
@@ -105,7 +110,6 @@ export function ContractsList({ companyId }: { companyId: string }) {
                     contractStatuses.find((candidate) => candidate === value) ??
                       "",
                   );
-                  setPage(1);
                 }}
               >
                 <NativeSelectOption value="">All statuses</NativeSelectOption>
@@ -115,6 +119,21 @@ export function ContractsList({ companyId }: { companyId: string }) {
                     value={contractStatus}
                   >
                     {formatLabel(contractStatus)}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="contract-sort">Sort by</FieldLabel>
+              <NativeSelect
+                id="contract-sort"
+                className="w-full"
+                value={sort}
+                onChange={(event) => setSort(event.target.value)}
+              >
+                {contractSortOptions.map((option) => (
+                  <NativeSelectOption key={option.value} value={option.value}>
+                    {option.label}
                   </NativeSelectOption>
                 ))}
               </NativeSelect>
@@ -129,10 +148,7 @@ export function ContractsList({ companyId }: { companyId: string }) {
             <input
               type="checkbox"
               checked={includeDeleted}
-              onChange={(event) => {
-                setIncludeDeleted(event.target.checked);
-                setPage(1);
-              }}
+              onChange={(event) => setIncludeDeleted(event.target.checked)}
             />
             Include archived contracts
           </label>
@@ -161,7 +177,7 @@ export function ContractsList({ companyId }: { companyId: string }) {
             >
               Loading contracts…
             </p>
-          ) : currentData?.items.length ? (
+          ) : currentData?.data.length ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -174,7 +190,7 @@ export function ContractsList({ companyId }: { companyId: string }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {currentData.items.map((contract) => (
+                {currentData.data.map((contract) => (
                   <TableRow key={contract.id}>
                     <TableCell>
                       {contract.deletedAt ? (
@@ -182,7 +198,7 @@ export function ContractsList({ companyId }: { companyId: string }) {
                       ) : (
                         <Link
                           className="font-medium text-primary underline-offset-4 hover:underline"
-                          href={`/dashboards/contracts/${encodeURIComponent(contract.id)}?companyId=${encodeURIComponent(companyId)}`}
+                          href={`/dashboards/contracts/${encodeURIComponent(contract.id)}`}
                         >
                           {contract.referenceNumber}
                         </Link>
@@ -221,32 +237,14 @@ export function ContractsList({ companyId }: { companyId: string }) {
           ) : null}
 
           {currentData ? (
-            <div className="flex items-center justify-between gap-3 border-t pt-4">
-              <p className="text-sm text-muted-foreground">
-                {currentData.total} contract{currentData.total === 1 ? "" : "s"}
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={page <= 1 || isFetching}
-                  onClick={() => setPage((currentPage) => currentPage - 1)}
-                >
-                  Previous
-                </Button>
-                <span className="text-sm tabular-nums">
-                  Page {page} of {pageCount}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={page >= pageCount || isFetching}
-                  onClick={() => setPage((currentPage) => currentPage + 1)}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
+            <DataPagination
+              className="border-t pt-4"
+              meta={currentData.meta}
+              itemLabel="contracts"
+              isFetching={isFetching}
+              onPageChange={setPage}
+              onPageSizeChange={setLimit}
+            />
           ) : null}
         </CardContent>
       </Card>
@@ -300,6 +298,9 @@ export function ContractDetail({
     history,
     historyError,
     historyLoading,
+    historyFetching,
+    setHistoryPage,
+    setHistoryPageSize,
   } = useContractDetails(query);
 
   if (contractLoading) {
@@ -318,7 +319,7 @@ export function ContractDetail({
       <div className="space-y-4">
         <Link
           className="text-sm text-primary underline-offset-4 hover:underline"
-          href={`/dashboards/contracts?companyId=${encodeURIComponent(companyId)}`}
+          href="/dashboards/contracts"
         >
           Back to contracts
         </Link>
@@ -351,7 +352,7 @@ export function ContractDetail({
       <div>
         <Link
           className="text-sm text-primary underline-offset-4 hover:underline"
-          href={`/dashboards/contracts?companyId=${encodeURIComponent(companyId)}`}
+          href="/dashboards/contracts"
         >
           Back to contracts
         </Link>
@@ -474,31 +475,38 @@ export function ContractDetail({
             <p role="status" className="py-4 text-sm text-muted-foreground">
               Loading status history…
             </p>
-          ) : history?.items.length ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Changed</TableHead>
-                  <TableHead>From</TableHead>
-                  <TableHead>To</TableHead>
-                  <TableHead>Reason</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {history.items.map((entry) => (
-                  <TableRow key={entry.id}>
-                    <TableCell>{formatDate(entry.changedAt)}</TableCell>
-                    <TableCell>
-                      {entry.fromStatus
-                        ? formatLabel(entry.fromStatus)
-                        : "—"}
-                    </TableCell>
-                    <TableCell>{formatLabel(entry.toStatus)}</TableCell>
-                    <TableCell>{entry.reason || "—"}</TableCell>
+          ) : history?.data.length ? (
+            <div className="space-y-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Changed</TableHead>
+                    <TableHead>From</TableHead>
+                    <TableHead>To</TableHead>
+                    <TableHead>Reason</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {history.data.map((entry) => (
+                    <TableRow key={entry.id}>
+                      <TableCell>{formatDate(entry.changedAt)}</TableCell>
+                      <TableCell>
+                        {entry.fromStatus ? formatLabel(entry.fromStatus) : "—"}
+                      </TableCell>
+                      <TableCell>{formatLabel(entry.toStatus)}</TableCell>
+                      <TableCell>{entry.reason || "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <DataPagination
+                meta={history.meta}
+                itemLabel="status changes"
+                isFetching={historyFetching}
+                onPageChange={setHistoryPage}
+                onPageSizeChange={setHistoryPageSize}
+              />
+            </div>
           ) : (
             <p className="py-4 text-sm text-muted-foreground">
               No status changes have been recorded.

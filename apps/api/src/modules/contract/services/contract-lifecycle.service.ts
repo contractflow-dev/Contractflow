@@ -1,31 +1,20 @@
-import {
+﻿import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import {
   ECompanyRole,
-  ECompanyStatus,
-  ECompanyUserStatus,
   EContractRole,
   EContractStatus,
   EFromStatus,
   EPartyType,
   EToStatus,
 } from '@contractflow/contracts-schema';
-import {
-  DataSource,
-  IsNull,
-  LessThanOrEqual,
-  type EntityManager,
-} from 'typeorm';
-import { ActivityLog } from '../../cross-cutting/entities/activity-log.entity';
-import { Company } from '../../identity/entities/company.entity';
-import { CompanyUser } from '../../identity/entities/company-user.entity';
-import { ContractPartyInvitation } from '../entities/contract-party-invitation.entity';
 import type {
   ContractPartyInvitationPreviewResponse,
   ContractPartyInvitationResponse,
@@ -38,12 +27,15 @@ import type {
   ContractTransition,
   TransitionContractRequestDto,
 } from '../dto/transition-contract-request.dto';
-import { Contract } from '../entities/contract.entity';
-import { ContractParty } from '../entities/contract-party.entity';
-import { ContractRoleAssignment } from '../entities/contract-role-assignment.entity';
-import { ContractRoleInvitation } from '../entities/contract-role-invitation.entity';
-import { ContractStatusHistory } from '../entities/contract-status-history.entity';
-import { ContractWorkspaceEntity } from '../entities/contract-workspace.entity';
+import type { Contract } from '../entities/contract.entity';
+import type { ContractParty } from '../entities/contract-party.entity';
+import type { ContractPartyInvitation } from '../entities/contract-party-invitation.entity';
+import type { CompanyUser } from '../../identity/entities/company-user.entity';
+import {
+  CONTRACT_LIFECYCLE_UNIT_OF_WORK,
+  type IContractLifecycleContext,
+  type IContractLifecycleUnitOfWork,
+} from '../interfaces/contract-lifecycle-persistence.interface';
 import { MailService } from '../../mail/mail.service';
 import {
   WORKSPACE_ROLES,
@@ -80,10 +72,20 @@ function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
+function projectLeadRole(partyType: EPartyType): EContractRole | null {
+  if (partyType === EPartyType.CLIENT) {
+    return EContractRole.CLIENT_PROJECT_MANAGER;
+  }
+  return [EPartyType.CONTRACTOR, EPartyType.SUBCONTRACTOR].includes(partyType)
+    ? EContractRole.CONTRACTOR_PROJECT_LEAD
+    : null;
+}
+
 @Injectable()
 export class ContractLifecycleService {
   constructor(
-    private readonly dataSource: DataSource,
+    @Inject(CONTRACT_LIFECYCLE_UNIT_OF_WORK)
+    private readonly unitOfWork: IContractLifecycleUnitOfWork,
     private readonly mail: MailService,
   ) {}
 
@@ -96,68 +98,45 @@ export class ContractLifecycleService {
     canTransition: boolean;
     canRestore: boolean;
   }> {
-    const manager = this.dataSource.manager;
-    const membership = await manager.getRepository(CompanyUser).findOne({
-      where: {
+    return this.unitOfWork.execute(async (context) => {
+      const membership = await context.memberships.findActive(
         userId,
         companyId,
-        status: ECompanyUserStatus.ACTIVE,
-        leftAt: IsNull(),
-      },
-    });
-    if (!membership) {
-      throw new ForbiddenException('Active company membership is required.');
-    }
-
-    const party = await manager.getRepository(ContractParty).findOne({
-      where: { contractId, companyId },
-    });
-    if (!party) {
-      throw new NotFoundException('Contract was not found.');
-    }
-    const contract = await manager.getRepository(Contract).findOne({
-      where: { id: contractId },
-      select: { id: true, createdByCompanyId: true, deletedAt: true },
-    });
-    if (!contract) {
-      throw new NotFoundException('Contract was not found.');
-    }
-
-    const isCreatorAdmin =
-      membership.companyRole === ECompanyRole.COMPANY_ADMIN &&
-      contract.createdByCompanyId === companyId;
-    const authorizedRole =
-      party.partyType === EPartyType.CLIENT
-        ? EContractRole.CLIENT_PROJECT_MANAGER
-        : [EPartyType.CONTRACTOR, EPartyType.SUBCONTRACTOR].includes(
-              party.partyType,
-            )
-          ? EContractRole.CONTRACTOR_PROJECT_LEAD
-          : null;
-    const hasProjectLeadAssignment =
-      !contract.deletedAt &&
-      authorizedRole !== null &&
-      Boolean(
-        await manager
-          .getRepository(ContractRoleAssignment)
-          .createQueryBuilder('assignment')
-          .where('assignment.companyId = :companyId', { companyId })
-          .andWhere('assignment.contractPartyId = :partyId', {
-            partyId: party.id,
-          })
-          .andWhere('assignment.companyUserId = :companyUserId', {
-            companyUserId: membership.id,
-          })
-          .andWhere('assignment.role = :role', { role: authorizedRole })
-          .andWhere('assignment.revokedAt IS NULL')
-          .getOne(),
       );
+      if (!membership) {
+        throw new ForbiddenException('Active company membership is required.');
+      }
 
-    return {
-      canManage: isCreatorAdmin && !contract.deletedAt,
-      canTransition: hasProjectLeadAssignment,
-      canRestore: isCreatorAdmin && Boolean(contract.deletedAt),
-    };
+      const party = await context.parties.find(contractId, companyId);
+      if (!party) {
+        throw new NotFoundException('Contract was not found.');
+      }
+      const contract =
+        await context.contracts.findPermissionSnapshot(contractId);
+      if (!contract) {
+        throw new NotFoundException('Contract was not found.');
+      }
+
+      const isCreatorAdmin =
+        membership.companyRole === ECompanyRole.COMPANY_ADMIN &&
+        contract.createdByCompanyId === companyId;
+      const authorizedRole = projectLeadRole(party.partyType);
+      const hasProjectLeadAssignment =
+        !contract.deletedAt &&
+        authorizedRole !== null &&
+        (await context.roleAssignments.hasActiveAssignment({
+          companyId,
+          contractPartyId: party.id,
+          companyUserId: membership.id,
+          role: authorizedRole,
+        }));
+
+      return {
+        canManage: isCreatorAdmin && !contract.deletedAt,
+        canTransition: hasProjectLeadAssignment,
+        canRestore: isCreatorAdmin && Boolean(contract.deletedAt),
+      };
+    });
   }
 
   async create(
@@ -165,24 +144,29 @@ export class ContractLifecycleService {
     companyId: string,
     dto: CreateContractRequestDto,
   ): Promise<Contract> {
-    validateDateRange(dto.awardDate, dto.startDate, dto.endDate, dto.revisedEndDate, dto.actualCompletionDate);
+    validateDateRange(
+      dto.awardDate,
+      dto.startDate,
+      dto.endDate,
+      dto.revisedEndDate,
+      dto.actualCompletionDate,
+    );
     try {
-      return await this.dataSource.transaction(async (manager) => {
+      return await this.unitOfWork.execute(async (context) => {
         const actor = await this.requireCompanyAdmin(
-          manager,
+          context,
           userId,
           companyId,
         );
         if (dto.parentContractId) {
           await this.requireCompanyParty(
-            manager,
+            context,
             dto.parentContractId,
             companyId,
           );
         }
 
-        const contracts = manager.getRepository(Contract);
-        const contract = contracts.create({
+        const savedContract = await context.contracts.create({
           referenceNumber: dto.referenceNumber.trim(),
           title: dto.title.trim(),
           description: dto.description?.trim() || null,
@@ -212,41 +196,24 @@ export class ContractLifecycleService {
           deletedAt: null,
           deletedByCompanyUserId: null,
         });
-        const savedContract = await contracts.save(contract);
-        const parties = manager.getRepository(ContractParty);
-        const party = parties.create({
+        await context.parties.create({
           contractId: savedContract.id,
           companyId,
           partyType: dto.partyType,
-          signatoryFirstName: null,
-          signatoryLastName: null,
-          signatoryTitle: null,
-          signedAt: null,
         });
-        await parties.save(party);
-
-        const workspaces = manager.getRepository(ContractWorkspaceEntity);
-        await workspaces.save(
-          dto.workspaces.map((workspace) =>
-            workspaces.create({
-              contractId: savedContract.id,
-              workspace,
-              createdByCompanyUserId: actor.id,
-            }),
-          ),
+        await context.workspaces.addMany(
+          savedContract.id,
+          dto.workspaces,
+          actor.id,
         );
-
-        const now = new Date();
-        await manager.getRepository(ContractStatusHistory).save(
-          manager.getRepository(ContractStatusHistory).create({
-            contractId: savedContract.id,
-            fromStatus: null,
-            toStatus: EToStatus.DRAFT,
-            reason: null,
-            changedById: actor.id,
-            changedAt: now,
-          }),
-        );
+        await context.statusHistory.record({
+          contractId: savedContract.id,
+          fromStatus: null,
+          toStatus: EToStatus.DRAFT,
+          reason: null,
+          changedById: actor.id,
+          changedAt: new Date(),
+        });
         return savedContract;
       });
     } catch (error) {
@@ -265,16 +232,18 @@ export class ContractLifecycleService {
     contractId: string,
     dto: UpdateContractRequestDto,
   ): Promise<Contract> {
-    return this.dataSource.transaction(async (manager) => {
+    return this.unitOfWork.execute(async (context) => {
       const { contract } = await this.requireOwnedContract(
-        manager,
+        context,
         userId,
         companyId,
         contractId,
       );
       const keys = Object.keys(dto);
       if (keys.length === 0) {
-        throw new BadRequestException('At least one contract field is required.');
+        throw new BadRequestException(
+          'At least one contract field is required.',
+        );
       }
       if (
         dto.originalValueMinor !== undefined &&
@@ -296,13 +265,12 @@ export class ContractLifecycleService {
       if (dto.parentContractId !== undefined) {
         if (dto.parentContractId) {
           await this.requireCompanyParty(
-            manager,
+            context,
             dto.parentContractId,
             companyId,
           );
           if (
-            await this.parentWouldCreateCycle(
-              manager,
+            await context.contracts.parentWouldCreateCycle(
               dto.parentContractId,
               contract.id,
             )
@@ -366,7 +334,7 @@ export class ContractLifecycleService {
         contract.revisedEndDate,
         contract.actualCompletionDate,
       );
-      return manager.getRepository(Contract).save(contract);
+      return context.contracts.save(contract);
     });
   }
 
@@ -376,16 +344,15 @@ export class ContractLifecycleService {
     contractId: string,
     dto: UpdateContractWorkspacesRequestDto,
   ): Promise<AssignableContractWorkspace[]> {
-    return this.dataSource.transaction(async (manager) => {
+    return this.unitOfWork.execute(async (context) => {
       const { contract, actor } = await this.requireOwnedContract(
-        manager,
+        context,
         userId,
         companyId,
         contractId,
       );
-      const repository = manager.getRepository(ContractWorkspaceEntity);
-      const current = await repository.find({ where: { contractId } });
-      const currentWorkspaces = current.map(({ workspace }) => workspace);
+      const currentWorkspaces =
+        await context.workspaces.listWorkspaces(contractId);
       const removed = currentWorkspaces.filter(
         (workspace) => !dto.workspaces.includes(workspace),
       );
@@ -395,49 +362,27 @@ export class ContractLifecycleService {
       const now = new Date();
 
       for (const workspace of removed) {
-        const roles = WORKSPACE_ROLES[workspace];
-        await manager
-          .getRepository(ContractRoleAssignment)
-          .createQueryBuilder()
-          .update()
-          .set({ revokedAt: now, revokedById: actor.id, updatedAt: now })
-          .where(
-            '"contract_party_id" IN (SELECT "id" FROM "contract_party" WHERE "contract_id" = :contractId)',
-            { contractId },
-          )
-          .andWhere('"contract_role" IN (:...roles)', { roles })
-          .andWhere('"revoked_at" IS NULL')
-          .execute();
-        await manager
-          .getRepository(ContractRoleInvitation)
-          .createQueryBuilder()
-          .update()
-          .set({ status: 'revoked', revokedAt: now, updatedAt: now })
-          .where(
-            '"contract_party_id" IN (SELECT "id" FROM "contract_party" WHERE "contract_id" = :contractId)',
-            { contractId },
-          )
-          .andWhere('"workspace" = :workspace', { workspace })
-          .andWhere('"status" = :pending', { pending: 'pending' })
-          .execute();
-        await repository.delete({ contractId, workspace });
+        await context.roleAssignments.revokeForWorkspaceRoles(
+          contractId,
+          WORKSPACE_ROLES[workspace],
+          actor.id,
+          now,
+        );
+        await context.roleInvitations.revokePendingForWorkspace(
+          contractId,
+          workspace,
+          now,
+        );
+        await context.workspaces.remove(contractId, workspace);
       }
 
       if (added.length) {
-        await repository.save(
-          added.map((workspace) =>
-            repository.create({
-              contractId,
-              workspace,
-              createdByCompanyUserId: actor.id,
-            }),
-          ),
-        );
+        await context.workspaces.addMany(contractId, added, actor.id);
       }
 
       if (removed.length) {
         await this.writeActivity(
-          manager,
+          context,
           contract,
           actor,
           'contract.workspaces_removed',
@@ -456,10 +401,10 @@ export class ContractLifecycleService {
     contractId: string,
     dto: TransitionContractRequestDto,
   ): Promise<Contract> {
-    return this.dataSource.transaction(async (manager) => {
-      const contract = await this.lockActiveContract(manager, contractId);
+    return this.unitOfWork.execute(async (context) => {
+      const contract = await this.lockActiveContract(context, contractId);
       const actor = await this.requireTransitionActor(
-        manager,
+        context,
         userId,
         companyId,
         contractId,
@@ -472,25 +417,24 @@ export class ContractLifecycleService {
       }
       const reason = dto.reason.trim();
       if (!reason) {
-        throw new BadRequestException('A reason is required for this transition.');
+        throw new BadRequestException(
+          'A reason is required for this transition.',
+        );
       }
 
       contract.status = transition.to;
       const now = new Date();
-      const saved = await manager.getRepository(Contract).save(contract);
-      const historyRepository = manager.getRepository(ContractStatusHistory);
-      await historyRepository.save(
-        historyRepository.create({
-          contractId,
-          fromStatus: historyFromStatus[transition.from],
-          toStatus: historyToStatus[transition.to],
-          reason,
-          changedById: actor.id,
-          changedAt: now,
-        }),
-      );
+      const saved = await context.contracts.save(contract);
+      await context.statusHistory.record({
+        contractId,
+        fromStatus: historyFromStatus[transition.from],
+        toStatus: historyToStatus[transition.to],
+        reason,
+        changedById: actor.id,
+        changedAt: now,
+      });
       await this.writeActivity(
-        manager,
+        context,
         saved,
         actor,
         'contract.status_transitioned',
@@ -511,9 +455,9 @@ export class ContractLifecycleService {
     companyId: string,
     contractId: string,
   ): Promise<void> {
-    await this.dataSource.transaction(async (manager) => {
-      const { contract, actor } = await this.requireOwnedContract(
-        manager,
+    await this.unitOfWork.execute(async (context) => {
+      const { contract, actor, party } = await this.requireOwnedContract(
+        context,
         userId,
         companyId,
         contractId,
@@ -521,21 +465,19 @@ export class ContractLifecycleService {
       const now = new Date();
       contract.deletedAt = now;
       contract.deletedByCompanyUserId = actor.id;
-      await manager.getRepository(Contract).save(contract);
-      await this.revokeContractAccess(manager, contractId, actor.id, now);
-      await manager.getRepository(ContractPartyInvitation).update(
-        {
-          sourceContractPartyId: await this.sourcePartyId(
-            manager,
-            contractId,
-            companyId,
-          ),
-          status: 'pending',
-        },
-        { status: 'revoked', revokedAt: now },
+      await context.contracts.save(contract);
+      await context.roleAssignments.revokeAllForContract(
+        contractId,
+        actor.id,
+        now,
       );
+      await context.roleInvitations.revokeAllPendingForContract(
+        contractId,
+        now,
+      );
+      await context.partyInvitations.revokePendingBySource(party.id, now);
       await this.writeActivity(
-        manager,
+        context,
         contract,
         actor,
         'contract.deleted',
@@ -551,9 +493,9 @@ export class ContractLifecycleService {
     companyId: string,
     contractId: string,
   ): Promise<Contract> {
-    return this.dataSource.transaction(async (manager) => {
+    return this.unitOfWork.execute(async (context) => {
       const { contract, actor } = await this.requireOwnedContract(
-        manager,
+        context,
         userId,
         companyId,
         contractId,
@@ -565,9 +507,9 @@ export class ContractLifecycleService {
       const now = new Date();
       contract.deletedAt = null;
       contract.deletedByCompanyUserId = null;
-      const restored = await manager.getRepository(Contract).save(contract);
+      const restored = await context.contracts.save(contract);
       await this.writeActivity(
-        manager,
+        context,
         contract,
         actor,
         'contract.restored',
@@ -584,25 +526,20 @@ export class ContractLifecycleService {
     companyId: string,
     contractId: string,
   ): Promise<ContractPartyInvitationResponse[]> {
-    const { party } = await this.requireOwnedContractOutsideTransaction(
-      userId,
-      companyId,
-      contractId,
-    );
-    const invitations = this.dataSource.getRepository(ContractPartyInvitation);
-    await invitations.update(
-      {
-        sourceContractPartyId: party.id,
-        status: 'pending',
-        expiresAt: LessThanOrEqual(new Date()),
-      },
-      { status: 'expired' },
-    );
-    const rows = await invitations.find({
-      where: { sourceContractPartyId: party.id },
-      order: { createdAt: 'DESC', id: 'ASC' },
+    return this.unitOfWork.execute(async (context) => {
+      const { party } = await this.requireOwnedContract(
+        context,
+        userId,
+        companyId,
+        contractId,
+      );
+      await context.partyInvitations.expirePendingBySource(
+        party.id,
+        new Date(),
+      );
+      const rows = await context.partyInvitations.listBySource(party.id);
+      return rows.map(toInvitationResponse);
     });
-    return rows.map(toInvitationResponse);
   }
 
   async inviteCompany(
@@ -611,22 +548,16 @@ export class ContractLifecycleService {
     contractId: string,
     dto: CreateContractPartyInvitationRequestDto,
   ): Promise<ContractPartyInvitationResponse> {
-    return this.dataSource.transaction(async (manager) => {
+    return this.unitOfWork.execute(async (context) => {
       const { contract, actor, party } = await this.requireOwnedContract(
-        manager,
+        context,
         userId,
         companyId,
         contractId,
       );
-      const targets = await manager
-        .getRepository(Company)
-        .createQueryBuilder('company')
-        .where('LOWER(company.email) = :email', { email: dto.email })
-        .andWhere('company.status = :status', {
-          status: ECompanyStatus.ACTIVE,
-        })
-        .andWhere('company.verifiedAt IS NOT NULL')
-        .getMany();
+      const targets = await context.companies.findActiveVerifiedByEmail(
+        dto.email,
+      );
       if (targets.length !== 1) {
         throw new NotFoundException(
           'No single active, verified company was found for this email.',
@@ -638,35 +569,25 @@ export class ContractLifecycleService {
           'A company cannot invite itself to its contract.',
         );
       }
-      const targetParty = await manager.getRepository(ContractParty).findOne({
-        where: { contractId, companyId: target.id },
-      });
+      const targetParty = await context.parties.find(contractId, target.id);
       if (targetParty) {
         throw new ConflictException(
           'This company is already a party to the contract.',
         );
       }
 
-      const invitations = manager.getRepository(ContractPartyInvitation);
       const now = new Date();
-      await invitations.update(
-        {
-          sourceContractPartyId: party.id,
-          targetCompanyId: target.id,
-          partyType: dto.partyType,
-          status: 'pending',
-          expiresAt: LessThanOrEqual(now),
-        },
-        { status: 'expired' },
+      const duplicateCriteria = {
+        sourcePartyId: party.id,
+        targetCompanyId: target.id,
+        partyType: dto.partyType,
+      };
+      await context.partyInvitations.expireDuplicatePending(
+        duplicateCriteria,
+        now,
       );
-      const duplicate = await invitations.findOne({
-        where: {
-          sourceContractPartyId: party.id,
-          targetCompanyId: target.id,
-          partyType: dto.partyType,
-          status: 'pending',
-        },
-      });
+      const duplicate =
+        await context.partyInvitations.findPendingDuplicate(duplicateCriteria);
       if (duplicate) {
         throw new ConflictException(
           'A pending invitation already exists for this company and party type.',
@@ -674,7 +595,7 @@ export class ContractLifecycleService {
       }
 
       const token = randomBytes(32).toString('base64url');
-      const invitation = invitations.create({
+      const saved = await context.partyInvitations.create({
         sourceContractPartyId: party.id,
         sourceCompanyId: companyId,
         targetCompanyId: target.id,
@@ -688,7 +609,8 @@ export class ContractLifecycleService {
         respondedAt: null,
         revokedAt: null,
       });
-      const saved = await invitations.save(invitation);
+      // Known risk: the email is sent before the transaction commits, so a
+      // later failure rolls back the invitation after the recipient was mailed.
       await this.mail.sendContractPartyInvitationEmail(
         target.email,
         contract.title,
@@ -697,7 +619,7 @@ export class ContractLifecycleService {
         token,
       );
       await this.writeActivity(
-        manager,
+        context,
         contract,
         actor,
         'contract.party_invitation_created',
@@ -715,22 +637,25 @@ export class ContractLifecycleService {
     contractId: string,
     invitationId: string,
   ): Promise<ContractPartyInvitationResponse> {
-    return this.dataSource.transaction(async (manager) => {
+    return this.unitOfWork.execute(async (context) => {
       const { contract, actor, party } = await this.requireOwnedContract(
-        manager,
+        context,
         userId,
         companyId,
         contractId,
       );
-      const invitations = manager.getRepository(ContractPartyInvitation);
-      const invitation = await invitations.findOne({
-        where: { id: invitationId, sourceContractPartyId: party.id },
-        lock: { mode: 'pessimistic_write' },
-      });
+      const invitation =
+        await context.partyInvitations.findBySourceAndIdForUpdate(
+          invitationId,
+          party.id,
+        );
       if (!invitation) {
         throw new NotFoundException('Contract invitation was not found.');
       }
-      if (invitation.status !== 'pending' || invitation.expiresAt <= new Date()) {
+      if (
+        invitation.status !== 'pending' ||
+        invitation.expiresAt <= new Date()
+      ) {
         throw new ConflictException(
           'Only a pending, unexpired contract invitation can be revoked.',
         );
@@ -738,9 +663,9 @@ export class ContractLifecycleService {
       const now = new Date();
       invitation.status = 'revoked';
       invitation.revokedAt = now;
-      const saved = await invitations.save(invitation);
+      const saved = await context.partyInvitations.save(invitation);
       await this.writeActivity(
-        manager,
+        context,
         contract,
         actor,
         'contract.party_invitation_revoked',
@@ -755,37 +680,47 @@ export class ContractLifecycleService {
   async getCompanyInvitationPreview(
     token: string,
   ): Promise<ContractPartyInvitationPreviewResponse> {
-    const invitation = await this.dataSource
-      .getRepository(ContractPartyInvitation)
-      .findOne({ where: { tokenHash: hashToken(token) } });
-    if (!invitation) {
-      throw new NotFoundException('Contract invitation was not found.');
-    }
-    if (invitation.status !== 'pending' || invitation.revokedAt) {
-      throw new ConflictException('This contract invitation is no longer active.');
-    }
-    if (invitation.expiresAt <= new Date()) {
-      await this.dataSource
-        .getRepository(ContractPartyInvitation)
-        .update(invitation.id, { status: 'expired' });
+    // Expiry is persisted inside the unit of work; the conflict is thrown
+    // afterwards so the update is committed rather than rolled back.
+    const outcome = await this.unitOfWork.execute(async (context) => {
+      const invitation = await context.partyInvitations.findByTokenHash(
+        hashToken(token),
+      );
+      if (!invitation) {
+        throw new NotFoundException('Contract invitation was not found.');
+      }
+      if (invitation.status !== 'pending' || invitation.revokedAt) {
+        throw new ConflictException(
+          'This contract invitation is no longer active.',
+        );
+      }
+      if (invitation.expiresAt <= new Date()) {
+        await context.partyInvitations.expireIfPending(invitation.id);
+        return { expired: true as const };
+      }
+      const source = await context.parties.findByIdWithContractAndCompany(
+        invitation.sourceContractPartyId,
+      );
+      const contract = source?.contract;
+      if (!source || !contract || contract.deletedAt) {
+        throw new NotFoundException('Contract invitation was not found.');
+      }
+      return {
+        expired: false as const,
+        preview: {
+          companyId: invitation.targetCompanyId,
+          contractTitle: contract.title,
+          invitingCompanyName: source.company.name,
+          email: invitation.email,
+          partyType: invitation.partyType,
+          expiresAt: invitation.expiresAt,
+        },
+      };
+    });
+    if (outcome.expired) {
       throw new ConflictException('This contract invitation has expired.');
     }
-    const source = await this.dataSource.getRepository(ContractParty).findOne({
-      where: { id: invitation.sourceContractPartyId },
-      relations: { contract: true, company: true },
-    });
-    const contract = source?.contract;
-    if (!source || !contract || contract.deletedAt) {
-      throw new NotFoundException('Contract invitation was not found.');
-    }
-    return {
-      companyId: invitation.targetCompanyId,
-      contractTitle: contract.title,
-      invitingCompanyName: source.company.name,
-      email: invitation.email,
-      partyType: invitation.partyType,
-      expiresAt: invitation.expiresAt,
-    };
+    return outcome.preview;
   }
 
   async respondToCompanyInvitation(
@@ -795,30 +730,25 @@ export class ContractLifecycleService {
     decision: 'accept' | 'reject',
   ): Promise<{ status: 'accepted' | 'rejected' | 'expired' }> {
     const tokenHash = hashToken(token);
-    const preflight = await this.dataSource
-      .getRepository(ContractPartyInvitation)
-      .findOne({ where: { tokenHash } });
-    if (!preflight) {
-      throw new NotFoundException('Contract invitation was not found.');
-    }
-    const source = await this.dataSource
-      .getRepository(ContractParty)
-      .findOne({ where: { id: preflight.sourceContractPartyId } });
-    if (!source) {
-      throw new NotFoundException('Contract invitation was not found.');
-    }
-
-    const result = await this.dataSource.transaction(async (manager) => {
-      const contract = await this.lockActiveContract(
-        manager,
-        source.contractId,
+    const sourceContractId = await this.unitOfWork.execute(async (context) => {
+      const preflight =
+        await context.partyInvitations.findByTokenHash(tokenHash);
+      if (!preflight) {
+        throw new NotFoundException('Contract invitation was not found.');
+      }
+      const source = await context.parties.findById(
+        preflight.sourceContractPartyId,
       );
-      const invitation = await manager
-        .getRepository(ContractPartyInvitation)
-        .createQueryBuilder('invitation')
-        .where('invitation.tokenHash = :tokenHash', { tokenHash })
-        .setLock('pessimistic_write')
-        .getOne();
+      if (!source) {
+        throw new NotFoundException('Contract invitation was not found.');
+      }
+      return source.contractId;
+    });
+
+    const result = await this.unitOfWork.execute(async (context) => {
+      const contract = await this.lockActiveContract(context, sourceContractId);
+      const invitation =
+        await context.partyInvitations.findByTokenHashForUpdate(tokenHash);
       if (!invitation) {
         throw new NotFoundException('Contract invitation was not found.');
       }
@@ -835,19 +765,13 @@ export class ContractLifecycleService {
       const now = new Date();
       if (invitation.expiresAt <= now) {
         invitation.status = 'expired';
-        await manager.getRepository(ContractPartyInvitation).save(invitation);
+        await context.partyInvitations.save(invitation);
         return { status: 'expired' as const };
       }
 
-      const actor = await this.requireCompanyAdmin(
-        manager,
-        userId,
-        companyId,
-      );
-      const targetCompany = await manager.getRepository(Company).findOne({
-        where: { id: companyId, status: ECompanyStatus.ACTIVE },
-        lock: { mode: 'pessimistic_read' },
-      });
+      const actor = await this.requireCompanyAdmin(context, userId, companyId);
+      const targetCompany =
+        await context.companies.findActiveForShare(companyId);
       if (
         !targetCompany?.verifiedAt ||
         targetCompany.email.toLowerCase() !== invitation.email.toLowerCase()
@@ -858,37 +782,29 @@ export class ContractLifecycleService {
       }
 
       if (decision === 'accept') {
-        const duplicateParty = await manager
-          .getRepository(ContractParty)
-          .findOne({
-            where: { contractId: contract.id, companyId },
-          });
+        const duplicateParty = await context.parties.find(
+          contract.id,
+          companyId,
+        );
         if (duplicateParty) {
           throw new ConflictException(
             'This company is already a party to the contract.',
           );
         }
-        const parties = manager.getRepository(ContractParty);
-        await parties.save(
-          parties.create({
-            contractId: contract.id,
-            companyId,
-            partyType: invitation.partyType,
-            signatoryFirstName: null,
-            signatoryLastName: null,
-            signatoryTitle: null,
-            signedAt: null,
-          }),
-        );
+        await context.parties.create({
+          contractId: contract.id,
+          companyId,
+          partyType: invitation.partyType,
+        });
         invitation.status = 'accepted';
         invitation.acceptedByCompanyUserId = actor.id;
       } else {
         invitation.status = 'rejected';
       }
       invitation.respondedAt = now;
-      await manager.getRepository(ContractPartyInvitation).save(invitation);
+      await context.partyInvitations.save(invitation);
       await this.writeActivity(
-        manager,
+        context,
         contract,
         actor,
         decision === 'accept'
@@ -907,26 +823,18 @@ export class ContractLifecycleService {
   }
 
   private async requireCompanyAdmin(
-    manager: EntityManager,
+    context: IContractLifecycleContext,
     userId: string,
     companyId: string,
   ): Promise<CompanyUser> {
-    const company = await manager.getRepository(Company).findOne({
-      where: { id: companyId, status: ECompanyStatus.ACTIVE },
-      lock: { mode: 'pessimistic_read' },
-    });
+    const company = await context.companies.findActiveForShare(companyId);
     if (!company) {
       throw new ForbiddenException('Active company membership is required.');
     }
-    const actor = await manager.getRepository(CompanyUser).findOne({
-      where: {
-        userId,
-        companyId,
-        status: ECompanyUserStatus.ACTIVE,
-        leftAt: IsNull(),
-      },
-      lock: { mode: 'pessimistic_write' },
-    });
+    const actor = await context.memberships.findActiveForUpdate(
+      userId,
+      companyId,
+    );
     if (!actor || actor.companyRole !== ECompanyRole.COMPANY_ADMIN) {
       throw new ForbiddenException(
         'Only a Company Administrator can manage this contract.',
@@ -936,16 +844,13 @@ export class ContractLifecycleService {
   }
 
   private async requireOwnedContract(
-    manager: EntityManager,
+    context: IContractLifecycleContext,
     userId: string,
     companyId: string,
     contractId: string,
     allowArchived = false,
   ): Promise<{ contract: Contract; actor: CompanyUser; party: ContractParty }> {
-    const contract = await manager.getRepository(Contract).findOne({
-      where: { id: contractId },
-      lock: { mode: 'pessimistic_write' },
-    });
+    const contract = await context.contracts.findForUpdate(contractId);
     if (
       !contract ||
       contract.createdByCompanyId !== companyId ||
@@ -953,45 +858,24 @@ export class ContractLifecycleService {
     ) {
       throw new NotFoundException('Contract was not found.');
     }
-    const actor = await this.requireCompanyAdmin(
-      manager,
-      userId,
-      companyId,
-    );
-    const party = await manager.getRepository(ContractParty).findOne({
-      where: { contractId, companyId },
-      lock: { mode: 'pessimistic_read' },
-    });
+    const actor = await this.requireCompanyAdmin(context, userId, companyId);
+    const party = await context.parties.findForShare(contractId, companyId);
     if (!party) {
       throw new NotFoundException('Contract was not found.');
     }
     return { contract, actor, party };
   }
 
-  private async requireOwnedContractOutsideTransaction(
-    userId: string,
-    companyId: string,
-    contractId: string,
-  ): Promise<{ contract: Contract; actor: CompanyUser; party: ContractParty }> {
-    return this.dataSource.transaction((manager) =>
-      this.requireOwnedContract(manager, userId, companyId, contractId),
-    );
-  }
-
   private async requireCompanyParty(
-    manager: EntityManager,
+    context: IContractLifecycleContext,
     contractId: string,
     companyId: string,
   ): Promise<void> {
-    const parent = await manager.getRepository(Contract).findOne({
-      where: { id: contractId, deletedAt: IsNull() },
-    });
+    const parent = await context.contracts.findActiveById(contractId);
     if (!parent) {
       throw new NotFoundException('Parent contract was not found.');
     }
-    const party = await manager.getRepository(ContractParty).findOne({
-      where: { contractId, companyId },
-    });
+    const party = await context.parties.find(contractId, companyId);
     if (!party) {
       throw new NotFoundException(
         'Parent contract was not found for this company.',
@@ -999,41 +883,11 @@ export class ContractLifecycleService {
     }
   }
 
-  private async parentWouldCreateCycle(
-    manager: EntityManager,
-    parentContractId: string,
-    contractId: string,
-  ): Promise<boolean> {
-    const rows = (await manager.query(
-      `
-        WITH RECURSIVE parent_chain("id", "parent_contract_id") AS (
-          SELECT "id", "parent_contract_id"
-          FROM "contract"
-          WHERE "id" = $1 AND "deleted_at" IS NULL
-          UNION ALL
-          SELECT parent."id", parent."parent_contract_id"
-          FROM "contract" AS parent
-          INNER JOIN parent_chain AS chain
-            ON parent."id" = chain."parent_contract_id"
-          WHERE parent."deleted_at" IS NULL
-        )
-        SELECT EXISTS (
-          SELECT 1 FROM parent_chain WHERE "id" = $2
-        ) AS "found"
-      `,
-      [parentContractId, contractId],
-    )) as Array<{ found: boolean }>;
-    return rows[0]?.found === true;
-  }
-
   private async lockActiveContract(
-    manager: EntityManager,
+    context: IContractLifecycleContext,
     contractId: string,
   ): Promise<Contract> {
-    const contract = await manager.getRepository(Contract).findOne({
-      where: { id: contractId, deletedAt: IsNull() },
-      lock: { mode: 'pessimistic_write' },
-    });
+    const contract = await context.contracts.findActiveForUpdate(contractId);
     if (!contract) {
       throw new NotFoundException('Contract was not found.');
     }
@@ -1041,58 +895,36 @@ export class ContractLifecycleService {
   }
 
   private async requireTransitionActor(
-    manager: EntityManager,
+    context: IContractLifecycleContext,
     userId: string,
     companyId: string,
     contractId: string,
   ): Promise<CompanyUser> {
-    const actor = await manager.getRepository(CompanyUser).findOne({
-      where: {
-        userId,
-        companyId,
-        status: ECompanyUserStatus.ACTIVE,
-        leftAt: IsNull(),
-      },
-      lock: { mode: 'pessimistic_write' },
-    });
+    const actor = await context.memberships.findActiveForUpdate(
+      userId,
+      companyId,
+    );
     if (!actor) {
       throw new ForbiddenException('Active company membership is required.');
     }
-    const party = await manager.getRepository(ContractParty).findOne({
-      where: { contractId, companyId },
-      lock: { mode: 'pessimistic_read' },
-    });
+    const party = await context.parties.findForShare(contractId, companyId);
     if (!party) {
       throw new NotFoundException('Contract was not found.');
     }
-    const authorizedRole =
-      party.partyType === EPartyType.CLIENT
-        ? EContractRole.CLIENT_PROJECT_MANAGER
-        : [EPartyType.CONTRACTOR, EPartyType.SUBCONTRACTOR].includes(
-              party.partyType,
-            )
-          ? EContractRole.CONTRACTOR_PROJECT_LEAD
-          : null;
+    const authorizedRole = projectLeadRole(party.partyType);
     if (!authorizedRole) {
       throw new ForbiddenException(
         'This contract party cannot initiate lifecycle transitions.',
       );
     }
-    const assignment = await manager
-      .getRepository(ContractRoleAssignment)
-      .createQueryBuilder('assignment')
-      .where('assignment.companyId = :companyId', { companyId })
-      .andWhere('assignment.contractPartyId = :partyId', {
-        partyId: party.id,
-      })
-      .andWhere('assignment.companyUserId = :companyUserId', {
+    const hasAssignment =
+      await context.roleAssignments.hasActiveAssignmentForShare({
+        companyId,
+        contractPartyId: party.id,
         companyUserId: actor.id,
-      })
-      .andWhere('assignment.role = :role', { role: authorizedRole })
-      .andWhere('assignment.revokedAt IS NULL')
-      .setLock('pessimistic_read')
-      .getOne();
-    if (!assignment) {
+        role: authorizedRole,
+      });
+    if (!hasAssignment) {
       throw new ForbiddenException(
         'An active project lead assignment is required to change contract status.',
       );
@@ -1100,57 +932,8 @@ export class ContractLifecycleService {
     return actor;
   }
 
-  private async revokeContractAccess(
-    manager: EntityManager,
-    contractId: string,
-    actorCompanyUserId: string,
-    now: Date,
-  ): Promise<void> {
-    await manager
-      .getRepository(ContractRoleAssignment)
-      .createQueryBuilder()
-      .update()
-      .set({
-        revokedAt: now,
-        revokedById: actorCompanyUserId,
-        updatedAt: now,
-      })
-      .where(
-        '"contract_party_id" IN (SELECT "id" FROM "contract_party" WHERE "contract_id" = :contractId)',
-        { contractId },
-      )
-      .andWhere('"revoked_at" IS NULL')
-      .execute();
-    await manager
-      .getRepository(ContractRoleInvitation)
-      .createQueryBuilder()
-      .update()
-      .set({ status: 'revoked', revokedAt: now, updatedAt: now })
-      .where(
-        '"contract_party_id" IN (SELECT "id" FROM "contract_party" WHERE "contract_id" = :contractId)',
-        { contractId },
-      )
-      .andWhere('"status" = :pending', { pending: 'pending' })
-      .execute();
-  }
-
-  private async sourcePartyId(
-    manager: EntityManager,
-    contractId: string,
-    companyId: string,
-  ): Promise<string> {
-    const party = await manager.getRepository(ContractParty).findOne({
-      where: { contractId, companyId },
-      select: { id: true },
-    });
-    if (!party) {
-      throw new NotFoundException('Contract was not found.');
-    }
-    return party.id;
-  }
-
   private async writeActivity(
-    manager: EntityManager,
+    context: IContractLifecycleContext,
     contract: Contract,
     actor: CompanyUser,
     action: string,
@@ -1158,27 +941,17 @@ export class ContractLifecycleService {
     changes: Record<string, unknown>,
     occurredAt: Date,
   ): Promise<void> {
-    const repository = manager.getRepository(ActivityLog);
-    await repository.save(
-      repository.create({
-        contractId: contract.id,
-        companyId: actor.companyId,
-        actorUserId: actor.id,
-        action,
-        entityType: 'contract',
-        entityId: randomUUID(),
-        summary,
-        changes: { before: null, after: changes },
-        metadata: {},
-        ipAddress: null,
-        userAgent: null,
-        requestId: null,
-        occurredAt,
-      }),
-    );
+    await context.activity.record({
+      contractId: contract.id,
+      companyId: actor.companyId,
+      actorUserId: actor.id,
+      action,
+      summary,
+      changes,
+      occurredAt,
+    });
   }
 }
-
 function parseDate(value: string): Date {
   return new Date(`${value.slice(0, 10)}T00:00:00.000Z`);
 }

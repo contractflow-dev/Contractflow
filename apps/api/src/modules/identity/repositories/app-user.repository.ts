@@ -8,15 +8,21 @@ import {
   Not,
   Repository,
   type DeepPartial,
-  type EntityManager,
 } from 'typeorm';
 import { BaseRepository } from '../../../common/database/repositories/base.repository';
 import type {} from '../../../common/database/repositories/base.repository.interface';
 import { AppUser } from '../entities/app-user.entity';
 import { IUpdateAppUserProfileInput } from '../interface/app-user.interface';
+import type {
+  IAppUserRepository,
+  ICreateAuthUser,
+} from '../interface/auth-persistence.interface';
 
 @Injectable()
-export class AppUserRepository extends BaseRepository<AppUser> {
+export class AppUserRepository
+  extends BaseRepository<AppUser>
+  implements IAppUserRepository
+{
   constructor(@InjectRepository(AppUser) repository: Repository<AppUser>) {
     super(repository);
   }
@@ -100,39 +106,29 @@ export class AppUserRepository extends BaseRepository<AppUser> {
       .getOne();
   }
 
-  createInTransaction(
-    manager: EntityManager,
-    data: DeepPartial<AppUser>,
-  ): AppUser {
-    const normalizedData =
-      typeof data.email === 'string'
-        ? { ...data, email: this.normalizeEmail(data.email) }
-        : data;
-    return manager.getRepository(AppUser).create(normalizedData);
+  createUser(data: ICreateAuthUser): AppUser {
+    return this.create(undefined, {
+      ...data,
+      email: this.normalizeEmail(data.email),
+    });
   }
 
-  findByEmailForUpdate(
-    manager: EntityManager,
-    email: string,
-  ): Promise<AppUser | null> {
-    return manager.getRepository(AppUser).findOne({
+  findByEmailForUpdate(email: string): Promise<AppUser | null> {
+    return this.repository.findOne({
       where: { email: this.normalizeEmail(email) },
       lock: { mode: 'pessimistic_write' },
     });
   }
 
-  findByIdForUpdate(
-    manager: EntityManager,
-    id: string,
-  ): Promise<AppUser | null> {
-    return manager.getRepository(AppUser).findOne({
+  findByIdForUpdate(id: string): Promise<AppUser | null> {
+    return this.repository.findOne({
       where: { id },
       lock: { mode: 'pessimistic_write' },
     });
   }
 
-  saveInTransaction(manager: EntityManager, user: AppUser): Promise<AppUser> {
-    return manager.getRepository(AppUser).save(user);
+  saveUser(user: AppUser): Promise<AppUser> {
+    return this.repository.save(user);
   }
 
   /** Same as above, by id (e.g. "confirm current password" flows). */
