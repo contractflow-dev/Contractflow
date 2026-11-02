@@ -7,12 +7,15 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
+import { CurrentCompanyId } from '../../../common/decorators/current-company-id.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import type { AuthenticatedUser } from '../services/auth.service';
+import { CompanyContextGuard } from '../../../common/guards/company-context.guard';
+import type { AuthenticatedUser } from '../interface/auth-context.interface';
 import { CreateCompanyRequestDto } from '../dto/company/requests/create-company-request.dto';
-import { CompanyService } from '../services/company.service';
-import { CompanyAdminService } from '../services/company-admin.service';
+import { CompanyService } from '../services/company/company.service';
+import { CompanyAdminService } from '../services/company/company-admin.service';
 import { ListCompanyMembersRequestDto } from '../dto/company/requests/list-company-members-request.dto';
 import { InviteCompanyMemberRequestDto } from '../dto/company/requests/invite-company-member-request.dto';
 import { UpdateCompanyMemberRoleRequestDto } from '../dto/company/requests/update-company-member-role-request.dto';
@@ -45,25 +48,28 @@ export class CompanyController {
   }
 
   @Get(':companyId/membership')
+  @UseGuards(CompanyContextGuard)
   getMembership(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
   ) {
     return this.companyService.getMembership(user.id, companyId);
   }
 
   @Get(':companyId/dashboard')
+  @UseGuards(CompanyContextGuard)
   getDashboard(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
   ) {
     return this.companyService.getDashboard(user.id, companyId);
   }
 
   @Patch(':companyId/profile')
+  @UseGuards(CompanyContextGuard)
   updateProfile(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Body() body: UpdateCompanyProfileRequestDto,
   ) {
     return this.companyAdminService.updateCompanyProfile(
@@ -74,18 +80,20 @@ export class CompanyController {
   }
 
   @Get(':companyId/members')
+  @UseGuards(CompanyContextGuard)
   listMembers(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Query() query: ListCompanyMembersRequestDto,
   ) {
     return this.companyAdminService.listMembers(user.id, companyId, query);
   }
 
   @Patch(':companyId/members/:membershipId/role')
+  @UseGuards(CompanyContextGuard)
   updateMemberRole(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('membershipId') membershipId: string,
     @Body() body: UpdateCompanyMemberRoleRequestDto,
   ) {
@@ -98,9 +106,10 @@ export class CompanyController {
   }
 
   @Delete(':companyId/members/:membershipId')
+  @UseGuards(CompanyContextGuard)
   removeMember(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('membershipId') membershipId: string,
   ) {
     return this.companyAdminService.removeMember(
@@ -111,32 +120,30 @@ export class CompanyController {
   }
 
   @Get(':companyId/invitations')
+  @UseGuards(CompanyContextGuard)
   listInvitations(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Query() query: ListCompanyInvitationsRequestDto,
   ) {
-    return this.companyAdminService.listInvitations(
-      user.id,
-      companyId,
-      query.page,
-      query.limit,
-    );
+    return this.companyAdminService.listInvitations(user.id, companyId, query);
   }
 
   @Post(':companyId/invitations')
+  @UseGuards(CompanyContextGuard)
   inviteMember(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Body() body: InviteCompanyMemberRequestDto,
   ) {
     return this.companyAdminService.inviteMember(user.id, companyId, body);
   }
 
   @Post(':companyId/invitations/:invitationId/revoke')
+  @UseGuards(CompanyContextGuard)
   revokeInvitation(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('invitationId') invitationId: string,
   ) {
     return this.companyAdminService.revokeInvitation(

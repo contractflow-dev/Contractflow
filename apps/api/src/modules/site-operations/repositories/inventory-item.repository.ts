@@ -14,10 +14,9 @@ export class InventoryItemRepository extends ContractScopedRepository<InventoryI
   }
 
   findByItemCode(itemCode: string, scope: IContractScope) {
-    return this.findOne(
-      { where: { itemCode } as FindOptionsWhere<InventoryItem> },
-      scope,
-    );
+    return this.findOne(scope, {
+      where: { itemCode } as FindOptionsWhere<InventoryItem>,
+    });
   }
 
   findBySite(contractSiteId: string, scope: IContractScope) {

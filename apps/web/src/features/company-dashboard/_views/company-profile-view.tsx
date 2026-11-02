@@ -22,7 +22,7 @@ import {
 } from "@workspace/ui/components/native-select";
 import { Separator } from "@workspace/ui/components/separator";
 import { useUpdateCompanyProfileMutation } from "@/features/companies";
-import type { CompanyProfile } from "@/features/companies";
+import type { ICompanyProfileResponse } from "@contractflow/contracts-schema";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { CompanyAdminShell } from "@/features/companies/CompanyAdminShell";
 
@@ -91,7 +91,7 @@ export function CompanyProfileView() {
   );
 }
 
-function ProfileContent({ company }: { company: CompanyProfile }) {
+function ProfileContent({ company }: { company: ICompanyProfileResponse }) {
   return (
     <section className="mx-auto max-w-4xl space-y-6">
       <header>
@@ -110,7 +110,7 @@ function ProfileContent({ company }: { company: CompanyProfile }) {
   );
 }
 
-function ProfileForm({ company }: { company: CompanyProfile }) {
+function ProfileForm({ company }: { company: ICompanyProfileResponse }) {
   const [updateProfile, { isLoading }] = useUpdateCompanyProfileMutation();
   const [submitError, setSubmitError] = useState("");
   const [saved, setSaved] = useState(false);

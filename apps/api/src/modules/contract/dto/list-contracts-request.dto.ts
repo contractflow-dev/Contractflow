@@ -1,18 +1,20 @@
-import { Transform, Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import {
   IsBoolean,
   IsDateString,
   IsEnum,
-  IsInt,
   IsOptional,
   Matches,
-  Max,
   MaxLength,
-  Min,
 } from 'class-validator';
-import { EContractStatus } from '@contractflow/contracts-schema';
+import {
+  EContractSortField,
+  EContractStatus,
+  ESortOrder,
+} from '@contractflow/contracts-schema';
+import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
-export class ListContractsRequestDto {
+export class ListContractsRequestDto extends PaginationQueryDto {
   @IsOptional()
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @MaxLength(100)
@@ -30,33 +32,15 @@ export class ListContractsRequestDto {
   status?: EContractStatus;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page = 1;
+  @IsEnum(EContractSortField)
+  sortBy?: EContractSortField;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  limit = 25;
+  @IsEnum(ESortOrder)
+  sortOrder?: ESortOrder;
 }
 
-export class ListContractStatusHistoryRequestDto {
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page = 1;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  limit = 50;
-
+export class ListContractStatusHistoryRequestDto extends PaginationQueryDto {
   @IsOptional()
   @IsDateString()
   fromDate?: string;

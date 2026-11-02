@@ -20,9 +20,8 @@ export class ContractSiteRepository extends ContractScopedRepository<ContractSit
   }
 
   findBySiteCode(siteCode: string, scope: IContractScope) {
-    return this.findOne(
-      { where: { siteCode } as FindOptionsWhere<ContractSite> },
-      scope,
-    );
+    return this.findOne(scope, {
+      where: { siteCode } as FindOptionsWhere<ContractSite>,
+    });
   }
 }

@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
   logout: vi.fn(),
   pathname: "/dashboards/contracts",
-  requestedCompanyId: null as string | null,
+  search: "",
   activeCompanyId: "company-1",
   replace: vi.fn(),
 }));
@@ -18,8 +18,7 @@ vi.mock("next/navigation", () => ({
   usePathname: () => mocks.pathname,
   useRouter: () => ({ replace: mocks.replace }),
   useSearchParams: () => ({
-    get: (key: string) =>
-      key === "companyId" ? mocks.requestedCompanyId : null,
+    toString: () => mocks.search,
   }),
 }));
 
@@ -36,7 +35,7 @@ vi.mock("@/features/workspace/workspaceSlice", () => ({
   })),
 }));
 
-vi.mock("./companiesApi", () => ({
+vi.mock("@/services/companiesApi", () => ({
   useGetCompaniesQuery: mocks.getCompanies,
 }));
 
@@ -73,19 +72,27 @@ vi.mock("@workspace/ui/components/dropdown-menu", () => ({
 
 const companies = [
   {
-    company: { id: "company-1", name: "Acme Works" },
-    membership: { canManageCompany: true },
+    company: { id: "company-1", name: "Acme Works", status: "active" },
+    membership: {
+      companyId: "company-1",
+      status: "active",
+      canManageCompany: true,
+    },
   },
   {
-    company: { id: "company-2", name: "Northstar Build" },
-    membership: { canManageCompany: false },
+    company: { id: "company-2", name: "Northstar Build", status: "active" },
+    membership: {
+      companyId: "company-2",
+      status: "active",
+      canManageCompany: false,
+    },
   },
 ];
 
 describe("CompanyAdminShell", () => {
   beforeEach(() => {
     mocks.pathname = "/dashboards/contracts";
-    mocks.requestedCompanyId = null;
+    mocks.search = "";
     mocks.activeCompanyId = "company-1";
     mocks.dispatch.mockClear();
     mocks.replace.mockClear();
@@ -97,6 +104,7 @@ describe("CompanyAdminShell", () => {
     });
     mocks.getCurrentUser.mockReturnValue({
       data: {
+        id: "user-1",
         firstName: "Ari",
         lastName: "Admin",
         email: "ari@example.com",
@@ -104,8 +112,8 @@ describe("CompanyAdminShell", () => {
     });
   });
 
-  it("shows shared navigation and resolves the company from the URL selection", () => {
-    mocks.requestedCompanyId = "company-2";
+  it("shows clean navigation URLs and uses the active company from state", () => {
+    mocks.activeCompanyId = "company-2";
 
     const markup = renderToStaticMarkup(
       <CompanyAdminShell>
@@ -114,9 +122,8 @@ describe("CompanyAdminShell", () => {
     );
 
     expect(markup).toContain("Content for Northstar Build");
-    expect(markup).toContain(
-      'href="/dashboards/contracts?companyId=company-2"',
-    );
+    expect(markup).toContain('href="/dashboards/contracts"');
+    expect(markup).not.toContain("companyId=");
     expect(markup).toContain('aria-current="page"');
     expect(markup).toContain(">Contracts</a>");
     expect(markup).toContain("Ari Admin");
@@ -131,7 +138,7 @@ describe("CompanyAdminShell", () => {
 
   it("denies company-admin routes to a regular company member", () => {
     mocks.pathname = "/dashboards/profile";
-    mocks.requestedCompanyId = "company-2";
+    mocks.activeCompanyId = "company-2";
 
     const markup = renderToStaticMarkup(
       <CompanyAdminShell>
@@ -146,8 +153,8 @@ describe("CompanyAdminShell", () => {
     expect(markup).not.toContain(">Company profile</a>");
   });
 
-  it("does not fall back to another company for an invalid explicit selection", () => {
-    mocks.requestedCompanyId = "not-a-company";
+  it("does not render scoped content until an invalid active company is resolved", () => {
+    mocks.activeCompanyId = "suspended-company";
 
     const markup = renderToStaticMarkup(
       <CompanyAdminShell>
@@ -155,7 +162,7 @@ describe("CompanyAdminShell", () => {
       </CompanyAdminShell>,
     );
 
-    expect(markup).toContain("Company workspace unavailable");
+    expect(markup).toContain("Loading your company workspace");
     expect(markup).not.toContain("Company-scoped content");
   });
 

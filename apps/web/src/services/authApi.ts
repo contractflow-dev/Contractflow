@@ -1,36 +1,20 @@
-import type { IGetAppUserResponse } from "@contractflow/contracts-schema";
+import type {
+  AuthMessageResponse,
+  AuthResponse,
+  LoginRequest,
+  LogoutResponse,
+  RegisterRequest,
+} from "@contractflow/contracts-schema";
 import { api } from "./api";
+export type {
+  AuthMessageResponse,
+  AuthResponse,
+  LoginRequest,
+  LogoutResponse,
+  RegisterRequest,
+} from "@contractflow/contracts-schema";
 
-export type UserProfile = IGetAppUserResponse;
-
-export interface LoginRequest {
-  email: string;
-  password: string;
-}
-
-export interface RegisterRequest {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  middleName?: string;
-  phoneNumber?: string;
-  timezone?: string;
-}
-
-export interface AuthResponse {
-  user: UserProfile;
-  message?: string;
-}
-
-export interface RegisterResponse {
-  message?: string;
-}
-
-export interface LogoutResponse {
-  success: boolean;
-  message?: string;
-}
+export type UserProfile = AuthResponse["user"];
 
 export const authApi = api.injectEndpoints({
   endpoints: (builder) => ({
@@ -48,7 +32,7 @@ export const authApi = api.injectEndpoints({
       invalidatesTags: ["Auth", "User", "Workspace"],
     }),
 
-    register: builder.mutation<RegisterResponse, RegisterRequest>({
+    register: builder.mutation<AuthMessageResponse, RegisterRequest>({
       query: (data) => ({
         url: "/auth/register",
         method: "POST",
@@ -57,7 +41,7 @@ export const authApi = api.injectEndpoints({
       invalidatesTags: ["Auth", "User"],
     }),
 
-    verifyEmail: builder.mutation<{ message?: string }, { token: string }>({
+    verifyEmail: builder.mutation<AuthMessageResponse, { token: string }>({
       query: (data) => ({
         url: "/auth/verify-email",
         method: "POST",
@@ -68,7 +52,7 @@ export const authApi = api.injectEndpoints({
     }),
 
     resendVerificationEmail: builder.mutation<
-      { message?: string },
+      AuthMessageResponse,
       { email: string }
     >({
       query: (data) => ({

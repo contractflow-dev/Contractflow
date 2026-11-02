@@ -1,8 +1,5 @@
 import type { EContractRole } from '@contractflow/contracts-schema';
-import type {
-  ContractRoleInvitation,
-  ContractRoleInvitationStatus,
-} from '../entities/contract-role-invitation.entity';
+import type { ContractRoleInvitationStatus } from '../interfaces/contract-role-assignment-persistence.interface';
 import type { AssignableContractWorkspace } from '../services/contract-workspace';
 
 export class ContractRoleInvitationResponseDto {
@@ -17,9 +14,18 @@ export class ContractRoleInvitationResponseDto {
   respondedAt!: string | null;
   revokedAt!: string | null;
 
-  static fromEntity(
-    invitation: ContractRoleInvitation,
-  ): ContractRoleInvitationResponseDto {
+  static fromEntity(invitation: {
+    id: string;
+    email: string;
+    role: EContractRole;
+    workspace: AssignableContractWorkspace;
+    isWorkspaceAdmin: boolean;
+    status: ContractRoleInvitationStatus;
+    createdAt: Date;
+    expiresAt: Date;
+    respondedAt: Date | null;
+    revokedAt: Date | null;
+  }): ContractRoleInvitationResponseDto {
     const response = new ContractRoleInvitationResponseDto();
     response.id = invitation.id;
     response.email = invitation.email;

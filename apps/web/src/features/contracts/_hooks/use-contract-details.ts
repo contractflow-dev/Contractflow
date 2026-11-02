@@ -1,5 +1,6 @@
 "use client";
 
+import { useKeepPageInRange, usePagination } from "@/hooks/use-pagination";
 import {
   useGetContractByIdQuery,
   useGetContractPartiesQuery,
@@ -11,14 +12,18 @@ interface ContractDetailsQuery {
   contractId: string;
 }
 
+const historyPageSize = 10;
+
 export function useContractDetails(query: ContractDetailsQuery) {
   const contract = useGetContractByIdQuery(query);
   const parties = useGetContractPartiesQuery(query);
+  const historyPagination = usePagination(historyPageSize);
   const history = useGetContractStatusHistoryQuery({
     ...query,
-    page: 1,
-    limit: 50,
+    page: historyPagination.page,
+    limit: historyPagination.limit,
   });
+  useKeepPageInRange(history.currentData?.meta, historyPagination.setPage);
 
   return {
     detail: contract.currentData,
@@ -30,6 +35,10 @@ export function useContractDetails(query: ContractDetailsQuery) {
     partiesLoading: parties.isLoading,
     history: history.currentData,
     historyError: history.error,
-    historyLoading: history.isLoading,
+    historyLoading:
+      history.isLoading || (history.isFetching && !history.currentData),
+    historyFetching: history.isFetching,
+    setHistoryPage: historyPagination.setPage,
+    setHistoryPageSize: historyPagination.setLimit,
   };
 }

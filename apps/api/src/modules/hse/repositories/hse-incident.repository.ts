@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, Repository } from 'typeorm';
+import type { FindOptionsOrder, FindOptionsWhere, Repository } from 'typeorm';
 import { ContractScopedRepository } from '../../../common/database/repositories/contract-scoped.repository';
 import { HseIncident } from '../entities/hse-incident.entity';
 import { IContractScope } from '../../../common/database/repositories/contract-scope.interface';
@@ -14,29 +14,28 @@ export class HseIncidentRepository extends ContractScopedRepository<HseIncident>
     super(repository);
   }
 
-  findByReference(referenceNumber: string, scope: IContractScope) {
-    return this.findOne(
-      { where: { referenceNumber } as FindOptionsWhere<HseIncident> },
-      scope,
-    );
+  findByReference(scope: IContractScope, referenceNumber: string) {
+    return this.findOne(scope, {
+      where: { referenceNumber } as FindOptionsWhere<HseIncident>,
+    });
   }
 
-  findByStatus(status: HseIncident['status'], scope: IContractScope) {
+  findByStatus(scope: IContractScope, status: HseIncident['status']) {
     return this.findAll(scope, {
       where: { status } as FindOptionsWhere<HseIncident>,
     });
   }
 
-  findBySeverity(severity: HseIncident['severity'], scope: IContractScope) {
+  findBySeverity(scope: IContractScope, severity: HseIncident['severity']) {
     return this.findAll(scope, {
       where: { severity } as FindOptionsWhere<HseIncident>,
     });
   }
 
-  findBySite(contractSiteId: string, scope: IContractScope) {
+  findBySite(scope: IContractScope, contractSiteId: string) {
     return this.findAll(scope, {
       where: { contractSiteId } as FindOptionsWhere<HseIncident>,
-      order: { occurredAt: 'DESC' } as any,
+      order: { occurredAt: 'DESC' } satisfies FindOptionsOrder<HseIncident>,
     });
   }
 
@@ -48,7 +47,7 @@ export class HseIncidentRepository extends ContractScopedRepository<HseIncident>
       .getMany();
   }
 
-  findOccurredBetween(from: Date, to: Date, scope: IContractScope) {
+  findOccurredBetween(scope: IContractScope, from: Date, to: Date) {
     return this.scopedQuery(scope)
       .andWhere('e.occurredAt >= :from AND e.occurredAt <= :to', { from, to })
       .orderBy('e.occurredAt', 'ASC')

@@ -6,7 +6,7 @@ import {
   RiCheckboxCircleLine,
   RiAlarmWarningLine,
 } from "@remixicon/react";
-import type { AdminContractMetrics } from "@/services/adminApi";
+import type { IAdminContractMetrics } from "@contractflow/contracts-schema";
 import { Badge } from "@workspace/ui/components/badge";
 import {
   Card,
@@ -18,7 +18,7 @@ import {
 } from "@workspace/ui/components/card";
 
 interface ContractLifecycleCardProps {
-  contracts: AdminContractMetrics;
+  contracts: IAdminContractMetrics;
 }
 
 export function ContractLifecycleCard({ contracts }: ContractLifecycleCardProps) {

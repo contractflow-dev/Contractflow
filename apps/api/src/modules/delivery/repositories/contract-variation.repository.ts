@@ -24,10 +24,9 @@ export class ContractVariationRepository extends ContractScopedRepository<Contra
   }
 
   findByReference(scope: Scope, referenceNumber: string) {
-    return this.findOne(
-      { where: { referenceNumber } as FindOptionsWhere<ContractVariation> },
-      scope,
-    );
+    return this.findOne(scope, {
+      where: { referenceNumber } as FindOptionsWhere<ContractVariation>,
+    });
   }
 
   /** Feeds contract.current_value_minor (original + approved variations). */

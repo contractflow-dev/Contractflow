@@ -77,8 +77,8 @@ export abstract class ContractScopedRepository<
   }
 
   protected override applyScope(
-    qb: SelectQueryBuilder<Entity>,
     scope: Scope,
+    qb: SelectQueryBuilder<Entity>,
   ): void {
     const { contractId, companyId } = this.resolveScope(scope);
     qb.andWhere(`${qb.alias}.contractId = :__scopeContractId`, {
@@ -125,7 +125,7 @@ export abstract class ContractScopedRepository<
         (w) => ({ ...w, ...scoped }) as FindOptionsWhere<Entity>,
       );
     }
-    return { ...(where ?? {}), ...scoped } as FindOptionsWhere<Entity>;
+    return { ...where, ...scoped } as FindOptionsWhere<Entity>;
   }
 
   /** Query builder with contract (and company) scope already applied. */
@@ -137,17 +137,39 @@ export abstract class ContractScopedRepository<
     return this.scopedQuery(scope, alias);
   }
 
-  override async findById(id: string, scope: Scope): Promise<Entity | null> {
+  override async findByIds(
+    scope: Scope,
+    ids: string[],
+    options: Omit<FindManyOptions<Entity>, 'where'> = {},
+  ): Promise<Entity[]> {
     await this.assertScope(scope);
-    return super.findById(id, scope);
+    return super.findByIds(scope, ids, options);
+  }
+
+  override async findById(scope: Scope, id: string): Promise<Entity | null> {
+    await this.assertScope(scope);
+    return super.findById(scope, id);
+  }
+
+  override async exists(
+    scope: Scope,
+    where?: FindOptionsWhere<Entity> | FindOptionsWhere<Entity>[],
+  ): Promise<boolean> {
+    await this.assertScope(scope);
+    return super.exists(scope, where);
+  }
+
+  override async existsById(scope: Scope, id: string): Promise<boolean> {
+    await this.assertScope(scope);
+    return super.existsById(scope, id);
   }
 
   override async findOne(
-    options: FindOneOptions<Entity>,
     scope: Scope,
+    options: FindOneOptions<Entity>,
   ): Promise<Entity | null> {
     await this.assertScope(scope);
-    return super.findOne(options, scope);
+    return super.findOne(scope, options);
   }
 
   override async findAll(
@@ -175,8 +197,8 @@ export abstract class ContractScopedRepository<
   }
 
   /** Creates a new record under the contract; existing records use update. */
-  override async save(entity: Entity, scope: Scope): Promise<Entity> {
-    const { contractId } = await this.assertScope(scope);
+  override async save(scope: Scope, entity: Entity): Promise<Entity> {
+    const { contractId, companyId } = await this.assertScope(scope);
     if (entity.id?.trim()) {
       throw new BadRequestException(
         'Scoped save only creates new records; use update for existing records',
@@ -187,6 +209,17 @@ export abstract class ContractScopedRepository<
         'Record belongs to a different contract than the scope',
       );
     }
+    if (this.companyProperty) {
+      const rowCompanyId = Object.getOwnPropertyDescriptor(
+        entity,
+        this.companyProperty,
+      )?.value;
+      if (rowCompanyId !== undefined && rowCompanyId !== companyId) {
+        throw new BadRequestException(
+          'Record belongs to a different company than the scope',
+        );
+      }
+    }
 
     const scopedEntity = this.repository.create({
       ...entity,
@@ -195,17 +228,81 @@ export abstract class ContractScopedRepository<
     return this.repository.save(scopedEntity);
   }
 
-  override async update(
-    id: string,
-    data: Omit<DeepPartial<Entity>, 'id'>,
-    scope: Scope,
-  ): Promise<Entity> {
-    await this.assertScope(scope);
-    return super.update(id, data, scope);
+  override async saveMany(scope: Scope, entities: Entity[]): Promise<Entity[]> {
+    if (!entities.length) return [];
+
+    const { contractId, companyId } = await this.assertScope(scope);
+    for (const entity of entities) {
+      if (entity.id?.trim()) {
+        throw new BadRequestException(
+          'Scoped save only creates new records; use update for existing records',
+        );
+      }
+      if (entity.contractId && entity.contractId !== contractId) {
+        throw new BadRequestException(
+          'Record belongs to a different contract than the scope',
+        );
+      }
+      if (this.companyProperty) {
+        const rowCompanyId = Object.getOwnPropertyDescriptor(
+          entity,
+          this.companyProperty,
+        )?.value;
+        if (rowCompanyId !== undefined && rowCompanyId !== companyId) {
+          throw new BadRequestException(
+            'Record belongs to a different company than the scope',
+          );
+        }
+      }
+    }
+
+    const values = this.scopeValues(scope);
+    const scopedEntities = entities.map((entity) =>
+      this.repository.create({ ...entity, ...values } as DeepPartial<Entity>),
+    );
+    return this.repository.manager.transaction((manager) =>
+      manager.save(scopedEntities),
+    );
   }
 
-  override async delete(id: string, scope: Scope): Promise<void> {
+  override async update(
+    scope: Scope,
+    id: string,
+    data: Omit<DeepPartial<Entity>, 'id'>,
+  ): Promise<Entity> {
     await this.assertScope(scope);
-    return super.delete(id, scope);
+    return super.update(scope, id, data);
+  }
+
+  override async updateMany(
+    scope: Scope,
+    where: FindOptionsWhere<Entity>,
+    data: Omit<DeepPartial<Entity>, 'id'>,
+  ): Promise<number> {
+    await this.assertScope(scope);
+    return super.updateMany(scope, where, data);
+  }
+
+  override async delete(scope: Scope, id: string): Promise<void> {
+    await this.assertScope(scope);
+    return super.delete(scope, id);
+  }
+
+  override async deleteMany(
+    scope: Scope,
+    where: FindOptionsWhere<Entity>,
+  ): Promise<number> {
+    await this.assertScope(scope);
+    return super.deleteMany(scope, where);
+  }
+
+  override async softDelete(scope: Scope, id: string): Promise<void> {
+    await this.assertScope(scope);
+    return super.softDelete(scope, id);
+  }
+
+  override async restore(scope: Scope, id: string): Promise<void> {
+    await this.assertScope(scope);
+    return super.restore(scope, id);
   }
 }

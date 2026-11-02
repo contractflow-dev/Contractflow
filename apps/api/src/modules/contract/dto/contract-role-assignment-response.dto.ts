@@ -1,11 +1,13 @@
-import type { EContractRole } from '@contractflow/contracts-schema';
-import type { ContractRoleAssignment } from '../entities/contract-role-assignment.entity';
+import type {
+  ContractRoleAssignment as ContractRoleAssignmentContract,
+  EContractRole,
+} from '@contractflow/contracts-schema';
 import {
   workspaceForRole,
   type AssignableContractWorkspace,
 } from '../services/contract-workspace';
 
-export class ContractRoleAssignmentResponseDto {
+export class ContractRoleAssignmentResponseDto implements ContractRoleAssignmentContract {
   id!: string;
   contractPartyId!: string;
   companyUserId!: string;
@@ -20,9 +22,23 @@ export class ContractRoleAssignmentResponseDto {
   revokedAt!: string | null;
   revokedById!: string | null;
 
-  static fromEntity(
-    assignment: ContractRoleAssignment,
-  ): ContractRoleAssignmentResponseDto {
+  static fromEntity(assignment: {
+    id: string;
+    contractPartyId: string;
+    companyUserId: string;
+    role: EContractRole;
+    isWorkspaceAdmin: boolean;
+    assignedAt: Date;
+    assignedById: string;
+    revokedAt: Date | null;
+    revokedById: string | null;
+    companyUser?: {
+      user: { firstName: string; lastName: string; email: string };
+    };
+  }): ContractRoleAssignmentResponseDto {
+    if (!assignment.companyUser) {
+      throw new Error('The assignment member details were not loaded.');
+    }
     const response = new ContractRoleAssignmentResponseDto();
     response.id = assignment.id;
     response.contractPartyId = assignment.contractPartyId;

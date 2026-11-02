@@ -6,10 +6,9 @@ import {
   MaxLength,
   IsStrongPassword,
 } from 'class-validator';
+import type { LoginRequest } from '@contractflow/contracts-schema';
 
-const trim = ({ value }: { value: unknown }) =>
-  typeof value === 'string' ? value.trim() : value;
-export class LoginAppUserDto {
+export class LoginAppUserDto implements LoginRequest {
   @Transform(({ value }) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value,
   )

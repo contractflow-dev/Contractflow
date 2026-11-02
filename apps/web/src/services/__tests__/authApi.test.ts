@@ -3,10 +3,12 @@ import { store } from "@/store";
 import { api } from "@/services/api";
 import { authApi } from "@/services/authApi";
 import { getApiBaseUrl } from "@/lib/apiBaseUrl";
-import { companiesApi } from "@/features/companies/companiesApi";
+import { companiesApi } from "@/services/companiesApi";
 import { getApiErrorMessage, getApiErrorStatus } from "@/lib/apiError";
 import {
   ECompanyRole,
+  ECountryCode,
+  ECurrencyCode,
   EInvitationRole,
   EUserStatus,
 } from "@contractflow/contracts-schema";
@@ -178,8 +180,8 @@ describe("RTK Query authentication and company API contracts", () => {
       city: "Test City",
       stateRegion: "Test Region",
       postalCode: "00000",
-      countryCode: "US",
-      defaultCurrencyCode: "USD",
+      countryCode: ECountryCode.US,
+      defaultCurrencyCode: ECurrencyCode.USD,
       status: EUserStatus.ACTIVE,
     };
     fetchMock.mockResolvedValueOnce(
@@ -252,10 +254,14 @@ describe("RTK Query authentication and company API contracts", () => {
     fetchMock.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
-          items: [],
-          total: 0,
-          page: 1,
-          limit: 20,
+          data: [],
+          meta: {
+            totalItems: 0,
+            itemCount: 0,
+            itemsPerPage: 20,
+            totalPages: 0,
+            currentPage: 1,
+          },
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       ),

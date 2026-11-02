@@ -7,6 +7,13 @@ export {
   resetWorkspace,
   selectActiveWorkspaceId,
   selectRecentWorkspaceIds,
-} from './workspaceSlice';
+} from "./workspaceSlice";
 
-export type { WorkspaceState } from './workspaceTypes';
+export type { WorkspaceState } from "./workspaceTypes";
+export {
+  activeCompanyStorageKey,
+  clearPersistedActiveCompanyId,
+  persistActiveCompanyId,
+  readPersistedActiveCompanyId,
+  resolveActiveCompanyId,
+} from "./companySelection";

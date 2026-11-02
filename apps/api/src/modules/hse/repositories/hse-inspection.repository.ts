@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, Repository } from 'typeorm';
+import type { FindOptionsOrder, FindOptionsWhere, Repository } from 'typeorm';
 import { ContractScopedRepository } from '../../../common/database/repositories/contract-scoped.repository';
 import { HseInspection } from '../entities/hse-inspection.entity';
 import { IContractScope } from '../../../common/database/repositories/contract-scope.interface';
@@ -13,35 +13,34 @@ export class HseInspectionRepository extends ContractScopedRepository<HseInspect
     super(repository);
   }
 
-  findByReference(referenceNumber: string, scope: IContractScope) {
-    return this.findOne(
-      { where: { referenceNumber } as FindOptionsWhere<HseInspection> },
-      scope,
-    );
-  }
-
-  findBySite(contractSiteId: string, scope: IContractScope) {
-    return this.findAll(scope, {
-      where: { contractSiteId } as FindOptionsWhere<HseInspection>,
-      order: { scheduledDate: 'DESC' } as any,
+  findByReference(scope: IContractScope, referenceNumber: string) {
+    return this.findOne(scope, {
+      where: { referenceNumber } as FindOptionsWhere<HseInspection>,
     });
   }
 
-  findByStatus(status: HseInspection['status'], scope: IContractScope) {
+  findBySite(scope: IContractScope, contractSiteId: string) {
+    return this.findAll(scope, {
+      where: { contractSiteId } as FindOptionsWhere<HseInspection>,
+      order: { scheduledDate: 'DESC' } satisfies FindOptionsOrder<HseInspection>,
+    });
+  }
+
+  findByStatus(scope: IContractScope, status: HseInspection['status']) {
     return this.findAll(scope, {
       where: { status } as FindOptionsWhere<HseInspection>,
     });
   }
 
   /** Still SCHEDULED after the scheduled date. */
-  findOverdue(today: string, scope: IContractScope) {
+  findOverdue(scope: IContractScope, today: string) {
     return this.scopedQuery(scope)
       .andWhere('e.status = :s', { s: 'SCHEDULED' })
       .andWhere('e.scheduledDate < :today', { today })
       .getMany();
   }
 
-  findScheduledBetween(from: string, to: string, scope: IContractScope) {
+  findScheduledBetween(scope: IContractScope, from: string, to: string) {
     return this.scopedQuery(scope)
       .andWhere('e.scheduledDate >= :from AND e.scheduledDate <= :to', {
         from,

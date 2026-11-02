@@ -1,3 +1,7 @@
+import type {
+  AssignableContractWorkspace,
+  CreateContractRequest,
+} from '@contractflow/contracts-schema';
 import { Type } from 'class-transformer';
 import {
   ArrayUnique,
@@ -19,11 +23,10 @@ import {
   ECurrencyCode,
   EPartyType,
 } from '@contractflow/contracts-schema';
-import type { AssignableContractWorkspace } from '../services/contract-workspace';
 
 const workspaces = ['project', 'hse', 'finance'] as const;
 
-export class CreateContractRequestDto {
+export class CreateContractRequestDto implements CreateContractRequest {
   @IsString()
   @Length(1, 40)
   referenceNumber!: string;

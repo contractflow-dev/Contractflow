@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
 import { api } from "@/services/api";
-import { adminApi, type AdminOverviewResponse } from "@/services/adminApi";
+import type { IAdminOverviewResponse } from "@contractflow/contracts-schema";
+import { adminApi } from "@/services/adminApi";
 import { getApiErrorMessage, getApiErrorStatus } from "@/lib/apiError";
 
 describe("RTK Query Admin API contracts", () => {
@@ -9,7 +10,7 @@ describe("RTK Query Admin API contracts", () => {
     (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
   >();
 
-  const mockOverviewData: AdminOverviewResponse = {
+  const mockOverviewData: IAdminOverviewResponse = {
     companies: { total: 12, active: 10, inactive: 2, newThisMonth: 4 },
     users: { total: 50, active: 45, inactive: 5, pendingVerification: 5, platformAdmins: 2 },
     contracts: { total: 24, active: 18, draft: 4, suspended: 1, completed: 1, expiringSoon: 3 },

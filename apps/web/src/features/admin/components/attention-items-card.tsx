@@ -22,10 +22,10 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@workspace/ui/components/empty";
-import type { AdminAttentionSummary } from "@/services/adminApi";
+import type { IAdminAttentionSummary } from "@contractflow/contracts-schema";
 
 interface AttentionItemsCardProps {
-  attention: AdminAttentionSummary;
+  attention: IAdminAttentionSummary;
 }
 
 export function AttentionItemsCard({ attention }: AttentionItemsCardProps) {
@@ -39,7 +39,8 @@ export function AttentionItemsCard({ attention }: AttentionItemsCardProps) {
 
   const urgencyStyles = {
     high: "bg-destructive/10 text-destructive border-destructive/20",
-    medium: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20",
+    medium:
+      "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20",
     low: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20",
   };
 
@@ -76,9 +77,12 @@ export function AttentionItemsCard({ attention }: AttentionItemsCardProps) {
               >
                 <RiCheckDoubleLine />
               </EmptyMedia>
-              <EmptyTitle className="text-sm">Everything is on track</EmptyTitle>
+              <EmptyTitle className="text-sm">
+                Everything is on track
+              </EmptyTitle>
               <EmptyDescription className="text-xs">
-                No contracts are expiring soon, and no invitation or user verification backlogs are pending.
+                No contracts are expiring soon, and no invitation or user
+                verification backlogs are pending.
               </EmptyDescription>
             </EmptyHeader>
           </Empty>

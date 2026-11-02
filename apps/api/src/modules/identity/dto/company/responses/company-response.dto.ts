@@ -1,10 +1,10 @@
 import {
   ECompanyStatus,
+  ECountryCode,
   ECurrencyCode,
   ICompanyResponseDto,
 } from '@contractflow/contracts-schema';
 import { Company } from '../../../entities/company.entity';
-import e from 'express';
 
 export class CompanyResponseDto implements ICompanyResponseDto {
   id: string;
@@ -20,7 +20,7 @@ export class CompanyResponseDto implements ICompanyResponseDto {
   city: string;
   stateRegion: string;
   postalCode: string;
-  countryCode: string;
+  countryCode: ECountryCode;
   defaultCurrencyCode: ECurrencyCode;
   status: ECompanyStatus;
   verifiedAt: Date | null;

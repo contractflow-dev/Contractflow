@@ -1,17 +1,20 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
+import { CurrentCompanyId } from '../../../common/decorators/current-company-id.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import type { AuthenticatedUser } from '../../identity/services/auth.service';
+import { CompanyContextGuard } from '../../../common/guards/company-context.guard';
+import type { AuthenticatedUser } from '../../identity/interface/auth-context.interface';
 import { FinancialService } from '../services/financial.service';
 
 @Controller('companies/:companyId/contracts/:contractId')
+@UseGuards(CompanyContextGuard)
 export class FinancialController {
   constructor(private readonly financial: FinancialService) {}
 
   @Get('invoices')
   listInvoices(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
     @Query() query: PaginationQueryDto,
   ) {
@@ -21,17 +24,22 @@ export class FinancialController {
   @Get('invoices/:invoiceId')
   getInvoice(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
     @Param('invoiceId') invoiceId: string,
   ) {
-    return this.financial.invoices.get(user.id, companyId, contractId, invoiceId);
+    return this.financial.invoices.get(
+      user.id,
+      companyId,
+      contractId,
+      invoiceId,
+    );
   }
 
   @Get('payments')
   listPayments(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
     @Query() query: PaginationQueryDto,
   ) {
@@ -41,10 +49,15 @@ export class FinancialController {
   @Get('payments/:paymentId')
   getPayment(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Param('contractId') contractId: string,
     @Param('paymentId') paymentId: string,
   ) {
-    return this.financial.payments.get(user.id, companyId, contractId, paymentId);
+    return this.financial.payments.get(
+      user.id,
+      companyId,
+      contractId,
+      paymentId,
+    );
   }
 }

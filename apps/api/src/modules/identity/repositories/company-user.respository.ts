@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import {
   ECompanyRole,
-  ECompanyStatus,
   ECompanyUserStatus,
 } from '@contractflow/contracts-schema';
 import { CompanyUser } from '../entities/company-user.entity';
@@ -23,24 +22,92 @@ export class CompanyUserRepository extends CompanyScopedRepository<
 
   /** The user's current membership of the scoped company, or null. */
   findActiveMember(
-    userId: string,
     scope: ICompanyScope,
+    userId: string,
   ): Promise<CompanyUser | null> {
-    return this.findOne(
-      {
-        where: {
-          userId,
-          status: ECompanyUserStatus.ACTIVE,
-          leftAt: IsNull(),
-        },
+    return this.findOne(scope, {
+      where: {
+        userId,
+        status: ECompanyUserStatus.ACTIVE,
+        leftAt: IsNull(),
       },
-      scope,
-    );
+    });
+  }
+
+  hasActiveMembershipForUser(
+    userId: string,
+    companyId: string,
+  ): Promise<boolean> {
+    return this.repository.exists({
+      where: {
+        userId,
+        companyId,
+        status: ECompanyUserStatus.ACTIVE,
+        leftAt: IsNull(),
+      },
+    });
+  }
+
+  async findActiveRoleForUser(
+    userId: string,
+    companyId: string,
+  ): Promise<CompanyUser['companyRole'] | null> {
+    const membership = await this.repository.findOne({
+      where: {
+        userId,
+        companyId,
+        status: ECompanyUserStatus.ACTIVE,
+        leftAt: IsNull(),
+      },
+      select: { companyRole: true },
+    });
+    return membership?.companyRole ?? null;
+  }
+
+  findActiveMembershipsForUser(userId: string): Promise<CompanyUser[]> {
+    return this.repository.find({
+      where: {
+        userId,
+        status: ECompanyUserStatus.ACTIVE,
+        leftAt: IsNull(),
+      },
+      order: { joinedAt: 'DESC' },
+      relations: { company: true },
+    });
+  }
+
+  findCurrentMembershipWithCompany(
+    userId: string,
+  ): Promise<CompanyUser | null> {
+    return this.repository.findOne({
+      where: {
+        userId,
+        status: ECompanyUserStatus.ACTIVE,
+        leftAt: IsNull(),
+      },
+      order: { joinedAt: 'DESC' },
+      relations: { company: true },
+    });
+  }
+
+  findActiveMembershipWithCompany(
+    userId: string,
+    companyId: string,
+  ): Promise<CompanyUser | null> {
+    return this.repository.findOne({
+      where: {
+        userId,
+        companyId,
+        status: ECompanyUserStatus.ACTIVE,
+        leftAt: IsNull(),
+      },
+      relations: { company: true },
+    });
   }
 
   findByRole(
-    companyRole: CompanyUser['companyRole'],
     scope: ICompanyScope,
+    companyRole: CompanyUser['companyRole'],
   ): Promise<CompanyUser[]> {
     return this.findAll(scope, { where: { companyRole } });
   }
@@ -50,6 +117,16 @@ export class CompanyUserRepository extends CompanyScopedRepository<
     return this.activeMembersQuery(scope)
       .andWhere('e.companyRole = :role', { role: ECompanyRole.COMPANY_ADMIN })
       .getCount();
+  }
+
+  async countActiveMembers(companyId: string): Promise<number> {
+    return this.repository.count({
+      where: {
+        companyId,
+        status: ECompanyUserStatus.ACTIVE,
+        leftAt: IsNull(),
+      },
+    });
   }
 
   /**

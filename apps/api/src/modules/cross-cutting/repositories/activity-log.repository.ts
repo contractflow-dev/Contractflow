@@ -29,9 +29,9 @@ export class ActivityLogRepository extends ContractScopedRepository<
   }
 
   findByEntity(
+    scope: IContractCompanyScope,
     entityType: string,
     entityId: string,
-    scope: IContractCompanyScope,
     limit = 100,
   ) {
     return this.scopedQuery(scope)
@@ -44,7 +44,7 @@ export class ActivityLogRepository extends ContractScopedRepository<
       .getMany();
   }
 
-  findByActor(actorUserId: string, scope: IContractCompanyScope, limit = 100) {
+  findByActor(scope: IContractCompanyScope, actorUserId: string, limit = 100) {
     return this.scopedQuery(scope)
       .andWhere('e.actorUserId = :actorUserId', { actorUserId })
       .orderBy('e.occurredAt', 'DESC')
@@ -53,8 +53,8 @@ export class ActivityLogRepository extends ContractScopedRepository<
   }
 
   findByContract(
-    contractId: string,
     scope: IContractCompanyScope,
+    contractId: string,
     limit = 100,
   ) {
     return this.scopedQuery(scope)
@@ -65,7 +65,7 @@ export class ActivityLogRepository extends ContractScopedRepository<
   }
 
   /** e.g. 'invoice.certified' */
-  findByAction(action: string, scope: IContractCompanyScope, limit = 100) {
+  findByAction(scope: IContractCompanyScope, action: string, limit = 100) {
     return this.scopedQuery(scope)
       .andWhere('e.action = :action', { action })
       .orderBy('e.occurredAt', 'DESC')
@@ -73,7 +73,7 @@ export class ActivityLogRepository extends ContractScopedRepository<
       .getMany();
   }
 
-  findBetween(from: Date, to: Date, scope: IContractCompanyScope, limit = 100) {
+  findBetween(scope: IContractCompanyScope, from: Date, to: Date, limit = 100) {
     return this.scopedQuery(scope)
       .andWhere('e.occurredAt >= :from AND e.occurredAt <= :to', { from, to })
       .orderBy('e.occurredAt', 'DESC')

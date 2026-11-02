@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { useCreateCompanyMutation } from "@/features/companies";
 import { useGetCurrentUserQuery } from "@/services/authApi";
+import { setActiveWorkspaceId } from "@/features/workspace/workspaceSlice";
+import { useAppDispatch } from "@/store/hooks";
 import { AuthTopBar } from "@/components/auth/authTopBar";
 import { HeroMetrics } from "@/components/auth/HeroMetrics";
 import {
@@ -159,6 +161,7 @@ function CompanyField({
 }
 
 export function OnboardingView() {
+  const dispatch = useAppDispatch();
   const router = useRouter();
   const {
     data: currentUser,
@@ -232,7 +235,12 @@ export function OnboardingView() {
   async function onSubmit(values: CompanyFormValues) {
     setServerError(null);
     try {
-      const response = await createCompany(values).unwrap();
+      const response = await createCompany({
+        ...values,
+        countryCode: values.countryCode as ECountryCode,
+        defaultCurrencyCode: values.defaultCurrencyCode as ECurrencyCode,
+      }).unwrap();
+      dispatch(setActiveWorkspaceId(response.company.id));
       setCreatedCompany({
         id: response.company.id,
         name: response.company.name,
@@ -259,7 +267,7 @@ export function OnboardingView() {
               : " Your membership is active."}
           </p>
           <Link
-            href={`/dashboards?companyId=${encodeURIComponent(createdCompany.id)}`}
+            href="/dashboards"
             className={buttonVariants({
               size: "lg",
               className: "h-11 w-full px-4",

@@ -45,3 +45,13 @@ export enum EContractStatus{
     SUSPENDED= 'suspended', 
     COMPLETED= 'completed'
 }
+
+/** Contract register columns the API accepts for `sortBy`. */
+export enum EContractSortField {
+  CREATED_AT = 'createdAt',
+  REFERENCE_NUMBER = 'referenceNumber',
+  TITLE = 'title',
+  STATUS = 'status',
+  START_DATE = 'startDate',
+  END_DATE = 'endDate',
+}
