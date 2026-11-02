@@ -1,11 +1,16 @@
-import type { EContractRole } from '@contractflow/contracts-schema';
+import type {
+  ContractRoleAssignment as ContractRoleAssignmentContract,
+  EContractRole,
+} from '@contractflow/contracts-schema';
 import type { ContractRoleAssignment } from '../entities/contract-role-assignment.entity';
 import {
   workspaceForRole,
   type AssignableContractWorkspace,
 } from '../services/contract-workspace';
 
-export class ContractRoleAssignmentResponseDto {
+export class ContractRoleAssignmentResponseDto
+  implements ContractRoleAssignmentContract
+{
   id!: string;
   contractPartyId!: string;
   companyUserId!: string;

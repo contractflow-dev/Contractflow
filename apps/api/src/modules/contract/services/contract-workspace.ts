@@ -1,7 +1,9 @@
 import { EContractRole, EPartyType } from '@contractflow/contracts-schema';
+import type { AssignableContractWorkspace } from '@contractflow/contracts-schema';
 
-export type ContractWorkspace = 'project' | 'finance' | 'hse' | 'general';
-export type AssignableContractWorkspace = Exclude<ContractWorkspace, 'general'>;
+export type { AssignableContractWorkspace } from '@contractflow/contracts-schema';
+
+export type ContractWorkspace = AssignableContractWorkspace | 'general';
 
 export const WORKSPACE_ROLES: Record<ContractWorkspace, EContractRole[]> = {
   project: [

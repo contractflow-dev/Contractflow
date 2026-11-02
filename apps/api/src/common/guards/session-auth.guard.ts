@@ -7,8 +7,8 @@ import {
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
-import { AuthService } from '../../modules/identity/services/auth.service';
-import type { AuthenticatedUser } from '../../modules/identity/services/auth.service';
+import { AuthService } from '../../modules/identity/services/auth/auth.service';
+import type { AuthenticatedUser } from '../../modules/identity/interface/auth-context.interface';
 
 export type AuthenticatedRequest = Request & {
   user: AuthenticatedUser;

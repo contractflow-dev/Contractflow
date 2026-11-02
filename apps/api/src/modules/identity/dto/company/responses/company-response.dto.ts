@@ -4,7 +4,6 @@ import {
   ICompanyResponseDto,
 } from '@contractflow/contracts-schema';
 import { Company } from '../../../entities/company.entity';
-import e from 'express';
 
 export class CompanyResponseDto implements ICompanyResponseDto {
   id: string;

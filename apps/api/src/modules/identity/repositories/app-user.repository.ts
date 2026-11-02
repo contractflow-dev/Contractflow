@@ -1,11 +1,19 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EUserStatus } from '@contractflow/contracts-schema';
-import { Brackets, Between, In, IsNull, Not, Repository } from 'typeorm';
-import type { DeepPartial } from 'typeorm';
+import {
+  Between,
+  In,
+  IsNull,
+  Not,
+  Repository,
+  type DeepPartial,
+  type EntityManager,
+} from 'typeorm';
 import { BaseRepository } from '../../../common/database/repositories/base.repository';
 import type {} from '../../../common/database/repositories/base.repository.interface';
 import { AppUser } from '../entities/app-user.entity';
+import { IUpdateAppUserProfileInput } from '../interface/app-user.interface';
 
 @Injectable()
 export class AppUserRepository extends BaseRepository<AppUser> {
@@ -90,6 +98,41 @@ export class AppUserRepository extends BaseRepository<AppUser> {
       .addSelect('u.passwordHash')
       .where('u.email = :email', { email: this.normalizeEmail(email) })
       .getOne();
+  }
+
+  createInTransaction(
+    manager: EntityManager,
+    data: DeepPartial<AppUser>,
+  ): AppUser {
+    const normalizedData =
+      typeof data.email === 'string'
+        ? { ...data, email: this.normalizeEmail(data.email) }
+        : data;
+    return manager.getRepository(AppUser).create(normalizedData);
+  }
+
+  findByEmailForUpdate(
+    manager: EntityManager,
+    email: string,
+  ): Promise<AppUser | null> {
+    return manager.getRepository(AppUser).findOne({
+      where: { email: this.normalizeEmail(email) },
+      lock: { mode: 'pessimistic_write' },
+    });
+  }
+
+  findByIdForUpdate(
+    manager: EntityManager,
+    id: string,
+  ): Promise<AppUser | null> {
+    return manager.getRepository(AppUser).findOne({
+      where: { id },
+      lock: { mode: 'pessimistic_write' },
+    });
+  }
+
+  saveInTransaction(manager: EntityManager, user: AppUser): Promise<AppUser> {
+    return manager.getRepository(AppUser).save(user);
   }
 
   /** Same as above, by id (e.g. "confirm current password" flows). */

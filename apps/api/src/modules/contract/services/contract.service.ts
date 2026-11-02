@@ -8,11 +8,10 @@ import { DataSource, IsNull } from 'typeorm';
 import {
   ECompanyRole,
   ECompanyUserStatus,
-  type EContractStatus,
 } from '@contractflow/contracts-schema';
 import type { IContractScope } from '../../../common/database/repositories/contract-scope.interface';
 import type { ICompanyScope } from '../../../common/database/repositories/company-scope.interface';
-import { CompanyScopeService } from '../../identity/services/company-scope.service';
+import { CompanyScopeService } from '../../identity/services/company/company-scope.service';
 import { CompanyUser } from '../../identity/entities/company-user.entity';
 import { Contract } from '../entities/contract.entity';
 import { ContractParty } from '../entities/contract-party.entity';
@@ -25,39 +24,13 @@ import {
 } from '../repositories/contract-status-history.repository';
 import { ContractStatusHistory } from '../entities/contract-status-history.entity';
 import type { AssignableContractWorkspace } from './contract-workspace';
-
-export interface Page<T> {
-  items: T[];
-  total: number;
-  page: number;
-  limit: number;
-}
-
-export interface PageQuery {
-  page: number;
-  limit: number;
-}
-
-export interface ListContractsQuery extends PageQuery {
-  search?: string;
-  status?: EContractStatus;
-  includeDeleted?: boolean;
-}
-
-export interface ListContractStatusHistoryQuery extends PageQuery {
-  fromDate?: string;
-  toDate?: string;
-  status?: EContractStatus;
-  userId?: string;
-}
-
-export interface ContractPartySummary {
-  id: string;
-  companyId: string;
-  companyName: string;
-  partyType: ContractParty['partyType'];
-  signedAt: Date | null;
-}
+import type {
+  ContractPartySummary,
+  ListContractStatusHistoryQuery,
+  ListContractsQuery,
+  Page,
+  PageQuery,
+} from '../interfaces/contract-listing.interface';
 
 /** Everything a contract-level read needs once membership is proven. */
 interface ContractAccess {
@@ -132,7 +105,7 @@ export class ContractService {
       contractId,
     );
 
-    const contract = await this.contracts.findById(contractId, companyScope);
+    const contract = await this.contracts.findById(companyScope, contractId);
     if (!contract) {
       throw contractNotFound();
     }
@@ -178,9 +151,7 @@ export class ContractService {
     }
     const filter: ContractStatusHistoryFilter = {
       fromDate: query.fromDate,
-      toDate: query.toDate
-        ? normalizeEndDate(query.toDate)
-        : undefined,
+      toDate: query.toDate ? normalizeEndDate(query.toDate) : undefined,
       status: query.status,
       userId: query.userId,
       skip: offset(query),
@@ -234,13 +205,13 @@ export class ContractService {
     };
     // The query is the proof: it matches only if THIS company is a party to THIS contract.
     const membership = await this.parties.findByCompany(
-      companyScope.companyId,
       contractScope,
+      companyScope.companyId,
     );
     if (!membership) {
       throw contractNotFound();
     }
-    const contract = await this.contracts.findById(contractId, companyScope);
+    const contract = await this.contracts.findById(companyScope, contractId);
     if (!contract) {
       throw contractNotFound();
     }
@@ -283,9 +254,7 @@ function toPartySummary(party: ContractParty): ContractPartySummary {
 }
 
 function normalizeEndDate(value: string): string {
-  return value.length === 10
-    ? `${value}T23:59:59.999Z`
-    : value;
+  return value.length === 10 ? `${value}T23:59:59.999Z` : value;
 }
 
 function toHistorySummary(history: ContractStatusHistory) {

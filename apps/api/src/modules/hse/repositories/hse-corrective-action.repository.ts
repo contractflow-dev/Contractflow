@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, Repository } from 'typeorm';
+import type { FindOptionsOrder, FindOptionsWhere, Repository } from 'typeorm';
 import { ContractScopedRepository } from '../../../common/database/repositories/contract-scoped.repository';
 import { HseCorrectiveAction } from '../entities/hse-corrective-action.entity';
 import { IContractScope } from '../../../common/database/repositories/contract-scope.interface';
@@ -33,7 +33,7 @@ export class HseCorrectiveActionRepository extends ContractScopedRepository<HseC
       where: {
         assignedToCompanyUserId,
       } as FindOptionsWhere<HseCorrectiveAction>,
-      order: { dueDate: 'ASC' } as any,
+      order: { dueDate: 'ASC' } satisfies FindOptionsOrder<HseCorrectiveAction>,
     });
   }
 

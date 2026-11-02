@@ -10,14 +10,14 @@ import {
   EInvitationRole,
 } from '@contractflow/contracts-schema';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AppUser } from '../entities/app-user.entity';
-import { Company } from '../entities/company.entity';
-import { CompanyInvitation } from '../entities/company-invitation.entity';
-import { CompanyUser } from '../entities/company-user.entity';
-import { CompanyInvitationRepository } from '../repositories/company-invitation.repository';
+import { AppUser } from '../../entities/app-user.entity';
+import { Company } from '../../entities/company.entity';
+import { CompanyInvitation } from '../../entities/company-invitation.entity';
+import { CompanyUser } from '../../entities/company-user.entity';
+import { CompanyInvitationRepository } from '../../repositories/company-invitation.repository';
 import { CompanyScopeService } from './company-scope.service';
 import { CompanyAdminService } from './company-admin.service';
-import { MailService } from '../../mail/mail.service';
+import { MailService } from '../../../mail/mail.service';
 
 const companyId = '01JCOMPANY00000000000000000';
 const actorId = '01JADMIN00000000000000000000';

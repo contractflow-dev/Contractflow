@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, Repository } from 'typeorm';
+import type { FindOptionsOrder, FindOptionsWhere, Repository } from 'typeorm';
 import { ContractScopedRepository } from '../../../common/database/repositories/contract-scoped.repository';
 import { Payment } from '../entities/payment.entity';
 import { sumBigint } from '../../../common/database/utils/sum-bigint';
@@ -15,7 +15,7 @@ export class PaymentRepository extends ContractScopedRepository<Payment> {
   findByInvoice(scope: IContractScope, invoiceId: string) {
     return this.findAll(scope, {
       where: { invoiceId } as FindOptionsWhere<Payment>,
-      order: { paymentDate: 'ASC' } as any,
+      order: { paymentDate: 'ASC' } satisfies FindOptionsOrder<Payment>,
     });
   }
 

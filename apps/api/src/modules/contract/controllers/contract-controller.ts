@@ -9,7 +9,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import type { AuthenticatedUser } from '../../identity/services/auth.service';
+import type { AuthenticatedUser } from '../../identity/interface/auth-context.interface';
 import {
   CreateContractRoleAssignmentRequestDto,
   CreateContractRoleInvitationRequestDto,

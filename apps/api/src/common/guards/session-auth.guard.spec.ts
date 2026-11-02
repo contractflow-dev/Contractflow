@@ -1,10 +1,8 @@
-import {
-  ExecutionContext,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AuthService, AuthenticatedUser } from '../../modules/identity/services/auth.service';
+import type { AuthService } from '../../modules/identity/services/auth/auth.service';
+import type { AuthenticatedUser } from '../../modules/identity/interface/auth-context.interface';
 import type { AuthenticatedRequest } from './session-auth.guard';
 import { SessionAuthGuard } from './session-auth.guard';
 
@@ -16,9 +14,7 @@ describe('SessionAuthGuard', () => {
     isPlatformAdmin: false,
   };
   const reflector = {
-    getAllAndOverride: vi.fn<
-      (key: string, targets: unknown[]) => boolean
-    >(),
+    getAllAndOverride: vi.fn<(key: string, targets: unknown[]) => boolean>(),
   };
   const authService = {
     sessionCookieName: vi.fn(() => 'contractflow_session'),

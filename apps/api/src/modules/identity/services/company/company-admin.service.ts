@@ -20,28 +20,28 @@ import {
   EInvitationRole,
   EInvitationStatus,
 } from '@contractflow/contracts-schema';
-import type { ICompanyScope } from '../../../common/database/repositories/company-scope.interface';
-import { Company } from '../entities/company.entity';
-import { CompanyInvitation } from '../entities/company-invitation.entity';
-import { CompanyUser } from '../entities/company-user.entity';
-import { AppUser } from '../entities/app-user.entity';
-import { CompanyInvitationRepository } from '../repositories/company-invitation.repository';
+import type { ICompanyScope } from '../../../../common/database/repositories/company-scope.interface';
+import { Company } from '../../entities/company.entity';
+import { CompanyInvitation } from '../../entities/company-invitation.entity';
+import { CompanyUser } from '../../entities/company-user.entity';
+import { AppUser } from '../../entities/app-user.entity';
+import { CompanyInvitationRepository } from '../../repositories/company-invitation.repository';
 import { CompanyScopeService } from './company-scope.service';
-import { MailService } from '../../mail/mail.service';
-import { CompanyResponseDto } from '../dto/company/responses/company-response.dto';
+import { MailService } from '../../../mail/mail.service';
+import { CompanyResponseDto } from '../../dto/company/responses/company-response.dto';
 import {
   CompanyMemberResponseDto,
   type ICompanyMemberResponseDto,
-} from '../dto/company/responses/company-member-response.dto';
+} from '../../dto/company/responses/company-member-response.dto';
 import {
   CompanyInvitationResponseDto,
   type ICompanyInvitationResponseDto,
-} from '../dto/company/responses/company-invitation-response.dto';
-import type { CompanyInvitationPublicResponseDto } from '../dto/company/responses/company-invitation-public-response.dto';
-import type { InviteCompanyMemberRequestDto } from '../dto/company/requests/invite-company-member-request.dto';
-import type { ListCompanyMembersRequestDto } from '../dto/company/requests/list-company-members-request.dto';
-import type { UpdateCompanyMemberRoleRequestDto } from '../dto/company/requests/update-company-member-role-request.dto';
-import type { UpdateCompanyProfileRequestDto } from '../dto/company/requests/update-company-profile-request.dto';
+} from '../../dto/company/responses/company-invitation-response.dto';
+import type { CompanyInvitationPublicResponseDto } from '../../dto/company/responses/company-invitation-public-response.dto';
+import type { InviteCompanyMemberRequestDto } from '../../dto/company/requests/invite-company-member-request.dto';
+import type { ListCompanyMembersRequestDto } from '../../dto/company/requests/list-company-members-request.dto';
+import type { UpdateCompanyMemberRoleRequestDto } from '../../dto/company/requests/update-company-member-role-request.dto';
+import type { UpdateCompanyProfileRequestDto } from '../../dto/company/requests/update-company-profile-request.dto';
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -394,9 +394,9 @@ export class CompanyAdminService {
     }
     if (invitation.expiresAt <= new Date()) {
       await this.invitations.update(
+        { companyId: invitation.companyId },
         invitation.id,
         { status: EInvitationStatus.EXPIRED },
-        { companyId: invitation.companyId },
       );
       throw new ConflictException('This invitation has expired.');
     }

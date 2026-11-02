@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import type { FindOptionsWhere, Repository } from 'typeorm';
+import type {
+  FindOptionsOrder,
+  FindOptionsWhere,
+  Repository,
+} from 'typeorm';
 import { ContractScopedRepository } from '../../../common/database/repositories/contract-scoped.repository';
 import { Comment } from '../entities/comment.entity';
 import { IContractScope } from '../../../common/database/repositories/contract-scope.interface';
@@ -37,7 +41,7 @@ export class CommentRepository extends ContractScopedRepository<Comment> {
   findReplies(scope: IContractScope, parentCommentId: string) {
     return this.findAll(scope, {
       where: { parentCommentId } as FindOptionsWhere<Comment>,
-      order: { createdAt: 'ASC' } as any,
+      order: { createdAt: 'ASC' } satisfies FindOptionsOrder<Comment>,
     });
   }
 }

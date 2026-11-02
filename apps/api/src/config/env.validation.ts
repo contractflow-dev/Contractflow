@@ -59,11 +59,6 @@ export class EnvVars {
   })
   DATABASE_URL!: string;
 
-  @IsOptional()
-  @Transform(toBool)
-  @IsBoolean()
-  DB_SYNC?: boolean;
-
   @Transform(toBool)
   @IsBoolean()
   DB_SSL: boolean = false;

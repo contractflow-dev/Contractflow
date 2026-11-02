@@ -8,8 +8,8 @@ describe('ContractAccessService', () => {
   const users = { findActiveMember: vi.fn() };
   const parties = { findByCompany: vi.fn() };
   const roleAssignments = { findActiveByCompanyUser: vi.fn() };
-  const contracts = { findOne: vi.fn() };
-  const workspaces = { findOne: vi.fn() };
+  const contracts = { findById: vi.fn() };
+  const workspaces = { exists: vi.fn() };
   let service: ContractAccessService;
 
   beforeEach(() => {
@@ -25,8 +25,8 @@ describe('ContractAccessService', () => {
         role: EContractRole.FINANCE_OFFICER,
       },
     ]);
-    contracts.findOne.mockResolvedValue({ id: 'c1' });
-    workspaces.findOne.mockResolvedValue({ contractId: 'c1' });
+    contracts.findById.mockResolvedValue({ id: 'c1' });
+    workspaces.exists.mockResolvedValue(true);
     service = new ContractAccessService(
       users as never,
       parties as never,
@@ -40,16 +40,25 @@ describe('ContractAccessService', () => {
     await expect(
       service.authorize('u1', 'co1', 'c1', 'finance'),
     ).resolves.toEqual({ contractId: 'c1', companyId: 'co1' });
-    expect(users.findActiveMember).toHaveBeenCalledWith('u1', {
-      companyId: 'co1',
-    });
-    expect(parties.findByCompany).toHaveBeenCalledWith('co1', {
-      contractId: 'c1',
-      companyId: 'co1',
-    });
+    expect(users.findActiveMember).toHaveBeenCalledWith(
+      { companyId: 'co1' },
+      'u1',
+    );
+    expect(parties.findByCompany).toHaveBeenCalledWith(
+      { contractId: 'c1', companyId: 'co1' },
+      'co1',
+    );
     expect(roleAssignments.findActiveByCompanyUser).toHaveBeenCalledWith('m1', {
       companyId: 'co1',
     });
+    expect(contracts.findById).toHaveBeenCalledWith(
+      { companyId: 'co1' },
+      'c1',
+    );
+    expect(workspaces.exists).toHaveBeenCalledWith(
+      { contractId: 'c1', companyId: 'co1' },
+      'finance',
+    );
   });
 
   it('rejects non-members before touching contract data', async () => {

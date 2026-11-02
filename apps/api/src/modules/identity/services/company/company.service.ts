@@ -13,14 +13,15 @@ import {
   ECompanyUserStatus,
   EUserStatus,
 } from '@contractflow/contracts-schema';
-import { AppUser } from '../entities/app-user.entity';
-import { Company } from '../entities/company.entity';
-import { CompanyUser } from '../entities/company-user.entity';
-import { CompanyInvitationRepository } from '../repositories/company-invitation.repository';
-import { Contract } from '../../contract/entities/contract.entity';
-import { ContractParty } from '../../contract/entities/contract-party.entity';
-import { CompanyResponseDto } from '../dto/company/responses/company-response.dto';
-import { CreateCompanyRequestDto } from '../dto/company/requests/create-company-request.dto';
+import { AppUser } from '../../entities/app-user.entity';
+import { Company } from '../../entities/company.entity';
+import { CompanyUser } from '../../entities/company-user.entity';
+import { CompanyInvitationRepository } from '../../repositories/company-invitation.repository';
+import { Contract } from '../../../contract/entities/contract.entity';
+import { ContractParty } from '../../../contract/entities/contract-party.entity';
+import type { DashboardContractRow } from '../../../contract/interfaces/dashboard-contract-row.interface';
+import { CompanyResponseDto } from '../../dto/company/responses/company-response.dto';
+import { CreateCompanyRequestDto } from '../../dto/company/requests/create-company-request.dto';
 
 import type {
   ICompanyAccessResponse,
@@ -32,15 +33,6 @@ import type {
 
 const COMPANY_DASHBOARD_RECENT_WINDOW_DAYS = 30;
 const COMPANY_DASHBOARD_CONTRACT_LIMIT = 5;
-
-interface DashboardContractRow {
-  id: string;
-  referenceNumber: string;
-  title: string;
-  status: EContractStatus;
-  endDate: Date | string | null;
-  updatedAt: Date | string;
-}
 
 @Injectable()
 export class CompanyService {

@@ -49,8 +49,8 @@ export abstract class CompanyScopedRepository<
     }
 
     const scopedEntity = this.repository.create({
-      ...this.scopeValues(scope),
       ...entity,
+      ...this.scopeValues(scope),
     } as DeepPartial<Entity>);
     return this.repository.save(scopedEntity);
   }

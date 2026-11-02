@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, Repository } from 'typeorm';
+import type { FindOptionsOrder, FindOptionsWhere, Repository } from 'typeorm';
 import { ContractScopedRepository } from '../../../common/database/repositories/contract-scoped.repository';
 import { Milestone } from '../entities/milestone.entity';
 import { IContractScope } from '../../../common/database/repositories/contract-scope.interface';
@@ -15,7 +15,7 @@ export class MilestoneRepository extends ContractScopedRepository<Milestone> {
   findByStage(scope: Scope, contractStageId: string) {
     return this.findAll(scope, {
       where: { contractStageId } as FindOptionsWhere<Milestone>,
-      order: { sequence: 'ASC' } as any,
+      order: { sequence: 'ASC' } satisfies FindOptionsOrder<Milestone>,
     });
   }
 
@@ -28,7 +28,7 @@ export class MilestoneRepository extends ContractScopedRepository<Milestone> {
   findPaymentMilestones(scope: Scope) {
     return this.findAll(scope, {
       where: { isPaymentMilestone: true } as FindOptionsWhere<Milestone>,
-      order: { sequence: 'ASC' } as any,
+      order: { sequence: 'ASC' } satisfies FindOptionsOrder<Milestone>,
     });
   }
 

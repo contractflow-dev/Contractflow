@@ -63,13 +63,14 @@ describe('ContractService', () => {
       contract: { id: 'c-1' },
       membership: party,
     });
-    expect(contracts.findById).toHaveBeenCalledWith('c-1', {
-      companyId: 'co-1',
-    });
-    expect(parties.findByCompany).toHaveBeenCalledWith('co-1', {
-      contractId: 'c-1',
-      companyId: 'co-1',
-    });
+    expect(contracts.findById).toHaveBeenCalledWith(
+      { companyId: 'co-1' },
+      'c-1',
+    );
+    expect(parties.findByCompany).toHaveBeenCalledWith(
+      { contractId: 'c-1', companyId: 'co-1' },
+      'co-1',
+    );
   });
 
   it('hides archived contracts from party, history, and detail reads', async () => {

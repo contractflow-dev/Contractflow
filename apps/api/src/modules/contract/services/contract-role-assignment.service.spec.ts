@@ -107,7 +107,7 @@ describe('ContractRoleAssignmentService', () => {
     assignments.findActiveForParty.mockResolvedValue([]);
     assignments.hasWorkspaceAdmin.mockResolvedValue(false);
     assignments.findActiveDuplicate.mockResolvedValue(null);
-    assignments.createInScope.mockImplementation(async (data) => ({
+    assignments.createInScope.mockImplementation(async (_scope, data) => ({
       ...assignment,
       ...data,
     }));
@@ -171,14 +171,15 @@ describe('ContractRoleAssignmentService', () => {
       'finance',
     );
 
-    expect(companyUsers.findActiveMember).toHaveBeenCalledWith('actor-user', {
-      companyId: 'company-1',
-    });
+    expect(companyUsers.findActiveMember).toHaveBeenCalledWith(
+      { companyId: 'company-1' },
+      'actor-user',
+    );
     expect(assignments.findActiveForParty).toHaveBeenCalledWith(
+      { companyId: 'company-1' },
       party.id,
       'contract-1',
       [EContractRole.FINANCE_OFFICER, EContractRole.FINANCE_DIRECTOR],
-      { companyId: 'company-1' },
     );
     expect(result[0]).toMatchObject({
       id: assignment.id,
@@ -251,15 +252,15 @@ describe('ContractRoleAssignmentService', () => {
     );
 
     expect(assignments.hasWorkspaceAdmin).toHaveBeenCalledWith(
+      { companyId: 'company-1' },
       actor.id,
       party.id,
       [EContractRole.FINANCE_OFFICER, EContractRole.FINANCE_DIRECTOR],
-      { companyId: 'company-1' },
       manager,
     );
     expect(assignments.createInScope).toHaveBeenCalledWith(
-      expect.objectContaining({ isWorkspaceAdmin: false }),
       { companyId: 'company-1' },
+      expect.objectContaining({ isWorkspaceAdmin: false }),
       manager,
     );
   });
@@ -369,6 +370,7 @@ describe('ContractRoleAssignmentService', () => {
     const activityRepository = repositories.get(ActivityLog)!;
 
     expect(assignments.createInScope).toHaveBeenCalledWith(
+      { companyId: 'company-1' },
       expect.objectContaining({
         contractPartyId: party.id,
         companyUserId: target.id,
@@ -376,7 +378,6 @@ describe('ContractRoleAssignmentService', () => {
         assignedById: actor.id,
         revokedAt: null,
       }),
-      { companyId: 'company-1' },
       manager,
     );
     expect(activityRepository.save).toHaveBeenCalledWith(
@@ -403,9 +404,9 @@ describe('ContractRoleAssignmentService', () => {
     const activityRepository = repositories.get(ActivityLog)!;
 
     expect(assignments.findByIdInPartyForUpdate).toHaveBeenCalledWith(
+      { companyId: 'company-1' },
       assignment.id,
       party.id,
-      { companyId: 'company-1' },
       manager,
     );
     expect(assignments.revokeInScope).toHaveBeenCalledWith(

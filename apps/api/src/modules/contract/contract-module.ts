@@ -22,6 +22,7 @@ import { IdentityModule } from '../identity/identity.module';
 import { ContractPartyRepository } from './repositories/contract-party.repository';
 import { ContractRepository } from './repositories/contract.repository';
 import { ContractRoleAssignmentRepository } from './repositories/contract-role-assignment.repository';
+import { ContractWorkspaceRepository } from './repositories/contract-workspace.repository';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { ContractRoleAssignmentRepository } from './repositories/contract-role-a
     ContractRepository,
     ContractPartyRepository,
     ContractRoleAssignmentRepository,
+    ContractWorkspaceRepository,
     ContractStatusHistoryRepository,
   ],
   exports: [

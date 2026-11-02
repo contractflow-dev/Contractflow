@@ -1,7 +1,7 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import type { AuthenticatedUser } from '../../identity/services/auth.service';
+import type { AuthenticatedUser } from '../../identity/interface/auth-context.interface';
 import { SiteOperationsService } from '../services/site-operations.service';
 
 @Controller('companies/:companyId/contracts/:contractId')

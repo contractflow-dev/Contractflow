@@ -67,9 +67,10 @@ export class ContractRoleAssignmentService {
     contractId: string,
     workspace: AssignableContractWorkspace,
   ): Promise<{ canManage: boolean; canGrantWorkspaceAdmin: boolean }> {
-    const membership = await this.companyUsers.findActiveMember(userId, {
-      companyId,
-    });
+    const membership = await this.companyUsers.findActiveMember(
+      { companyId },
+      userId,
+    );
     if (!membership) {
       throw new ForbiddenException('Active company membership is required.');
     }
@@ -84,10 +85,10 @@ export class ContractRoleAssignmentService {
     const canManage =
       canGrantWorkspaceAdmin ||
       (await this.assignments.hasWorkspaceAdmin(
+        { companyId },
         membership.id,
         party.id,
         WORKSPACE_ROLES[workspace],
-        { companyId },
       ));
     return { canManage, canGrantWorkspaceAdmin };
   }
@@ -136,10 +137,10 @@ export class ContractRoleAssignmentService {
     );
 
     const rows = await this.assignments.findActiveForParty(
+      { companyId },
       party.id,
       contractId,
       WORKSPACE_ROLES[workspace],
-      { companyId },
     );
     return rows.map(ContractRoleAssignmentResponseDto.fromEntity);
   }
@@ -188,10 +189,10 @@ export class ContractRoleAssignmentService {
       const scope: ICompanyScope = { companyId };
 
       const duplicate = await this.assignments.findActiveDuplicate(
+        scope,
         party.id,
         companyUserId,
         role,
-        scope,
         manager,
       );
       if (duplicate) {
@@ -202,6 +203,7 @@ export class ContractRoleAssignmentService {
 
       const now = new Date();
       const assignment = await this.assignments.createInScope(
+        scope,
         {
           contractPartyId: party.id,
           companyUserId,
@@ -212,7 +214,6 @@ export class ContractRoleAssignmentService {
           revokedAt: null,
           revokedById: null,
         },
-        scope,
         manager,
       );
 
@@ -253,9 +254,9 @@ export class ContractRoleAssignmentService {
         companyId,
       );
       const assignment = await this.assignments.findByIdInPartyForUpdate(
+        { companyId },
         assignmentId,
         party.id,
-        { companyId },
         manager,
       );
       if (!assignment) {
@@ -279,9 +280,9 @@ export class ContractRoleAssignmentService {
       if (
         assignment.isWorkspaceAdmin &&
         (await this.assignments.countActiveWorkspaceAdmins(
+          { companyId },
           party.id,
           WORKSPACE_ROLES[workspace],
-          { companyId },
           manager,
         )) <= 1
       ) {
@@ -353,9 +354,9 @@ export class ContractRoleAssignmentService {
       }
 
       const assignment = await this.assignments.findByIdInPartyForUpdate(
+        { companyId },
         assignmentId,
         party.id,
-        { companyId },
         manager,
       );
       if (!assignment || assignment.revokedAt) {
@@ -378,9 +379,9 @@ export class ContractRoleAssignmentService {
       if (
         !isWorkspaceAdmin &&
         (await this.assignments.countActiveWorkspaceAdmins(
+          { companyId },
           party.id,
           WORKSPACE_ROLES[workspace],
-          { companyId },
           manager,
         )) <= 1
       ) {
@@ -528,10 +529,10 @@ export class ContractRoleAssignmentService {
       if (
         member &&
         (await this.assignments.findActiveDuplicate(
+          { companyId },
           party.id,
           member.id,
           role,
-          { companyId },
           manager,
         ))
       ) {
@@ -806,10 +807,10 @@ export class ContractRoleAssignmentService {
       }
       if (
         await this.assignments.findActiveDuplicate(
+          { companyId: invitation.companyId },
           party.id,
           member.id,
           invitation.role,
-          { companyId: invitation.companyId },
           manager,
         )
       ) {
@@ -819,6 +820,7 @@ export class ContractRoleAssignmentService {
       }
 
       const assignment = await this.assignments.createInScope(
+        { companyId: invitation.companyId },
         {
           contractPartyId: party.id,
           companyUserId: member.id,
@@ -829,7 +831,6 @@ export class ContractRoleAssignmentService {
           revokedAt: null,
           revokedById: null,
         },
-        { companyId: invitation.companyId },
         manager,
       );
       await this.writeActivity(
@@ -890,7 +891,7 @@ export class ContractRoleAssignmentService {
       contractId,
       workspace,
     );
-    const membership = await this.companyUsers.findActiveMember(userId, scope);
+    const membership = await this.companyUsers.findActiveMember(scope, userId);
     if (!membership) {
       throw new ForbiddenException('Active company membership is required.');
     }
@@ -903,10 +904,10 @@ export class ContractRoleAssignmentService {
     if (
       membership.companyRole !== ECompanyRole.COMPANY_ADMIN &&
       !(await this.assignments.hasWorkspaceAdmin(
+        scope,
         membership.id,
         party.id,
         WORKSPACE_ROLES[workspace],
-        scope,
       ))
     ) {
       throw new ForbiddenException(
@@ -921,13 +922,11 @@ export class ContractRoleAssignmentService {
     contractId: string,
     companyId: string,
   ): Promise<ContractParty> {
-    const contract = await repository.manager
-      .getRepository(Contract)
-      .findOne({
-        where: { id: contractId, deletedAt: IsNull() },
-        lock: { mode: 'pessimistic_write' },
-        select: { id: true },
-      });
+    const contract = await repository.manager.getRepository(Contract).findOne({
+      where: { id: contractId, deletedAt: IsNull() },
+      lock: { mode: 'pessimistic_write' },
+      select: { id: true },
+    });
     if (!contract) {
       throw new NotFoundException('Contract was not found.');
     }
@@ -1011,10 +1010,10 @@ export class ContractRoleAssignmentService {
       !isCompanyAdmin &&
       workspace !== undefined &&
       (await this.assignments.hasWorkspaceAdmin(
+        { companyId },
         actor.id,
         contractPartyId,
         WORKSPACE_ROLES[workspace],
-        { companyId },
         manager,
       ));
     if (!isCompanyAdmin && !hasWorkspaceAdmin) {

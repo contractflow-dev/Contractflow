@@ -397,7 +397,7 @@ function DashboardContent({ companyId }: { companyId: string }) {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex items-start gap-3 rounded-lg bg-muted/60 p-4">
+                <div className="flex items-start gap-3 rounded-sm bg-muted/60 p-4">
                   <RiShieldUserLine className="mt-0.5 size-5 shrink-0 text-primary" />
                   <div>
                     <p className="text-sm font-medium">

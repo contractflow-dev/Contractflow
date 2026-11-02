@@ -8,11 +8,11 @@ import {
   IsTimeZone,
   IsOptional,
 } from 'class-validator';
-import { AppUser } from '../../../entities/app-user.entity';
+import type { RegisterRequest } from '@contractflow/contracts-schema';
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
 
-export class CreateAppUserRequestDto {
+export class CreateAppUserRequestDto implements RegisterRequest {
   @Transform(({ value }) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value,
   )

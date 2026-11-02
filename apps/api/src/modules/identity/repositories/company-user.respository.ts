@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import {
   ECompanyRole,
-  ECompanyStatus,
   ECompanyUserStatus,
 } from '@contractflow/contracts-schema';
 import { CompanyUser } from '../entities/company-user.entity';
@@ -47,6 +46,16 @@ export class CompanyUserRepository extends CompanyScopedRepository<
     return this.activeMembersQuery(scope)
       .andWhere('e.companyRole = :role', { role: ECompanyRole.COMPANY_ADMIN })
       .getCount();
+  }
+
+  async countActiveMembers(companyId: string): Promise<number> {
+    return this.repository.count({
+      where: {
+        companyId,
+        status: ECompanyUserStatus.ACTIVE,
+        leftAt: IsNull(),
+      },
+    });
   }
 
   /**

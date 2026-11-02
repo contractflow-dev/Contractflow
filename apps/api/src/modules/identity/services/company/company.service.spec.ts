@@ -10,11 +10,11 @@ import {
   EUserStatus,
 } from '@contractflow/contracts-schema';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AppUser } from '../entities/app-user.entity';
-import { Company } from '../entities/company.entity';
-import { CompanyUser } from '../entities/company-user.entity';
-import { ContractParty } from '../../contract/entities/contract-party.entity';
-import { CompanyInvitationRepository } from '../repositories/company-invitation.repository';
+import { AppUser } from '../../entities/app-user.entity';
+import { Company } from '../../entities/company.entity';
+import { CompanyUser } from '../../entities/company-user.entity';
+import { ContractParty } from '../../../contract/entities/contract-party.entity';
+import { CompanyInvitationRepository } from '../../repositories/company-invitation.repository';
 import { CompanyService } from './company.service';
 
 const companyData = {

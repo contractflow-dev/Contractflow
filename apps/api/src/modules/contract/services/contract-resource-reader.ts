@@ -5,10 +5,8 @@ import type {
   IContractScopedEntity,
 } from '../../../common/database/repositories/contract-scope.interface';
 import type { ContractScopedRepository } from '../../../common/database/repositories/contract-scoped.repository';
-import type {
-  ContractAccessService,
-  ContractWorkspace,
-} from './contract-access.service';
+import type { ContractAccessService } from './contract-access.service';
+import type { ContractWorkspace } from './contract-workspace';
 
 export interface PagedResult<T> {
   items: T[];
@@ -23,7 +21,10 @@ export class ContractResourceReader<
 > {
   constructor(
     private readonly access: ContractAccessService,
-    private readonly repository: ContractScopedRepository<Entity, IContractScope>,
+    private readonly repository: ContractScopedRepository<
+      Entity,
+      IContractScope
+    >,
     private readonly workspace: ContractWorkspace,
     private readonly label: string,
   ) {}
@@ -41,7 +42,10 @@ export class ContractResourceReader<
       this.workspace,
     );
     const { items, total } = await this.repository.findPage(scope, {
-      order: { createdAt: 'DESC', id: 'ASC' } as unknown as FindOptionsOrder<Entity>,
+      order: {
+        createdAt: 'DESC',
+        id: 'ASC',
+      } as unknown as FindOptionsOrder<Entity>,
       skip: (query.page - 1) * query.limit,
       take: query.limit,
     });
@@ -60,7 +64,7 @@ export class ContractResourceReader<
       contractId,
       this.workspace,
     );
-    const record = await this.repository.findById(id, scope);
+    const record = await this.repository.findById(scope, id);
     if (!record) {
       throw new NotFoundException(`${this.label} was not found`);
     }

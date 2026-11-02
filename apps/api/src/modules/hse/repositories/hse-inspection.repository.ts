@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, Repository } from 'typeorm';
+import type { FindOptionsOrder, FindOptionsWhere, Repository } from 'typeorm';
 import { ContractScopedRepository } from '../../../common/database/repositories/contract-scoped.repository';
 import { HseInspection } from '../entities/hse-inspection.entity';
 import { IContractScope } from '../../../common/database/repositories/contract-scope.interface';
@@ -22,7 +22,7 @@ export class HseInspectionRepository extends ContractScopedRepository<HseInspect
   findBySite(scope: IContractScope, contractSiteId: string) {
     return this.findAll(scope, {
       where: { contractSiteId } as FindOptionsWhere<HseInspection>,
-      order: { scheduledDate: 'DESC' } as any,
+      order: { scheduledDate: 'DESC' } satisfies FindOptionsOrder<HseInspection>,
     });
   }
 

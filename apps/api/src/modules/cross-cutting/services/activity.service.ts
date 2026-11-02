@@ -1,16 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ContractAccessService } from '../../contract/services/contract-access.service';
+import type { ActivityFeedItem } from '../interfaces/activity-feed-item.interface';
 import { ActivityLogRepository } from '../repositories/activity-log.repository';
-
-export interface ActivityFeedItem {
-  id: string;
-  action: string;
-  entityType: string;
-  entityId: string;
-  summary: string;
-  actorUserId: string;
-  occurredAt: Date;
-}
 
 /** Contract activity visible to the caller's own company only. */
 @Injectable()

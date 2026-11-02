@@ -89,7 +89,7 @@
 /* ── Light ─────────────────────────────────────────────────── */
 :root {
   color-scheme: light;
-  --radius: 0.625rem;
+  --radius: 0.125rem;
   --background: oklch(0.985 0.003 84.6); /* #fbfaf8 */
   --foreground: oklch(0.181 0.006 55.9); /* #14110f */
   --card: oklch(1 0 0); /* #ffffff */

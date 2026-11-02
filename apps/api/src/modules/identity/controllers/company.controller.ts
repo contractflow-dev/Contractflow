@@ -9,10 +9,10 @@ import {
   Query,
 } from '@nestjs/common';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import type { AuthenticatedUser } from '../services/auth.service';
+import type { AuthenticatedUser } from '../interface/auth-context.interface';
 import { CreateCompanyRequestDto } from '../dto/company/requests/create-company-request.dto';
-import { CompanyService } from '../services/company.service';
-import { CompanyAdminService } from '../services/company-admin.service';
+import { CompanyService } from '../services/company/company.service';
+import { CompanyAdminService } from '../services/company/company-admin.service';
 import { ListCompanyMembersRequestDto } from '../dto/company/requests/list-company-members-request.dto';
 import { InviteCompanyMemberRequestDto } from '../dto/company/requests/invite-company-member-request.dto';
 import { UpdateCompanyMemberRoleRequestDto } from '../dto/company/requests/update-company-member-role-request.dto';

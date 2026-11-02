@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, Repository } from 'typeorm';
+import type { FindOptionsOrder, FindOptionsWhere, Repository } from 'typeorm';
 import { ContractScopedRepository } from '../../../common/database/repositories/contract-scoped.repository';
 import { SiteDailyLog } from '../entities/site-daily-log.entity';
 import { IContractScope } from '../../../common/database/repositories/contract-scope.interface';
@@ -21,16 +21,15 @@ export class SiteDailyLogRepository extends ContractScopedRepository<SiteDailyLo
     logDate: Date,
     scope: IContractScope,
   ) {
-    return this.findOne(
-      { where: { contractSiteId, contractPartyId, logDate } },
-      scope,
-    );
+    return this.findOne(scope, {
+      where: { contractSiteId, contractPartyId, logDate },
+    });
   }
 
   findBySite(contractSiteId: string, scope: IContractScope) {
     return this.findAll(scope, {
       where: { contractSiteId } as FindOptionsWhere<SiteDailyLog>,
-      order: { logDate: 'DESC' } as any,
+      order: { logDate: 'DESC' } satisfies FindOptionsOrder<SiteDailyLog>,
     });
   }
 

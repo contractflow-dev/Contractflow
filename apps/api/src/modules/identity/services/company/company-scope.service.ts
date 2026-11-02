@@ -2,8 +2,8 @@ import { ForbiddenException, Injectable } from '@nestjs/common';
 import { ECompanyUserStatus } from '@contractflow/contracts-schema';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
-import type { ICompanyScope } from '../../../common/database/repositories/company-scope.interface';
-import { CompanyUser } from '../entities/company-user.entity';
+import type { ICompanyScope } from '../../../../common/database/repositories/company-scope.interface';
+import { CompanyUser } from '../../entities/company-user.entity';
 
 @Injectable()
 export class CompanyScopeService {

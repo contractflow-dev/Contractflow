@@ -1,8 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import type { DeepPartial, FindOptionsWhere, Repository } from 'typeorm';
-import { ContractScopedRepository } from '../../../common/database/repositories/contract-scoped.repository';
-import type { IContractCompanyScope } from '../../../common/database/repositories/contract-scope.interface';
+import type {
+  DeepPartial,
+  FindOptionsOrder,
+  FindOptionsWhere,
+  Repository,
+} from 'typeorm';
 import { Document } from '../entities/document.entity';
 import {
   CompanyScopedRepository,
@@ -48,7 +51,7 @@ export class DocumentRepository extends CompanyScopedRepository<Document> {
   findByContract(scope: ICompanyScope, contractId: string) {
     return this.findAll(scope, {
       where: { contractId } as FindOptionsWhere<Document>,
-      order: { createdAt: 'DESC' } as any,
+      order: { createdAt: 'DESC' } satisfies FindOptionsOrder<Document>,
     });
   }
 

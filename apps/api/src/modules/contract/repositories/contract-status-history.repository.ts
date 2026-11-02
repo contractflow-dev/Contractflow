@@ -1,6 +1,6 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import type { FindOptionsOrder, Repository } from 'typeorm';
 import type { IContractScope } from '../../../common/database/repositories/contract-scope.interface';
 import { ContractStatusHistory } from '../entities/contract-status-history.entity';
 import { AppendOnlyContractScopedRepository } from '../../../common/database/repositories/appendonly-contract-scoped.repository';
@@ -27,11 +27,15 @@ export class ContractStatusHistoryRepository extends AppendOnlyContractScopedRep
   }
 
   findTimeline(scope: IContractScope) {
-    return this.findAll(scope, { order: { changedAt: 'ASC' } as any });
+    return this.findAll(scope, {
+      order: { changedAt: 'ASC' } satisfies FindOptionsOrder<ContractStatusHistory>,
+    });
   }
 
   findLatest(scope: IContractScope) {
-    return this.findOne(scope, { order: { changedAt: 'DESC' } as any });
+    return this.findOne(scope, {
+      order: { changedAt: 'DESC' } satisfies FindOptionsOrder<ContractStatusHistory>,
+    });
   }
 
   async searchPage(

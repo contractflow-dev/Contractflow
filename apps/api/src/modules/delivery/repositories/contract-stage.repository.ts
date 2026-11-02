@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, Repository } from 'typeorm';
+import type { FindOptionsOrder, FindOptionsWhere, Repository } from 'typeorm';
 import { ContractScopedRepository } from '../../../common/database/repositories/contract-scoped.repository';
 import { IContractScope } from '../../../common/database/repositories/contract-scope.interface';
 import { ContractStage } from '../entities/contract-stage.entity';
@@ -16,7 +16,9 @@ export class ContractStageRepository extends ContractScopedRepository<ContractSt
   }
 
   findOrdered(scope: Scope) {
-    return this.findAll(scope, { order: { sequence: 'ASC' } as any });
+    return this.findAll(scope, {
+      order: { sequence: 'ASC' } satisfies FindOptionsOrder<ContractStage>,
+    });
   }
 
   findByStatus(scope: Scope, status: ContractStage['status']) {

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import migrationDataSource from './data-source';
 import { registeredMigrations } from './registered-migrations';
 import { TYPEORM_EXECUTION_SAFETY } from './typeorm-execution-options';
+import { createRuntimeDatabaseOptions } from './runtime-database-options';
 
 class TestableMigrationExecutor extends MigrationExecutor {
   orderedMigrationNames(): string[] {
@@ -41,11 +42,35 @@ describe('database migration configuration', () => {
     });
   });
 
-  it('uses the shared safety settings in the Nest runtime configuration', () => {
+  it('uses the runtime database-options helper in the Nest configuration', () => {
     const runtimeConfiguration = readFileSync(
       new URL('../../app.module.ts', import.meta.url),
       'utf8',
     );
-    expect(runtimeConfiguration).toContain('...TYPEORM_EXECUTION_SAFETY');
+    expect(runtimeConfiguration).toContain('createRuntimeDatabaseOptions');
+    expect(runtimeConfiguration).not.toContain('DB_SYNC');
   });
+
+  it('disables schema synchronization in production even when DB_SYNC is true', () => {
+    const options = createRuntimeDatabaseOptions({
+      nodeEnv: 'production',
+      databaseUrl: 'postgres://localhost/contractflow',
+    });
+
+    expect(options.synchronize).toBe(false);
+    expect(options.migrationsRun).toBe(false);
+  });
+
+  it.each(['development', 'test'])(
+    'keeps schema synchronization disabled in %s',
+    (nodeEnv) => {
+      const options = createRuntimeDatabaseOptions({
+        nodeEnv,
+        databaseUrl: 'postgres://localhost/contractflow',
+      });
+
+      expect(options.synchronize).toBe(false);
+      expect(options.migrationsRun).toBe(false);
+    },
+  );
 });

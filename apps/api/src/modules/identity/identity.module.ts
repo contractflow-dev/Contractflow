@@ -12,15 +12,18 @@ import { AuthController } from './controllers/auth.controller';
 import { CompanyController } from './controllers/company.controller';
 import { CompanyInvitationController } from './controllers/company-invitation.controller';
 import { AppUserRepository } from './repositories/app-user.repository';
-import { AppUserService } from './services/app-user.service';
-import { AuthService } from './services/auth.service';
-import { CompanyService } from './services/company.service';
-import { CompanyAdminService } from './services/company-admin.service';
+import { EmailVerificationTokenRepository } from './repositories/email-verification-token.repository';
+import { AppUserService } from './services/app-user/app-user.service';
+import { AuthService } from './services/auth/auth.service';
+import { PasswordService } from './services/auth/password.service';
+import { SessionService } from './services/auth/session.service';
+import { CompanyService } from './services/company/company.service';
+import { CompanyAdminService } from './services/company/company-admin.service';
 import { SessionAuthGuard } from '../../common/guards/session-auth.guard';
 import { MailService } from '../mail/mail.service';
 import { CompanyRepository } from './repositories/company.repository';
 import { CompanyInvitationRepository } from './repositories/company-invitation.repository';
-import { CompanyScopeService } from './services/company-scope.service';
+import { CompanyScopeService } from './services/company/company-scope.service';
 import { CompanyUserRepository } from './repositories/company-user.respository';
 import { CompanyAuditLog } from './entities/company-audit-log.entity';
 import { CompanyAuditLogRepository } from './repositories/company-audit-log.repository';
@@ -49,8 +52,11 @@ import { ContractParty } from '../contract/entities/contract-party.entity';
   ],
   providers: [
     AppUserRepository,
+    EmailVerificationTokenRepository,
     AppUserService,
     AuthService,
+    PasswordService,
+    SessionService,
     CompanyService,
     CompanyAdminService,
     CompanyUserRepository,
