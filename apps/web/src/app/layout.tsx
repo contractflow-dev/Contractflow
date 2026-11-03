@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { IBM_Plex_Sans, Outfit, Geist_Mono } from "next/font/google";
+import { StoreProvider } from "@/store/provider";
+import { ThemeProvider } from "@/components/theme/theme-provider";
 
 const ibmPlexSans = IBM_Plex_Sans({
   subsets: ["latin"],
@@ -34,7 +36,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${ibmPlexSans.variable} ${outfit.variable} ${geistMono.variable}`}>
-      <body>{children}</body>
+      <body>
+        <StoreProvider>
+          <ThemeProvider>{children}</ThemeProvider>
+        </StoreProvider>
+      </body>
     </html>
   );
 }
