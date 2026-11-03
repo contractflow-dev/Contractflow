@@ -14,6 +14,10 @@ import {
 import { useGetCurrentUserQuery } from "@/services/authApi";
 
 export function RequireAuth({ children }: { children: ReactNode }) {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
   const { data: user, error, isFetching, refetch } = useGetCurrentUserQuery(
     undefined,
     { refetchOnMountOrArgChange: true },
