@@ -25,6 +25,12 @@ import { cn } from "@/lib/utils";
 
 export function RequirePlatformAdmin({ children }: { children: ReactNode }) {
   const router = useRouter();
+
+  // FIX: Prevent build crash when prerendering
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
   const { data: user, error, isFetching, refetch } = useGetCurrentUserQuery(
     undefined,
     { refetchOnMountOrArgChange: true },
@@ -96,7 +102,6 @@ export function RequirePlatformAdmin({ children }: { children: ReactNode }) {
     );
   }
 
-  // Deny access if user is not a platform administrator
   if (!user?.isPlatformAdmin) {
     return (
       <main className="grid min-h-svh place-items-center p-4 sm:p-6 bg-background">
@@ -116,7 +121,6 @@ export function RequirePlatformAdmin({ children }: { children: ReactNode }) {
               </div>
             </div>
           </CardHeader>
-
           <CardContent>
             <div className="space-y-3 rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
               <p>
@@ -127,7 +131,6 @@ export function RequirePlatformAdmin({ children }: { children: ReactNode }) {
               </p>
             </div>
           </CardContent>
-
           <CardFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
             <SignOutAction />
             <Link
