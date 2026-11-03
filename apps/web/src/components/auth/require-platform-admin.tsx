@@ -24,12 +24,11 @@ import {
 import { cn } from "@/lib/utils";
 
 export function RequirePlatformAdmin({ children }: { children: ReactNode }) {
-  const router = useRouter();
-
-  // FIX: Prevent build crash when prerendering
   if (typeof window === 'undefined') {
     return null;
   }
+
+  const router = useRouter();
 
   const { data: user, error, isFetching, refetch } = useGetCurrentUserQuery(
     undefined,
