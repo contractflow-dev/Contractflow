@@ -7,72 +7,74 @@ export class PasswordService {
   async hash(password: string): Promise<string> {
     return argon2.hash(password, { type: argon2.argon2id });
   }
-
-  // auth.service.ts calls verify(), but we also keep compare() for compatibility
   async verify(password: string, hash: string): Promise<boolean> {
     return this.compare(password, hash);
   }
-
   async compare(password: string, hash: string): Promise<boolean> {
     if (!hash) return false;
     try {
-      // New: argon2id / argon2i / argon2d
       if (hash.startsWith('$argon2')) {
         return await argon2.verify(hash, password);
       }
-
-      // Old: scrypt $scrypt$n=...$salt$hash or $scrypt$salt$hash
       if (hash.startsWith('$scrypt$')) {
         return await this.verifyScrypt(password, hash);
       }
-
-      // If we still encounter bcrypt hashes from very old users,
-      // try bcryptjs if installed, otherwise fail safely
       if (hash.startsWith('$2a$') || hash.startsWith('$2b$') || hash.startsWith('$2y$')) {
         try {
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
-          const bcrypt = require('bcryptjs') as any;
+          const bcrypt = require('bcryptjs');
           return await bcrypt.compare(password, hash);
-        } catch {
-          // bcryptjs not installed - cannot verify this legacy hash
-          return false;
-        }
+        } catch { return false; }
       }
+      return false;
+    } catch { return false; }
+  }
 
-      return false;
-    } catch {
-      return false;
-    }
+  private decodeMaybe(s: string): Buffer {
+    s = s.trim();
+    // try base64
+    try { const b = Buffer.from(s, 'base64'); if (b.length > 8) return b; } catch {}
+    // try base64url
+    try { const b = Buffer.from(s.replace(/-/g,'+').replace(/_/g,'/'), 'base64'); if (b.length > 8) return b; } catch {}
+    // try hex
+    try { if (/^[0-9a-fA-F]+$/.test(s)) { const b = Buffer.from(s, 'hex'); if (b.length > 8) return b; } } catch {}
+    return Buffer.from(s, 'base64');
   }
 
   private async verifyScrypt(password: string, stored: string): Promise<boolean> {
-    const parts = stored.split('$').filter(Boolean);
+    // Supports:
+    // $scrypt$n=16384,r=8,p=1$salt$hash
+    // $scrypt$16384$8$1$salt$hash
+    // $scrypt$salt$hash (defaults n=16384,r=8,p=1)
+    const parts = stored.split('$').filter(Boolean); // ['scrypt', ...]
     let n = 16384, r = 8, p = 1;
-    let saltB64: string, hashB64: string;
+    let saltStr: string, hashStr: string;
 
-    if (parts[1]?.includes('n=')) {
-      const params = parts[1].split(',');
-      n = parseInt(params.find(v => v.startsWith('n='))!.split('=')[1], 10);
-      r = parseInt(params.find(v => v.startsWith('r='))!.split('=')[1], 10);
-      p = parseInt(params.find(v => v.startsWith('p='))!.split('=')[1], 10);
-      saltB64 = parts[2];
-      hashB64 = parts[3];
+    if (parts.length === 5 && !parts[1].includes('n=')) {
+      // $scrypt$16384$8$1$salt$hash
+      n = parseInt(parts[1],10); r = parseInt(parts[2],10); p = parseInt(parts[3],10);
+      saltStr = parts[4]; hashStr = parts[5] || parts[4]; // safety
+      if (parts.length >= 6) { saltStr = parts[4]; hashStr = parts[5]; }
+    } else if (parts[1]?.includes('n=')) {
+      const map: any = {};
+      parts[1].split(',').forEach(kv => { const [k,v]=kv.split('='); map[k]=v; });
+      n = parseInt(map.n,10) || n; r = parseInt(map.r,10) || r; p = parseInt(map.p,10) || p;
+      saltStr = parts[2]; hashStr = parts[3];
     } else {
-      saltB64 = parts[1];
-      hashB64 = parts[2];
+      // $scrypt$salt$hash
+      saltStr = parts[1]; hashStr = parts[2];
     }
 
-    const salt = Buffer.from(saltB64, 'base64');
-    const expected = Buffer.from(hashB64, 'base64');
+    if (!saltStr || !hashStr) return false;
 
-    return new Promise((resolve, reject) => {
-      crypto.scrypt(password, salt, expected.length, { N: n, r, p, maxmem: 32 * 1024 * 1024 }, (err, derived) => {
-        if (err) return reject(err);
-        try {
-          resolve(crypto.timingSafeEqual(derived, expected));
-        } catch {
-          resolve(false);
-        }
+    const salt = this.decodeMaybe(saltStr);
+    const expected = this.decodeMaybe(hashStr);
+    if (salt.length < 8 || expected.length < 16) return false;
+
+    return new Promise((resolve) => {
+      crypto.scrypt(password, salt, expected.length, { N: n, r, p, maxmem: 64 * 1024 * 1024 }, (err, derived) => {
+        if (err) { resolve(false); return; }
+        try { resolve(derived.length === expected.length && crypto.timingSafeEqual(derived, expected)); }
+        catch { resolve(false); }
       });
     });
   }
