@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, Column } from 'typeorm';
 import { BaseCustomEntity } from '../../cross-cutting/entities/base-custom.entity';
 import { ICompanyEntity } from '../interface/company.interface';
 import {

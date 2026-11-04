@@ -1,10 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from "typeorm";
+import { Entity, Column, ManyToOne, JoinColumn } from "typeorm";
 import { Contract } from "../../contract/entities/contract.entity";
 import { ContractParty } from "../../contract/entities/contract-party.entity";
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IInvoiceEntity } from "../interface/invoice.interface";
-import { EInvoiceStatus, EInvoiceType } from "@contractflow/contracts-schema";
+import { EInvoiceStatus, EInvoiceType, ECurrencyCode } from "@contractflow/contracts-schema";
 
 
 
@@ -51,7 +51,7 @@ export class Invoice extends BaseCustomEntity implements IInvoiceEntity{
     periodEnd!: Date
 
     @Column({name: "currency_code", type: "char", length: 3})
-    currencyCode!: string
+    currencyCode!: ECurrencyCode
 
     @Column({name: "gross_amount_minor", type: "bigint"})
     grossAmountMinor!: number

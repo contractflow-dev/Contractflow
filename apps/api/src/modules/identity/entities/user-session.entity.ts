@@ -1,7 +1,6 @@
 // @ts-ignore - TypeORM is expected to be installed in the project dependencies.
 import {
   Entity,
-  PrimaryGeneratedColumn,
   Column,
   ManyToOne,
   JoinColumn,

@@ -1,10 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from "typeorm";
+import { Entity, Column, ManyToOne, JoinColumn } from "typeorm";
 import { Contract } from "../../contract/entities/contract.entity";
 import { ContractStage } from "./contract-stage.entity";
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IMilestoneEntity } from "../interface/milestone.interface";
-import { EMilestoneStatus } from "@contractflow/contracts-schema";
+import { EMilestoneStatus, ECurrencyCode } from "@contractflow/contracts-schema";
 
 
 @Entity("milestone")
@@ -47,7 +47,7 @@ export class Milestone extends BaseCustomEntity implements IMilestoneEntity{
     amountMinor!: number
 
     @Column({name: "currency_code", type: "char", length: 3})
-    currencyCode!: string
+    currencyCode!: ECurrencyCode
 
     @Column({name: "due_date", type: "date"})
     dueDate!: Date

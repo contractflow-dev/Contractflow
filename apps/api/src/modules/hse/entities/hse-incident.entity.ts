@@ -1,10 +1,10 @@
-import {Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, JoinColumn} from "typeorm";
+import {Entity, Column, ManyToOne, JoinColumn} from "typeorm";
 import { Contract } from "../../contract/entities/contract.entity";
 import { ContractSite } from "../../site-operations/entities/contract-site.entity";
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IHseIncidentEntity } from "../interface/hse-incident.interface";
-import { EHseIncidentStatus, EHseIncidentType, EHseSeverity } from "@contractflow/contracts-schema";
+import { EHseIncidentStatus, EHseIncidentType, EHseSeverity, ECurrencyCode } from "@contractflow/contracts-schema";
 
 
 
@@ -60,7 +60,7 @@ export class HseIncident extends BaseCustomEntity implements IHseIncidentEntity{
     estimatedCostMinor!: number
 
     @Column({name: "currency_code", type:"char", length:3})
-    currencyCode!: string
+    currencyCode!: ECurrencyCode
 
     @Column({name: "is_notifiable", type:"boolean"})
     isNotifiable!: boolean

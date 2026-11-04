@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
@@ -180,7 +180,7 @@ export function OnboardingView() {
     register,
     handleSubmit,
     setValue,
-    watch,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
@@ -202,7 +202,11 @@ export function OnboardingView() {
     },
   });
 
-  const countryCode = watch("countryCode");
+  const countryCode = useWatch({ control, name: "countryCode" });
+  const defaultCurrencyCode = useWatch({
+    control,
+    name: "defaultCurrencyCode",
+  });
 
   useEffect(() => {
     if (!countryCode) {
@@ -541,7 +545,7 @@ export function OnboardingView() {
                 id="defaultCurrencyCode"
                 className="w-full"
                 aria-invalid={!!errors.defaultCurrencyCode}
-                value={watch("defaultCurrencyCode")}
+                value={defaultCurrencyCode}
                 onChange={(event) =>
                   setValue("defaultCurrencyCode", event.target.value, {
                     shouldValidate: true,

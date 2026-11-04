@@ -32,6 +32,8 @@ import { getApiErrorMessage } from "@/lib/apiError";
 import { CreateContractForm } from "./contract-lifecycle-management";
 import { useRestoreContractMutation } from "@/services/contractApi";
 import { ContractRoleAssignmentManagement } from "./contract-role-assignment-management";
+import { ContractSignatoryManagement } from "./contract-signatory-management";
+import { ContractSiteManagement } from "./contract-site-management";
 import { useContractDetails } from "../_hooks/use-contract-details";
 import {
   contractSortOptions,
@@ -372,6 +374,17 @@ export function ContractDetail({
             {contract.description}
           </p>
         ) : null}
+        {contract.parentContractId ? (
+          <p className="mt-3 text-sm text-muted-foreground">
+            Subcontract of{" "}
+            <Link
+              className="text-primary underline-offset-4 hover:underline"
+              href={`/dashboards/contracts/${encodeURIComponent(contract.parentContractId)}`}
+            >
+              the parent contract
+            </Link>
+          </p>
+        ) : null}
       </div>
 
       <Card>
@@ -403,6 +416,8 @@ export function ContractDetail({
         contractId={contractId}
       />
       <ContractLifecycleManagement companyId={companyId} contract={contract} />
+      <ContractSignatoryManagement companyId={companyId} contract={contract} />
+      <ContractSiteManagement companyId={companyId} contract={contract} />
 
       <Card>
         <CardHeader>

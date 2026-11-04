@@ -1,4 +1,4 @@
-import {Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, JoinColumn, OneToOne} from "typeorm";
+import {Entity, Column, ManyToOne, JoinColumn, OneToOne} from "typeorm";
 import { HseIncident } from "./hse-incident.entity";
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";

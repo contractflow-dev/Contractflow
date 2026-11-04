@@ -1,4 +1,4 @@
-import { EHseIncidentStatus, EHseIncidentType, EHseSeverity } from "@contractflow/contracts-schema"
+import { EHseIncidentStatus, EHseIncidentType, EHseSeverity, ECurrencyCode } from "@contractflow/contracts-schema"
 
 export interface IHseIncidentEntity {
     contractId : string
@@ -15,7 +15,7 @@ export interface IHseIncidentEntity {
     investigationSummary : string
     lostTimeDays : number
     estimatedCostMinor : number
-    currencyCode : string
+    currencyCode : ECurrencyCode
     isNotifiable : boolean
     authorityNotifiedAt : Date
     reportedAt : Date

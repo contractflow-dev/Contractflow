@@ -1,4 +1,4 @@
-import { EComplianceRecordStatus } from '@contractflow/contracts-schema';
+import { EComplianceRecordStatus, ECurrencyCode } from '@contractflow/contracts-schema';
 
 export interface IComplianceRecordEntity {
   contractId: string;
@@ -9,7 +9,7 @@ export interface IComplianceRecordEntity {
   issueDate: Date;
   expiryDate: Date;
   coveredAmountMinor: number;
-  currencyCode: string;
+  currencyCode: ECurrencyCode;
   status: EComplianceRecordStatus;
   verifiedAt: Date;
   verifiedById: string;

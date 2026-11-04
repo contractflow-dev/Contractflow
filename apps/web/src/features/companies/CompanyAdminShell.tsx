@@ -278,33 +278,41 @@ export function CompanyAdminShell({
     : "Account";
   const initials =
     `${user?.firstName?.[0] ?? ""}${user?.lastName?.[0] ?? ""}`.toUpperCase();
-  const linkClass = (active: boolean) =>
+  const sidebarLinkClass = (active: boolean) =>
     cn(
-      "flex shrink-0 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium",
+      "flex items-center gap-3 rounded-md border-l-2 px-3 py-2.5 text-sm font-medium",
       active
-        ? "bg-primary/10 text-primary"
-        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+        ? "border-sidebar-primary bg-sidebar-accent text-sidebar-accent-foreground"
+        : "border-transparent text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
     );
 
   return (
-    <div className="min-h-svh bg-muted/30">
-      <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r bg-card md:flex">
-        <Link
-          href="/dashboards"
-          className="flex h-16 items-center gap-3 border-b px-5"
-        >
-          <span className="grid size-9 place-items-center rounded-lg bg-primary text-primary-foreground">
-            <RiBuilding4Line className="size-5" />
-          </span>
-          <span className="min-w-0">
-            <span className="block font-heading text-sm font-semibold">
+    <div className="min-h-svh bg-background">
+      <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
+        <div className="space-y-3 border-b border-sidebar-border px-5 py-4">
+          <Link href="/dashboards" className="flex items-center gap-3">
+            <span className="grid size-9 place-items-center rounded-lg bg-primary text-primary-foreground">
+              <RiBuilding4Line className="size-5" />
+            </span>
+            <span className="font-heading text-lg font-semibold text-sidebar-accent-foreground">
               ContractFlow
             </span>
-            <span className="block truncate text-xs text-muted-foreground">
-              {access.company.name}
-            </span>
-          </span>
-        </Link>
+          </Link>
+          {availableCompanies.length > 1 && (
+            <NativeSelect
+              aria-label="Select company"
+              className="max-w-40 sm:max-w-56"
+              value={access.company.id}
+              onChange={(event) => selectCompany(event.target.value)}
+            >
+              {availableCompanies.map(({ company }) => (
+                <NativeSelectOption key={company.id} value={company.id}>
+                  {company.name}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          )}
+        </div>
         <nav aria-label="Company dashboard" className="space-y-1 p-3">
           {navigation.map(({ href, label, icon: Icon }) => {
             const active = isActiveRoute(pathname, href);
@@ -313,7 +321,7 @@ export function CompanyAdminShell({
                 key={href}
                 href={href}
                 aria-current={active ? "page" : undefined}
-                className={linkClass(active)}
+                className={sidebarLinkClass(active)}
               >
                 <Icon className="size-4" />
                 {label}
@@ -321,7 +329,7 @@ export function CompanyAdminShell({
             );
           })}
         </nav>
-        <div className="mt-auto border-t p-4 text-xs text-muted-foreground">
+        <div className="mt-auto border-t border-sidebar-border p-4 text-xs text-sidebar-foreground/60">
           Contract access is based on active company membership and contract
           participation.
         </div>
@@ -337,20 +345,6 @@ export function CompanyAdminShell({
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {availableCompanies.length > 1 && (
-                <NativeSelect
-                  aria-label="Select company"
-                  className="max-w-40 sm:max-w-56"
-                  value={access.company.id}
-                  onChange={(event) => selectCompany(event.target.value)}
-                >
-                  {availableCompanies.map(({ company }) => (
-                    <NativeSelectOption key={company.id} value={company.id}>
-                      {company.name}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              )}
               <ThemeToggle />
               <DropdownMenu>
                 <DropdownMenuTrigger

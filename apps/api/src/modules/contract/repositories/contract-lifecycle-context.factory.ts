@@ -15,6 +15,7 @@ import { ContractRoleAssignment } from '../entities/contract-role-assignment.ent
 import { ContractRoleInvitation } from '../entities/contract-role-invitation.entity';
 import { ContractStatusHistory } from '../entities/contract-status-history.entity';
 import { ContractWorkspaceEntity } from '../entities/contract-workspace.entity';
+import { ContractSite } from '../../site-operations/entities/contract-site.entity';
 import type {
   IActiveAssignmentCriteria,
   IContractLifecycleContext,
@@ -36,6 +37,7 @@ export class ContractLifecycleContextFactory implements ITransactionContextFacto
     const invitations = manager.getRepository(ContractPartyInvitation);
     const history = manager.getRepository(ContractStatusHistory);
     const activity = manager.getRepository(ActivityLog);
+    const sites = manager.getRepository(ContractSite);
 
     const activeMembership = {
       status: ECompanyUserStatus.ACTIVE,
@@ -141,6 +143,12 @@ export class ContractLifecycleContextFactory implements ITransactionContextFacto
             relations: { contract: true, company: true },
           }) as Promise<IContractPartyWithRelations | null>,
         findById: (partyId) => parties.findOne({ where: { id: partyId } }),
+        findForUpdate: (contractId, companyId) =>
+          parties.findOne({
+            where: { contractId, companyId },
+            lock: { mode: 'pessimistic_write' },
+          }),
+        save: (party) => parties.save(party),
         create: async (data) =>
           parties.save(
             parties.create({
@@ -291,6 +299,22 @@ export class ContractLifecycleContextFactory implements ITransactionContextFacto
         },
         create: (data) => invitations.save(invitations.create(data)),
         save: (invitation) => invitations.save(invitation),
+      },
+      sites: {
+        listByContract: (contractId) =>
+          sites.find({
+            where: { contractId },
+            order: { name: 'ASC', id: 'ASC' },
+          }),
+        findForUpdate: (contractId, siteId) =>
+          sites.findOne({
+            where: { id: siteId, contractId },
+            lock: { mode: 'pessimistic_write' },
+          }),
+        findByCode: (contractId, siteCode) =>
+          sites.findOne({ where: { contractId, siteCode } }),
+        create: (data) => sites.save(sites.create(data)),
+        save: (site) => sites.save(site),
       },
       statusHistory: {
         record: async (data) => {

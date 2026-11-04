@@ -1,4 +1,4 @@
-import {Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToOne, OneToMany, JoinColumn} from "typeorm";
+import {Entity, Column, ManyToOne, JoinColumn} from "typeorm";
 import { Contract } from "../../contract/entities/contract.entity";
 import { ContractSite } from "../../site-operations/entities/contract-site.entity";
 import { CompanyUser } from "../../identity/entities/company-user.entity";

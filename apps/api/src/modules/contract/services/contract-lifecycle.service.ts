@@ -15,12 +15,19 @@ import {
   EPartyType,
   EToStatus,
 } from '@contractflow/contracts-schema';
+import type { ContractSite as ContractSiteResponse } from '@contractflow/contracts-schema';
 import type {
   ContractPartyInvitationPreviewResponse,
   ContractPartyInvitationResponse,
   CreateContractPartyInvitationRequestDto,
 } from '../dto/contract-party-invitation.dto';
 import type { CreateContractRequestDto } from '../dto/create-contract-request.dto';
+import type { RecordContractSignatoryRequestDto } from '../dto/record-contract-signatory-request.dto';
+import type {
+  CreateContractSiteRequestDto,
+  UpdateContractSiteRequestDto,
+} from '../dto/contract-site-request.dto';
+import type { ContractSite } from '../../site-operations/entities/contract-site.entity';
 import type { UpdateContractRequestDto } from '../dto/update-contract-request.dto';
 import type { UpdateContractWorkspacesRequestDto } from '../dto/update-contract-workspaces-request.dto';
 import type {
@@ -43,6 +50,17 @@ import {
 } from './contract-workspace';
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+export type RecordedContractSignatory = Pick<
+  ContractParty,
+  | 'id'
+  | 'companyId'
+  | 'partyType'
+  | 'signatoryFirstName'
+  | 'signatoryLastName'
+  | 'signatoryTitle'
+  | 'signedAt'
+>;
 
 const transitionMap: Record<
   ContractTransition,
@@ -521,6 +539,174 @@ export class ContractLifecycleService {
     });
   }
 
+  /**
+   * Contract sites are contract setup data: the creating company's Company
+   * Administrator manages them, separately from project-workspace reads.
+   */
+  async listSites(
+    userId: string,
+    companyId: string,
+    contractId: string,
+  ): Promise<ContractSiteResponse[]> {
+    return this.unitOfWork.execute(async (context) => {
+      await this.requireOwnedContract(context, userId, companyId, contractId);
+      const sites = await context.sites.listByContract(contractId);
+      return sites.map(toSiteResponse);
+    });
+  }
+
+  async createSite(
+    userId: string,
+    companyId: string,
+    contractId: string,
+    dto: CreateContractSiteRequestDto,
+  ): Promise<ContractSiteResponse> {
+    return this.unitOfWork.execute(async (context) => {
+      const { contract, actor } = await this.requireOwnedContract(
+        context,
+        userId,
+        companyId,
+        contractId,
+      );
+      await this.requireUniqueSiteCode(context, contractId, dto.siteCode);
+      const site = await context.sites.create({
+        contractId,
+        name: dto.name.trim(),
+        siteCode: dto.siteCode.trim(),
+        addressLine1: dto.addressLine1.trim(),
+        city: dto.city.trim(),
+        stateRegion: dto.stateRegion.trim(),
+        countryCode: dto.countryCode,
+        latitudeE6: dto.latitudeE6,
+        longitudeE6: dto.longitudeE6,
+        status: dto.status,
+      });
+      await this.writeActivity(
+        context,
+        contract,
+        actor,
+        'contract.site_created',
+        `Added site ${site.siteCode} to ${contract.referenceNumber}.`,
+        { siteId: site.id, siteCode: site.siteCode },
+        new Date(),
+      );
+      return toSiteResponse(site);
+    });
+  }
+
+  async updateSite(
+    userId: string,
+    companyId: string,
+    contractId: string,
+    siteId: string,
+    dto: UpdateContractSiteRequestDto,
+  ): Promise<ContractSiteResponse> {
+    const fields = Object.keys(dto) as Array<keyof UpdateContractSiteRequestDto>;
+    if (fields.length === 0) {
+      throw new BadRequestException('At least one site field is required.');
+    }
+    return this.unitOfWork.execute(async (context) => {
+      const { contract, actor } = await this.requireOwnedContract(
+        context,
+        userId,
+        companyId,
+        contractId,
+      );
+      const site = await context.sites.findForUpdate(contractId, siteId);
+      if (!site) {
+        throw new NotFoundException('Site was not found.');
+      }
+      if (dto.siteCode !== undefined && dto.siteCode !== site.siteCode) {
+        await this.requireUniqueSiteCode(context, contractId, dto.siteCode);
+      }
+
+      if (dto.name !== undefined) site.name = dto.name.trim();
+      if (dto.siteCode !== undefined) site.siteCode = dto.siteCode.trim();
+      if (dto.addressLine1 !== undefined) {
+        site.addressLine1 = dto.addressLine1.trim();
+      }
+      if (dto.city !== undefined) site.city = dto.city.trim();
+      if (dto.stateRegion !== undefined) {
+        site.stateRegion = dto.stateRegion.trim();
+      }
+      if (dto.countryCode !== undefined) site.countryCode = dto.countryCode;
+      if (dto.latitudeE6 !== undefined) site.latitudeE6 = dto.latitudeE6;
+      if (dto.longitudeE6 !== undefined) site.longitudeE6 = dto.longitudeE6;
+      if (dto.status !== undefined) site.status = dto.status;
+
+      const saved = await context.sites.save(site);
+      await this.writeActivity(
+        context,
+        contract,
+        actor,
+        'contract.site_updated',
+        `Updated site ${saved.siteCode} on ${contract.referenceNumber}.`,
+        { siteId: saved.id, fields },
+        new Date(),
+      );
+      return toSiteResponse(saved);
+    });
+  }
+
+  async getSignatory(
+    userId: string,
+    companyId: string,
+    contractId: string,
+  ): Promise<RecordedContractSignatory> {
+    return this.unitOfWork.execute(async (context) => {
+      await this.lockActiveContract(context, contractId);
+      await this.requireCompanyAdmin(context, userId, companyId);
+      const party = await context.parties.find(contractId, companyId);
+      if (!party) {
+        throw new NotFoundException('Contract was not found.');
+      }
+      return toSignatoryResponse(party);
+    });
+  }
+
+  /**
+   * Records the acting company's own signatory on its CONTRACT_PARTY row.
+   * Any party's Company Administrator may do this; it never touches another
+   * party's signature.
+   */
+  async recordSignatory(
+    userId: string,
+    companyId: string,
+    contractId: string,
+    dto: RecordContractSignatoryRequestDto,
+  ): Promise<RecordedContractSignatory> {
+    const signedAt = new Date(dto.signedAt);
+    if (Number.isNaN(signedAt.getTime()) || signedAt > new Date()) {
+      throw new BadRequestException(
+        'The signing date must be a valid date that is not in the future.',
+      );
+    }
+    return this.unitOfWork.execute(async (context) => {
+      const contract = await this.lockActiveContract(context, contractId);
+      const actor = await this.requireCompanyAdmin(context, userId, companyId);
+      const party = await context.parties.findForUpdate(contractId, companyId);
+      if (!party) {
+        throw new NotFoundException('Contract was not found.');
+      }
+
+      party.signatoryFirstName = dto.signatoryFirstName.trim();
+      party.signatoryLastName = dto.signatoryLastName.trim();
+      party.signatoryTitle = dto.signatoryTitle.trim();
+      party.signedAt = signedAt;
+      const saved = await context.parties.save(party);
+      await this.writeActivity(
+        context,
+        contract,
+        actor,
+        'contract.signatory_recorded',
+        `Recorded the signatory for ${contract.referenceNumber}.`,
+        { contractPartyId: saved.id, signedAt: signedAt.toISOString() },
+        new Date(),
+      );
+      return toSignatoryResponse(saved);
+    });
+  }
+
   async listPartyInvitations(
     userId: string,
     companyId: string,
@@ -883,6 +1069,18 @@ export class ContractLifecycleService {
     }
   }
 
+  private async requireUniqueSiteCode(
+    context: IContractLifecycleContext,
+    contractId: string,
+    siteCode: string,
+  ): Promise<void> {
+    if (await context.sites.findByCode(contractId, siteCode.trim())) {
+      throw new ConflictException(
+        'A site with this code already exists on the contract.',
+      );
+    }
+  }
+
   private async lockActiveContract(
     context: IContractLifecycleContext,
     contractId: string,
@@ -989,6 +1187,36 @@ function validateDateRange(
       'The actual completion date must not be before the start date.',
     );
   }
+}
+
+function toSiteResponse(site: ContractSite): ContractSiteResponse {
+  return {
+    id: site.id,
+    contractId: site.contractId,
+    name: site.name,
+    siteCode: site.siteCode,
+    addressLine1: site.addressLine1,
+    city: site.city,
+    stateRegion: site.stateRegion,
+    countryCode: site.countryCode,
+    latitudeE6: site.latitudeE6,
+    longitudeE6: site.longitudeE6,
+    status: site.status,
+    createdAt: site.createdAt.toISOString(),
+    updatedAt: site.updatedAt.toISOString(),
+  };
+}
+
+function toSignatoryResponse(party: ContractParty): RecordedContractSignatory {
+  return {
+    id: party.id,
+    companyId: party.companyId,
+    partyType: party.partyType,
+    signatoryFirstName: party.signatoryFirstName,
+    signatoryLastName: party.signatoryLastName,
+    signatoryTitle: party.signatoryTitle,
+    signedAt: party.signedAt,
+  };
 }
 
 function toInvitationResponse(

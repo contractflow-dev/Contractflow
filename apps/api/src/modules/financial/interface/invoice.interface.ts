@@ -1,4 +1,4 @@
-import { EInvoiceStatus, EInvoiceType } from "@contractflow/contracts-schema"
+import { EInvoiceStatus, EInvoiceType, ECurrencyCode } from "@contractflow/contracts-schema"
 
 export interface IInvoiceEntity {
     contractId : string
@@ -11,7 +11,7 @@ export interface IInvoiceEntity {
     dueDate : Date
     periodStart : Date
     periodEnd : Date
-    currencyCode : string
+    currencyCode : ECurrencyCode
     grossAmountMinor : number
     adjustmentsTotalMinor : number
     netPayableMinor : number

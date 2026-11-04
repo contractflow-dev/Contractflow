@@ -13,6 +13,7 @@ import type {
   InvitableContractPartyType,
 } from '../entities/contract-party-invitation.entity';
 import type { ContractParty } from '../entities/contract-party.entity';
+import type { ContractSite } from '../../site-operations/entities/contract-site.entity';
 import type { AssignableContractWorkspace } from '../services/contract-workspace';
 
 export const CONTRACT_LIFECYCLE_UNIT_OF_WORK = Symbol(
@@ -69,6 +70,11 @@ export interface ILifecyclePartyRepository {
     partyId: string,
   ): Promise<IContractPartyWithRelations | null>;
   findById(partyId: string): Promise<ContractParty | null>;
+  findForUpdate(
+    contractId: string,
+    companyId: string,
+  ): Promise<ContractParty | null>;
+  save(party: ContractParty): Promise<ContractParty>;
   create(data: {
     contractId: string;
     companyId: string;
@@ -168,6 +174,31 @@ export interface ILifecyclePartyInvitationRepository {
   save(invitation: ContractPartyInvitation): Promise<ContractPartyInvitation>;
 }
 
+export type ICreateContractSiteRecord = Pick<
+  ContractSite,
+  | 'contractId'
+  | 'name'
+  | 'siteCode'
+  | 'addressLine1'
+  | 'city'
+  | 'stateRegion'
+  | 'countryCode'
+  | 'latitudeE6'
+  | 'longitudeE6'
+  | 'status'
+>;
+
+export interface ILifecycleSiteRepository {
+  listByContract(contractId: string): Promise<ContractSite[]>;
+  findForUpdate(
+    contractId: string,
+    siteId: string,
+  ): Promise<ContractSite | null>;
+  findByCode(contractId: string, siteCode: string): Promise<ContractSite | null>;
+  create(data: ICreateContractSiteRecord): Promise<ContractSite>;
+  save(site: ContractSite): Promise<ContractSite>;
+}
+
 export interface IContractStatusHistoryRecord {
   contractId: string;
   fromStatus: EFromStatus | null;
@@ -204,6 +235,7 @@ export interface IContractLifecycleContext {
   roleAssignments: ILifecycleRoleAssignmentRepository;
   roleInvitations: ILifecycleRoleInvitationRepository;
   partyInvitations: ILifecyclePartyInvitationRepository;
+  sites: ILifecycleSiteRepository;
   statusHistory: ILifecycleStatusHistoryRepository;
   activity: ILifecycleActivityRepository;
 }

@@ -1,4 +1,4 @@
-import { ECompanyStatus } from '@contractflow/contracts-schema';
+import { ECompanyStatus, ECountryCode, ECurrencyCode } from '@contractflow/contracts-schema';
 
 export interface ICompanyEntity {
   name: string;
@@ -13,8 +13,8 @@ export interface ICompanyEntity {
   city: string;
   stateRegion: string;
   postalCode: string;
-  countryCode: string;
-  defaultCurrencyCode: string;
+  countryCode: ECountryCode;
+  defaultCurrencyCode: ECurrencyCode;
   status: ECompanyStatus;
   verifiedAt: Date | null;
 }

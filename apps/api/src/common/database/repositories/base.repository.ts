@@ -1,10 +1,9 @@
 import { NotFoundException } from '@nestjs/common';
-import { In, LessThan, MoreThan } from 'typeorm';
+import { In } from 'typeorm';
 import type {
   DeepPartial,
   FindManyOptions,
   FindOneOptions,
-  FindOptionsOrder,
   FindOptionsSelect,
   FindOptionsWhere,
   ObjectLiteral,
@@ -61,7 +60,7 @@ export abstract class BaseRepository<
     if (Array.isArray(where)) {
       return where.map((w) => ({ ...w, ...scoped }) as FindOptionsWhere<T>);
     }
-    return { ...(where ?? {}), ...scoped } as FindOptionsWhere<T>;
+    return { ...where, ...scoped } as FindOptionsWhere<T>;
   }
 
   /** Single-object variant for APIs that don't accept OR-arrays (update/delete). */

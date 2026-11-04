@@ -1,7 +1,7 @@
-import type { SelectQueryBuilder } from 'typeorm';
+import type { ObjectLiteral, SelectQueryBuilder } from 'typeorm';
 
 export async function sumBigint(
-  qb: SelectQueryBuilder<any>,
+  qb: SelectQueryBuilder<ObjectLiteral>,
   expression: string,
 ): Promise<bigint> {
   const row = await qb
