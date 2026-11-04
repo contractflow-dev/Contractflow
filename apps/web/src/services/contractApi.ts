@@ -8,17 +8,22 @@ import type {
   ContractLifecyclePermissions,
   ContractPartyInvitation,
   ContractPartyInvitationPreview,
+  ContractPartySignatory,
   ContractPartySummary,
   ContractRoleAssignment,
   ContractRoleAssignmentQuery,
   ContractRoleInvitation,
   ContractRoleInvitationPreview,
+  ContractSite,
   ContractStatusHistory,
   ContractTransition,
   CreateContractRequest,
+  CreateContractSiteRequest,
   EContractRole,
   EPartyType,
   IPaginatedResponse,
+  RecordContractSignatoryRequest,
+  UpdateContractSiteRequest,
 } from "@contractflow/contracts-schema";
 import { api } from "./api";
 
@@ -34,16 +39,21 @@ export type {
   ContractMembership,
   ContractPartyInvitation,
   ContractPartyInvitationPreview,
+  ContractPartySignatory,
   ContractPartySummary,
   ContractRoleAssignment,
   ContractRoleAssignmentQuery,
   ContractRoleInvitation,
   ContractRoleInvitationPreview,
+  ContractSite,
   ContractStatusHistory,
   ContractTransition,
   CreateContractRequest,
+  CreateContractSiteRequest,
   EContractRole,
   EPartyType,
+  RecordContractSignatoryRequest,
+  UpdateContractSiteRequest,
 } from "@contractflow/contracts-schema";
 
 const roleAssignmentTag = (
@@ -52,6 +62,16 @@ const roleAssignmentTag = (
 ) => ({
   type: "ContractRoleAssignment" as const,
   id: `${contractId}:${workspace}`,
+});
+
+const signatoryTag = (contractId: string) => ({
+  type: "Contract" as const,
+  id: `signatory:${contractId}`,
+});
+
+const managedSitesTag = (contractId: string) => ({
+  type: "Contract" as const,
+  id: `sites:${contractId}`,
 });
 
 const roleInvitationTag = (
@@ -107,6 +127,74 @@ export const contractApi = api.injectEndpoints({
       providesTags: (_result, _error, { contractId }) => [
         { type: "Contract", id: contractId },
       ],
+    }),
+
+    getContractSignatory: builder.query<
+      ContractPartySignatory,
+      CompanyContractDetailQuery
+    >({
+      query: ({ companyId, contractId }) => ({
+        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/parties/signatory`,
+      }),
+      providesTags: (_result, _error, { contractId }) => [
+        signatoryTag(contractId),
+      ],
+    }),
+
+    recordContractSignatory: builder.mutation<
+      ContractPartySignatory,
+      CompanyContractDetailQuery & { body: RecordContractSignatoryRequest }
+    >({
+      query: ({ companyId, contractId, body }) => ({
+        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/parties/signatory`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: (_result, error, { contractId }) =>
+        error
+          ? []
+          : [signatoryTag(contractId), { type: "Contract", id: contractId }],
+    }),
+
+    getManagedContractSites: builder.query<
+      ContractSite[],
+      CompanyContractDetailQuery
+    >({
+      query: ({ companyId, contractId }) => ({
+        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/site-management`,
+      }),
+      providesTags: (_result, _error, { contractId }) => [
+        managedSitesTag(contractId),
+      ],
+    }),
+
+    createContractSite: builder.mutation<
+      ContractSite,
+      CompanyContractDetailQuery & { body: CreateContractSiteRequest }
+    >({
+      query: ({ companyId, contractId, body }) => ({
+        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/sites`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, error, { contractId }) =>
+        error ? [] : [managedSitesTag(contractId)],
+    }),
+
+    updateContractSite: builder.mutation<
+      ContractSite,
+      CompanyContractDetailQuery & {
+        siteId: string;
+        body: UpdateContractSiteRequest;
+      }
+    >({
+      query: ({ companyId, contractId, siteId, body }) => ({
+        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/sites/${encodeURIComponent(siteId)}`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: (_result, error, { contractId }) =>
+        error ? [] : [managedSitesTag(contractId)],
     }),
 
     getContractStatusHistory: builder.query<
@@ -489,6 +577,11 @@ export const {
   useGetContractByIdQuery,
   useGetContractPartiesQuery,
   useGetContractStatusHistoryQuery,
+  useGetContractSignatoryQuery,
+  useGetManagedContractSitesQuery,
+  useCreateContractSiteMutation,
+  useUpdateContractSiteMutation,
+  useRecordContractSignatoryMutation,
   useGetContractWorkspacesQuery,
   useGetContractLifecyclePermissionsQuery,
   useCreateContractMutation,

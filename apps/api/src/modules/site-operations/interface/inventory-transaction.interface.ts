@@ -1,4 +1,4 @@
-import { ETransactionType } from "@contractflow/contracts-schema"
+import { ETransactionType, ECurrencyCode } from "@contractflow/contracts-schema"
 
 export interface IInventoryTransactionEntity {
     contractId : string
@@ -7,7 +7,7 @@ export interface IInventoryTransactionEntity {
     transactionType : ETransactionType
     quantityMilli : number
     unitCostMinor : number
-    currencyCode : string
+    currencyCode : ECurrencyCode
     referenceNumber : string
     counterPartyName : string
     transactionAt : string

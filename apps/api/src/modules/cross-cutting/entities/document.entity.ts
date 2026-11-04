@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, JoinColumn } from "typeorm";
+import { Entity, Column, ManyToOne, JoinColumn } from "typeorm";
 import { Contract } from "../../contract/entities/contract.entity";
 import { Company } from "../../identity/entities/company.entity";
 import { BaseCustomEntity } from "./base-custom.entity";

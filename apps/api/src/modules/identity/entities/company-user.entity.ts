@@ -1,10 +1,8 @@
 import {
   Entity,
   Index,
-  PrimaryGeneratedColumn,
   Column,
   ManyToOne,
-  OneToOne,
   JoinColumn,
 } from 'typeorm';
 import { Company } from './company.entity';

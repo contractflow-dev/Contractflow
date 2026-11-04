@@ -1,4 +1,4 @@
-import {Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, JoinColumn} from "typeorm";
+import {Entity, Column, ManyToOne, JoinColumn} from "typeorm";
 import { HseInspection } from "./hse-inspection.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IHseInspectionFidingEntity } from "../interface/hse-inspection-finding.interface";

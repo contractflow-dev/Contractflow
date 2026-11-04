@@ -21,6 +21,11 @@ import {
 } from '../dto/contract-role-assignment.dto';
 import { CreateContractRequestDto } from '../dto/create-contract-request.dto';
 import { CreateContractPartyInvitationRequestDto } from '../dto/contract-party-invitation.dto';
+import { RecordContractSignatoryRequestDto } from '../dto/record-contract-signatory-request.dto';
+import {
+  CreateContractSiteRequestDto,
+  UpdateContractSiteRequestDto,
+} from '../dto/contract-site-request.dto';
 import {
   ListContractStatusHistoryRequestDto,
   ListContractsRequestDto,
@@ -146,6 +151,66 @@ export class ContractController {
     @Param('contractId') contractId: string,
   ) {
     return this.contractService.listParties(user.id, companyId, contractId);
+  }
+
+  @Get(':contractId/site-management')
+  listManagedSites(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @Param('contractId') contractId: string,
+  ) {
+    return this.lifecycle.listSites(user.id, companyId, contractId);
+  }
+
+  @Post(':contractId/sites')
+  createSite(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @Param('contractId') contractId: string,
+    @Body() body: CreateContractSiteRequestDto,
+  ) {
+    return this.lifecycle.createSite(user.id, companyId, contractId, body);
+  }
+
+  @Patch(':contractId/sites/:siteId')
+  updateSite(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @Param('contractId') contractId: string,
+    @Param('siteId') siteId: string,
+    @Body() body: UpdateContractSiteRequestDto,
+  ) {
+    return this.lifecycle.updateSite(
+      user.id,
+      companyId,
+      contractId,
+      siteId,
+      body,
+    );
+  }
+
+  @Get(':contractId/parties/signatory')
+  getSignatory(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @Param('contractId') contractId: string,
+  ) {
+    return this.lifecycle.getSignatory(user.id, companyId, contractId);
+  }
+
+  @Patch(':contractId/parties/signatory')
+  recordSignatory(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @Param('contractId') contractId: string,
+    @Body() body: RecordContractSignatoryRequestDto,
+  ) {
+    return this.lifecycle.recordSignatory(
+      user.id,
+      companyId,
+      contractId,
+      body,
+    );
   }
 
   @Get(':contractId/status-history')

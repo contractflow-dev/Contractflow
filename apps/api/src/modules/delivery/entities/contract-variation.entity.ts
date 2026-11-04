@@ -1,10 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from "typeorm";
+import { Entity, Column, ManyToOne, JoinColumn } from "typeorm";
 import { Contract } from "../../contract/entities/contract.entity";
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { ContractParty } from "../../contract/entities/contract-party.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IContractVariationEntity } from "../interface/contract-variation.interface";
-import { EContractVariationType, EContractVariationStatus } from "@contractflow/contracts-schema";
+import { EContractVariationType, EContractVariationStatus, ECurrencyCode } from "@contractflow/contracts-schema";
 
 
 
@@ -42,7 +42,7 @@ export class ContractVariation extends BaseCustomEntity implements IContractVari
     amountDeltaMinor!: number
 
     @Column({name: "currency_code", type: "char", length: 3})
-    currencyCode!: string
+    currencyCode!: ECurrencyCode
 
     @Column({name: "time_extension_days", type: "int"})
     timeExtensionDays!: number

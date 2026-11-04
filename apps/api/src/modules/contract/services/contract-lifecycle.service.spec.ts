@@ -1,4 +1,5 @@
 ﻿import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   NotFoundException,
@@ -8,6 +9,8 @@ import {
   ECompanyUserStatus,
   EContractType,
   EContractStatus,
+  EContractSiteStatus,
+  ECountryCode,
   ECurrencyCode,
   EFromStatus,
   EPartyType,
@@ -41,6 +44,8 @@ function createContext() {
       findForShare: vi.fn(),
       findByIdWithContractAndCompany: vi.fn(),
       findById: vi.fn(),
+      findForUpdate: vi.fn(),
+      save: vi.fn(async (value) => value),
       create: vi.fn(),
     },
     workspaces: {
@@ -68,6 +73,13 @@ function createContext() {
       findByTokenHashForUpdate: vi.fn(),
       expireIfPending: vi.fn(),
       revokePendingBySource: vi.fn(),
+      create: vi.fn(),
+      save: vi.fn(async (value) => value),
+    },
+    sites: {
+      listByContract: vi.fn(),
+      findForUpdate: vi.fn(),
+      findByCode: vi.fn(),
       create: vi.fn(),
       save: vi.fn(async (value) => value),
     },
@@ -397,5 +409,262 @@ describe('ContractLifecycleService', () => {
     ).rejects.toThrow('audit write failed');
     expect(mail.sendContractPartyInvitationEmail).toHaveBeenCalledOnce();
     expect(outcomes).toEqual({ committed: 0, rolledBack: 1 });
+  });
+  describe('recordSignatory', () => {
+    const adminActor = { ...actor, companyRole: ECompanyRole.COMPANY_ADMIN };
+    const signatory = {
+      signatoryFirstName: '  Ada ',
+      signatoryLastName: 'Lovelace',
+      signatoryTitle: 'Managing Director',
+      signedAt: '2026-01-15',
+    };
+
+    beforeEach(() => {
+      context.companies.findActiveForShare.mockResolvedValue({ id: 'company-1' });
+      context.memberships.findActiveForUpdate.mockResolvedValue(adminActor);
+      context.parties.findForUpdate.mockResolvedValue({
+        ...party,
+        signatoryFirstName: null,
+        signatoryLastName: null,
+        signatoryTitle: null,
+        signedAt: null,
+      });
+      context.parties.save.mockImplementation(async (value) => value);
+    });
+
+    it("records the acting company's own signatory and audits it atomically", async () => {
+      const result = await service.recordSignatory(
+        actor.userId,
+        actor.companyId,
+        contract.id,
+        signatory,
+      );
+
+      expect(context.parties.findForUpdate).toHaveBeenCalledWith(
+        contract.id,
+        actor.companyId,
+      );
+      expect(result).toMatchObject({
+        id: party.id,
+        companyId: actor.companyId,
+        signatoryFirstName: 'Ada',
+        signatoryLastName: 'Lovelace',
+        signatoryTitle: 'Managing Director',
+      });
+      expect(result.signedAt?.toISOString()).toBe('2026-01-15T00:00:00.000Z');
+      expect(context.activity.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'contract.signatory_recorded',
+          companyId: actor.companyId,
+        }),
+      );
+      expect(outcomes).toEqual({ committed: 1, rolledBack: 0 });
+    });
+
+    it('requires a Company Administrator', async () => {
+      context.memberships.findActiveForUpdate.mockResolvedValue(actor);
+
+      await expect(
+        service.recordSignatory(
+          actor.userId,
+          actor.companyId,
+          contract.id,
+          signatory,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(context.parties.save).not.toHaveBeenCalled();
+    });
+
+    it('does not let a company sign a contract it is not a party to', async () => {
+      context.parties.findForUpdate.mockResolvedValue(null);
+
+      await expect(
+        service.recordSignatory(
+          actor.userId,
+          'other-company',
+          contract.id,
+          signatory,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(context.parties.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects archived contracts', async () => {
+      context.contracts.findActiveForUpdate.mockResolvedValue(null);
+
+      await expect(
+        service.recordSignatory(
+          actor.userId,
+          actor.companyId,
+          contract.id,
+          signatory,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(context.parties.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects a signing date in the future', async () => {
+      await expect(
+        service.recordSignatory(actor.userId, actor.companyId, contract.id, {
+          ...signatory,
+          signedAt: '2999-01-01',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(unitOfWork.execute).not.toHaveBeenCalled();
+    });
+    it("reads only the acting company's signatory, and only for a Company Administrator", async () => {
+      context.parties.find.mockResolvedValue({
+        ...party,
+        signatoryFirstName: 'Ada',
+        signatoryLastName: 'Lovelace',
+        signatoryTitle: 'Director',
+        signedAt: new Date('2026-01-15T00:00:00.000Z'),
+      });
+
+      await expect(
+        service.getSignatory(actor.userId, actor.companyId, contract.id),
+      ).resolves.toMatchObject({ id: party.id, signatoryFirstName: 'Ada' });
+      expect(context.parties.find).toHaveBeenCalledWith(
+        contract.id,
+        actor.companyId,
+      );
+
+      context.memberships.findActiveForUpdate.mockResolvedValue(actor);
+      await expect(
+        service.getSignatory(actor.userId, actor.companyId, contract.id),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+  });
+  describe('contract sites', () => {
+    const adminActor = { ...actor, companyRole: ECompanyRole.COMPANY_ADMIN };
+    const timestamp = new Date('2026-02-01T00:00:00.000Z');
+    const siteInput = {
+      name: 'North yard',
+      siteCode: 'NY-01',
+      addressLine1: '1 Quay Road',
+      city: 'Lagos',
+      stateRegion: 'Lagos',
+      countryCode: ECountryCode.NG,
+      latitudeE6: 6_524_379,
+      longitudeE6: 3_379_206,
+      status: EContractSiteStatus.PLANNED,
+    };
+    const storedSite = {
+      ...siteInput,
+      id: 'site-1',
+      contractId: contract.id,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+
+    beforeEach(() => {
+      context.companies.findActiveForShare.mockResolvedValue({ id: 'company-1' });
+      context.memberships.findActiveForUpdate.mockResolvedValue(adminActor);
+      context.contracts.findForUpdate.mockResolvedValue({
+        ...contract,
+        createdByCompanyId: actor.companyId,
+      });
+      context.sites.findByCode.mockResolvedValue(null);
+      context.sites.create.mockResolvedValue(storedSite);
+      context.sites.save.mockImplementation(async (value) => value);
+    });
+
+    it("lets the creating company's administrator add a site and audits it", async () => {
+      const result = await service.createSite(
+        actor.userId,
+        actor.companyId,
+        contract.id,
+        siteInput,
+      );
+
+      expect(context.sites.findByCode).toHaveBeenCalledWith(
+        contract.id,
+        'NY-01',
+      );
+      expect(context.sites.create).toHaveBeenCalledWith({
+        ...siteInput,
+        contractId: contract.id,
+      });
+      expect(result).toMatchObject({
+        id: 'site-1',
+        latitudeE6: 6_524_379,
+        createdAt: '2026-02-01T00:00:00.000Z',
+      });
+      expect(context.activity.record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'contract.site_created' }),
+      );
+      expect(outcomes).toEqual({ committed: 1, rolledBack: 0 });
+    });
+
+    it('hides site management from companies that did not create the contract', async () => {
+      context.contracts.findForUpdate.mockResolvedValue({
+        ...contract,
+        createdByCompanyId: 'another-company',
+      });
+
+      await expect(
+        service.listSites(actor.userId, actor.companyId, contract.id),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      await expect(
+        service.createSite(actor.userId, actor.companyId, contract.id, siteInput),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(context.sites.listByContract).not.toHaveBeenCalled();
+      expect(context.sites.create).not.toHaveBeenCalled();
+    });
+
+    it('requires a Company Administrator', async () => {
+      context.memberships.findActiveForUpdate.mockResolvedValue(actor);
+
+      await expect(
+        service.createSite(actor.userId, actor.companyId, contract.id, siteInput),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(context.sites.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a duplicate site code on the same contract', async () => {
+      context.sites.findByCode.mockResolvedValue(storedSite);
+
+      await expect(
+        service.createSite(actor.userId, actor.companyId, contract.id, siteInput),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(context.sites.create).not.toHaveBeenCalled();
+    });
+
+    it('updates only a site that belongs to the contract', async () => {
+      context.sites.findForUpdate.mockResolvedValue({ ...storedSite });
+
+      const result = await service.updateSite(
+        actor.userId,
+        actor.companyId,
+        contract.id,
+        'site-1',
+        { name: ' Main yard ', status: EContractSiteStatus.ACTIVE },
+      );
+
+      expect(context.sites.findForUpdate).toHaveBeenCalledWith(
+        contract.id,
+        'site-1',
+      );
+      expect(result).toMatchObject({
+        name: 'Main yard',
+        status: EContractSiteStatus.ACTIVE,
+        siteCode: 'NY-01',
+      });
+      expect(context.sites.findByCode).not.toHaveBeenCalled();
+
+      context.sites.findForUpdate.mockResolvedValue(null);
+      await expect(
+        service.updateSite(actor.userId, actor.companyId, contract.id, 'other', {
+          name: 'X',
+        }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('rejects an empty site update', async () => {
+      await expect(
+        service.updateSite(actor.userId, actor.companyId, contract.id, 'site-1', {}),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(unitOfWork.execute).not.toHaveBeenCalled();
+    });
   });
 });

@@ -1,11 +1,11 @@
-import {Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, JoinColumn} from "typeorm";
+import {Entity, Column, ManyToOne, JoinColumn} from "typeorm";
 import { Contract } from "../../contract/entities/contract.entity";
 import { InventoryItem } from "./inventory-item.entity";
 import { SiteDailyLog } from "./site-daily-log.entity";
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IInventoryTransactionEntity } from "../interface/inventory-transaction.interface";
-import { ETransactionType } from "@contractflow/contracts-schema";
+import { ETransactionType, ECurrencyCode } from "@contractflow/contracts-schema";
 
 
 @Entity("inventory_transaction")
@@ -39,7 +39,7 @@ export class InventoryTransaction extends BaseCustomEntity implements IInventory
     unitCostMinor!: number
 
     @Column({name: "currency_code", type: "varchar", length: 3})
-    currencyCode!: string
+    currencyCode!: ECurrencyCode
     
     @Column({name: "reference_number", type: "varchar", length: 100})
     referenceNumber!: string
