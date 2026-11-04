@@ -4,7 +4,6 @@ import {
   IsString,
   IsNotEmpty,
   MaxLength,
-  IsStrongPassword,
 } from 'class-validator';
 import type { LoginRequest } from '@contractflow/contracts-schema';
 
@@ -16,15 +15,8 @@ export class LoginAppUserDto implements LoginRequest {
   @MaxLength(254)
   email: string;
 
-  @IsStrongPassword({
-    minLength: 12,
-    minLowercase: 1,
-    minUppercase: 1,
-    minNumbers: 1,
-    minSymbols: 1,
-  })
-  @MaxLength(255)
-  @IsNotEmpty()
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
   password: string;
 }

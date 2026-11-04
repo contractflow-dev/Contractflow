@@ -20,6 +20,7 @@ const outfit = Outfit({
 
 const geistMono = Geist_Mono({
   subsets: ["latin"],
+  weight: ["400", "500", "700"],
   variable: "--font-geist-mono",
   display: "swap",
 });
