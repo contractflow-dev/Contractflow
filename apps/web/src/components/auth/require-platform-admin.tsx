@@ -24,10 +24,6 @@ import {
 import { cn } from "@/lib/utils";
 
 export function RequirePlatformAdmin({ children }: { children: ReactNode }) {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
   const router = useRouter();
 
   const { data: user, error, isFetching, refetch } = useGetCurrentUserQuery(
