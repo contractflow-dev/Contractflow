@@ -59,9 +59,11 @@ export class EnvVars {
   })
   DATABASE_URL!: string;
 
+  // Unset: SSL follows NODE_ENV (on in production).
+  @IsOptional()
   @Transform(toBool)
   @IsBoolean()
-  DB_SSL: boolean = false;
+  DB_SSL?: boolean;
 
   @Transform(normalizeHttpUrl)
   @IsUrl({ require_tld: false })
