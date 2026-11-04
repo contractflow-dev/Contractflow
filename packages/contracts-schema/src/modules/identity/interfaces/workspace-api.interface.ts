@@ -3,6 +3,7 @@ import type {
   ECompanyStatus,
   ECompanyUserStatus,
 } from "@contractflow/contracts-schema";
+import type { ECountryCode, ECurrencyCode } from "../enums/identity.enum.js";
 
 export interface IWorkspace {
   id: string;
@@ -18,8 +19,8 @@ export interface IWorkspace {
   city?: string;
   stateRegion?: string;
   postalCode?: string;
-  countryCode?: string;
-  defaultCurrencyCode?: string;
+  countryCode?: ECountryCode;
+  defaultCurrencyCode?: ECurrencyCode;
   status: ECompanyStatus;
   createdAt: string;
   updatedAt: string;
@@ -48,8 +49,8 @@ export interface ICreateWorkspaceRequest {
   taxIdentificationNumber?: string;
   email?: string;
   phoneNumber?: string;
-  countryCode?: string;
-  defaultCurrencyCode?: string;
+  countryCode?: ECountryCode;
+  defaultCurrencyCode?: ECurrencyCode;
 }
 
 export interface IUpdateWorkspaceRequest {

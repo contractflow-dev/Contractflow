@@ -1,3 +1,4 @@
+import { ECurrencyCode } from "@contractflow/contracts-schema";
 
 export interface IInvoiceLineItemEntity {
     invoiceId : string
@@ -8,5 +9,5 @@ export interface IInvoiceLineItemEntity {
     unitOfMeasure : string
     unitPriceMinor : number
     amountMinor : number
-    currencyCode : string
+    currencyCode : ECurrencyCode
 }

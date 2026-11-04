@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from "typeorm";
+import { Entity, Column, ManyToOne, JoinColumn } from "typeorm";
 import { Document } from "./document.entity";
 import { BaseCustomEntity } from "./base-custom.entity";
 import { IDocumentLinkEntity } from "../interfaces/document-link.interface";

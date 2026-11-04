@@ -23,7 +23,7 @@ export interface Contract {
   parentContractId: string | null;
   originalValueMinor: number | string;
   currentValueMinor: number | string;
-  currencyCode: string;
+  currencyCode: ECurrencyCode;
   retentionRateBps: number;
   advancePaymentRateBps: number | null;
   paymentTermsDays: number;
@@ -56,10 +56,28 @@ export interface ContractPartySummary {
   signedAt: string | null;
 }
 
+export interface RecordContractSignatoryRequest {
+  signatoryFirstName: string;
+  signatoryLastName: string;
+  signatoryTitle: string;
+  signedAt: string;
+}
+
 export interface ContractMembership {
   id: string;
   companyId: string;
   partyType: EPartyType;
+  signedAt: string | null;
+}
+
+/** The acting company's own signatory; readable only by its Company Administrators. */
+export interface ContractPartySignatory {
+  id: string;
+  companyId: string;
+  partyType: EPartyType;
+  signatoryFirstName: string | null;
+  signatoryLastName: string | null;
+  signatoryTitle: string | null;
   signedAt: string | null;
 }
 

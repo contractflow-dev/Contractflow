@@ -6,6 +6,8 @@ import {
   ECompanyStatus,
   ECompanyUserStatus,
   EContractStatus,
+  ECountryCode,
+  ECurrencyCode,
   EUserStatus,
 } from '@contractflow/contracts-schema';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -29,8 +31,8 @@ const companyData = {
   city: 'Test City',
   stateRegion: 'Test Region',
   postalCode: '00000',
-  countryCode: 'US',
-  defaultCurrencyCode: 'USD',
+  countryCode: ECountryCode.US,
+  defaultCurrencyCode: ECurrencyCode.USD,
   status: ECompanyStatus.ACTIVE,
 };
 

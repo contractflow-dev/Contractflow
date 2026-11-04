@@ -1,10 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from "typeorm";
+import { Entity, Column, ManyToOne, JoinColumn } from "typeorm";
 import { Contract } from "../../contract/entities/contract.entity";
 import { Invoice } from "./invoice.entity"; 
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IPaymentEntity } from "../interface/payment.interface";
-import { EPaymentMethod, EPaymentStatus } from "@contractflow/contracts-schema";
+import { EPaymentMethod, EPaymentStatus, ECurrencyCode } from "@contractflow/contracts-schema";
 
 
 @Entity("payment")
@@ -32,7 +32,7 @@ export class Payment extends BaseCustomEntity implements IPaymentEntity {
     amountMinor!: number
 
     @Column({name: "currency_code", type: "char", length: 3})
-    currencyCode!: string
+    currencyCode!: ECurrencyCode
 
     @Column({name: "invoice_amount_minor", type: "bigint"})
     invoiceAmountMinor!: number

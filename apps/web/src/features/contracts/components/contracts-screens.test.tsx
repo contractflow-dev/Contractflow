@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   EContractStatus,
   EContractType,
+  ECurrencyCode,
   EPartyType,
 } from "@contractflow/contracts-schema";
 import type { ContractDetail as ContractDetailResponse } from "@/services/contractApi";
@@ -21,6 +22,14 @@ vi.mock("./contract-lifecycle-management", () => ({
   ContractLifecycleManagement: () => <div>Contract lifecycle management</div>,
 }));
 
+vi.mock("./contract-signatory-management", () => ({
+  ContractSignatoryManagement: () => <div>Contract signatory management</div>,
+}));
+
+vi.mock("./contract-site-management", () => ({
+  ContractSiteManagement: () => <div>Contract site management</div>,
+}));
+
 const contractDetail: ContractDetailResponse = {
   contract: {
     id: "contract-1",
@@ -32,7 +41,7 @@ const contractDetail: ContractDetailResponse = {
     parentContractId: null,
     originalValueMinor: 1000,
     currentValueMinor: 1000,
-    currencyCode: "USD",
+    currencyCode: ECurrencyCode.USD,
     retentionRateBps: 0,
     advancePaymentRateBps: 0,
     paymentTermsDays: 30,

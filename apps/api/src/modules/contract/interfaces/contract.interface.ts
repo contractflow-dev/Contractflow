@@ -1,4 +1,4 @@
-import { EContractStatus, EContractType } from "@contractflow/contracts-schema"
+import { EContractStatus, EContractType, ECurrencyCode } from "@contractflow/contracts-schema"
 
 export interface IContractEntity {
     referenceNumber : string
@@ -9,7 +9,7 @@ export interface IContractEntity {
     parentContractId : string | null
     originalValueMinor : string | number
     currentValueMinor : string | number
-    currencyCode : string
+    currencyCode : ECurrencyCode
     retentionRateBps : number
     advancePaymentRateBps : number | null
     paymentTermsDays : number

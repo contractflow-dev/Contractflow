@@ -1,4 +1,4 @@
-import {Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, JoinColumn, OneToOne} from "typeorm";
+import {Entity, Column, ManyToOne, JoinColumn, OneToOne} from "typeorm";
 import { Contract } from "../../contract/entities/contract.entity";
 import { HseIncident } from "./hse-incident.entity";
 import { HseInspectionFinding } from "./hse-inspection-finding.entity";

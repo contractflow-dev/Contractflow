@@ -154,14 +154,14 @@ function DashboardContent({ companyId }: { companyId: string }) {
             className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"
           >
             {summaryCards.map(({ key, label, description, icon: Icon }) => (
-              <Card key={key}>
+              <Card key={key} highlight>
                 <CardHeader>
                   <div className="flex items-center justify-between gap-3">
                     <CardDescription className="font-medium">
                       {label}
                     </CardDescription>
                     <Avatar className="rounded-lg after:rounded-lg">
-                      <AvatarFallback className="rounded-lg bg-primary/10 text-primary">
+                      <AvatarFallback className="rounded-lg bg-primary/10 text-primary transition-colors group-hover/card:bg-primary group-hover/card:text-primary-foreground">
                         <Icon className="size-5" aria-hidden="true" />
                       </AvatarFallback>
                     </Avatar>

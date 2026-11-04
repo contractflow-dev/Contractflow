@@ -1,5 +1,5 @@
 import { ExecutionContext, ForbiddenException, UnauthorizedException } from '@nestjs/common';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { AuthenticatedRequest } from './session-auth.guard';
 import { PlatformAdminGuard } from './platform-admin.guard';
 

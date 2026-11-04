@@ -4,7 +4,7 @@ import { FindOptionsWhere, Repository } from 'typeorm';
 import { ContractScopedRepository } from '../../../common/database/repositories/contract-scoped.repository';
 import { Invoice } from '../entities/invoice.entity';
 import { IContractScope } from '../../../common/database/repositories/contract-scope.interface';
-import { SelectQueryBuilder } from 'typeorm/browser';
+import {  } from 'typeorm/browser';
 import { sumBigint } from '../../../common/database/utils/sum-bigint';
 
 type Scope = IContractScope;

@@ -1,4 +1,4 @@
-import { ForbiddenException, Scope } from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
 import { ContractScopedRepository } from './contract-scoped.repository';
 import { IContractScope } from './contract-scope.interface';
 
