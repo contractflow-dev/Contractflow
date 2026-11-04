@@ -1,3 +1,4 @@
+cat > apps/api/src/modules/identity/controllers/auth.controller.ts << 'EOF'
 import { Body, Controller, Post, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
@@ -85,9 +86,10 @@ export class AuthController {
     await this.authService.logout(sessionToken(request, cookieName));
     const secure =
       this.config.get<string>('NODE_ENV') === 'production' ? '; Secure' : '';
+    const sameSite = secure ? 'None' : 'Lax';
     response.setHeader(
       'Set-Cookie',
-      `${cookieName}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0${secure}`,
+      `${cookieName}=; HttpOnly; Path=/; SameSite=${sameSite}; Max-Age=0${secure}`,
     );
     return { success: true, message: 'You have been signed out.' };
   }
@@ -95,7 +97,9 @@ export class AuthController {
   private sessionCookie(sessionToken: string, expiresAt: Date): string {
     const secure =
       this.config.get<string>('NODE_ENV') === 'production' ? '; Secure' : '';
+    const sameSite = secure ? 'None' : 'Lax';
     const maxAge = Math.floor((expiresAt.getTime() - Date.now()) / 1000);
-    return `${this.authService.sessionCookieName()}=${sessionToken}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}${secure}`;
+    return `${this.authService.sessionCookieName()}=${sessionToken}; HttpOnly; Path=/; SameSite=${sameSite}; Max-Age=${maxAge}${secure}`;
   }
 }
+EOF
