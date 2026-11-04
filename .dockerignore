@@ -1,0 +1,15 @@
+**/node_modules
+**/.next
+**/dist
+**/coverage
+**/*.tsbuildinfo
+**/*.log
+**/.env
+**/.env.*
+.git
+.github
+.vscode
+infra
+*.dump
+packages/db/docs
+apps/api/prisma/imports

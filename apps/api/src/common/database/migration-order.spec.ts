@@ -61,6 +61,26 @@ describe('database migration configuration', () => {
     expect(options.migrationsRun).toBe(false);
   });
 
+  it.each([
+    ['production', undefined, true],
+    ['development', undefined, false],
+    ['production', false, false],
+    ['development', true, true],
+  ] as const)(
+    'resolves SSL for NODE_ENV=%s with DB_SSL=%s to %s',
+    (nodeEnv, ssl, expected) => {
+      const options = createRuntimeDatabaseOptions({
+        nodeEnv,
+        databaseUrl: 'postgres://localhost/contractflow',
+        ssl,
+      });
+
+      expect(options.ssl).toEqual(
+        expected ? { rejectUnauthorized: false } : false,
+      );
+    },
+  );
+
   it.each(['development', 'test'])(
     'keeps schema synchronization disabled in %s',
     (nodeEnv) => {

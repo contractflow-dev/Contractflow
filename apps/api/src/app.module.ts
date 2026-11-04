@@ -28,6 +28,7 @@ import { createRuntimeDatabaseOptions } from './common/database/runtime-database
         createRuntimeDatabaseOptions({
           nodeEnv: config.get<string>('NODE_ENV') ?? 'development',
           databaseUrl: config.getOrThrow<string>('DATABASE_URL'),
+          ssl: config.get<boolean>('DB_SSL'),
         }),
     }),
     IdentityModule,
