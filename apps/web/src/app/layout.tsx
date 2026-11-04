@@ -1,29 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { IBM_Plex_Sans, Outfit, Geist_Mono } from "next/font/google";
 import { StoreProvider } from "@/store/provider";
 import { ThemeProvider } from "@/components/theme/theme-provider";
-
-const ibmPlexSans = IBM_Plex_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-ibm",
-  display: "swap",
-});
-
-const outfit = Outfit({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-outfit",
-  display: "swap",
-});
-
-const geistMono = Geist_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "700"],
-  variable: "--font-geist-mono",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "Contractflow",
@@ -36,7 +14,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${ibmPlexSans.variable} ${outfit.variable} ${geistMono.variable}`}>
+    <html
+      lang="en"
+      style={
+        {
+          "--font-ibm": "'IBM Plex Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+          "--font-outfit": "Outfit, system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+          "--font-geist-mono": "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+        } as React.CSSProperties
+      }
+    >
       <body>
         <StoreProvider>
           <ThemeProvider>{children}</ThemeProvider>
