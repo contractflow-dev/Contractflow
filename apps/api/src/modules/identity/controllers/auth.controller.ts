@@ -1,4 +1,3 @@
-cat > apps/api/src/modules/identity/controllers/auth.controller.ts << 'EOF'
 import { Body, Controller, Post, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
@@ -102,4 +101,3 @@ export class AuthController {
     return `${this.authService.sessionCookieName()}=${sessionToken}; HttpOnly; Path=/; SameSite=${sameSite}; Max-Age=${maxAge}${secure}`;
   }
 }
-EOF
