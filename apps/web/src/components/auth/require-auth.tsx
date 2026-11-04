@@ -14,10 +14,8 @@ import {
 import { useGetCurrentUserQuery } from "@/services/authApi";
 
 export function RequireAuth({ children }: { children: ReactNode }) {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
+  // The query starts after mount, so the server render and the first client
+  // render both show the loading state below and hydrate identically.
   const { data: user, error, isFetching, refetch } = useGetCurrentUserQuery(
     undefined,
     { refetchOnMountOrArgChange: true },

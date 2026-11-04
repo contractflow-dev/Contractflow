@@ -39,42 +39,71 @@ export class PasswordService {
       return timingSafeEqual(expectedKey, actualKey);
     } catch {
       return false;
-    } catch { return false; }
+    }
   }
 
   private decodeMaybe(s: string): Buffer {
     s = s.trim();
     // try base64
-    try { const b = Buffer.from(s, 'base64'); if (b.length > 8) return b; } catch {}
+    try {
+      const b = Buffer.from(s, 'base64');
+      if (b.length > 8) return b;
+    } catch {}
     // try base64url
-    try { const b = Buffer.from(s.replace(/-/g,'+').replace(/_/g,'/'), 'base64'); if (b.length > 8) return b; } catch {}
+    try {
+      const b = Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+      if (b.length > 8) return b;
+    } catch {}
     // try hex
-    try { if (/^[0-9a-fA-F]+$/.test(s)) { const b = Buffer.from(s, 'hex'); if (b.length > 8) return b; } } catch {}
+    try {
+      if (/^[0-9a-fA-F]+$/.test(s)) {
+        const b = Buffer.from(s, 'hex');
+        if (b.length > 8) return b;
+      }
+    } catch {}
     return Buffer.from(s, 'base64');
   }
 
-  private async verifyScrypt(password: string, stored: string): Promise<boolean> {
+  private async verifyScrypt(
+    password: string,
+    stored: string,
+  ): Promise<boolean> {
     // Supports:
     // $scrypt$n=16384,r=8,p=1$salt$hash
     // $scrypt$16384$8$1$salt$hash
     // $scrypt$salt$hash (defaults n=16384,r=8,p=1)
     const parts = stored.split('$').filter(Boolean); // ['scrypt', ...]
-    let n = 16384, r = 8, p = 1;
+    let n = 16384,
+      r = 8,
+      p = 1;
     let saltStr: string, hashStr: string;
 
     if (parts.length === 5 && !parts[1].includes('n=')) {
       // $scrypt$16384$8$1$salt$hash
-      n = parseInt(parts[1],10); r = parseInt(parts[2],10); p = parseInt(parts[3],10);
-      saltStr = parts[4]; hashStr = parts[5] || parts[4]; // safety
-      if (parts.length >= 6) { saltStr = parts[4]; hashStr = parts[5]; }
+      n = parseInt(parts[1], 10);
+      r = parseInt(parts[2], 10);
+      p = parseInt(parts[3], 10);
+      saltStr = parts[4];
+      hashStr = parts[5] || parts[4]; // safety
+      if (parts.length >= 6) {
+        saltStr = parts[4];
+        hashStr = parts[5];
+      }
     } else if (parts[1]?.includes('n=')) {
       const map: any = {};
-      parts[1].split(',').forEach(kv => { const [k,v]=kv.split('='); map[k]=v; });
-      n = parseInt(map.n,10) || n; r = parseInt(map.r,10) || r; p = parseInt(map.p,10) || p;
-      saltStr = parts[2]; hashStr = parts[3];
+      parts[1].split(',').forEach((kv) => {
+        const [k, v] = kv.split('=');
+        map[k] = v;
+      });
+      n = parseInt(map.n, 10) || n;
+      r = parseInt(map.r, 10) || r;
+      p = parseInt(map.p, 10) || p;
+      saltStr = parts[2];
+      hashStr = parts[3];
     } else {
       // $scrypt$salt$hash
-      saltStr = parts[1]; hashStr = parts[2];
+      saltStr = parts[1];
+      hashStr = parts[2];
     }
 
     if (!saltStr || !hashStr) return false;
@@ -84,11 +113,26 @@ export class PasswordService {
     if (salt.length < 8 || expected.length < 16) return false;
 
     return new Promise((resolve) => {
-      crypto.scrypt(password, salt, expected.length, { N: n, r, p, maxmem: 64 * 1024 * 1024 }, (err, derived) => {
-        if (err) { resolve(false); return; }
-        try { resolve(derived.length === expected.length && crypto.timingSafeEqual(derived, expected)); }
-        catch { resolve(false); }
-      });
+      crypto.scrypt(
+        password,
+        salt,
+        expected.length,
+        { N: n, r, p, maxmem: 64 * 1024 * 1024 },
+        (err, derived) => {
+          if (err) {
+            resolve(false);
+            return;
+          }
+          try {
+            resolve(
+              derived.length === expected.length &&
+                crypto.timingSafeEqual(derived, expected),
+            );
+          } catch {
+            resolve(false);
+          }
+        },
+      );
     });
   }
 }
