@@ -3,13 +3,15 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { useCreateCompanyMutation } from "@/features/companies";
 import { useGetCurrentUserQuery } from "@/services/authApi";
+import { setActiveWorkspaceId } from "@/features/workspace/workspaceSlice";
+import { useAppDispatch } from "@/store/hooks";
 import { AuthTopBar } from "@/components/auth/authTopBar";
 import { HeroMetrics } from "@/components/auth/HeroMetrics";
 import {
@@ -159,6 +161,7 @@ function CompanyField({
 }
 
 export function OnboardingView() {
+  const dispatch = useAppDispatch();
   const router = useRouter();
   const {
     data: currentUser,
@@ -177,7 +180,7 @@ export function OnboardingView() {
     register,
     handleSubmit,
     setValue,
-    watch,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
@@ -199,7 +202,11 @@ export function OnboardingView() {
     },
   });
 
-  const countryCode = watch("countryCode");
+  const countryCode = useWatch({ control, name: "countryCode" });
+  const defaultCurrencyCode = useWatch({
+    control,
+    name: "defaultCurrencyCode",
+  });
 
   useEffect(() => {
     if (!countryCode) {
@@ -232,7 +239,12 @@ export function OnboardingView() {
   async function onSubmit(values: CompanyFormValues) {
     setServerError(null);
     try {
-      const response = await createCompany(values).unwrap();
+      const response = await createCompany({
+        ...values,
+        countryCode: values.countryCode as ECountryCode,
+        defaultCurrencyCode: values.defaultCurrencyCode as ECurrencyCode,
+      }).unwrap();
+      dispatch(setActiveWorkspaceId(response.company.id));
       setCreatedCompany({
         id: response.company.id,
         name: response.company.name,
@@ -259,7 +271,7 @@ export function OnboardingView() {
               : " Your membership is active."}
           </p>
           <Link
-            href={`/dashboards?companyId=${encodeURIComponent(createdCompany.id)}`}
+            href="/dashboards"
             className={buttonVariants({
               size: "lg",
               className: "h-11 w-full px-4",
@@ -533,7 +545,7 @@ export function OnboardingView() {
                 id="defaultCurrencyCode"
                 className="w-full"
                 aria-invalid={!!errors.defaultCurrencyCode}
-                value={watch("defaultCurrencyCode")}
+                value={defaultCurrencyCode}
                 onChange={(event) =>
                   setValue("defaultCurrencyCode", event.target.value, {
                     shouldValidate: true,

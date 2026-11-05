@@ -1,4 +1,4 @@
-import { EMilestoneStatus } from "@contractflow/contracts-schema"
+import { EMilestoneStatus, ECurrencyCode } from "@contractflow/contracts-schema"
 export interface IMilestoneEntity {
     contractId : string
     contractStageId : string
@@ -10,7 +10,7 @@ export interface IMilestoneEntity {
     weightBps : number
     isPaymentMilestone : boolean
     amountMinor : number
-    currencyCode : string
+    currencyCode : ECurrencyCode
     dueDate : Date
     revisedDueDate : Date
     completedDate : Date

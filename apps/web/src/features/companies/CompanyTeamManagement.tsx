@@ -55,12 +55,12 @@ import {
   useRemoveCompanyMemberMutation,
   useRevokeCompanyInvitationMutation,
   useChangeCompanyMemberRoleMutation,
-} from "./companiesApi";
-import type { CompanyMember } from "./companiesApi";
+} from "@/services/companiesApi";
+import type { ICompanyMember } from "@contractflow/contracts-schema";
 
 type StatusFilter = "active" | "inactive" | "all";
 
-const memberName = (member: CompanyMember) =>
+const memberName = (member: ICompanyMember) =>
   `${member.firstName} ${member.lastName}`.trim() || member.email;
 
 export function CompanyTeamManagement({ companyId }: { companyId: string }) {
@@ -69,7 +69,7 @@ export function CompanyTeamManagement({ companyId }: { companyId: string }) {
   const [roleDrafts, setRoleDrafts] = useState<Record<string, ECompanyRole>>(
     {},
   );
-  const [memberToRemove, setMemberToRemove] = useState<CompanyMember | null>(
+  const [memberToRemove, setMemberToRemove] = useState<ICompanyMember | null>(
     null,
   );
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -84,8 +84,8 @@ export function CompanyTeamManagement({ companyId }: { companyId: string }) {
     error: invitationsError,
     isFetching: invitationsFetching,
   } = useGetCompanyInvitationsQuery({ companyId, limit: 100 });
-  const members = membersPage?.items;
-  const invitations = invitationsPage?.items;
+  const members = membersPage?.data;
+  const invitations = invitationsPage?.data;
   const [createInvitation, inviteState] = useInviteCompanyMemberMutation();
   const [updateMember, updateState] = useChangeCompanyMemberRoleMutation();
   const [removeMember, removeState] = useRemoveCompanyMemberMutation();
@@ -128,7 +128,7 @@ export function CompanyTeamManagement({ companyId }: { companyId: string }) {
     }
   }
 
-  async function saveRole(member: CompanyMember) {
+  async function saveRole(member: ICompanyMember) {
     const companyRole = roleDrafts[member.id];
     if (!companyRole || companyRole === member.companyRole) return;
     setFailure(null);

@@ -1,7 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, Column } from 'typeorm';
 import { BaseCustomEntity } from '../../cross-cutting/entities/base-custom.entity';
 import { ICompanyEntity } from '../interface/company.interface';
-import { ECompanyStatus, ECurrencyCode } from '@contractflow/contracts-schema';
+import {
+  ECompanyStatus,
+  ECountryCode,
+  ECurrencyCode,
+} from '@contractflow/contracts-schema';
 
 @Entity('company')
 export class Company extends BaseCustomEntity implements ICompanyEntity {
@@ -42,7 +46,7 @@ export class Company extends BaseCustomEntity implements ICompanyEntity {
   postalCode!: string;
 
   @Column({ name: 'country_code', type: 'char', length: 2 })
-  countryCode!: string;
+  countryCode!: ECountryCode;
 
   @Column({ name: 'default_currency_code', type: 'char', length: 3 })
   defaultCurrencyCode!: ECurrencyCode;

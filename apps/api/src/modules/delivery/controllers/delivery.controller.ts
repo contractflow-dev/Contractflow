@@ -1,18 +1,23 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
+import { CurrentCompanyId } from '../../../common/decorators/current-company-id.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import type { AuthenticatedUser } from '../../identity/services/auth.service';
+import { CompanyContextGuard } from '../../../common/guards/company-context.guard';
+import { ContractContextGuard } from '../../../common/guards/contract-context.guard';
+import { CurrentContractId } from '../../../common/decorators/current-contract-id.decorator';
+import type { AuthenticatedUser } from '../../identity/interface/auth-context.interface';
 import { DeliveryService } from '../services/delivery.service';
 
-@Controller('companies/:companyId/contracts/:contractId')
+@Controller('contract')
+@UseGuards(CompanyContextGuard, ContractContextGuard)
 export class DeliveryController {
   constructor(private readonly delivery: DeliveryService) {}
 
   @Get('stages')
   listStages(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
     @Query() query: PaginationQueryDto,
   ) {
     return this.delivery.stages.list(user.id, companyId, contractId, query);
@@ -21,8 +26,8 @@ export class DeliveryController {
   @Get('stages/:stageId')
   getStage(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
     @Param('stageId') stageId: string,
   ) {
     return this.delivery.stages.get(user.id, companyId, contractId, stageId);
@@ -31,8 +36,8 @@ export class DeliveryController {
   @Get('milestones')
   listMilestones(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
     @Query() query: PaginationQueryDto,
   ) {
     return this.delivery.milestones.list(user.id, companyId, contractId, query);
@@ -41,18 +46,23 @@ export class DeliveryController {
   @Get('milestones/:milestoneId')
   getMilestone(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
     @Param('milestoneId') milestoneId: string,
   ) {
-    return this.delivery.milestones.get(user.id, companyId, contractId, milestoneId);
+    return this.delivery.milestones.get(
+      user.id,
+      companyId,
+      contractId,
+      milestoneId,
+    );
   }
 
   @Get('variations')
   listVariations(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
     @Query() query: PaginationQueryDto,
   ) {
     return this.delivery.variations.list(user.id, companyId, contractId, query);
@@ -61,10 +71,15 @@ export class DeliveryController {
   @Get('variations/:variationId')
   getVariation(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
     @Param('variationId') variationId: string,
   ) {
-    return this.delivery.variations.get(user.id, companyId, contractId, variationId);
+    return this.delivery.variations.get(
+      user.id,
+      companyId,
+      contractId,
+      variationId,
+    );
   }
 }

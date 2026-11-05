@@ -11,14 +11,17 @@ async function bootstrap() {
   const config = app.get(ConfigService);
   app.enableCors({
     origin: new URL(
-      config.get<string>('CORS_ORIGIN') ??
-        config.getOrThrow<string>('WEB_URL'),
+      config.get<string>('CORS_ORIGIN') ?? config.getOrThrow<string>('WEB_URL'),
     ).origin,
     credentials: true,
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Company-Id',
+      'X-Contract-Id',
+    ],
   });
-  app.useGlobalPipes(
-    new ValidationPipe({ whitelist: true, transform: true }),
-  );
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   const port = process.env.PORT ?? 3001;
   await app.listen(port, '0.0.0.0');

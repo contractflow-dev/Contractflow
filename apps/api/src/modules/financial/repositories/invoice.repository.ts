@@ -4,7 +4,7 @@ import { FindOptionsWhere, Repository } from 'typeorm';
 import { ContractScopedRepository } from '../../../common/database/repositories/contract-scoped.repository';
 import { Invoice } from '../entities/invoice.entity';
 import { IContractScope } from '../../../common/database/repositories/contract-scope.interface';
-import { SelectQueryBuilder } from 'typeorm/browser';
+import {  } from 'typeorm/browser';
 import { sumBigint } from '../../../common/database/utils/sum-bigint';
 
 type Scope = IContractScope;
@@ -15,20 +15,19 @@ export class InvoiceRepository extends ContractScopedRepository<Invoice> {
     super(repository);
   }
 
-  findByStatus(status: Invoice['status'], scope: Scope) {
+  findByStatus(scope: Scope, status: Invoice['status']) {
     return this.findAll(scope, {
       where: { status } as FindOptionsWhere<Invoice>,
     });
   }
 
   findByInvoiceNumber(invoiceNumber: string, scope: Scope) {
-    return this.findOne(
-      { where: { invoiceNumber } as FindOptionsWhere<Invoice> },
-      scope,
-    );
+    return this.findOne(scope, {
+      where: { invoiceNumber } as FindOptionsWhere<Invoice>,
+    });
   }
 
-  findByIssuer(issuedByPartyId: string, scope: Scope) {
+  findByIssuer(scope: Scope, issuedByPartyId: string) {
     return this.findAll(scope, {
       where: { issuedByPartyId } as FindOptionsWhere<Invoice>,
     });
@@ -43,7 +42,7 @@ export class InvoiceRepository extends ContractScopedRepository<Invoice> {
       .getMany();
   }
 
-  findOverdue(today: string, scope: Scope) {
+  findOverdue(scope: Scope, today: string) {
     return this.scopedQuery(scope)
       .andWhere('e.status = :s', { s: 'CERTIFIED' })
       .andWhere('e.amountPaidMinor < e.netPayableMinor')

@@ -1,4 +1,4 @@
-import { EContractVariationStatus, EContractVariationType } from "@contractflow/contracts-schema"
+import { EContractVariationStatus, EContractVariationType, ECurrencyCode } from "@contractflow/contracts-schema"
 
 export interface IContractVariationEntity {
     contractId : string
@@ -9,7 +9,7 @@ export interface IContractVariationEntity {
     variationType : EContractVariationType
     status : EContractVariationStatus
     amountDeltaMinor : number
-    currencyCode : string
+    currencyCode : ECurrencyCode
     timeExtensionDays : number
     submittedAt : Date
     submittedById : string

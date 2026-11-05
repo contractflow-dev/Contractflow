@@ -1,7 +1,9 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { CurrentCompanyId } from '../../../common/decorators/current-company-id.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { CompanyContextGuard } from '../../../common/guards/company-context.guard';
 import { Public } from '../../../common/decorators/public.decorator';
-import type { AuthenticatedUser } from '../../identity/services/auth.service';
+import type { AuthenticatedUser } from '../../identity/interface/auth-context.interface';
 import {
   ContractPartyInvitationTokenRequestDto,
   RespondContractPartyInvitationRequestDto,
@@ -18,10 +20,11 @@ export class ContractPartyInvitationController {
     return this.lifecycle.getCompanyInvitationPreview(body.token);
   }
 
-  @Post('companies/:companyId/contract-party-invitations/respond')
+  @Post('contract-party-invitations/respond')
+  @UseGuards(CompanyContextGuard)
   respond(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
+    @CurrentCompanyId() companyId: string,
     @Body() body: RespondContractPartyInvitationRequestDto,
   ) {
     return this.lifecycle.respondToCompanyInvitation(

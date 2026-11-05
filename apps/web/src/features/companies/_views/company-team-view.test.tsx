@@ -35,12 +35,32 @@ vi.mock("@/features/companies", () => ({
 describe("CompanyTeamView", () => {
   beforeEach(() => {
     mocks.getMembers.mockReturnValue({
-      currentData: { items: [], total: 0, page: 1, limit: 20 },
+      currentData: {
+        data: [],
+        meta: {
+          totalItems: 0,
+          itemCount: 0,
+          itemsPerPage: 20,
+          totalPages: 0,
+          currentPage: 1,
+        },
+      },
+      isFetching: false,
       error: undefined,
       isLoading: false,
     });
     mocks.getInvitations.mockReturnValue({
-      currentData: { items: [], total: 0, page: 1, limit: 50 },
+      currentData: {
+        data: [],
+        meta: {
+          totalItems: 0,
+          itemCount: 0,
+          itemsPerPage: 10,
+          totalPages: 0,
+          currentPage: 1,
+        },
+      },
+      isFetching: false,
       error: undefined,
       isLoading: false,
     });

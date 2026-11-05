@@ -5,10 +5,13 @@ import type { FormEvent, InputHTMLAttributes } from "react";
 import { useRouter } from "next/navigation";
 import {
   ECompanyRole,
+  EContractSortField,
   EContractStatus,
   EContractType,
   ECurrencyCode,
   EPartyType,
+  ESortOrder,
+  MAX_PAGE_LIMIT,
 } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Badge } from "@workspace/ui/components/badge";
@@ -28,13 +31,14 @@ import {
 } from "@workspace/ui/components/native-select";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { getApiErrorMessage } from "@/lib/apiError";
-import { useGetCompanyMembershipQuery } from "@/features/companies/companiesApi";
+import { useGetCompanyMembershipQuery } from "@/services/companiesApi";
 import {
   useArchiveContractMutation,
   useCreateContractMutation,
   useCreateContractPartyInvitationMutation,
   useGetContractLifecyclePermissionsQuery,
   useGetContractPartyInvitationsQuery,
+  useGetContractsQuery,
   useGetContractWorkspacesQuery,
   useRevokeContractPartyInvitationMutation,
   useTransitionContractMutation,
@@ -64,6 +68,16 @@ const transitionOptions: Record<
 export function CreateContractForm({ companyId }: { companyId: string }) {
   const [open, setOpen] = useState(false);
   const membershipQuery = useGetCompanyMembershipQuery({ companyId });
+  const parentContractsQuery = useGetContractsQuery(
+    {
+      companyId,
+      page: 1,
+      limit: MAX_PAGE_LIMIT,
+      sortBy: EContractSortField.REFERENCE_NUMBER,
+      sortOrder: ESortOrder.ASC,
+    },
+    { skip: !open },
+  );
   const [createContract, createState] = useCreateContractMutation();
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -80,6 +94,7 @@ export function CreateContractForm({ companyId }: { companyId: string }) {
       contractType: String(form.get("contractType")) as EContractType,
       partyType: String(form.get("partyType")) as EPartyType,
       workspaces: selectedWorkspaces,
+      parentContractId: String(form.get("parentContractId") ?? "") || null,
       originalValueMinor: Number(form.get("originalValueMinor")),
       currencyCode: String(form.get("currencyCode")) as ECurrencyCode,
       retentionRateBps: Number(form.get("retentionRateBps")),
@@ -151,6 +166,34 @@ export function CreateContractForm({ companyId }: { companyId: string }) {
                 label="Contract type"
                 values={Object.values(EContractType)}
               />
+              <Field>
+                <FieldLabel htmlFor="new-contract-parentContractId">
+                  Parent contract (subcontract of)
+                </FieldLabel>
+                <NativeSelect
+                  id="new-contract-parentContractId"
+                  name="parentContractId"
+                  defaultValue=""
+                  disabled={parentContractsQuery.isFetching}
+                >
+                  <NativeSelectOption value="">
+                    None — standalone contract
+                  </NativeSelectOption>
+                  {parentContractsQuery.currentData?.data.map((parent) => (
+                    <NativeSelectOption key={parent.id} value={parent.id}>
+                      {parent.referenceNumber} · {parent.title}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+                {parentContractsQuery.error ? (
+                  <p className="text-xs text-destructive">
+                    {getApiErrorMessage(
+                      parentContractsQuery.error,
+                      "Unable to load existing contracts.",
+                    )}
+                  </p>
+                ) : null}
+              </Field>
               <FormSelect
                 name="partyType"
                 label="Creating company party type"
@@ -548,9 +591,7 @@ export function ContractLifecycleManagement({
                   ) {
                     const result = await archiveContract(query);
                     if (!("error" in result)) {
-                      router.push(
-                        `/dashboards/contracts?companyId=${encodeURIComponent(companyId)}`,
-                      );
+                      router.push("/dashboards/contracts");
                     }
                   }
                 }}

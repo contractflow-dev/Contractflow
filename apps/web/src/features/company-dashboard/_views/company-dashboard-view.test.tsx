@@ -1,8 +1,15 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { EContractStatus } from "@contractflow/contracts-schema";
-import type { CompanyDashboard } from "@/features/companies/companiesApi";
+import {
+  ECompanyRole,
+  ECompanyStatus,
+  ECompanyUserStatus,
+  ECountryCode,
+  ECurrencyCode,
+  EContractStatus,
+} from "@contractflow/contracts-schema";
+import type { ICompanyDashboardResponse } from "@contractflow/contracts-schema";
 import { CompanyDashboardView } from "./company-dashboard-view";
 
 const mocks = vi.hoisted(() => ({
@@ -33,7 +40,7 @@ vi.mock("@/services/authApi", () => ({
   useGetCurrentUserQuery: mocks.getCurrentUser,
 }));
 
-const dashboard: CompanyDashboard = {
+const dashboard: ICompanyDashboardResponse = {
   company: {
     id: "company-1",
     name: "Acme Works",
@@ -48,15 +55,15 @@ const dashboard: CompanyDashboard = {
     city: "Test City",
     stateRegion: "Test Region",
     postalCode: "00000",
-    countryCode: "US",
-    defaultCurrencyCode: "USD",
-    status: "active",
+    countryCode: ECountryCode.US,
+    defaultCurrencyCode: ECurrencyCode.USD,
+    status: ECompanyStatus.ACTIVE,
   },
   membership: {
     id: "membership-1",
     companyId: "company-1",
-    companyRole: "COMPANY_ADMIN",
-    status: "active",
+    companyRole: ECompanyRole.COMPANY_ADMIN,
+    status: ECompanyUserStatus.ACTIVE,
     canManageCompany: true,
   },
   expiryWindowDays: 30,
@@ -110,9 +117,7 @@ describe("CompanyDashboardView", () => {
     expect(markup).toContain("Site services agreement");
     expect(markup).toContain("CTR-001");
     expect(markup).toContain("Total contracts");
-    expect(markup).toContain(
-      'href="/dashboards/contracts/contract-1?companyId=company-1"',
-    );
+    expect(markup).toContain('href="/dashboards/contracts/contract-1"');
     expect(markup).toContain("Recently updated contracts");
     expect(markup).toContain("ending in the next 30 days");
     expect(markup).toContain("Equipment supply");

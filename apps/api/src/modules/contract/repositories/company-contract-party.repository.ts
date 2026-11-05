@@ -32,21 +32,20 @@ export class CompanyContractPartyRepository extends CompanyScopedRepository<Cont
   }
 
   /** This company's party row on one contract, or null if it is not a party. */
-  findByContract(contractId: string, scope: ICompanyScope) {
-    return this.findOne(
-      { where: { contractId } as FindOptionsWhere<ContractParty> },
-      scope,
-    );
+  findByContract(scope: ICompanyScope, contractId: string) {
+    return this.findOne(scope, {
+      where: { contractId } as FindOptionsWhere<ContractParty>,
+    });
   }
 
   async isPartyToContract(
-    contractId: string,
     scope: ICompanyScope,
+    contractId: string,
   ): Promise<boolean> {
-    return (await this.findByContract(contractId, scope)) !== null;
+    return (await this.findByContract(scope, contractId)) !== null;
   }
 
-  findByPartyType(partyType: ContractParty['partyType'], scope: ICompanyScope) {
+  findByPartyType(scope: ICompanyScope, partyType: ContractParty['partyType']) {
     return this.findAll(scope, {
       where: { partyType } as FindOptionsWhere<ContractParty>,
     });

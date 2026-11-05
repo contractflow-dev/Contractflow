@@ -108,12 +108,7 @@ export class ContractRoleInvitations1791882600004 implements MigrationInterface 
       ['company_id', 'character varying', '26', false],
       ['invited_by_id', 'character varying', '26', false],
       ['email', 'character varying', '320', false],
-      [
-        'contract_role',
-        'enum',
-        '',
-        false,
-      ],
+      ['contract_role', 'enum', '', false],
       ['workspace', 'character varying', '20', false],
       ['is_workspace_admin', 'boolean', '', false],
       ['token_hash', 'character varying', '64', false],
@@ -174,8 +169,7 @@ export class ContractRoleInvitations1791882600004 implements MigrationInterface 
       },
       {
         name: 'ck_contract_role_invitation_status',
-        expression:
-          `"status" IN ('pending', 'accepted', 'rejected', 'expired', 'revoked')`,
+        expression: `"status" IN ('pending', 'accepted', 'rejected', 'expired', 'revoked')`,
       },
     ] as const;
     for (const expected of expectedChecks) {
@@ -184,7 +178,12 @@ export class ContractRoleInvitations1791882600004 implements MigrationInterface 
       );
       if (namedCheck) {
         const normalize = (value: string) =>
-          value.toLowerCase().replace(/["'()\s]/g, '');
+          value
+            .toLowerCase()
+            .replace(/::(?:character varying|text)(?:\[\])?/g, '')
+            .replace(/["'()\s]/g, '')
+            .replace(/^check/, '')
+            .replace(/^([^=]+)=anyarray\[(.*)\]$/, '$1in$2');
         if (
           normalize(namedCheck.expression ?? '') !==
           normalize(expected.expression)
@@ -330,8 +329,7 @@ export class ContractRoleInvitations1791882600004 implements MigrationInterface 
         index.valid &&
         index.ready &&
         index.columns.join(',') === columns.join(',') &&
-        normalizePredicate(index.predicate) ===
-          normalizePredicate(predicate);
+        normalizePredicate(index.predicate) === normalizePredicate(predicate);
       const namedIndex = indexes.find((index) => index.name === name);
       if (namedIndex && !equivalent(namedIndex)) {
         throw new Error(
@@ -341,7 +339,7 @@ export class ContractRoleInvitations1791882600004 implements MigrationInterface 
       if (namedIndex || indexes.some(equivalent)) return;
 
       const [nameOccupied] = await queryRunner.query(
-        `SELECT to_regclass(format('%I.%I', current_schema(), $1)) IS NOT NULL AS present`,
+        `SELECT to_regclass(format('%I.%I', current_schema(), $1::text)) IS NOT NULL AS present`,
         [name],
       );
       if (nameOccupied.present) {

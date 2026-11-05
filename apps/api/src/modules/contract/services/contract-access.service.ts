@@ -3,17 +3,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
 import type { IContractCompanyScope } from '../../../common/database/repositories/contract-scope.interface';
 import { CompanyUserRepository } from '../../identity/repositories/company-user.respository';
-import { Contract } from '../entities/contract.entity';
-import { ContractWorkspaceEntity } from '../entities/contract-workspace.entity';
+import { ContractRepository } from '../repositories/contract.repository';
 import { ContractPartyRepository } from '../repositories/contract-party.repository';
 import { ContractRoleAssignmentRepository } from '../repositories/contract-role-assignment.repository';
+import { ContractWorkspaceRepository } from '../repositories/contract-workspace.repository';
 import { WORKSPACE_ROLES, type ContractWorkspace } from './contract-workspace';
-
-export type { ContractWorkspace } from './contract-workspace';
 
 @Injectable()
 export class ContractAccessService {
@@ -21,10 +17,8 @@ export class ContractAccessService {
     private readonly companyUsers: CompanyUserRepository,
     private readonly parties: ContractPartyRepository,
     private readonly roleAssignments: ContractRoleAssignmentRepository,
-    @InjectRepository(Contract)
-    private readonly contracts: Repository<Contract>,
-    @InjectRepository(ContractWorkspaceEntity)
-    private readonly workspaces: Repository<ContractWorkspaceEntity>,
+    private readonly contracts: ContractRepository,
+    private readonly workspaces: ContractWorkspaceRepository,
   ) {}
 
   async authorize(
@@ -40,33 +34,34 @@ export class ContractAccessService {
       throw new ForbiddenException('Active company membership is required');
     }
 
-    const membership = await this.companyUsers.findActiveMember(user, {
-      companyId: company,
-    });
+    const membership = await this.companyUsers.findActiveMember(
+      { companyId: company },
+      user,
+    );
     if (!membership) {
       throw new ForbiddenException('Active company membership is required');
     }
 
-    const party = await this.parties.findByCompany(company, {
-      contractId: contract,
-      companyId: company,
-    });
+    const party = await this.parties.findByCompany(
+      { contractId: contract, companyId: company },
+      company,
+    );
     if (!party) {
       throw new NotFoundException('Contract was not found');
     }
-    const contractRecord = await this.contracts.findOne({
-      where: { id: contract, deletedAt: IsNull() },
-      select: { id: true },
-    });
+    const contractRecord = await this.contracts.findById(
+      { companyId: company },
+      contract,
+    );
     if (!contractRecord) {
       throw new NotFoundException('Contract was not found');
     }
     if (workspace !== 'general') {
-      const workspaceRecord = await this.workspaces.findOne({
-        where: { contractId: contract, workspace },
-        select: { contractId: true },
-      });
-      if (!workspaceRecord) {
+      const workspaceExists = await this.workspaces.exists(
+        { contractId: contract, companyId: company },
+        workspace,
+      );
+      if (!workspaceExists) {
         throw new ForbiddenException('This contract workspace is unavailable');
       }
     }

@@ -17,6 +17,7 @@ import { Comment } from './entities/comment.entity';
 import { Conversation } from './entities/conversation.entity';
 import { Notification } from './entities/notification.entity';
 import { ContractModule } from '../contract/contract-module';
+import { IdentityModule } from '../identity/identity.module';
 import { ActivityController } from './controllers/activity.controller';
 import { ActivityService } from './services/activity.service';
 
@@ -31,6 +32,7 @@ const REPOSITORIES = [
 @Module({
   imports: [
     ContractModule,
+    IdentityModule,
     TypeOrmModule.forFeature([
       ActivityLog,
       Comment,

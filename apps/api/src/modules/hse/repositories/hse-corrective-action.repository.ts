@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, Repository } from 'typeorm';
+import type { FindOptionsOrder, FindOptionsWhere, Repository } from 'typeorm';
 import { ContractScopedRepository } from '../../../common/database/repositories/contract-scoped.repository';
 import { HseCorrectiveAction } from '../entities/hse-corrective-action.entity';
 import { IContractScope } from '../../../common/database/repositories/contract-scope.interface';
@@ -14,13 +14,13 @@ export class HseCorrectiveActionRepository extends ContractScopedRepository<HseC
     super(repository);
   }
 
-  findByIncident(hseIncidentId: string, scope: IContractScope) {
+  findByIncident(scope: IContractScope, hseIncidentId: string) {
     return this.findAll(scope, {
       where: { hseIncidentId } as FindOptionsWhere<HseCorrectiveAction>,
     });
   }
 
-  findByFinding(hseInspectionFindingId: string, scope: IContractScope) {
+  findByFinding(scope: IContractScope, hseInspectionFindingId: string) {
     return this.findAll(scope, {
       where: {
         hseInspectionFindingId,
@@ -28,12 +28,12 @@ export class HseCorrectiveActionRepository extends ContractScopedRepository<HseC
     });
   }
 
-  findByAssignee(assignedToCompanyUserId: string, scope: IContractScope) {
+  findByAssignee(scope: IContractScope, assignedToCompanyUserId: string) {
     return this.findAll(scope, {
       where: {
         assignedToCompanyUserId,
       } as FindOptionsWhere<HseCorrectiveAction>,
-      order: { dueDate: 'ASC' } as any,
+      order: { dueDate: 'ASC' } satisfies FindOptionsOrder<HseCorrectiveAction>,
     });
   }
 
@@ -44,7 +44,7 @@ export class HseCorrectiveActionRepository extends ContractScopedRepository<HseC
       .getMany();
   }
 
-  findOverdue(today: string, scope: IContractScope) {
+  findOverdue(scope: IContractScope, today: string) {
     return this.scopedQuery(scope)
       .andWhere('e.status IN (:...open)', { open: ['OPEN', 'IN_PROGRESS'] })
       .andWhere('e.dueDate < :today', { today })

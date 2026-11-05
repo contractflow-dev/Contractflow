@@ -19,10 +19,11 @@ export class CompanyAuditLogRepository extends CompanyScopedRepository<
   }
 
   async append(
-    data: DeepPartial<CompanyAuditLog>,
     scope: ICompanyScope,
+    data: DeepPartial<CompanyAuditLog>,
   ): Promise<CompanyAuditLog> {
-    return this.save(this.create(data, scope), scope);
+    const auditLog = this.create(scope, data);
+    return this.save(scope, auditLog);
   }
 
   override async update(): Promise<CompanyAuditLog> {

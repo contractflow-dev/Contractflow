@@ -1,33 +1,99 @@
-import { ForbiddenException } from '@nestjs/common';
+﻿import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import {
-  ECompanyStatus,
   ECompanyRole,
   ECompanyUserStatus,
   EContractType,
-  EContractRole,
   EContractStatus,
+  EContractSiteStatus,
+  ECountryCode,
   ECurrencyCode,
   EFromStatus,
   EPartyType,
   EToStatus,
 } from '@contractflow/contracts-schema';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ActivityLog } from '../../cross-cutting/entities/activity-log.entity';
-import { Company } from '../../identity/entities/company.entity';
-import { CompanyUser } from '../../identity/entities/company-user.entity';
-import { Contract } from '../entities/contract.entity';
-import { ContractParty } from '../entities/contract-party.entity';
-import { ContractRoleAssignment } from '../entities/contract-role-assignment.entity';
-import { ContractStatusHistory } from '../entities/contract-status-history.entity';
-import { ContractWorkspaceEntity } from '../entities/contract-workspace.entity';
+import type {
+  IContractLifecycleContext,
+  IContractLifecycleUnitOfWork,
+} from '../interfaces/contract-lifecycle-persistence.interface';
 import { ContractLifecycleService } from './contract-lifecycle.service';
+
+function createContext() {
+  return {
+    companies: {
+      findActiveForShare: vi.fn(),
+      findActiveVerifiedByEmail: vi.fn(),
+    },
+    memberships: { findActive: vi.fn(), findActiveForUpdate: vi.fn() },
+    contracts: {
+      findPermissionSnapshot: vi.fn(),
+      findForUpdate: vi.fn(),
+      findActiveForUpdate: vi.fn(),
+      findActiveById: vi.fn(),
+      create: vi.fn(),
+      save: vi.fn(async (value) => value),
+      parentWouldCreateCycle: vi.fn(),
+    },
+    parties: {
+      find: vi.fn(),
+      findForShare: vi.fn(),
+      findByIdWithContractAndCompany: vi.fn(),
+      findById: vi.fn(),
+      findForUpdate: vi.fn(),
+      save: vi.fn(async (value) => value),
+      create: vi.fn(),
+    },
+    workspaces: {
+      listWorkspaces: vi.fn(),
+      addMany: vi.fn(),
+      remove: vi.fn(),
+    },
+    roleAssignments: {
+      hasActiveAssignment: vi.fn(),
+      hasActiveAssignmentForShare: vi.fn(),
+      revokeForWorkspaceRoles: vi.fn(),
+      revokeAllForContract: vi.fn(),
+    },
+    roleInvitations: {
+      revokePendingForWorkspace: vi.fn(),
+      revokeAllPendingForContract: vi.fn(),
+    },
+    partyInvitations: {
+      expirePendingBySource: vi.fn(),
+      expireDuplicatePending: vi.fn(),
+      findPendingDuplicate: vi.fn(),
+      listBySource: vi.fn(),
+      findBySourceAndIdForUpdate: vi.fn(),
+      findByTokenHash: vi.fn(),
+      findByTokenHashForUpdate: vi.fn(),
+      expireIfPending: vi.fn(),
+      revokePendingBySource: vi.fn(),
+      create: vi.fn(),
+      save: vi.fn(async (value) => value),
+    },
+    sites: {
+      listByContract: vi.fn(),
+      findForUpdate: vi.fn(),
+      findByCode: vi.fn(),
+      create: vi.fn(),
+      save: vi.fn(async (value) => value),
+    },
+    statusHistory: { record: vi.fn() },
+    activity: { record: vi.fn() },
+  };
+}
 
 describe('ContractLifecycleService', () => {
   const contract = {
     id: 'contract-1',
     referenceNumber: 'CTR-001',
     status: EContractStatus.DRAFT,
-    deletedAt: null,
+    deletedAt: null as Date | null,
   };
   const actor = {
     id: 'membership-1',
@@ -42,76 +108,48 @@ describe('ContractLifecycleService', () => {
     companyId: actor.companyId,
     partyType: EPartyType.CONTRACTOR,
   };
-  const repositories = new Map<
-    unknown,
-    Record<string, ReturnType<typeof vi.fn>>
-  >();
-  const assignmentQuery = {
-    where: vi.fn(),
-    andWhere: vi.fn(),
-    setLock: vi.fn(),
-    getOne: vi.fn(),
-  };
-  const manager = {
-    getRepository: vi.fn((entity: unknown) => repositories.get(entity)),
-  };
-  const dataSource = {
-    manager,
-    transaction: vi.fn(
-      (callback: (transactionManager: typeof manager) => Promise<unknown>) =>
-        callback(manager),
-    ),
-  };
   const mail = { sendContractPartyInvitationEmail: vi.fn() };
+  let context: ReturnType<typeof createContext>;
+  let outcomes: { committed: number; rolledBack: number };
+  let unitOfWork: { execute: ReturnType<typeof vi.fn> };
   let service: ContractLifecycleService;
 
   beforeEach(() => {
     vi.resetAllMocks();
-    repositories.clear();
     contract.status = EContractStatus.DRAFT;
     contract.deletedAt = null;
-    manager.getRepository.mockImplementation((entity: unknown) =>
-      repositories.get(entity),
+    context = createContext();
+    context.contracts.save.mockImplementation(async (value) => value);
+    context.partyInvitations.save.mockImplementation(async (value) => value);
+    context.contracts.findActiveForUpdate.mockResolvedValue(contract);
+    context.contracts.findForUpdate.mockResolvedValue(contract);
+    context.contracts.findPermissionSnapshot.mockResolvedValue(contract);
+    context.memberships.findActive.mockResolvedValue(actor);
+    context.memberships.findActiveForUpdate.mockResolvedValue(actor);
+    context.parties.find.mockResolvedValue(party);
+    context.parties.findForShare.mockResolvedValue(party);
+    context.roleAssignments.hasActiveAssignment.mockResolvedValue(true);
+    context.roleAssignments.hasActiveAssignmentForShare.mockResolvedValue(true);
+
+    outcomes = { committed: 0, rolledBack: 0 };
+    unitOfWork = {
+      execute: vi.fn(async (operation) => {
+        try {
+          const result = await operation(
+            context as unknown as IContractLifecycleContext,
+          );
+          outcomes.committed += 1;
+          return result;
+        } catch (error) {
+          outcomes.rolledBack += 1;
+          throw error;
+        }
+      }),
+    };
+    service = new ContractLifecycleService(
+      unitOfWork as unknown as IContractLifecycleUnitOfWork,
+      mail as never,
     );
-    assignmentQuery.where.mockReturnValue(assignmentQuery);
-    assignmentQuery.andWhere.mockReturnValue(assignmentQuery);
-    assignmentQuery.setLock.mockReturnValue(assignmentQuery);
-    assignmentQuery.getOne.mockResolvedValue({
-      id: 'assignment-1',
-      role: EContractRole.CONTRACTOR_PROJECT_LEAD,
-      revokedAt: null,
-    });
-
-    const contractRepository = {
-      findOne: vi.fn().mockResolvedValue(contract),
-      save: vi.fn(async (value) => value),
-    };
-    const companyUserRepository = {
-      findOne: vi.fn().mockResolvedValue(actor),
-    };
-    const partyRepository = {
-      findOne: vi.fn().mockResolvedValue(party),
-    };
-    const assignmentRepository = {
-      createQueryBuilder: vi.fn().mockReturnValue(assignmentQuery),
-    };
-    const historyRepository = {
-      create: vi.fn((value) => value),
-      save: vi.fn(async (value) => value),
-    };
-    const activityRepository = {
-      create: vi.fn((value) => value),
-      save: vi.fn(async (value) => value),
-    };
-
-    repositories.set(Contract, contractRepository);
-    repositories.set(CompanyUser, companyUserRepository);
-    repositories.set(ContractParty, partyRepository);
-    repositories.set(ContractRoleAssignment, assignmentRepository);
-    repositories.set(ContractStatusHistory, historyRepository);
-    repositories.set(ActivityLog, activityRepository);
-
-    service = new ContractLifecycleService(dataSource as never, mail as never);
   });
 
   it('writes the status history and activity audit atomically', async () => {
@@ -122,10 +160,8 @@ describe('ContractLifecycleService', () => {
       { transition: 'activate', reason: 'Execution approved.' },
     );
 
-    const historyRepository = repositories.get(ContractStatusHistory)!;
-    const activityRepository = repositories.get(ActivityLog)!;
     expect(result.status).toBe(EContractStatus.ACTIVE);
-    expect(historyRepository.save).toHaveBeenCalledWith(
+    expect(context.statusHistory.record).toHaveBeenCalledWith(
       expect.objectContaining({
         fromStatus: EFromStatus.DRAFT,
         toStatus: EToStatus.ACTIVE,
@@ -133,23 +169,52 @@ describe('ContractLifecycleService', () => {
         changedById: actor.id,
       }),
     );
-    expect(activityRepository.save).toHaveBeenCalledWith(
+    expect(context.activity.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'contract.status_transitioned',
         changes: expect.objectContaining({
-          after: expect.objectContaining({
-            fromStatus: EContractStatus.DRAFT,
-            toStatus: EContractStatus.ACTIVE,
-            reason: 'Execution approved.',
-          }),
+          fromStatus: EContractStatus.DRAFT,
+          toStatus: EContractStatus.ACTIVE,
+          reason: 'Execution approved.',
         }),
       }),
     );
-    expect(dataSource.transaction).toHaveBeenCalledOnce();
+    expect(unitOfWork.execute).toHaveBeenCalledOnce();
+    expect(outcomes).toEqual({ committed: 1, rolledBack: 0 });
+  });
+
+  it('rolls the transition back when its audit write fails', async () => {
+    context.activity.record.mockRejectedValue(new Error('audit write failed'));
+
+    await expect(
+      service.transition(actor.userId, actor.companyId, contract.id, {
+        transition: 'activate',
+        reason: 'Execution approved.',
+      }),
+    ).rejects.toThrow('audit write failed');
+    expect(unitOfWork.execute).toHaveBeenCalledOnce();
+    expect(context.contracts.save).toHaveBeenCalledOnce();
+    expect(context.statusHistory.record).toHaveBeenCalledOnce();
+    expect(outcomes).toEqual({ committed: 0, rolledBack: 1 });
+  });
+
+  it('rolls the transition back when the history write fails', async () => {
+    context.statusHistory.record.mockRejectedValue(new Error('history failed'));
+
+    await expect(
+      service.transition(actor.userId, actor.companyId, contract.id, {
+        transition: 'activate',
+        reason: 'Execution approved.',
+      }),
+    ).rejects.toThrow('history failed');
+    expect(context.activity.record).not.toHaveBeenCalled();
+    expect(outcomes).toEqual({ committed: 0, rolledBack: 1 });
   });
 
   it('rejects lifecycle changes without an active project-lead assignment', async () => {
-    assignmentQuery.getOne.mockResolvedValue(null);
+    context.roleAssignments.hasActiveAssignmentForShare.mockResolvedValue(
+      false,
+    );
 
     await expect(
       service.transition(actor.userId, actor.companyId, contract.id, {
@@ -157,8 +222,9 @@ describe('ContractLifecycleService', () => {
         reason: 'Execution approved.',
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(repositories.get(ContractStatusHistory)!.save).not.toHaveBeenCalled();
-    expect(repositories.get(ActivityLog)!.save).not.toHaveBeenCalled();
+    expect(context.statusHistory.record).not.toHaveBeenCalled();
+    expect(context.activity.record).not.toHaveBeenCalled();
+    expect(outcomes.rolledBack).toBe(1);
   });
 
   it('records the creating company separately from the acting membership and contract party', async () => {
@@ -170,37 +236,11 @@ describe('ContractLifecycleService', () => {
       id: 'contract-created',
       createdByCompanyId: actor.companyId,
     };
-    const companyRepository = {
-      findOne: vi.fn().mockResolvedValue({
-        id: actor.companyId,
-        status: ECompanyStatus.ACTIVE,
-      }),
-    };
-    const companyUserRepository = {
-      findOne: vi.fn().mockResolvedValue(creatorActor),
-    };
-    const contractRepository = {
-      create: vi.fn((value) => value),
-      save: vi.fn().mockResolvedValue(newContract),
-    };
-    const partyRepository = {
-      create: vi.fn((value) => value),
-      save: vi.fn(async (value) => value),
-    };
-    const workspaceRepository = {
-      create: vi.fn((value) => value),
-      save: vi.fn(async (value) => value),
-    };
-    const historyRepository = {
-      create: vi.fn((value) => value),
-      save: vi.fn(async (value) => value),
-    };
-    repositories.set(Company, companyRepository);
-    repositories.set(CompanyUser, companyUserRepository);
-    repositories.set(Contract, contractRepository);
-    repositories.set(ContractParty, partyRepository);
-    repositories.set(ContractWorkspaceEntity, workspaceRepository);
-    repositories.set(ContractStatusHistory, historyRepository);
+    context.companies.findActiveForShare.mockResolvedValue({
+      id: actor.companyId,
+    });
+    context.memberships.findActiveForUpdate.mockResolvedValue(creatorActor);
+    context.contracts.create.mockResolvedValue(newContract);
 
     const created = await service.create(actor.userId, actor.companyId, {
       referenceNumber: 'CTR-002',
@@ -220,57 +260,411 @@ describe('ContractLifecycleService', () => {
     });
 
     expect(created).toBe(newContract);
-    expect(contractRepository.create).toHaveBeenCalledWith(
+    expect(context.contracts.create).toHaveBeenCalledWith(
       expect.objectContaining({ createdByCompanyId: actor.companyId }),
     );
-    expect(partyRepository.create).toHaveBeenCalledWith(
+    expect(context.parties.create).toHaveBeenCalledWith({
+      contractId: newContract.id,
+      companyId: actor.companyId,
+      partyType: EPartyType.CONTRACTOR,
+    });
+    expect(context.workspaces.addMany).toHaveBeenCalledWith(
+      newContract.id,
+      ['project'],
+      creatorActor.id,
+    );
+    expect(context.statusHistory.record).toHaveBeenCalledWith(
       expect.objectContaining({
         contractId: newContract.id,
-        companyId: actor.companyId,
-        partyType: EPartyType.CONTRACTOR,
+        toStatus: EToStatus.DRAFT,
+        changedById: creatorActor.id,
       }),
     );
-    expect(workspaceRepository.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        contractId: newContract.id,
-        createdByCompanyUserId: creatorActor.id,
-      }),
-    );
-    expect(dataSource.transaction).toHaveBeenCalledOnce();
+    expect(unitOfWork.execute).toHaveBeenCalledOnce();
+    expect(outcomes).toEqual({ committed: 1, rolledBack: 0 });
   });
 
   it('keeps creator administration distinct from project-lead transition access', async () => {
-    const permissions = await service.managementPermissions(
-      actor.userId,
-      actor.companyId,
-      contract.id,
-    );
-    expect(permissions).toEqual({
+    await expect(
+      service.managementPermissions(actor.userId, actor.companyId, contract.id),
+    ).resolves.toEqual({
       canManage: false,
       canTransition: true,
       canRestore: false,
     });
 
-    repositories.get(CompanyUser)!.findOne.mockResolvedValue({
+    context.memberships.findActive.mockResolvedValue({
       ...actor,
       companyRole: ECompanyRole.COMPANY_ADMIN,
     });
-    repositories.get(Contract)!.findOne.mockResolvedValue({
+    context.contracts.findPermissionSnapshot.mockResolvedValue({
       ...contract,
       createdByCompanyId: actor.companyId,
     });
-    assignmentQuery.getOne.mockResolvedValue(null);
+    context.roleAssignments.hasActiveAssignment.mockResolvedValue(false);
 
     await expect(
-      service.managementPermissions(
-        actor.userId,
-        actor.companyId,
-        contract.id,
-      ),
+      service.managementPermissions(actor.userId, actor.companyId, contract.id),
     ).resolves.toEqual({
       canManage: true,
       canTransition: false,
       canRestore: false,
+    });
+  });
+
+  it('does not allow a non-admin party member to modify contract workspaces', async () => {
+    context.companies.findActiveForShare.mockResolvedValue({
+      id: actor.companyId,
+    });
+    context.contracts.findForUpdate.mockResolvedValue({
+      ...contract,
+      createdByCompanyId: actor.companyId,
+    });
+
+    await expect(
+      service.updateWorkspaces(actor.userId, actor.companyId, contract.id, {
+        workspaces: ['project'],
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(context.workspaces.listWorkspaces).not.toHaveBeenCalled();
+    expect(context.workspaces.addMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid party-invitation tokens', async () => {
+    context.partyInvitations.findByTokenHash.mockResolvedValue(null);
+
+    await expect(
+      service.getCompanyInvitationPreview('invalid-token'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(context.partyInvitations.expireIfPending).not.toHaveBeenCalled();
+  });
+
+  it('expires only a still-pending party invitation and commits before reporting expiry', async () => {
+    context.partyInvitations.findByTokenHash.mockResolvedValue({
+      id: 'invitation-1',
+      status: 'pending',
+      revokedAt: null,
+      expiresAt: new Date('2020-01-01T00:00:00.000Z'),
+    });
+
+    await expect(
+      service.getCompanyInvitationPreview('expired-token'),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(context.partyInvitations.expireIfPending).toHaveBeenCalledWith(
+      'invitation-1',
+    );
+    expect(outcomes).toEqual({ committed: 1, rolledBack: 0 });
+  });
+
+  it('rejects reuse of an already accepted party invitation', async () => {
+    const invitation = {
+      id: 'invitation-1',
+      sourceContractPartyId: party.id,
+      targetCompanyId: 'target-company',
+      status: 'accepted',
+      revokedAt: null,
+    };
+    context.partyInvitations.findByTokenHash.mockResolvedValue(invitation);
+    context.partyInvitations.findByTokenHashForUpdate.mockResolvedValue(
+      invitation,
+    );
+    context.parties.findById.mockResolvedValue(party);
+
+    await expect(
+      service.respondToCompanyInvitation(
+        actor.userId,
+        'target-company',
+        'used-token',
+        'accept',
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(context.partyInvitations.save).not.toHaveBeenCalled();
+  });
+
+  it('sends the invitation email before commit and rolls back when the later audit write fails', async () => {
+    const creatorActor = {
+      ...actor,
+      companyRole: ECompanyRole.COMPANY_ADMIN,
+    };
+    const target = { id: 'target', email: 'a@b.co', name: 'Target Co' };
+    context.companies.findActiveForShare.mockResolvedValue({ id: 'company-1' });
+    context.memberships.findActiveForUpdate.mockResolvedValue(creatorActor);
+    context.contracts.findForUpdate.mockResolvedValue({
+      ...contract,
+      title: 'Contract',
+      createdByCompanyId: actor.companyId,
+    });
+    context.parties.find.mockResolvedValue(null);
+    context.parties.findForShare.mockResolvedValue(party);
+    context.companies.findActiveVerifiedByEmail.mockResolvedValue([target]);
+    context.partyInvitations.findPendingDuplicate.mockResolvedValue(null);
+    context.partyInvitations.create.mockResolvedValue({ id: 'invitation-1' });
+    context.activity.record.mockRejectedValue(new Error('audit write failed'));
+
+    await expect(
+      service.inviteCompany(actor.userId, actor.companyId, contract.id, {
+        email: target.email,
+        partyType: EPartyType.CONTRACTOR,
+      } as never),
+    ).rejects.toThrow('audit write failed');
+    expect(mail.sendContractPartyInvitationEmail).toHaveBeenCalledOnce();
+    expect(outcomes).toEqual({ committed: 0, rolledBack: 1 });
+  });
+  describe('recordSignatory', () => {
+    const adminActor = { ...actor, companyRole: ECompanyRole.COMPANY_ADMIN };
+    const signatory = {
+      signatoryFirstName: '  Ada ',
+      signatoryLastName: 'Lovelace',
+      signatoryTitle: 'Managing Director',
+      signedAt: '2026-01-15',
+    };
+
+    beforeEach(() => {
+      context.companies.findActiveForShare.mockResolvedValue({ id: 'company-1' });
+      context.memberships.findActiveForUpdate.mockResolvedValue(adminActor);
+      context.parties.findForUpdate.mockResolvedValue({
+        ...party,
+        signatoryFirstName: null,
+        signatoryLastName: null,
+        signatoryTitle: null,
+        signedAt: null,
+      });
+      context.parties.save.mockImplementation(async (value) => value);
+    });
+
+    it("records the acting company's own signatory and audits it atomically", async () => {
+      const result = await service.recordSignatory(
+        actor.userId,
+        actor.companyId,
+        contract.id,
+        signatory,
+      );
+
+      expect(context.parties.findForUpdate).toHaveBeenCalledWith(
+        contract.id,
+        actor.companyId,
+      );
+      expect(result).toMatchObject({
+        id: party.id,
+        companyId: actor.companyId,
+        signatoryFirstName: 'Ada',
+        signatoryLastName: 'Lovelace',
+        signatoryTitle: 'Managing Director',
+      });
+      expect(result.signedAt?.toISOString()).toBe('2026-01-15T00:00:00.000Z');
+      expect(context.activity.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'contract.signatory_recorded',
+          companyId: actor.companyId,
+        }),
+      );
+      expect(outcomes).toEqual({ committed: 1, rolledBack: 0 });
+    });
+
+    it('requires a Company Administrator', async () => {
+      context.memberships.findActiveForUpdate.mockResolvedValue(actor);
+
+      await expect(
+        service.recordSignatory(
+          actor.userId,
+          actor.companyId,
+          contract.id,
+          signatory,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(context.parties.save).not.toHaveBeenCalled();
+    });
+
+    it('does not let a company sign a contract it is not a party to', async () => {
+      context.parties.findForUpdate.mockResolvedValue(null);
+
+      await expect(
+        service.recordSignatory(
+          actor.userId,
+          'other-company',
+          contract.id,
+          signatory,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(context.parties.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects archived contracts', async () => {
+      context.contracts.findActiveForUpdate.mockResolvedValue(null);
+
+      await expect(
+        service.recordSignatory(
+          actor.userId,
+          actor.companyId,
+          contract.id,
+          signatory,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(context.parties.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects a signing date in the future', async () => {
+      await expect(
+        service.recordSignatory(actor.userId, actor.companyId, contract.id, {
+          ...signatory,
+          signedAt: '2999-01-01',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(unitOfWork.execute).not.toHaveBeenCalled();
+    });
+    it("reads only the acting company's signatory, and only for a Company Administrator", async () => {
+      context.parties.find.mockResolvedValue({
+        ...party,
+        signatoryFirstName: 'Ada',
+        signatoryLastName: 'Lovelace',
+        signatoryTitle: 'Director',
+        signedAt: new Date('2026-01-15T00:00:00.000Z'),
+      });
+
+      await expect(
+        service.getSignatory(actor.userId, actor.companyId, contract.id),
+      ).resolves.toMatchObject({ id: party.id, signatoryFirstName: 'Ada' });
+      expect(context.parties.find).toHaveBeenCalledWith(
+        contract.id,
+        actor.companyId,
+      );
+
+      context.memberships.findActiveForUpdate.mockResolvedValue(actor);
+      await expect(
+        service.getSignatory(actor.userId, actor.companyId, contract.id),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+  });
+  describe('contract sites', () => {
+    const adminActor = { ...actor, companyRole: ECompanyRole.COMPANY_ADMIN };
+    const timestamp = new Date('2026-02-01T00:00:00.000Z');
+    const siteInput = {
+      name: 'North yard',
+      siteCode: 'NY-01',
+      addressLine1: '1 Quay Road',
+      city: 'Lagos',
+      stateRegion: 'Lagos',
+      countryCode: ECountryCode.NG,
+      latitudeE6: 6_524_379,
+      longitudeE6: 3_379_206,
+      status: EContractSiteStatus.PLANNED,
+    };
+    const storedSite = {
+      ...siteInput,
+      id: 'site-1',
+      contractId: contract.id,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+
+    beforeEach(() => {
+      context.companies.findActiveForShare.mockResolvedValue({ id: 'company-1' });
+      context.memberships.findActiveForUpdate.mockResolvedValue(adminActor);
+      context.contracts.findForUpdate.mockResolvedValue({
+        ...contract,
+        createdByCompanyId: actor.companyId,
+      });
+      context.sites.findByCode.mockResolvedValue(null);
+      context.sites.create.mockResolvedValue(storedSite);
+      context.sites.save.mockImplementation(async (value) => value);
+    });
+
+    it("lets the creating company's administrator add a site and audits it", async () => {
+      const result = await service.createSite(
+        actor.userId,
+        actor.companyId,
+        contract.id,
+        siteInput,
+      );
+
+      expect(context.sites.findByCode).toHaveBeenCalledWith(
+        contract.id,
+        'NY-01',
+      );
+      expect(context.sites.create).toHaveBeenCalledWith({
+        ...siteInput,
+        contractId: contract.id,
+      });
+      expect(result).toMatchObject({
+        id: 'site-1',
+        latitudeE6: 6_524_379,
+        createdAt: '2026-02-01T00:00:00.000Z',
+      });
+      expect(context.activity.record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'contract.site_created' }),
+      );
+      expect(outcomes).toEqual({ committed: 1, rolledBack: 0 });
+    });
+
+    it('hides site management from companies that did not create the contract', async () => {
+      context.contracts.findForUpdate.mockResolvedValue({
+        ...contract,
+        createdByCompanyId: 'another-company',
+      });
+
+      await expect(
+        service.listSites(actor.userId, actor.companyId, contract.id),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      await expect(
+        service.createSite(actor.userId, actor.companyId, contract.id, siteInput),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(context.sites.listByContract).not.toHaveBeenCalled();
+      expect(context.sites.create).not.toHaveBeenCalled();
+    });
+
+    it('requires a Company Administrator', async () => {
+      context.memberships.findActiveForUpdate.mockResolvedValue(actor);
+
+      await expect(
+        service.createSite(actor.userId, actor.companyId, contract.id, siteInput),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(context.sites.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a duplicate site code on the same contract', async () => {
+      context.sites.findByCode.mockResolvedValue(storedSite);
+
+      await expect(
+        service.createSite(actor.userId, actor.companyId, contract.id, siteInput),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(context.sites.create).not.toHaveBeenCalled();
+    });
+
+    it('updates only a site that belongs to the contract', async () => {
+      context.sites.findForUpdate.mockResolvedValue({ ...storedSite });
+
+      const result = await service.updateSite(
+        actor.userId,
+        actor.companyId,
+        contract.id,
+        'site-1',
+        { name: ' Main yard ', status: EContractSiteStatus.ACTIVE },
+      );
+
+      expect(context.sites.findForUpdate).toHaveBeenCalledWith(
+        contract.id,
+        'site-1',
+      );
+      expect(result).toMatchObject({
+        name: 'Main yard',
+        status: EContractSiteStatus.ACTIVE,
+        siteCode: 'NY-01',
+      });
+      expect(context.sites.findByCode).not.toHaveBeenCalled();
+
+      context.sites.findForUpdate.mockResolvedValue(null);
+      await expect(
+        service.updateSite(actor.userId, actor.companyId, contract.id, 'other', {
+          name: 'X',
+        }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('rejects an empty site update', async () => {
+      await expect(
+        service.updateSite(actor.userId, actor.companyId, contract.id, 'site-1', {}),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(unitOfWork.execute).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,4 +1,5 @@
 export * from "./common/index.js";
+export * from "./modules/admin/index.js";
 export * from "./modules/compliance/index.js";
 export * from "./modules/contract/index.js";
 export * from "./modules/cross-cutting/index.js";

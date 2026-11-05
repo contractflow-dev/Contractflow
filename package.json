@@ -6,7 +6,8 @@
   "scripts": {
     "dev:web": "pnpm --filter ./apps/web dev",
     "dev:api": "pnpm --filter ./apps/api start:dev",
-    "dev": "concurrently -n web,api -c cyan,magenta \"pnpm run dev:web\" \"pnpm run dev:api\"",
+    "dev:docker": "docker compose -f infra/docker-compose.yml --env-file infra/dev-docker.env --profile app up -d --build web",
+    "dev": "concurrently -n web,api,docker -c cyan,magenta,yellow \"pnpm run dev:web\" \"pnpm run dev:api\" \"pnpm run dev:docker\"",
     "build": "pnpm -r --if-present run build",
     "lint": "pnpm -r --if-present run lint",
     "format": "prettier --write ."

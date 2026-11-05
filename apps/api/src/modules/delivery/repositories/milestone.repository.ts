@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, Repository } from 'typeorm';
+import type { FindOptionsOrder, FindOptionsWhere, Repository } from 'typeorm';
 import { ContractScopedRepository } from '../../../common/database/repositories/contract-scoped.repository';
 import { Milestone } from '../entities/milestone.entity';
 import { IContractScope } from '../../../common/database/repositories/contract-scope.interface';
@@ -12,14 +12,14 @@ export class MilestoneRepository extends ContractScopedRepository<Milestone> {
     super(repository);
   }
 
-  findByStage(contractStageId: string, scope: Scope) {
+  findByStage(scope: Scope, contractStageId: string) {
     return this.findAll(scope, {
       where: { contractStageId } as FindOptionsWhere<Milestone>,
-      order: { sequence: 'ASC' } as any,
+      order: { sequence: 'ASC' } satisfies FindOptionsOrder<Milestone>,
     });
   }
 
-  findByStatus(status: Milestone['status'], scope: Scope) {
+  findByStatus(scope: Scope, status: Milestone['status']) {
     return this.findAll(scope, {
       where: { status } as FindOptionsWhere<Milestone>,
     });
@@ -28,7 +28,7 @@ export class MilestoneRepository extends ContractScopedRepository<Milestone> {
   findPaymentMilestones(scope: Scope) {
     return this.findAll(scope, {
       where: { isPaymentMilestone: true } as FindOptionsWhere<Milestone>,
-      order: { sequence: 'ASC' } as any,
+      order: { sequence: 'ASC' } satisfies FindOptionsOrder<Milestone>,
     });
   }
 
@@ -40,7 +40,7 @@ export class MilestoneRepository extends ContractScopedRepository<Milestone> {
   }
 
   /** Not completed and past its (revised) due date. */
-  findOverdue(today: string, scope: Scope) {
+  findOverdue(scope: Scope, today: string) {
     return this.scopedQuery(scope)
       .andWhere('e.completedDate IS NULL')
       .andWhere('COALESCE(e.revisedDueDate, e.dueDate) < :today', { today })

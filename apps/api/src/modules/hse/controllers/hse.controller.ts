@@ -1,18 +1,23 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
+import { CurrentCompanyId } from '../../../common/decorators/current-company-id.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import type { AuthenticatedUser } from '../../identity/services/auth.service';
+import { CompanyContextGuard } from '../../../common/guards/company-context.guard';
+import { ContractContextGuard } from '../../../common/guards/contract-context.guard';
+import { CurrentContractId } from '../../../common/decorators/current-contract-id.decorator';
+import type { AuthenticatedUser } from '../../identity/interface/auth-context.interface';
 import { HseService } from '../services/hse.service';
 
-@Controller('companies/:companyId/contracts/:contractId/hse')
+@Controller('contract/hse')
+@UseGuards(CompanyContextGuard, ContractContextGuard)
 export class HseController {
   constructor(private readonly hse: HseService) {}
 
   @Get('incidents')
   listIncidents(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
     @Query() query: PaginationQueryDto,
   ) {
     return this.hse.incidents.list(user.id, companyId, contractId, query);
@@ -21,8 +26,8 @@ export class HseController {
   @Get('incidents/:incidentId')
   getIncident(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
     @Param('incidentId') incidentId: string,
   ) {
     return this.hse.incidents.get(user.id, companyId, contractId, incidentId);
@@ -31,8 +36,8 @@ export class HseController {
   @Get('inspections')
   listInspections(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
     @Query() query: PaginationQueryDto,
   ) {
     return this.hse.inspections.list(user.id, companyId, contractId, query);
@@ -41,30 +46,45 @@ export class HseController {
   @Get('inspections/:inspectionId')
   getInspection(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
     @Param('inspectionId') inspectionId: string,
   ) {
-    return this.hse.inspections.get(user.id, companyId, contractId, inspectionId);
+    return this.hse.inspections.get(
+      user.id,
+      companyId,
+      contractId,
+      inspectionId,
+    );
   }
 
   @Get('corrective-actions')
   listCorrectiveActions(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
     @Query() query: PaginationQueryDto,
   ) {
-    return this.hse.correctiveActions.list(user.id, companyId, contractId, query);
+    return this.hse.correctiveActions.list(
+      user.id,
+      companyId,
+      contractId,
+      query,
+    );
   }
 
   @Get('corrective-actions/:actionId')
   getCorrectiveAction(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('companyId') companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
     @Param('actionId') actionId: string,
   ) {
-    return this.hse.correctiveActions.get(user.id, companyId, contractId, actionId);
+    return this.hse.correctiveActions.get(
+      user.id,
+      companyId,
+      contractId,
+      actionId,
+    );
   }
 }

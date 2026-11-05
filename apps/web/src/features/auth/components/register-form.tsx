@@ -52,6 +52,10 @@ const nameFields = [
 ] as const;
 
 export function RegisterForm() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
   const router = useRouter();
   const [registerUser] = useRegisterMutation();
 
@@ -81,7 +85,6 @@ export function RegisterForm() {
 
   const { getValues, setValue } = form;
 
-  // Resolve the browser timezone after hydration and preserve any selection.
   useEffect(() => {
     if (!getValues("timezone")) {
       const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -145,7 +148,6 @@ export function RegisterForm() {
       </header>
 
       <FieldGroup className="gap-4">
-        {/* Full name */}
         <div className="flex flex-col gap-1.5">
           <span className={labelClass}>Full name</span>
           <div className="grid grid-cols-3 gap-2">
@@ -175,7 +177,6 @@ export function RegisterForm() {
           </div>
         </div>
 
-        {/* Email */}
         <Controller
           name="email"
           control={form.control}
@@ -203,7 +204,6 @@ export function RegisterForm() {
           )}
         />
 
-        {/* Phone */}
         <Controller
           name="phone"
           control={form.control}
@@ -232,7 +232,6 @@ export function RegisterForm() {
           )}
         />
 
-        {/* Timezone */}
         <Controller
           name="timezone"
           control={form.control}
@@ -267,7 +266,6 @@ export function RegisterForm() {
           )}
         />
 
-        {/* Password */}
         <Controller
           name="password"
           control={form.control}
@@ -291,7 +289,6 @@ export function RegisterForm() {
           )}
         />
 
-        {/* Confirm password */}
         <Controller
           name="confirmPassword"
           control={form.control}
@@ -311,7 +308,6 @@ export function RegisterForm() {
           )}
         />
 
-        {/* Terms */}
         <Controller
           name="acceptTerms"
           control={form.control}

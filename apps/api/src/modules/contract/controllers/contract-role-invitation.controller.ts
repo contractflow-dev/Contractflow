@@ -1,7 +1,7 @@
 import { Body, Controller, Post } from '@nestjs/common';
 import { Public } from '../../../common/decorators/public.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import type { AuthenticatedUser } from '../../identity/services/auth.service';
+import type { AuthenticatedUser } from '../../identity/interface/auth-context.interface';
 import {
   ContractRoleInvitationTokenRequestDto,
   RespondContractRoleInvitationRequestDto,

@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, Repository } from 'typeorm';
-import { ContractScopedRepository } from '../../../common/database/repositories/contract-scoped.repository';
+import type { FindOptionsOrder, FindOptionsWhere, Repository } from 'typeorm';
 import { InventoryTransaction } from '../entities/inventory-transaction.entity';
 import { AppendOnlyContractScopedRepository } from '../../../common/database/repositories/appendonly-contract-scoped.repository';
 import { IContractScope } from '../../../common/database/repositories/contract-scope.interface';
@@ -19,7 +18,7 @@ export class InventoryTransactionRepository extends AppendOnlyContractScopedRepo
   findByItem(inventoryItemId: string, scope: IContractScope) {
     return this.findAll(scope, {
       where: { inventoryItemId } as FindOptionsWhere<InventoryTransaction>,
-      order: { transactionAt: 'DESC' } as any,
+      order: { transactionAt: 'DESC' } satisfies FindOptionsOrder<InventoryTransaction>,
     });
   }
 

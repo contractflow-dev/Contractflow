@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ContractModule } from '../contract/contract-module';
+import { IdentityModule } from '../identity/identity.module';
 import { HseController } from './controllers/hse.controller';
 import { HseCorrectiveAction } from './entities/hse-corrective-action.entity';
 import { HseIncident } from './entities/hse-incident.entity';
@@ -20,6 +21,7 @@ import { HseService } from './services/hse.service';
       HseCorrectiveAction,
     ]),
     ContractModule,
+    IdentityModule,
   ],
   controllers: [HseController],
   providers: [

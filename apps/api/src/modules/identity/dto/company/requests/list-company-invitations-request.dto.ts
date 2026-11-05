@@ -1,17 +1,3 @@
-import { Type } from 'class-transformer';
-import { IsInt, IsOptional, Max, Min } from 'class-validator';
+import { PaginationQueryDto } from '../../../../../common/dto/pagination-query.dto';
 
-export class ListCompanyInvitationsRequestDto {
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page = 1;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  limit = 50;
-}
+export class ListCompanyInvitationsRequestDto extends PaginationQueryDto {}

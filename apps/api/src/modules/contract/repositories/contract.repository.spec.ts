@@ -51,12 +51,14 @@ describe('ContractRepository', () => {
   });
 
   it('applies the party restriction when loading one contract', async () => {
-    await repository.findById('c-1', { companyId: 'co-1' });
+    await repository.findById({ companyId: 'co-1' }, 'c-1');
 
     expect(qb.andWhere).toHaveBeenCalledWith('EXISTS (SELECT 1)', {
       __scopeCompanyId: 'co-1',
     });
-    expect(qb.andWhere).toHaveBeenCalledWith('contract.id = :id', { id: 'c-1' });
+    expect(qb.andWhere).toHaveBeenCalledWith('contract.id = :id', {
+      id: 'c-1',
+    });
   });
 
   it('escapes search wildcards and pages the result', async () => {
@@ -101,9 +103,9 @@ describe('ContractRepository', () => {
   });
 
   it('refuses a blank company scope', async () => {
-    await expect(repository.searchPage({ companyId: ' ' })).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    await expect(
+      repository.searchPage({ companyId: ' ' }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('disables the unscoped generic methods', () => {

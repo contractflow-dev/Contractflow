@@ -7,17 +7,15 @@ import { z } from "zod";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent } from "@workspace/ui/components/card";
-import {
-  Field,
-  FieldError,
-  FieldLabel,
-} from "@workspace/ui/components/field";
+import { Field, FieldError, FieldLabel } from "@workspace/ui/components/field";
 import { Input } from "@workspace/ui/components/input";
 import { getApiErrorMessage } from "@/lib/apiError";
 import {
-  useUpdateCompanyProfileMutation,
-  type CompanyProfile,
-} from "./companiesApi";
+  ECountryCode,
+  ECurrencyCode,
+  type ICompanyProfileResponse,
+} from "@contractflow/contracts-schema";
+import { useUpdateCompanyProfileMutation } from "@/services/companiesApi";
 
 const profileSchema = z.object({
   name: z.string().trim().min(1, "Enter a company name.").max(255),
@@ -56,14 +54,11 @@ const profileSchema = z.object({
   city: z.string().trim().min(1, "Enter a city.").max(100),
   stateRegion: z.string().trim().min(1, "Enter a state or region.").max(100),
   postalCode: z.string().trim().min(1, "Enter a postal code.").max(20),
-  countryCode: z
-    .string()
-    .trim()
-    .regex(/^[A-Za-z]{2}$/, "Use a two-letter country code."),
-  defaultCurrencyCode: z
-    .string()
-    .trim()
-    .regex(/^[A-Za-z]{3}$/, "Use a three-letter currency code."),
+  countryCode: z.enum(ECountryCode, "Use a valid two-letter country code."),
+  defaultCurrencyCode: z.enum(
+    ECurrencyCode,
+    "Use a valid three-letter currency code.",
+  ),
 });
 
 type ProfileValues = z.infer<typeof profileSchema>;
@@ -99,7 +94,7 @@ const profileFields: Array<{
   },
 ];
 
-function profileValues(company: CompanyProfile): ProfileValues {
+function profileValues(company: ICompanyProfileResponse): ProfileValues {
   return {
     name: company.name,
     legalName: company.legalName,
@@ -121,7 +116,7 @@ function profileValues(company: CompanyProfile): ProfileValues {
 export function CompanyProfileEditor({
   company,
 }: {
-  company: CompanyProfile;
+  company: ICompanyProfileResponse;
 }) {
   const [updateProfile, mutationState] = useUpdateCompanyProfileMutation();
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -201,7 +196,9 @@ export function CompanyProfileEditor({
                           : undefined
                     }
                     aria-invalid={Boolean(errors[name])}
-                    aria-describedby={errors[name] ? `${name}-error` : undefined}
+                    aria-describedby={
+                      errors[name] ? `${name}-error` : undefined
+                    }
                     disabled={mutationState.isLoading}
                   />
                   {errors[name]?.message && (

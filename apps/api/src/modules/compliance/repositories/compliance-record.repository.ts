@@ -14,26 +14,26 @@ export class ComplianceRecordRepository extends ContractScopedRepository<Complia
     super(repository);
   }
 
-  findByRequirement(complianceRequirementId: string, scope: IContractScope) {
+  findByRequirement(scope: IContractScope, complianceRequirementId: string) {
     return this.findAll(scope, {
       where: { complianceRequirementId } as FindOptionsWhere<ComplianceRecord>,
     });
   }
 
-  findByParty(contractPartyId: string, scope: IContractScope) {
+  findByParty(scope: IContractScope, contractPartyId: string) {
     return this.findAll(scope, {
       where: { contractPartyId } as FindOptionsWhere<ComplianceRecord>,
     });
   }
 
-  findByStatus(status: ComplianceRecord['status'], scope: IContractScope) {
+  findByStatus(scope: IContractScope, status: ComplianceRecord['status']) {
     return this.findAll(scope, {
       where: { status } as FindOptionsWhere<ComplianceRecord>,
     });
   }
 
   /** Verified records expiring in [today, cutoff]; drives reminder notifications. */
-  findExpiringBetween(today: string, cutoff: string, scope: IContractScope) {
+  findExpiringBetween(scope: IContractScope, today: string, cutoff: string) {
     return this.scopedQuery(scope)
       .andWhere('e.status = :s', { s: 'VERIFIED' })
       .andWhere('e.expiryDate >= :today AND e.expiryDate <= :cutoff', {
@@ -44,7 +44,7 @@ export class ComplianceRecordRepository extends ContractScopedRepository<Complia
       .getMany();
   }
 
-  findExpired(today: string, scope: IContractScope) {
+  findExpired(scope: IContractScope, today: string) {
     return this.scopedQuery(scope)
       .andWhere('e.expiryDate < :today', { today })
       .orderBy('e.expiryDate', 'ASC')

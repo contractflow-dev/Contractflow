@@ -3,10 +3,12 @@ import { store } from "@/store";
 import { api } from "@/services/api";
 import { authApi } from "@/services/authApi";
 import { getApiBaseUrl } from "@/lib/apiBaseUrl";
-import { companiesApi } from "@/features/companies/companiesApi";
+import { companiesApi } from "@/services/companiesApi";
 import { getApiErrorMessage, getApiErrorStatus } from "@/lib/apiError";
 import {
   ECompanyRole,
+  ECountryCode,
+  ECurrencyCode,
   EInvitationRole,
   EUserStatus,
 } from "@contractflow/contracts-schema";
@@ -178,8 +180,8 @@ describe("RTK Query authentication and company API contracts", () => {
       city: "Test City",
       stateRegion: "Test Region",
       postalCode: "00000",
-      countryCode: "US",
-      defaultCurrencyCode: "USD",
+      countryCode: ECountryCode.US,
+      defaultCurrencyCode: ECurrencyCode.USD,
       status: EUserStatus.ACTIVE,
     };
     fetchMock.mockResolvedValueOnce(
@@ -252,10 +254,14 @@ describe("RTK Query authentication and company API contracts", () => {
     fetchMock.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
-          items: [],
-          total: 0,
-          page: 1,
-          limit: 20,
+          data: [],
+          meta: {
+            totalItems: 0,
+            itemCount: 0,
+            itemsPerPage: 20,
+            totalPages: 0,
+            currentPage: 1,
+          },
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       ),
@@ -273,8 +279,9 @@ describe("RTK Query authentication and company API contracts", () => {
 
     let request = fetchMock.mock.calls[0][0] as Request;
     expect(request.url).toBe(
-      "http://localhost:3001/api/companies/company-1/members?page=1&limit=20&search=person",
+      "http://localhost:3001/api/company/members?page=1&limit=20&search=person",
     );
+    expect(request.headers.get("X-Company-Id")).toBe("company-1");
     expect(request.credentials).toBe("include");
 
     fetchMock.mockResolvedValueOnce(
@@ -297,8 +304,9 @@ describe("RTK Query authentication and company API contracts", () => {
 
     request = fetchMock.mock.calls[1][0] as Request;
     expect(request.url).toBe(
-      "http://localhost:3001/api/companies/company-1/invitations",
+      "http://localhost:3001/api/company/invitations",
     );
+    expect(request.headers.get("X-Company-Id")).toBe("company-1");
     expect(request.method).toBe("POST");
     await expect(request.clone().json()).resolves.toMatchObject({
       email: "person@example.com",
@@ -321,8 +329,9 @@ describe("RTK Query authentication and company API contracts", () => {
       .unwrap();
     request = fetchMock.mock.calls[2][0] as Request;
     expect(request.url).toBe(
-      "http://localhost:3001/api/companies/company-1/profile",
+      "http://localhost:3001/api/company/profile",
     );
+    expect(request.headers.get("X-Company-Id")).toBe("company-1");
     expect(request.method).toBe("PATCH");
   });
 

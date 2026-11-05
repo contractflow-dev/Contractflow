@@ -29,10 +29,10 @@ export class ContractRoleAssignmentRepository extends CompanyScopedRepository<Co
   }
 
   findActiveForParty(
+    scope: ICompanyScope,
     contractPartyId: string,
     contractId: string,
     roles: EContractRole[],
-    scope: ICompanyScope,
     manager: EntityManager = this.repository.manager,
   ) {
     return manager
@@ -59,10 +59,10 @@ export class ContractRoleAssignmentRepository extends CompanyScopedRepository<Co
   }
 
   findActiveDuplicate(
+    scope: ICompanyScope,
     contractPartyId: string,
     companyUserId: string,
     role: EContractRole,
-    scope: ICompanyScope,
     manager: EntityManager,
   ) {
     return manager.getRepository(ContractRoleAssignment).findOne({
@@ -77,10 +77,10 @@ export class ContractRoleAssignmentRepository extends CompanyScopedRepository<Co
   }
 
   async hasWorkspaceAdmin(
+    scope: ICompanyScope,
     companyUserId: string,
     contractPartyId: string,
     roles: EContractRole[],
-    scope: ICompanyScope,
     manager: EntityManager = this.repository.manager,
   ): Promise<boolean> {
     return (
@@ -104,9 +104,9 @@ export class ContractRoleAssignmentRepository extends CompanyScopedRepository<Co
   }
 
   countActiveWorkspaceAdmins(
+    scope: ICompanyScope,
     contractPartyId: string,
     roles: EContractRole[],
-    scope: ICompanyScope,
     manager: EntityManager,
   ): Promise<number> {
     return manager
@@ -125,9 +125,9 @@ export class ContractRoleAssignmentRepository extends CompanyScopedRepository<Co
   }
 
   findByIdInPartyForUpdate(
+    scope: ICompanyScope,
     id: string,
     contractPartyId: string,
-    scope: ICompanyScope,
     manager: EntityManager,
   ) {
     return manager
@@ -145,6 +145,7 @@ export class ContractRoleAssignmentRepository extends CompanyScopedRepository<Co
   }
 
   async createInScope(
+    scope: ICompanyScope,
     data: Pick<
       ContractRoleAssignment,
       | 'contractPartyId'
@@ -156,13 +157,12 @@ export class ContractRoleAssignmentRepository extends CompanyScopedRepository<Co
       | 'revokedAt'
       | 'revokedById'
     >,
-    scope: ICompanyScope,
     manager: EntityManager,
   ): Promise<ContractRoleAssignment> {
     const repository = manager.getRepository(ContractRoleAssignment);
     const assignment = repository.create({
-      ...data,
       companyId: scope.companyId,
+      ...data,
     });
     return repository.save(assignment);
   }
@@ -193,12 +193,12 @@ export class ContractRoleAssignmentRepository extends CompanyScopedRepository<Co
       .getMany();
   }
 
-  /** For authorisation guards: does this user hold this role on this party right now? */
+  /** For authoriation guards: does this user hold this role on this party right now? */
   async hasActiveRole(
+    scope: ICompanyScope,
     companyUserId: string,
     contractPartyId: string,
     role: ContractRoleAssignment['role'],
-    scope: ICompanyScope,
   ): Promise<boolean> {
     const count = await this.scopedQuery(scope)
       .andWhere(
@@ -211,7 +211,7 @@ export class ContractRoleAssignmentRepository extends CompanyScopedRepository<Co
   }
 
   /** Full assignment history for one user (revoked rows included). */
-  findHistoryByCompanyUser(companyUserId: string, scope: ICompanyScope) {
+  findHistoryByCompanyUser(scope: ICompanyScope, companyUserId: string) {
     return this.scopedQuery(scope)
       .andWhere('e.companyUserId = :companyUserId', { companyUserId })
       .orderBy('e.assignedAt', 'DESC')

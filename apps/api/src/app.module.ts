@@ -10,10 +10,10 @@ import { DeliveryModule } from './modules/delivery/delivery.module';
 import { FinancialModule } from './modules/financial/financial.module';
 import { HseModule } from './modules/hse/hse.module';
 import { SiteOperationsModule } from './modules/site-operations/site-operations.module';
-import { MailModule } from './modules/mail/mail.module';
-import { EnvVars, NodeEnv, validateEnv } from './config/env.validation';
+import { validateEnv } from './config/env.validation';
 import { HealthController } from './health.controller';
-import { TYPEORM_EXECUTION_SAFETY } from './common/database/typeorm-execution-options';
+import { createRuntimeDatabaseOptions } from './common/database/runtime-database-options';
+import { MailModule } from './modules/mail/mail.module';
 
 @Module({
   imports: [
@@ -23,32 +23,15 @@ import { TYPEORM_EXECUTION_SAFETY } from './common/database/typeorm-execution-op
       envFilePath: ['.env'],
       validate: validateEnv,
     }),
-
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
-        const isProd = config.get('NODE_ENV') === 'production';
-        const dbSync =
-          String(config.get('DB_SYNC')).toLowerCase() === 'true';
-
-        return {
-          type: 'postgres' as const,
-          url: config.getOrThrow<string>('DATABASE_URL'),
-          autoLoadEntities: true,
-          ...TYPEORM_EXECUTION_SAFETY,
-          synchronize: !isProd || dbSync,
-          ssl: isProd ? { rejectUnauthorized: false } : false,
-          extra: isProd
-            ? {
-                ssl: {
-                  rejectUnauthorized: false,
-                },
-              }
-            : {},
-        };
-      },
+      useFactory: (config: ConfigService) =>
+        createRuntimeDatabaseOptions({
+          nodeEnv: config.get<string>('NODE_ENV') ?? 'development',
+          databaseUrl: config.getOrThrow<string>('DATABASE_URL'),
+          ssl: config.get<boolean>('DB_SSL'),
+        }),
     }),
-
     IdentityModule,
     ContractModule,
     CrossCuttingModule,
@@ -60,7 +43,6 @@ import { TYPEORM_EXECUTION_SAFETY } from './common/database/typeorm-execution-op
     SiteOperationsModule,
     MailModule,
   ],
-
   controllers: [HealthController],
 })
 export class AppModule {}

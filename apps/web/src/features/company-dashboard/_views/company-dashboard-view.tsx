@@ -78,7 +78,10 @@ function DashboardContent({ companyId }: { companyId: string }) {
     isLoading,
     isFetching,
     refetch,
-  } = useGetCompanyDashboardQuery({ companyId });
+  } = useGetCompanyDashboardQuery(
+    { companyId },
+    { refetchOnMountOrArgChange: true },
+  );
   const { data: user } = useGetCurrentUserQuery();
   const displayName = user
     ? `${user.firstName} ${user.lastName}`.trim()
@@ -151,14 +154,14 @@ function DashboardContent({ companyId }: { companyId: string }) {
             className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"
           >
             {summaryCards.map(({ key, label, description, icon: Icon }) => (
-              <Card key={key}>
+              <Card key={key} highlight>
                 <CardHeader>
                   <div className="flex items-center justify-between gap-3">
                     <CardDescription className="font-medium">
                       {label}
                     </CardDescription>
                     <Avatar className="rounded-lg after:rounded-lg">
-                      <AvatarFallback className="rounded-lg bg-primary/10 text-primary">
+                      <AvatarFallback className="rounded-lg bg-primary/10 text-primary transition-colors group-hover/card:bg-primary group-hover/card:text-primary-foreground">
                         <Icon className="size-5" aria-hidden="true" />
                       </AvatarFallback>
                     </Avatar>
@@ -202,7 +205,7 @@ function DashboardContent({ companyId }: { companyId: string }) {
                       >
                         <div className="min-w-0">
                           <Link
-                            href={contractHref(companyId, contract.id)}
+                            href={contractHref(contract.id)}
                             className="font-medium text-primary underline-offset-4 hover:underline"
                           >
                             {contract.title}
@@ -257,7 +260,7 @@ function DashboardContent({ companyId }: { companyId: string }) {
                       >
                         <div className="min-w-0">
                           <Link
-                            href={contractHref(companyId, contract.id)}
+                            href={contractHref(contract.id)}
                             className="font-medium text-primary underline-offset-4 hover:underline"
                           >
                             {contract.title}
@@ -304,19 +307,19 @@ function DashboardContent({ companyId }: { companyId: string }) {
             <CardContent className="flex flex-wrap gap-2">
               <Link
                 className={buttonVariants({ variant: "outline" })}
-                href={`/dashboards/contracts?companyId=${encodeURIComponent(companyId)}`}
+                href="/dashboards/contracts"
               >
                 View contracts
               </Link>
               <Link
                 className={buttonVariants({ variant: "outline" })}
-                href={`/dashboards/team?companyId=${encodeURIComponent(companyId)}`}
+                href="/dashboards/team"
               >
                 Manage team and invitations
               </Link>
               <Link
                 className={buttonVariants({ variant: "outline" })}
-                href={`/dashboards/profile?companyId=${encodeURIComponent(companyId)}`}
+                href="/dashboards/profile"
               >
                 Edit company profile
               </Link>
@@ -380,7 +383,7 @@ function DashboardContent({ companyId }: { companyId: string }) {
                 </dl>
                 <Link
                   className="mt-5 inline-flex text-sm font-medium text-primary underline-offset-4 hover:underline"
-                  href={`/dashboards/profile?companyId=${encodeURIComponent(companyId)}`}
+                  href="/dashboards/profile"
                 >
                   Edit company profile
                 </Link>
@@ -397,7 +400,7 @@ function DashboardContent({ companyId }: { companyId: string }) {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex items-start gap-3 rounded-lg bg-muted/60 p-4">
+                <div className="flex items-start gap-3 rounded-sm bg-muted/60 p-4">
                   <RiShieldUserLine className="mt-0.5 size-5 shrink-0 text-primary" />
                   <div>
                     <p className="text-sm font-medium">
@@ -427,8 +430,8 @@ function ProfileField({ label, value }: { label: string; value: string }) {
   );
 }
 
-function contractHref(companyId: string, contractId: string): string {
-  return `/dashboards/contracts/${encodeURIComponent(contractId)}?companyId=${encodeURIComponent(companyId)}`;
+function contractHref(contractId: string): string {
+  return `/dashboards/contracts/${encodeURIComponent(contractId)}`;
 }
 
 function formatDate(value: string | null): string {
