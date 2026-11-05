@@ -18,7 +18,7 @@ import {
   initializePostgresTestDatabase,
 } from './database/postgres-test-database';
 
-@Controller('company-context-test/:companyId')
+@Controller('company-context-test')
 @UseGuards(CompanyContextGuard)
 class CompanyContextTestController {
   @Get()
@@ -77,28 +77,29 @@ describe('Company context PostgreSQL integration', () => {
     currentUserId = fixture.member.userId;
 
     await request(app!.getHttpServer())
-      .get(`/company-context-test/${fixture.company.id}`)
+      .get('/company-context-test')
       .set('X-Company-Id', fixture.company.id)
       .expect(200)
       .expect({ companyId: fixture.company.id });
   });
 
-  it('rejects missing headers, conflicting route IDs, and another company', async () => {
+  it('rejects missing headers, query IDs, and another company', async () => {
     const ownCompany = await factory.createCompanyMember();
     const otherCompany = await factory.createCompanyMember();
     currentUserId = ownCompany.member.userId;
 
     await request(app!.getHttpServer())
-      .get(`/company-context-test/${ownCompany.company.id}`)
+      .get('/company-context-test')
       .expect(400);
 
     await request(app!.getHttpServer())
-      .get(`/company-context-test/${ownCompany.company.id}`)
-      .set('X-Company-Id', otherCompany.company.id)
+      .get('/company-context-test')
+      .query({ companyId: ownCompany.company.id })
+      .set('X-Company-Id', ownCompany.company.id)
       .expect(400);
 
     await request(app!.getHttpServer())
-      .get(`/company-context-test/${otherCompany.company.id}`)
+      .get('/company-context-test')
       .set('X-Company-Id', otherCompany.company.id)
       .expect(403);
   });
@@ -110,7 +111,7 @@ describe('Company context PostgreSQL integration', () => {
     fixture.company.status = ECompanyStatus.INACTIVE;
     await dataSource.getRepository(Company).save(fixture.company);
     await request(app!.getHttpServer())
-      .get(`/company-context-test/${fixture.company.id}`)
+      .get('/company-context-test')
       .set('X-Company-Id', fixture.company.id)
       .expect(403);
 
@@ -119,7 +120,7 @@ describe('Company context PostgreSQL integration', () => {
     fixture.member.leftAt = new Date();
     await dataSource.getRepository(CompanyUser).save(fixture.member);
     await request(app!.getHttpServer())
-      .get(`/company-context-test/${fixture.company.id}`)
+      .get('/company-context-test')
       .set('X-Company-Id', fixture.company.id)
       .expect(403);
   });

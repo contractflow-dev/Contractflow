@@ -3,11 +3,13 @@ import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 import { CurrentCompanyId } from '../../../common/decorators/current-company-id.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { CompanyContextGuard } from '../../../common/guards/company-context.guard';
+import { ContractContextGuard } from '../../../common/guards/contract-context.guard';
+import { CurrentContractId } from '../../../common/decorators/current-contract-id.decorator';
 import type { AuthenticatedUser } from '../../identity/interface/auth-context.interface';
 import { SiteOperationsService } from '../services/site-operations.service';
 
-@Controller('companies/:companyId/contracts/:contractId')
-@UseGuards(CompanyContextGuard)
+@Controller('contract')
+@UseGuards(CompanyContextGuard, ContractContextGuard)
 export class SiteOperationsController {
   constructor(private readonly siteOperations: SiteOperationsService) {}
 
@@ -15,7 +17,7 @@ export class SiteOperationsController {
   listSites(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Query() query: PaginationQueryDto,
   ) {
     return this.siteOperations.sites.list(
@@ -30,7 +32,7 @@ export class SiteOperationsController {
   getSite(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Param('siteId') siteId: string,
   ) {
     return this.siteOperations.sites.get(
@@ -45,7 +47,7 @@ export class SiteOperationsController {
   listDailyLogs(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Query() query: PaginationQueryDto,
   ) {
     return this.siteOperations.dailyLogs.list(
@@ -60,7 +62,7 @@ export class SiteOperationsController {
   getDailyLog(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Param('logId') logId: string,
   ) {
     return this.siteOperations.dailyLogs.get(
@@ -75,7 +77,7 @@ export class SiteOperationsController {
   listInventoryItems(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Query() query: PaginationQueryDto,
   ) {
     return this.siteOperations.inventoryItems.list(
@@ -90,7 +92,7 @@ export class SiteOperationsController {
   getInventoryItem(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Param('itemId') itemId: string,
   ) {
     return this.siteOperations.inventoryItems.get(
@@ -105,7 +107,7 @@ export class SiteOperationsController {
   listInventoryTransactions(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Query() query: PaginationQueryDto,
   ) {
     return this.siteOperations.inventoryTransactions.list(
@@ -120,7 +122,7 @@ export class SiteOperationsController {
   getInventoryTransaction(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Param('transactionId') transactionId: string,
   ) {
     return this.siteOperations.inventoryTransactions.get(

@@ -59,7 +59,7 @@ describe("RTK Query contract API contracts", () => {
 
     const request = fetchMock.mock.calls[0][0] as Request;
     expect(request.url).toBe(
-      "http://localhost:3001/api/companies/company-1/contracts?search=bridge+replacement&status=active&page=2&limit=10",
+      "http://localhost:3001/api/contracts?search=bridge+replacement&status=active&page=2&limit=10",
     );
     expect(request.method).toBe("GET");
     expect(request.credentials).toBe("include");
@@ -97,12 +97,29 @@ describe("RTK Query contract API contracts", () => {
     expect(
       fetchMock.mock.calls.map(([input]) => (input as Request).url),
     ).toEqual([
-      "http://localhost:3001/api/companies/company-1/contracts/contract-1",
-      "http://localhost:3001/api/companies/company-1/contracts/contract-1/parties",
-      "http://localhost:3001/api/companies/company-1/contracts/contract-1/status-history?page=3&limit=20",
+      "http://localhost:3001/api/contract",
+      "http://localhost:3001/api/contract/parties",
+      "http://localhost:3001/api/contract/status-history?page=3&limit=20",
     ]);
     expect(
       fetchMock.mock.calls.map(([, init]) => init?.method ?? "GET"),
     ).toEqual(["GET", "GET", "GET"]);
+    expect(
+      fetchMock.mock.calls.map(([input]) =>
+        (input as Request).headers.get("X-Contract-Id"),
+      ),
+    ).toEqual(["contract-1", "contract-1", "contract-1"]);
+  });
+
+  it("does not send contract context on the contract list", async () => {
+    await store
+      .dispatch(
+        contractApi.endpoints.getContracts.initiate({ companyId: "company-1" }),
+      )
+      .unwrap();
+
+    const request = fetchMock.mock.calls[0][0] as Request;
+    expect(request.headers.has("X-Contract-Id")).toBe(false);
+    expect(new URL(request.url).searchParams.has("contractId")).toBe(false);
   });
 });

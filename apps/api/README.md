@@ -50,8 +50,14 @@ The identity endpoints are `POST /api/auth/register`,
 `POST /api/auth/resend-verification`, `POST /api/auth/logout`, and the
 authenticated `GET /api/users/me`. Company endpoints are authenticated
 `POST /api/companies`, `GET /api/companies`, `GET /api/companies/current`,
-`GET /api/companies/:companyId/membership`, and the administrator-only
-`GET /api/companies/:companyId/dashboard`.
+`GET /api/company/membership`, and the administrator-only
+`GET /api/company/dashboard`.
+
+Company and contract IDs are never part of the URL. Company-scoped routes
+(`/api/company/...`, `/api/contracts`) take the company from the
+`X-Company-Id` header. Single-contract routes (`/api/contract/...`) also take
+the contract from the `X-Contract-Id` header. Both must be ULIDs. The API
+rejects either ID when it is sent as a query or path parameter.
 
 The company-admin dashboard shows active contracts expiring within
 `COMPANY_DASHBOARD_EXPIRY_WINDOW_DAYS` days (default `30`, allowed range `1` to
@@ -60,9 +66,9 @@ revised end date when present, otherwise the scheduled end date; contracts
 without an effective end date are not included in expiry results.
 
 Company Admins can manage active contract-role assignments with
-`GET /api/companies/:companyId/contracts/:contractId/role-assignments?workspace=project|hse|finance`,
+`GET /api/contract/role-assignments?workspace=project|hse|finance`,
 `POST` on the same path, and
-`DELETE /api/companies/:companyId/contracts/:contractId/role-assignments/:assignmentId`.
+`DELETE /api/contract/role-assignments/:assignmentId`.
 The `POST` body contains `companyUserId` and `role`, and the role must belong to
 the selected workspace.
 Assignments are limited to active members of the actor's company and are

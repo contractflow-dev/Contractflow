@@ -29,15 +29,12 @@ export class CompanyContextGuard implements CanActivate {
       throw new BadRequestException('X-Company-Id must be a valid ULID.');
     }
 
-    if (request.query.companyId !== undefined) {
+    if (
+      request.query.companyId !== undefined ||
+      request.params.companyId !== undefined
+    ) {
       throw new BadRequestException(
         'Company context must be supplied through the X-Company-Id header.',
-      );
-    }
-    const routeCompanyId = request.params.companyId;
-    if (routeCompanyId !== undefined && routeCompanyId !== companyId) {
-      throw new BadRequestException(
-        'X-Company-Id must match the company in the request path.',
       );
     }
 
