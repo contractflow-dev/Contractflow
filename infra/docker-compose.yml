@@ -2,6 +2,7 @@
 # Backing services start by default (`docker compose up -d`).
 # The full containerised app runs under the `app` profile:
 #   docker compose -f infra/docker-compose.yml --profile app up -d --build
+# WEB_PORT / API_PORT move the app's host ports (see infra/dev-docker.env).
 services:
   postgres:
     image: postgres:17-alpine
@@ -57,7 +58,7 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgres://contractflow:contractflow@postgres:5432/contractflow
       DB_SSL: "false"
-      WEB_URL: http://localhost:3000
+      WEB_URL: http://localhost:${WEB_PORT:-3000}
       JWT_SECRET: ${JWT_SECRET:-local-docker-jwt-secret-change-me-0123456789}
       MAIL_PROVIDER: smtp
       SMTP_HOST: mailpit
@@ -71,7 +72,7 @@ services:
     image: contractflow-api
     environment: *api-env
     ports:
-      - "3001:3001"
+      - "${API_PORT:-3001}:3001"
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -84,9 +85,9 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         # Inlined into the browser bundle, so it must be reachable from the host.
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:${API_PORT:-3001}}
     ports:
-      - "3000:3000"
+      - "${WEB_PORT:-3000}:3000"
     depends_on:
       api:
         condition: service_healthy
