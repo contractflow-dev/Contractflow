@@ -13,6 +13,7 @@ import { SiteOperationsModule } from './modules/site-operations/site-operations.
 import { validateEnv } from './config/env.validation';
 import { HealthController } from './health.controller';
 import { createRuntimeDatabaseOptions } from './common/database/runtime-database-options';
+import { MailModule } from './modules/mail/mail.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { createRuntimeDatabaseOptions } from './common/database/runtime-database
     FinancialModule,
     HseModule,
     SiteOperationsModule,
+    MailModule,
   ],
   controllers: [HealthController],
 })
