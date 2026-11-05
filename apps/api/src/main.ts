@@ -14,7 +14,12 @@ async function bootstrap() {
       config.get<string>('CORS_ORIGIN') ?? config.getOrThrow<string>('WEB_URL'),
     ).origin,
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Company-Id'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Company-Id',
+      'X-Contract-Id',
+    ],
   });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 

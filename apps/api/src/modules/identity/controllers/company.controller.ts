@@ -22,14 +22,14 @@ import { UpdateCompanyMemberRoleRequestDto } from '../dto/company/requests/updat
 import { UpdateCompanyProfileRequestDto } from '../dto/company/requests/update-company-profile-request.dto';
 import { ListCompanyInvitationsRequestDto } from '../dto/company/requests/list-company-invitations-request.dto';
 
-@Controller('companies')
+@Controller()
 export class CompanyController {
   constructor(
     private readonly companyService: CompanyService,
     private readonly companyAdminService: CompanyAdminService,
   ) {}
 
-  @Post()
+  @Post('companies')
   create(
     @CurrentUser() user: AuthenticatedUser,
     @Body() body: CreateCompanyRequestDto,
@@ -37,17 +37,17 @@ export class CompanyController {
     return this.companyService.create(user.id, body);
   }
 
-  @Get()
+  @Get('companies')
   list(@CurrentUser() user: AuthenticatedUser) {
     return this.companyService.listForUser(user.id);
   }
 
-  @Get('current')
+  @Get('companies/current')
   getCurrent(@CurrentUser() user: AuthenticatedUser) {
     return this.companyService.getCurrent(user.id);
   }
 
-  @Get(':companyId/membership')
+  @Get('company/membership')
   @UseGuards(CompanyContextGuard)
   getMembership(
     @CurrentUser() user: AuthenticatedUser,
@@ -56,7 +56,7 @@ export class CompanyController {
     return this.companyService.getMembership(user.id, companyId);
   }
 
-  @Get(':companyId/dashboard')
+  @Get('company/dashboard')
   @UseGuards(CompanyContextGuard)
   getDashboard(
     @CurrentUser() user: AuthenticatedUser,
@@ -65,7 +65,7 @@ export class CompanyController {
     return this.companyService.getDashboard(user.id, companyId);
   }
 
-  @Patch(':companyId/profile')
+  @Patch('company/profile')
   @UseGuards(CompanyContextGuard)
   updateProfile(
     @CurrentUser() user: AuthenticatedUser,
@@ -79,7 +79,7 @@ export class CompanyController {
     );
   }
 
-  @Get(':companyId/members')
+  @Get('company/members')
   @UseGuards(CompanyContextGuard)
   listMembers(
     @CurrentUser() user: AuthenticatedUser,
@@ -89,7 +89,7 @@ export class CompanyController {
     return this.companyAdminService.listMembers(user.id, companyId, query);
   }
 
-  @Patch(':companyId/members/:membershipId/role')
+  @Patch('company/members/:membershipId/role')
   @UseGuards(CompanyContextGuard)
   updateMemberRole(
     @CurrentUser() user: AuthenticatedUser,
@@ -105,7 +105,7 @@ export class CompanyController {
     );
   }
 
-  @Delete(':companyId/members/:membershipId')
+  @Delete('company/members/:membershipId')
   @UseGuards(CompanyContextGuard)
   removeMember(
     @CurrentUser() user: AuthenticatedUser,
@@ -119,7 +119,7 @@ export class CompanyController {
     );
   }
 
-  @Get(':companyId/invitations')
+  @Get('company/invitations')
   @UseGuards(CompanyContextGuard)
   listInvitations(
     @CurrentUser() user: AuthenticatedUser,
@@ -129,7 +129,7 @@ export class CompanyController {
     return this.companyAdminService.listInvitations(user.id, companyId, query);
   }
 
-  @Post(':companyId/invitations')
+  @Post('company/invitations')
   @UseGuards(CompanyContextGuard)
   inviteMember(
     @CurrentUser() user: AuthenticatedUser,
@@ -139,7 +139,7 @@ export class CompanyController {
     return this.companyAdminService.inviteMember(user.id, companyId, body);
   }
 
-  @Post(':companyId/invitations/:invitationId/revoke')
+  @Post('company/invitations/:invitationId/revoke')
   @UseGuards(CompanyContextGuard)
   revokeInvitation(
     @CurrentUser() user: AuthenticatedUser,

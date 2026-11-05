@@ -51,7 +51,7 @@ describe('CompanyContextGuard', () => {
         isPlatformAdmin: false,
       },
       headers: { 'x-company-id': companyId },
-      params: { companyId },
+      params: {},
       query: {},
     };
     guard = new CompanyContextGuard(
@@ -90,9 +90,9 @@ describe('CompanyContextGuard', () => {
       BadRequestException,
     );
 
+    // Company IDs never travel in the path, even when they match the header.
     request.query = {};
-    request.params = { companyId: '01ARZ3NDEKTSV4RRFFQ69G5FAV' };
-    request.headers = { 'x-company-id': '01ARZ3NDEKTSV4RRFFQ69G5FAW' };
+    request.params = { companyId };
     await expect(guard.canActivate(executionContext())).rejects.toBeInstanceOf(
       BadRequestException,
     );

@@ -25,7 +25,7 @@ import type {
   RecordContractSignatoryRequest,
   UpdateContractSiteRequest,
 } from "@contractflow/contracts-schema";
-import { api } from "./api";
+import { api, companyCollectionRoute, contractRoute } from "./api";
 
 export type {
   AssignableContractWorkspace,
@@ -82,10 +82,6 @@ const roleInvitationTag = (
   id: `invitations:${contractId}:${workspace}`,
 });
 
-function contractsUrl(companyId: string): string {
-  return `/companies/${encodeURIComponent(companyId)}/contracts`;
-}
-
 export const contractApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getContracts: builder.query<
@@ -93,7 +89,7 @@ export const contractApi = api.injectEndpoints({
       CompanyContractQuery
     >({
       query: ({ companyId, ...params }) => ({
-        url: contractsUrl(companyId),
+        ...companyCollectionRoute(companyId, "/contracts"),
         params,
       }),
       providesTags: (result) =>
@@ -110,7 +106,7 @@ export const contractApi = api.injectEndpoints({
 
     getContractById: builder.query<ContractDetail, CompanyContractDetailQuery>({
       query: ({ companyId, contractId }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}`,
+        ...contractRoute(companyId, contractId),
       }),
       providesTags: (_result, _error, { contractId }) => [
         { type: "Contract", id: contractId },
@@ -122,7 +118,7 @@ export const contractApi = api.injectEndpoints({
       CompanyContractDetailQuery
     >({
       query: ({ companyId, contractId }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/parties`,
+        ...contractRoute(companyId, contractId, `/parties`),
       }),
       providesTags: (_result, _error, { contractId }) => [
         { type: "Contract", id: contractId },
@@ -134,7 +130,7 @@ export const contractApi = api.injectEndpoints({
       CompanyContractDetailQuery
     >({
       query: ({ companyId, contractId }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/parties/signatory`,
+        ...contractRoute(companyId, contractId, `/parties/signatory`),
       }),
       providesTags: (_result, _error, { contractId }) => [
         signatoryTag(contractId),
@@ -146,7 +142,7 @@ export const contractApi = api.injectEndpoints({
       CompanyContractDetailQuery & { body: RecordContractSignatoryRequest }
     >({
       query: ({ companyId, contractId, body }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/parties/signatory`,
+        ...contractRoute(companyId, contractId, `/parties/signatory`),
         method: "PATCH",
         body,
       }),
@@ -161,7 +157,7 @@ export const contractApi = api.injectEndpoints({
       CompanyContractDetailQuery
     >({
       query: ({ companyId, contractId }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/site-management`,
+        ...contractRoute(companyId, contractId, `/site-management`),
       }),
       providesTags: (_result, _error, { contractId }) => [
         managedSitesTag(contractId),
@@ -173,7 +169,7 @@ export const contractApi = api.injectEndpoints({
       CompanyContractDetailQuery & { body: CreateContractSiteRequest }
     >({
       query: ({ companyId, contractId, body }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/sites`,
+        ...contractRoute(companyId, contractId, `/sites`),
         method: "POST",
         body,
       }),
@@ -189,7 +185,7 @@ export const contractApi = api.injectEndpoints({
       }
     >({
       query: ({ companyId, contractId, siteId, body }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/sites/${encodeURIComponent(siteId)}`,
+        ...contractRoute(companyId, contractId, `/sites/${encodeURIComponent(siteId)}`),
         method: "PATCH",
         body,
       }),
@@ -211,7 +207,7 @@ export const contractApi = api.injectEndpoints({
         status,
         userId,
       }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/status-history`,
+        ...contractRoute(companyId, contractId, `/status-history`),
         params: { page, limit, fromDate, toDate, status, userId },
       }),
       providesTags: (_result, _error, { contractId }) => [
@@ -224,7 +220,7 @@ export const contractApi = api.injectEndpoints({
       CompanyContractDetailQuery
     >({
       query: ({ companyId, contractId }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/workspaces`,
+        ...contractRoute(companyId, contractId, `/workspaces`),
       }),
       providesTags: (_result, _error, { contractId }) => [
         { type: "Contract", id: contractId },
@@ -236,7 +232,7 @@ export const contractApi = api.injectEndpoints({
       CompanyContractDetailQuery
     >({
       query: ({ companyId, contractId }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/lifecycle-permissions`,
+        ...contractRoute(companyId, contractId, `/lifecycle-permissions`),
       }),
       providesTags: (_result, _error, { contractId }) => [
         { type: "ContractLifecyclePermission", id: contractId },
@@ -250,7 +246,7 @@ export const contractApi = api.injectEndpoints({
       { companyId: string; body: CreateContractRequest }
     >({
       query: ({ companyId, body }) => ({
-        url: contractsUrl(companyId),
+        ...companyCollectionRoute(companyId, "/contracts"),
         method: "POST",
         body,
       }),
@@ -262,7 +258,7 @@ export const contractApi = api.injectEndpoints({
       CompanyContractDetailQuery & { body: Partial<CreateContractRequest> }
     >({
       query: ({ companyId, contractId, body }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}`,
+        ...contractRoute(companyId, contractId),
         method: "PATCH",
         body,
       }),
@@ -277,7 +273,7 @@ export const contractApi = api.injectEndpoints({
       CompanyContractDetailQuery & { workspaces: AssignableContractWorkspace[] }
     >({
       query: ({ companyId, contractId, workspaces }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/workspaces`,
+        ...contractRoute(companyId, contractId, `/workspaces`),
         method: "PATCH",
         body: { workspaces },
       }),
@@ -294,7 +290,7 @@ export const contractApi = api.injectEndpoints({
       }
     >({
       query: ({ companyId, contractId, transition, reason }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/transitions`,
+        ...contractRoute(companyId, contractId, `/transitions`),
         method: "POST",
         body: { transition, reason },
       }),
@@ -305,7 +301,7 @@ export const contractApi = api.injectEndpoints({
 
     archiveContract: builder.mutation<void, CompanyContractDetailQuery>({
       query: ({ companyId, contractId }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}`,
+        ...contractRoute(companyId, contractId),
         method: "DELETE",
       }),
       invalidatesTags: (_result, _error, { contractId }) => [
@@ -316,7 +312,7 @@ export const contractApi = api.injectEndpoints({
 
     restoreContract: builder.mutation<Contract, CompanyContractDetailQuery>({
       query: ({ companyId, contractId }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/restore`,
+        ...contractRoute(companyId, contractId, `/restore`),
         method: "POST",
       }),
       invalidatesTags: (_result, _error, { contractId }) => [
@@ -330,7 +326,7 @@ export const contractApi = api.injectEndpoints({
       CompanyContractDetailQuery
     >({
       query: ({ companyId, contractId }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/party-invitations`,
+        ...contractRoute(companyId, contractId, `/party-invitations`),
       }),
       providesTags: (_result, _error, { contractId }) => [
         { type: "ContractPartyInvitation", id: contractId },
@@ -345,7 +341,7 @@ export const contractApi = api.injectEndpoints({
       }
     >({
       query: ({ companyId, contractId, email, partyType }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/party-invitations`,
+        ...contractRoute(companyId, contractId, `/party-invitations`),
         method: "POST",
         body: { email, partyType },
       }),
@@ -360,7 +356,7 @@ export const contractApi = api.injectEndpoints({
       CompanyContractDetailQuery & { invitationId: string }
     >({
       query: ({ companyId, contractId, invitationId }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/party-invitations/${encodeURIComponent(invitationId)}`,
+        ...contractRoute(companyId, contractId, `/party-invitations/${encodeURIComponent(invitationId)}`),
         method: "DELETE",
       }),
       invalidatesTags: (_result, _error, { contractId }) => [
@@ -384,7 +380,10 @@ export const contractApi = api.injectEndpoints({
       { companyId: string; token: string; decision: "accept" | "reject" }
     >({
       query: ({ companyId, token, decision }) => ({
-        url: `/companies/${encodeURIComponent(companyId)}/contract-party-invitations/respond`,
+        ...companyCollectionRoute(
+          companyId,
+          "/contract-party-invitations/respond",
+        ),
         method: "POST",
         body: { token, decision },
       }),
@@ -399,7 +398,7 @@ export const contractApi = api.injectEndpoints({
       ContractRoleAssignmentQuery
     >({
       query: ({ companyId, contractId, workspace }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/role-assignments`,
+        ...contractRoute(companyId, contractId, `/role-assignments`),
         params: { workspace },
       }),
       providesTags: (_result, _error, { contractId, workspace }) => [
@@ -413,7 +412,7 @@ export const contractApi = api.injectEndpoints({
       ContractRoleAssignmentQuery
     >({
       query: ({ companyId, contractId, workspace }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/role-management`,
+        ...contractRoute(companyId, contractId, `/role-management`),
         params: { workspace },
       }),
     }),
@@ -423,7 +422,7 @@ export const contractApi = api.injectEndpoints({
       ContractRoleAssignmentQuery
     >({
       query: ({ companyId, contractId, workspace }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/role-assignment-members`,
+        ...contractRoute(companyId, contractId, `/role-assignment-members`),
         params: { workspace },
       }),
     }),
@@ -444,7 +443,7 @@ export const contractApi = api.injectEndpoints({
         role,
         isWorkspaceAdmin,
       }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/role-assignments`,
+        ...contractRoute(companyId, contractId, `/role-assignments`),
         method: "POST",
         params: { workspace },
         body: { companyUserId, role, isWorkspaceAdmin },
@@ -461,7 +460,7 @@ export const contractApi = api.injectEndpoints({
       ContractRoleAssignmentQuery & { assignmentId: string }
     >({
       query: ({ companyId, contractId, assignmentId }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/role-assignments/${encodeURIComponent(assignmentId)}`,
+        ...contractRoute(companyId, contractId, `/role-assignments/${encodeURIComponent(assignmentId)}`),
         method: "DELETE",
       }),
       invalidatesTags: (_result, _error, { contractId, workspace }) => [
@@ -478,7 +477,7 @@ export const contractApi = api.injectEndpoints({
       }
     >({
       query: ({ companyId, contractId, assignmentId, isWorkspaceAdmin }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/role-assignments/${encodeURIComponent(assignmentId)}/workspace-admin`,
+        ...contractRoute(companyId, contractId, `/role-assignments/${encodeURIComponent(assignmentId)}/workspace-admin`),
         method: "PATCH",
         body: { isWorkspaceAdmin },
       }),
@@ -492,7 +491,7 @@ export const contractApi = api.injectEndpoints({
       ContractRoleAssignmentQuery
     >({
       query: ({ companyId, contractId, workspace }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/role-invitations`,
+        ...contractRoute(companyId, contractId, `/role-invitations`),
         params: { workspace },
       }),
       providesTags: (_result, _error, { contractId, workspace }) => [
@@ -517,7 +516,7 @@ export const contractApi = api.injectEndpoints({
         role,
         isWorkspaceAdmin,
       }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/role-invitations`,
+        ...contractRoute(companyId, contractId, `/role-invitations`),
         method: "POST",
         params: { workspace },
         body: { email, role, isWorkspaceAdmin },
@@ -533,7 +532,7 @@ export const contractApi = api.injectEndpoints({
       ContractRoleAssignmentQuery & { invitationId: string }
     >({
       query: ({ companyId, contractId, invitationId }) => ({
-        url: `${contractsUrl(companyId)}/${encodeURIComponent(contractId)}/role-invitations/${encodeURIComponent(invitationId)}`,
+        ...contractRoute(companyId, contractId, `/role-invitations/${encodeURIComponent(invitationId)}`),
         method: "DELETE",
       }),
       invalidatesTags: (_result, _error, { contractId, workspace }) => [

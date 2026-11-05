@@ -3,11 +3,13 @@ import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 import { CurrentCompanyId } from '../../../common/decorators/current-company-id.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { CompanyContextGuard } from '../../../common/guards/company-context.guard';
+import { ContractContextGuard } from '../../../common/guards/contract-context.guard';
+import { CurrentContractId } from '../../../common/decorators/current-contract-id.decorator';
 import type { AuthenticatedUser } from '../../identity/interface/auth-context.interface';
 import { DeliveryService } from '../services/delivery.service';
 
-@Controller('companies/:companyId/contracts/:contractId')
-@UseGuards(CompanyContextGuard)
+@Controller('contract')
+@UseGuards(CompanyContextGuard, ContractContextGuard)
 export class DeliveryController {
   constructor(private readonly delivery: DeliveryService) {}
 
@@ -15,7 +17,7 @@ export class DeliveryController {
   listStages(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Query() query: PaginationQueryDto,
   ) {
     return this.delivery.stages.list(user.id, companyId, contractId, query);
@@ -25,7 +27,7 @@ export class DeliveryController {
   getStage(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Param('stageId') stageId: string,
   ) {
     return this.delivery.stages.get(user.id, companyId, contractId, stageId);
@@ -35,7 +37,7 @@ export class DeliveryController {
   listMilestones(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Query() query: PaginationQueryDto,
   ) {
     return this.delivery.milestones.list(user.id, companyId, contractId, query);
@@ -45,7 +47,7 @@ export class DeliveryController {
   getMilestone(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Param('milestoneId') milestoneId: string,
   ) {
     return this.delivery.milestones.get(
@@ -60,7 +62,7 @@ export class DeliveryController {
   listVariations(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Query() query: PaginationQueryDto,
   ) {
     return this.delivery.variations.list(user.id, companyId, contractId, query);
@@ -70,7 +72,7 @@ export class DeliveryController {
   getVariation(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Param('variationId') variationId: string,
   ) {
     return this.delivery.variations.get(

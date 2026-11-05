@@ -3,11 +3,13 @@ import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 import { CurrentCompanyId } from '../../../common/decorators/current-company-id.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { CompanyContextGuard } from '../../../common/guards/company-context.guard';
+import { ContractContextGuard } from '../../../common/guards/contract-context.guard';
+import { CurrentContractId } from '../../../common/decorators/current-contract-id.decorator';
 import type { AuthenticatedUser } from '../../identity/interface/auth-context.interface';
 import { HseService } from '../services/hse.service';
 
-@Controller('companies/:companyId/contracts/:contractId/hse')
-@UseGuards(CompanyContextGuard)
+@Controller('contract/hse')
+@UseGuards(CompanyContextGuard, ContractContextGuard)
 export class HseController {
   constructor(private readonly hse: HseService) {}
 
@@ -15,7 +17,7 @@ export class HseController {
   listIncidents(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Query() query: PaginationQueryDto,
   ) {
     return this.hse.incidents.list(user.id, companyId, contractId, query);
@@ -25,7 +27,7 @@ export class HseController {
   getIncident(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Param('incidentId') incidentId: string,
   ) {
     return this.hse.incidents.get(user.id, companyId, contractId, incidentId);
@@ -35,7 +37,7 @@ export class HseController {
   listInspections(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Query() query: PaginationQueryDto,
   ) {
     return this.hse.inspections.list(user.id, companyId, contractId, query);
@@ -45,7 +47,7 @@ export class HseController {
   getInspection(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Param('inspectionId') inspectionId: string,
   ) {
     return this.hse.inspections.get(
@@ -60,7 +62,7 @@ export class HseController {
   listCorrectiveActions(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Query() query: PaginationQueryDto,
   ) {
     return this.hse.correctiveActions.list(
@@ -75,7 +77,7 @@ export class HseController {
   getCorrectiveAction(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Param('actionId') actionId: string,
   ) {
     return this.hse.correctiveActions.get(

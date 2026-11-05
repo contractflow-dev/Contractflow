@@ -15,6 +15,7 @@ export type AuthenticatedRequest = Request & {
   user: AuthenticatedUser;
   sessionId: string;
   companyContext?: ICompanyRequestContext;
+  contractId?: string;
 };
 
 @Injectable()

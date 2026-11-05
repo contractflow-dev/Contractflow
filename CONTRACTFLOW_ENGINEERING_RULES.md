@@ -130,12 +130,33 @@ and do not add repository layers that merely duplicate existing abstractions.
 
 - Enforce authorization in the backend; frontend-supplied company or contract
   IDs are not proof of access.
-- Company-scoped routes use `CompanyContextGuard`. It requires an
-  `X-Company-Id` header containing a ULID, rejects a `companyId` query
-  parameter, rejects a header that differs from a `:companyId` route
-  parameter, and verifies active membership in an active company. Controllers
-  read the validated value with `@CurrentCompanyId()`; never take the company
-  from the request body or query.
+- Scope identifiers (`companyId`, `contractId`, and any future identifier that
+  selects which tenant or contract a request acts on) travel only in request
+  headers. They are never part of the URL path, the query string, or the
+  request body. Do not add them to route paths, query DTOs, or body DTOs, and
+  never read them with `@Param()`, `@Query()`, or `@Body()`.
+  - The company comes from the `X-Company-Id` header. Company-scoped routes
+    use `CompanyContextGuard`. It requires the header as a ULID, rejects a
+    `companyId` query or route parameter, and verifies active membership in an
+    active company. Controllers read the value with `@CurrentCompanyId()`.
+  - The contract comes from the `X-Contract-Id` header. Single-contract routes
+    add `ContractContextGuard` after `CompanyContextGuard`. It requires the
+    header as a ULID and rejects a `contractId` query or route parameter.
+    Controllers read the value with `@CurrentContractId()`. The guard only
+    establishes which contract is addressed. Access is still decided by
+    `ContractAccessService.authorize`.
+  - Route naming follows from this. A plural path is a collection inside the
+    header company (`/contracts`). A singular path is the one record named by
+    the header (`/company/members`, `/contract/parties`,
+    `/contract/hse/incidents`). Identifiers of child records owned by that
+    scope (for example `:siteId`, `:invitationId`, `:assignmentId`) stay in
+    the path.
+  - Any new scope header must also be added to `allowedHeaders` in
+    `apps/api/src/main.ts`, or browsers will block it at CORS preflight.
+  - Query parameters may carry only pagination, sorting, search, and filters
+    that narrow results inside an already authorized scope (for example
+    `status`, `fromDate`, or a `userId` filter on status history). Such a
+    filter never widens or replaces the scope.
 - Contract access goes through `ContractAccessService.authorize`, which checks
   company membership, contract party status, the contract workspace, and the
   user's contract role assignment, then returns the contract scope to use.
@@ -219,11 +240,24 @@ apps/web/src/
   patterns. Do not introduce a second API or state-management architecture.
   RTK Query endpoints are added with `api.injectEndpoints()` in a
   `src/services/*Api.ts` file; import them through the `@/services/...` alias.
-- The base query in `src/services/api.ts` sends `X-Company-Id` from
-  `workspace.activeWorkspaceId`. Endpoints that must not carry company context
-  (authentication, public invitations, onboarding, company listing and
-  creation, platform administration) are listed in
-  `COMPANY_CONTEXT_EXEMPT_ENDPOINTS`; add new endpoints of that kind there.
+- Never put `companyId`, `contractId`, or other scope identifiers in an API
+  URL, RTK Query `params`, or a request body. Build scoped requests with the
+  helpers in `src/services/api.ts` and spread the result into the endpoint's
+  `query` return value:
+  - `companyRoute(companyId, path)` for `/company/...` routes.
+  - `companyCollectionRoute(companyId, path)` for company-scoped collections
+    such as `/contracts`.
+  - `contractRoute(companyId, contractId, path)` for `/contract/...` routes.
+  Each helper sets the matching `X-Company-Id` and `X-Contract-Id` headers.
+- The base query keeps an `X-Company-Id` header that an endpoint set itself.
+  Otherwise it fills the header from `workspace.activeWorkspaceId`. Endpoints
+  that must not carry company context (authentication, public invitations,
+  onboarding, company listing and creation, platform administration) are
+  listed in `COMPANY_CONTEXT_EXEMPT_ENDPOINTS`; add new endpoints of that kind
+  there.
+  Page URLs must not carry `?companyId=` either: `CompanyAdminShell` removes
+  it, and the active company comes from `workspace.activeWorkspaceId`
+  resolved against the user's memberships.
 - Consume shared transport contracts from `@contractflow/contracts-schema`
   where appropriate. Do not import backend entities or repositories into the
   web app.

@@ -1,4 +1,4 @@
-import { api } from "@/services/api";
+import { api, companyRoute } from "@/services/api";
 import type {
   ECompanyRole,
   ECompanyUserStatus,
@@ -46,8 +46,7 @@ export const companiesApi = api.injectEndpoints({
       ICompanyAccessResponse,
       { companyId: string }
     >({
-      query: ({ companyId }) =>
-        `/companies/${encodeURIComponent(companyId)}/membership`,
+      query: ({ companyId }) => companyRoute(companyId, "/membership"),
       providesTags: (_result, _error, { companyId }) => [
         { type: "Company", id: `MEMBERSHIP_${companyId}` },
       ],
@@ -57,8 +56,7 @@ export const companiesApi = api.injectEndpoints({
       ICompanyDashboardResponse,
       { companyId: string }
     >({
-      query: ({ companyId }) =>
-        `/companies/${encodeURIComponent(companyId)}/dashboard`,
+      query: ({ companyId }) => companyRoute(companyId, "/dashboard"),
       providesTags: (_result, _error, { companyId }) => [
         { type: "Dashboard", id: companyId },
       ],
@@ -73,7 +71,7 @@ export const companiesApi = api.injectEndpoints({
       }
     >({
       query: ({ companyId, ...params }) => ({
-        url: `/companies/${encodeURIComponent(companyId)}/members`,
+        ...companyRoute(companyId, `/members`),
         params,
       }),
       providesTags: (_result, _error, { companyId }) => [
@@ -86,7 +84,7 @@ export const companiesApi = api.injectEndpoints({
       IPaginationQuery & { companyId: string }
     >({
       query: ({ companyId, ...params }) => ({
-        url: `/companies/${encodeURIComponent(companyId)}/invitations`,
+        ...companyRoute(companyId, `/invitations`),
         params,
       }),
       providesTags: (_result, _error, { companyId }) => [
@@ -99,7 +97,7 @@ export const companiesApi = api.injectEndpoints({
       { companyId: string; data: IInviteCompanyMemberRequest }
     >({
       query: ({ companyId, data }) => ({
-        url: `/companies/${encodeURIComponent(companyId)}/invitations`,
+        ...companyRoute(companyId, `/invitations`),
         method: "POST",
         body: data,
       }),
@@ -114,7 +112,7 @@ export const companiesApi = api.injectEndpoints({
       { companyId: string; invitationId: string }
     >({
       query: ({ companyId, invitationId }) => ({
-        url: `/companies/${encodeURIComponent(companyId)}/invitations/${encodeURIComponent(invitationId)}/revoke`,
+        ...companyRoute(companyId, `/invitations/${encodeURIComponent(invitationId)}/revoke`),
         method: "POST",
       }),
       invalidatesTags: (_result, _error, { companyId }) => [
@@ -128,7 +126,7 @@ export const companiesApi = api.injectEndpoints({
       { companyId: string; membershipId: string; companyRole: ECompanyRole }
     >({
       query: ({ companyId, membershipId, companyRole }) => ({
-        url: `/companies/${encodeURIComponent(companyId)}/members/${encodeURIComponent(membershipId)}/role`,
+        ...companyRoute(companyId, `/members/${encodeURIComponent(membershipId)}/role`),
         method: "PATCH",
         body: { companyRole },
       }),
@@ -144,7 +142,7 @@ export const companiesApi = api.injectEndpoints({
       { companyId: string; membershipId: string }
     >({
       query: ({ companyId, membershipId }) => ({
-        url: `/companies/${encodeURIComponent(companyId)}/members/${encodeURIComponent(membershipId)}`,
+        ...companyRoute(companyId, `/members/${encodeURIComponent(membershipId)}`),
         method: "DELETE",
       }),
       invalidatesTags: (_result, _error, { companyId }) => [
@@ -159,7 +157,7 @@ export const companiesApi = api.injectEndpoints({
       { companyId: string; data: IUpdateCompanyProfileRequest }
     >({
       query: ({ companyId, data }) => ({
-        url: `/companies/${encodeURIComponent(companyId)}/profile`,
+        ...companyRoute(companyId, `/profile`),
         method: "PATCH",
         body: data,
       }),

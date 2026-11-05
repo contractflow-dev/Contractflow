@@ -15,8 +15,9 @@ describe("paginated query cache", () => {
     store.dispatch(setActiveWorkspaceId(null));
     fetchMock.mockReset();
     fetchMock.mockImplementation(async (input, init) => {
-      const url = new URL(new Request(input, init).url);
-      const companyId = url.pathname.match(/\/companies\/([^/]+)/)?.[1];
+      const request = new Request(input, init);
+      const url = new URL(request.url);
+      const companyId = request.headers.get("X-Company-Id");
       const page = Number(url.searchParams.get("page") ?? 1);
       const limit = Number(url.searchParams.get("limit") ?? 20);
       return new Response(

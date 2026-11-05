@@ -12,6 +12,8 @@ import {
 import { CurrentCompanyId } from '../../../common/decorators/current-company-id.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { CompanyContextGuard } from '../../../common/guards/company-context.guard';
+import { ContractContextGuard } from '../../../common/guards/contract-context.guard';
+import { CurrentContractId } from '../../../common/decorators/current-contract-id.decorator';
 import type { AuthenticatedUser } from '../../identity/interface/auth-context.interface';
 import {
   CreateContractRoleAssignmentRequestDto,
@@ -37,7 +39,7 @@ import { ContractService } from '../services/contract.service';
 import { ContractLifecycleService } from '../services/contract-lifecycle.service';
 import { ContractRoleAssignmentService } from '../services/contract-role-assignment.service';
 
-@Controller('companies/:companyId/contracts')
+@Controller()
 @UseGuards(CompanyContextGuard)
 export class ContractController {
   constructor(
@@ -46,7 +48,7 @@ export class ContractController {
     private readonly lifecycle: ContractLifecycleService,
   ) {}
 
-  @Post()
+  @Post('contracts')
   create(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
@@ -55,7 +57,7 @@ export class ContractController {
     return this.lifecycle.create(user.id, companyId, body);
   }
 
-  @Get()
+  @Get('contracts')
   list(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
@@ -64,39 +66,43 @@ export class ContractController {
     return this.contractService.list(user.id, companyId, query);
   }
 
-  @Get(':contractId/workspaces')
+  @Get('contract/workspaces')
+  @UseGuards(ContractContextGuard)
   listWorkspaces(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
   ) {
     return this.contractService.listWorkspaces(user.id, companyId, contractId);
   }
 
-  @Get(':contractId/lifecycle-permissions')
+  @Get('contract/lifecycle-permissions')
+  @UseGuards(ContractContextGuard)
   lifecyclePermissions(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
   ) {
     return this.lifecycle.managementPermissions(user.id, companyId, contractId);
   }
 
-  @Patch(':contractId')
+  @Patch('contract')
+  @UseGuards(ContractContextGuard)
   update(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Body() body: UpdateContractRequestDto,
   ) {
     return this.lifecycle.update(user.id, companyId, contractId, body);
   }
 
-  @Patch(':contractId/workspaces')
+  @Patch('contract/workspaces')
+  @UseGuards(ContractContextGuard)
   updateWorkspaces(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Body() body: UpdateContractWorkspacesRequestDto,
   ) {
     return this.lifecycle.updateWorkspaces(
@@ -107,76 +113,84 @@ export class ContractController {
     );
   }
 
-  @Post(':contractId/transitions')
+  @Post('contract/transitions')
+  @UseGuards(ContractContextGuard)
   transition(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Body() body: TransitionContractRequestDto,
   ) {
     return this.lifecycle.transition(user.id, companyId, contractId, body);
   }
 
-  @Delete(':contractId')
+  @Delete('contract')
+  @UseGuards(ContractContextGuard)
   archive(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
   ) {
     return this.lifecycle.archive(user.id, companyId, contractId);
   }
 
-  @Post(':contractId/restore')
+  @Post('contract/restore')
+  @UseGuards(ContractContextGuard)
   restore(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
   ) {
     return this.lifecycle.restore(user.id, companyId, contractId);
   }
 
-  @Get(':contractId')
+  @Get('contract')
+  @UseGuards(ContractContextGuard)
   get(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
   ) {
     return this.contractService.get(user.id, companyId, contractId);
   }
 
-  @Get(':contractId/parties')
+  @Get('contract/parties')
+  @UseGuards(ContractContextGuard)
   listParties(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
   ) {
     return this.contractService.listParties(user.id, companyId, contractId);
   }
 
-  @Get(':contractId/site-management')
+  @Get('contract/site-management')
+  @UseGuards(ContractContextGuard)
   listManagedSites(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
   ) {
     return this.lifecycle.listSites(user.id, companyId, contractId);
   }
 
-  @Post(':contractId/sites')
+  @Post('contract/sites')
+  @UseGuards(ContractContextGuard)
   createSite(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Body() body: CreateContractSiteRequestDto,
   ) {
     return this.lifecycle.createSite(user.id, companyId, contractId, body);
   }
 
-  @Patch(':contractId/sites/:siteId')
+  @Patch('contract/sites/:siteId')
+  @UseGuards(ContractContextGuard)
   updateSite(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Param('siteId') siteId: string,
     @Body() body: UpdateContractSiteRequestDto,
   ) {
@@ -189,20 +203,22 @@ export class ContractController {
     );
   }
 
-  @Get(':contractId/parties/signatory')
+  @Get('contract/parties/signatory')
+  @UseGuards(ContractContextGuard)
   getSignatory(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
   ) {
     return this.lifecycle.getSignatory(user.id, companyId, contractId);
   }
 
-  @Patch(':contractId/parties/signatory')
+  @Patch('contract/parties/signatory')
+  @UseGuards(ContractContextGuard)
   recordSignatory(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Body() body: RecordContractSignatoryRequestDto,
   ) {
     return this.lifecycle.recordSignatory(
@@ -213,11 +229,12 @@ export class ContractController {
     );
   }
 
-  @Get(':contractId/status-history')
+  @Get('contract/status-history')
+  @UseGuards(ContractContextGuard)
   listStatusHistory(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Query() query: ListContractStatusHistoryRequestDto,
   ) {
     return this.contractService.listStatusHistory(
@@ -228,30 +245,33 @@ export class ContractController {
     );
   }
 
-  @Get(':contractId/party-invitations')
+  @Get('contract/party-invitations')
+  @UseGuards(ContractContextGuard)
   listPartyInvitations(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
   ) {
     return this.lifecycle.listPartyInvitations(user.id, companyId, contractId);
   }
 
-  @Post(':contractId/party-invitations')
+  @Post('contract/party-invitations')
+  @UseGuards(ContractContextGuard)
   inviteCompany(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Body() body: CreateContractPartyInvitationRequestDto,
   ) {
     return this.lifecycle.inviteCompany(user.id, companyId, contractId, body);
   }
 
-  @Delete(':contractId/party-invitations/:invitationId')
+  @Delete('contract/party-invitations/:invitationId')
+  @UseGuards(ContractContextGuard)
   revokeCompanyInvitation(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Param('invitationId') invitationId: string,
   ) {
     return this.lifecycle.revokeCompanyInvitation(
@@ -262,11 +282,12 @@ export class ContractController {
     );
   }
 
-  @Get(':contractId/role-assignments')
+  @Get('contract/role-assignments')
+  @UseGuards(ContractContextGuard)
   listRoleAssignments(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Query() query: ListContractRoleAssignmentsRequestDto,
   ) {
     return this.roleAssignments.list(
@@ -277,11 +298,12 @@ export class ContractController {
     );
   }
 
-  @Get(':contractId/role-management')
+  @Get('contract/role-management')
+  @UseGuards(ContractContextGuard)
   roleManagementPermissions(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Query() query: ListContractRoleAssignmentsRequestDto,
   ) {
     return this.roleAssignments.managementPermissions(
@@ -292,11 +314,12 @@ export class ContractController {
     );
   }
 
-  @Get(':contractId/role-assignment-members')
+  @Get('contract/role-assignment-members')
+  @UseGuards(ContractContextGuard)
   listRoleAssignmentMembers(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Query() query: ListContractRoleAssignmentsRequestDto,
   ) {
     return this.roleAssignments.listEligibleMembers(
@@ -307,11 +330,12 @@ export class ContractController {
     );
   }
 
-  @Post(':contractId/role-assignments')
+  @Post('contract/role-assignments')
+  @UseGuards(ContractContextGuard)
   assignRole(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Query() query: ListContractRoleAssignmentsRequestDto,
     @Body() body: CreateContractRoleAssignmentRequestDto,
   ) {
@@ -326,11 +350,12 @@ export class ContractController {
     );
   }
 
-  @Delete(':contractId/role-assignments/:assignmentId')
+  @Delete('contract/role-assignments/:assignmentId')
+  @UseGuards(ContractContextGuard)
   revokeRole(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Param('assignmentId') assignmentId: string,
   ) {
     return this.roleAssignments.revoke(
@@ -341,11 +366,12 @@ export class ContractController {
     );
   }
 
-  @Patch(':contractId/role-assignments/:assignmentId/workspace-admin')
+  @Patch('contract/role-assignments/:assignmentId/workspace-admin')
+  @UseGuards(ContractContextGuard)
   setWorkspaceAdmin(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Param('assignmentId') assignmentId: string,
     @Body() body: SetWorkspaceAdminRequestDto,
   ) {
@@ -358,11 +384,12 @@ export class ContractController {
     );
   }
 
-  @Get(':contractId/role-invitations')
+  @Get('contract/role-invitations')
+  @UseGuards(ContractContextGuard)
   listRoleInvitations(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Query() query: ListContractRoleAssignmentsRequestDto,
   ) {
     return this.roleAssignments.listInvitations(
@@ -373,11 +400,12 @@ export class ContractController {
     );
   }
 
-  @Post(':contractId/role-invitations')
+  @Post('contract/role-invitations')
+  @UseGuards(ContractContextGuard)
   inviteContractRole(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Query() query: ListContractRoleAssignmentsRequestDto,
     @Body() body: CreateContractRoleInvitationRequestDto,
   ) {
@@ -392,11 +420,12 @@ export class ContractController {
     );
   }
 
-  @Delete(':contractId/role-invitations/:invitationId')
+  @Delete('contract/role-invitations/:invitationId')
+  @UseGuards(ContractContextGuard)
   revokeRoleInvitation(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('contractId') contractId: string,
+    @CurrentContractId() contractId: string,
     @Param('invitationId') invitationId: string,
   ) {
     return this.roleAssignments.revokeInvitation(

@@ -78,7 +78,18 @@ describe("company context request headers", () => {
     expect(requests[0]?.credentials).toBe("include");
   });
 
-  it("omits company context for unselected and public requests", async () => {
+  it("omits company context for requests that are not company-scoped", async () => {
+    store.dispatch(setActiveWorkspaceId("company-a"));
+    await store
+      .dispatch(companiesApi.endpoints.getCompanies.initiate())
+      .unwrap();
+
+    const request = new Request(...fetchMock.mock.calls[0]);
+    expect(request.headers.has("X-Company-Id")).toBe(false);
+  });
+
+  it("sends the requested company even when another company is active", async () => {
+    store.dispatch(setActiveWorkspaceId("company-b"));
     await store
       .dispatch(
         contractApi.endpoints.getContracts.initiate({
@@ -88,15 +99,33 @@ describe("company context request headers", () => {
         }),
       )
       .unwrap();
-    store.dispatch(setActiveWorkspaceId("company-a"));
+
+    const request = new Request(...fetchMock.mock.calls[0]);
+    expect(request.headers.get("X-Company-Id")).toBe("company-a");
+    expect(new URL(request.url).pathname).toBe("/api/contracts");
+  });
+
+  it("sends the invited company in the header when responding to a contract invitation", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: "accepted" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
     await store
-      .dispatch(companiesApi.endpoints.getCompanies.initiate())
+      .dispatch(
+        contractApi.endpoints.respondToContractPartyInvitation.initiate({
+          companyId: "company-a",
+          token: "token-1",
+          decision: "accept",
+        }),
+      )
       .unwrap();
 
-    const requests = fetchMock.mock.calls.map(
-      ([input, init]) => new Request(input, init),
+    const request = new Request(...fetchMock.mock.calls[0]);
+    expect(new URL(request.url).pathname).toBe(
+      "/api/contract-party-invitations/respond",
     );
-    expect(requests[0]?.headers.has("X-Company-Id")).toBe(false);
-    expect(requests[1]?.headers.has("X-Company-Id")).toBe(false);
+    expect(request.headers.get("X-Company-Id")).toBe("company-a");
   });
 });
