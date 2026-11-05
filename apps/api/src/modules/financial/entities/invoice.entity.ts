@@ -1,10 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from "typeorm";
+import { Entity, Column, ManyToOne, JoinColumn } from "typeorm";
 import { Contract } from "../../contract/entities/contract.entity";
 import { ContractParty } from "../../contract/entities/contract-party.entity";
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IInvoiceEntity } from "../interface/invoice.interface";
-import { InvoiceStatus, InvoiceType } from "@contractflow/contracts-schema";
+import { EInvoiceStatus, EInvoiceType, ECurrencyCode } from "@contractflow/contracts-schema";
 
 
 
@@ -26,17 +26,17 @@ export class Invoice extends BaseCustomEntity implements IInvoiceEntity{
     @Column({name: "billed_to_party_id", type: "varchar", length: 26})
     billedToPartyId!: string
     @ManyToOne(() => ContractParty, {onDelete:"CASCADE"})
-    @JoinColumn({name: "billed_by_party_id", referencedColumnName: "id"})
+    @JoinColumn({ name: "billed_to_party_id", referencedColumnName: "id" })
     billedToContractParty!: ContractParty
 
     @Column({name: "invoice_number", type: "varchar", length: 40})
     invoiceNumber!: string
 
-    @Column({name: "invoice_type", type: "enum", enum: InvoiceType})
-    invoiceType!: InvoiceType
+    @Column({name: "invoice_type", type: "enum", enum: EInvoiceType})
+    invoiceType!: EInvoiceType
 
-    @Column({name: "status", type: "enum", enum: InvoiceStatus})
-    status!: InvoiceStatus
+    @Column({name: "status", type: "enum", enum: EInvoiceStatus})
+    status!: EInvoiceStatus
 
     @Column({name: "issue_date", type: "date"})
     issueDate!: Date
@@ -51,7 +51,7 @@ export class Invoice extends BaseCustomEntity implements IInvoiceEntity{
     periodEnd!: Date
 
     @Column({name: "currency_code", type: "char", length: 3})
-    currencyCode!: string
+    currencyCode!: ECurrencyCode
 
     @Column({name: "gross_amount_minor", type: "bigint"})
     grossAmountMinor!: number

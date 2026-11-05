@@ -1,0 +1,593 @@
+"use client";
+
+import { useState } from "react";
+import type { FormEvent } from "react";
+import {
+  ECompanyRole,
+  ECompanyUserStatus,
+  EInvitationRole,
+  EInvitationStatus,
+} from "@contractflow/contracts-schema";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@workspace/ui/components/alert";
+import { Badge } from "@workspace/ui/components/badge";
+import { Button } from "@workspace/ui/components/button";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
+import { Field, FieldGroup, FieldLabel } from "@workspace/ui/components/field";
+import { Input } from "@workspace/ui/components/input";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@workspace/ui/components/native-select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@workspace/ui/components/table";
+import {
+  useChangeCompanyMemberRoleMutation,
+  useGetCompanyInvitationsQuery,
+  useGetCompanyMembersQuery,
+  useInviteCompanyMemberMutation,
+  useRemoveCompanyMemberMutation,
+  useRevokeCompanyInvitationMutation,
+} from "@/features/companies";
+import type { ICompanyMember } from "@contractflow/contracts-schema";
+import { DataPagination } from "@/components/pagination/data-pagination";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useKeepPageInRange, usePagination } from "@/hooks/use-pagination";
+import { getApiErrorMessage } from "@/lib/apiError";
+import { CompanyAdminShell } from "../CompanyAdminShell";
+
+const invitationRoles = Object.values(EInvitationRole);
+const memberRoles = Object.values(ECompanyRole);
+
+export function CompanyTeamView() {
+  return (
+    <CompanyAdminShell>
+      {(access) => <TeamContent companyId={access.company.id} />}
+    </CompanyAdminShell>
+  );
+}
+
+function TeamContent({ companyId }: { companyId: string }) {
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<ECompanyUserStatus | "">("");
+  const memberPages = usePagination();
+  const invitationPages = usePagination(10);
+  const debouncedSearch = useDebouncedValue(search.trim());
+  const [appliedSearch, setAppliedSearch] = useState(debouncedSearch);
+  // A new search term restarts at page 1 in the same render that applies it,
+  // so no request is made for the new term on the old page.
+  if (appliedSearch !== debouncedSearch) {
+    setAppliedSearch(debouncedSearch);
+    memberPages.resetPage();
+  }
+  const [inviteError, setInviteError] = useState("");
+  const [inviteSuccess, setInviteSuccess] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [busyMemberId, setBusyMemberId] = useState("");
+  const [busyInvitationId, setBusyInvitationId] = useState("");
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<EInvitationRole>(
+    EInvitationRole.CONTRACTOR_PROJECT_LEAD,
+  );
+  const {
+    currentData: members,
+    error: membersError,
+    isLoading: membersInitialLoading,
+    isFetching: membersFetching,
+  } = useGetCompanyMembersQuery({
+    companyId,
+    page: memberPages.page,
+    limit: memberPages.limit,
+    search: appliedSearch || undefined,
+    status: status || undefined,
+  });
+  const membersLoading = membersInitialLoading || (membersFetching && !members);
+  useKeepPageInRange(members?.meta, memberPages.setPage);
+  const {
+    currentData: invitations,
+    error: invitationsError,
+    isLoading: invitationsInitialLoading,
+    isFetching: invitationsFetching,
+  } = useGetCompanyInvitationsQuery({
+    companyId,
+    page: invitationPages.page,
+    limit: invitationPages.limit,
+  });
+  const invitationsLoading =
+    invitationsInitialLoading || (invitationsFetching && !invitations);
+  useKeepPageInRange(invitations?.meta, invitationPages.setPage);
+  const [inviteMember, inviteState] = useInviteCompanyMemberMutation();
+  const [changeRole] = useChangeCompanyMemberRoleMutation();
+  const [removeMember] = useRemoveCompanyMemberMutation();
+  const [revokeInvitation] = useRevokeCompanyInvitationMutation();
+
+  async function submitInvitation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setInviteError("");
+    setInviteSuccess("");
+    try {
+      await inviteMember({
+        companyId,
+        data: {
+          email: email.trim().toLowerCase(),
+          companyRole: role,
+        },
+      }).unwrap();
+      setInviteSuccess(`Invitation sent to ${email.trim()}.`);
+      setEmail("");
+    } catch (error) {
+      setInviteError(
+        getApiErrorMessage(error, "The invitation could not be sent."),
+      );
+    }
+  }
+
+  async function updateRole(member: ICompanyMember, value: string) {
+    if (!memberRoles.includes(value as ECompanyRole)) return;
+    setActionError("");
+    setBusyMemberId(member.id);
+    try {
+      await changeRole({
+        companyId,
+        membershipId: member.id,
+        companyRole: value as ECompanyRole,
+      }).unwrap();
+    } catch (error) {
+      setActionError(
+        getApiErrorMessage(error, "The member role could not be changed."),
+      );
+    } finally {
+      setBusyMemberId("");
+    }
+  }
+
+  async function remove(member: ICompanyMember) {
+    if (
+      !window.confirm(
+        `Remove ${member.firstName} ${member.lastName} from this company? Their user account will not be deleted.`,
+      )
+    ) {
+      return;
+    }
+    setActionError("");
+    setBusyMemberId(member.id);
+    try {
+      await removeMember({ companyId, membershipId: member.id }).unwrap();
+    } catch (error) {
+      setActionError(
+        getApiErrorMessage(error, "The member could not be removed."),
+      );
+    } finally {
+      setBusyMemberId("");
+    }
+  }
+
+  async function revoke(invitationId: string, invitedEmail: string) {
+    if (!window.confirm(`Revoke the pending invitation for ${invitedEmail}?`)) {
+      return;
+    }
+    setActionError("");
+    setBusyInvitationId(invitationId);
+    try {
+      await revokeInvitation({ companyId, invitationId }).unwrap();
+    } catch (error) {
+      setActionError(
+        getApiErrorMessage(error, "The invitation could not be revoked."),
+      );
+    } finally {
+      setBusyInvitationId("");
+    }
+  }
+
+  return (
+    <div className="space-y-8">
+      <header>
+        <p className="text-sm font-medium text-primary">
+          Company administration
+        </p>
+        <h2 className="mt-1 font-heading text-2xl font-semibold tracking-tight">
+          Team & invitations
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Manage company memberships and invite colleagues. Removing a member
+          does not delete their account.
+        </p>
+      </header>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            <h3 className="text-lg">Invite a team member</h3>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <form onSubmit={(event) => void submitInvitation(event)}>
+            <FieldGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <Field>
+                <FieldLabel htmlFor="invite-email">Email</FieldLabel>
+                <Input
+                  id="invite-email"
+                  required
+                  type="email"
+                  maxLength={254}
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  autoComplete="email"
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="invite-role">Company role</FieldLabel>
+                <NativeSelect
+                  id="invite-role"
+                  className="w-full"
+                  value={role}
+                  onChange={(event) =>
+                    setRole(event.target.value as EInvitationRole)
+                  }
+                >
+                  {invitationRoles.map((option) => (
+                    <NativeSelectOption key={option} value={option}>
+                      {option}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              </Field>
+              <div className="flex items-end">
+                <Button
+                  type="submit"
+                  disabled={inviteState.isLoading}
+                  className="w-full"
+                >
+                  {inviteState.isLoading ? "Sending…" : "Send invitation"}
+                </Button>
+              </div>
+            </FieldGroup>
+          </form>
+          {inviteError && (
+            <Alert variant="destructive">
+              <AlertDescription>{inviteError}</AlertDescription>
+            </Alert>
+          )}
+          {inviteSuccess && (
+            <Alert role="status">
+              <AlertDescription>{inviteSuccess}</AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+      <section className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h3 className="font-heading text-lg font-semibold">
+              Company members
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              {members?.meta.totalItems ?? 0} membership
+              {members?.meta.totalItems === 1 ? "" : "s"}
+            </p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-[minmax(12rem,1fr)_auto]">
+            <FieldLabel className="sr-only" htmlFor="member-search">
+              Search members
+            </FieldLabel>
+            <Input
+              id="member-search"
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search name or email"
+            />
+            <FieldLabel className="sr-only" htmlFor="member-status">
+              Membership status
+            </FieldLabel>
+            <NativeSelect
+              id="member-status"
+              value={status}
+              onChange={(event) => {
+                setStatus(event.target.value as ECompanyUserStatus | "");
+                memberPages.resetPage();
+              }}
+            >
+              <NativeSelectOption value="">All statuses</NativeSelectOption>
+              <NativeSelectOption value={ECompanyUserStatus.ACTIVE}>
+                Active
+              </NativeSelectOption>
+              <NativeSelectOption value={ECompanyUserStatus.INACTIVE}>
+                Inactive
+              </NativeSelectOption>
+            </NativeSelect>
+          </div>
+        </div>
+        {actionError && (
+          <Alert variant="destructive">
+            <AlertDescription>{actionError}</AlertDescription>
+          </Alert>
+        )}
+
+        {membersLoading ? (
+          <Alert role="status">
+            <AlertDescription>Loading company members…</AlertDescription>
+          </Alert>
+        ) : membersError ? (
+          <ErrorPanel
+            error={membersError}
+            message="Company members could not be loaded."
+          />
+        ) : !members?.data.length ? (
+          <Alert role="status">
+            <AlertDescription>No members match this search.</AlertDescription>
+          </Alert>
+        ) : (
+          <Card className="gap-0 py-0">
+            <div className="divide-y md:hidden">
+              {members.data.map((member) => (
+                <MemberCard
+                  key={member.id}
+                  member={member}
+                  busy={busyMemberId === member.id}
+                  onRoleChange={(value) => void updateRole(member, value)}
+                  onRemove={() => void remove(member)}
+                />
+              ))}
+            </div>
+            <div className="hidden md:block">
+              <Table>
+                <TableHeader className="bg-muted/50 text-xs uppercase tracking-wide">
+                  <TableRow>
+                    <TableHead className="px-4">Member</TableHead>
+                    <TableHead className="px-4">Role</TableHead>
+                    <TableHead className="px-4">Status</TableHead>
+                    <TableHead className="px-4">Joined</TableHead>
+                    <TableHead className="px-4">
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {members.data.map((member) => (
+                    <TableRow key={member.id}>
+                      <TableCell className="px-4 py-3">
+                        <p className="font-medium">
+                          {member.firstName} {member.lastName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {member.email}
+                        </p>
+                      </TableCell>
+                      <TableCell className="px-4 py-3">
+                        <MemberRoleSelect
+                          member={member}
+                          busy={busyMemberId === member.id}
+                          onChange={(value) => void updateRole(member, value)}
+                        />
+                      </TableCell>
+                      <TableCell className="px-4 py-3">
+                        <Badge variant="secondary" className="capitalize">
+                          {member.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="px-4 py-3">
+                        {new Date(member.joinedAt).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-right">
+                        {member.status === ECompanyUserStatus.ACTIVE && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={busyMemberId === member.id}
+                            onClick={() => void remove(member)}
+                          >
+                            {busyMemberId === member.id ? "Saving…" : "Remove"}
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <CardFooter className="border-t py-3">
+              <DataPagination
+                className="w-full"
+                meta={members.meta}
+                itemLabel="members"
+                isFetching={membersFetching}
+                onPageChange={memberPages.setPage}
+                onPageSizeChange={memberPages.setLimit}
+              />
+            </CardFooter>
+          </Card>
+        )}
+      </section>
+
+      <section className="space-y-4">
+        <div>
+          <h3 className="font-heading text-lg font-semibold">Invitations</h3>
+          <p className="text-sm text-muted-foreground">
+            Invitation links are single-use and expire after seven days.
+          </p>
+        </div>
+        {invitationsLoading ? (
+          <Alert role="status">
+            <AlertDescription>Loading invitations…</AlertDescription>
+          </Alert>
+        ) : invitationsError ? (
+          <ErrorPanel
+            error={invitationsError}
+            message="Invitations could not be loaded."
+          />
+        ) : !invitations?.data.length ? (
+          <Alert role="status">
+            <AlertDescription>No invitations have been sent.</AlertDescription>
+          </Alert>
+        ) : (
+          <Card className="py-0">
+            <Table>
+              <TableHeader className="bg-muted/50 text-xs uppercase tracking-wide">
+                <TableRow>
+                  <TableHead className="px-4">Recipient</TableHead>
+                  <TableHead className="px-4">Role</TableHead>
+                  <TableHead className="px-4">Status</TableHead>
+                  <TableHead className="px-4">Expires</TableHead>
+                  <TableHead className="px-4">
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {invitations.data.map((invitation) => (
+                  <TableRow key={invitation.id}>
+                    <TableCell className="px-4 py-3">
+                      {invitation.firstName || invitation.lastName
+                        ? [invitation.firstName, invitation.lastName]
+                            .filter(Boolean)
+                            .join(" ")
+                        : "Invitee"}
+                      <p className="text-xs text-muted-foreground">
+                        {invitation.email}
+                      </p>
+                    </TableCell>
+                    <TableCell className="px-4 py-3">
+                      {invitation.companyRole}
+                    </TableCell>
+                    <TableCell className="px-4 py-3">
+                      <Badge variant="secondary" className="capitalize">
+                        {invitation.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="px-4 py-3">
+                      {new Date(invitation.expiresAt).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-right">
+                      {invitation.status === EInvitationStatus.PENDING &&
+                        new Date(invitation.expiresAt) > new Date() && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={busyInvitationId === invitation.id}
+                            onClick={() =>
+                              void revoke(invitation.id, invitation.email)
+                            }
+                          >
+                            {busyInvitationId === invitation.id
+                              ? "Revoking…"
+                              : "Revoke"}
+                          </Button>
+                        )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <CardFooter className="border-t py-3">
+              <DataPagination
+                className="w-full"
+                meta={invitations.meta}
+                itemLabel="invitations"
+                isFetching={invitationsFetching}
+                onPageChange={invitationPages.setPage}
+                onPageSizeChange={invitationPages.setLimit}
+              />
+            </CardFooter>
+          </Card>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function MemberRoleSelect({
+  member,
+  busy,
+  onChange,
+}: {
+  member: ICompanyMember;
+  busy: boolean;
+  onChange: (value: string) => void;
+}) {
+  if (member.status !== ECompanyUserStatus.ACTIVE) {
+    return <span>{member.companyRole}</span>;
+  }
+  return (
+    <NativeSelect
+      aria-label={`Role for ${member.firstName} ${member.lastName}`}
+      disabled={busy}
+      value={member.companyRole}
+      onChange={(event) => onChange(event.target.value)}
+      className="max-w-64"
+    >
+      {memberRoles.map((option) => (
+        <NativeSelectOption key={option} value={option}>
+          {option}
+        </NativeSelectOption>
+      ))}
+    </NativeSelect>
+  );
+}
+
+function MemberCard({
+  member,
+  busy,
+  onRoleChange,
+  onRemove,
+}: {
+  member: ICompanyMember;
+  busy: boolean;
+  onRoleChange: (value: string) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <article className="space-y-3 p-4">
+      <div>
+        <p className="font-medium">
+          {member.firstName} {member.lastName}
+        </p>
+        <p className="text-xs text-muted-foreground">{member.email}</p>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Status: <span className="capitalize">{member.status}</span> · Joined{" "}
+        {new Date(member.joinedAt).toLocaleDateString()}
+      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <MemberRoleSelect member={member} busy={busy} onChange={onRoleChange} />
+        {member.status === ECompanyUserStatus.ACTIVE && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy}
+            onClick={onRemove}
+          >
+            {busy ? "Saving…" : "Remove"}
+          </Button>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function ErrorPanel({ error, message }: { error: unknown; message: string }) {
+  return (
+    <Alert variant="destructive">
+      <AlertTitle>{message}</AlertTitle>
+      <AlertDescription>
+        {getApiErrorMessage(error, "Please try again.")}
+      </AlertDescription>
+    </Alert>
+  );
+}

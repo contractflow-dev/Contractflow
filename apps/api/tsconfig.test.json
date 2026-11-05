@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["node", "vitest/globals"]
+  },
+  "include": [
+    "test/disposable-postgres-safety.spec.ts",
+    "test/helpers/**/*.ts",
+    "test/migration-recovery-planner.integration.spec.ts",
+    "test/integration/**/*.ts"
+  ],
+  "exclude": ["node_modules", "dist"]
+}

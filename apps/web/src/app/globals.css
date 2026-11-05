@@ -1,26 +1,260 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@source "../../../../packages/ui/src/**/*.{js,ts,jsx,tsx}";
+@custom-variant dark (&:is(.dark *));
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ───────────────────────────────────────────────────────────────
+ * ContractFlow theme
+ *
+ * Semantic tokens only: components use `bg-background`, `text-brand`,
+ * `bg-field` etc. and never raw hex, so light/dark is one class swap.
+ * Hex values in the comments are the design source of truth.
+ *
+ * Fonts: load them with next/font in app/layout.tsx and expose
+ *   --font-dm-sans  (body)   and   --font-outfit  (headings)
+ * ─────────────────────────────────────────────────────────────── */
 
 @theme inline {
+  /* Typography */
+  --font-sans: var(--font-ibm-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-heading:
+    var(--font-outfit), var(--font-ibm-plex-sans), ui-sans-serif, system-ui,
+    sans-serif;
+  --font-mono: var(--font-geist-mono);
+
+  /* Background images */
+  --background-image-auth-hero: url("/auth-hero.jpg");
+  --background-image-reg-hero: url("/company-worker-gaspipes.png");
+  --background-image-dashboard-hero: url("/iron-workers.jpg");
+  --background-image-email-hero-hero: url("/offshore-rig.jpg");
+
+  /* Core */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* ContractFlow additions */
+  --color-field: var(--field);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--primary-foreground);
+  --color-hero-overlay: var(--hero-overlay);
+  --color-hero-fade: var(--hero-fade);
+  --color-hero-foreground: var(--hero-foreground);
+  --color-hero-muted: var(--hero-muted);
+  --color-hero-accent: var(--hero-accent);
+  --color-navy: var(--navy);
+  --color-navy-foreground: var(--navy-foreground);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+
+  /* Department workspaces */
+  --color-dept-contractor: var(--dept-contractor);
+  --color-dept-client-pm: var(--dept-client-pm);
+  --color-dept-hse: var(--dept-hse);
+  --color-dept-finance: var(--dept-finance);
+
+  /* Charts */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Sidebar */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Radius (inputs and buttons = rounded-md ≈ 8px) */
+  --radius-sm: calc(var(--radius) * 0.8);
+  --radius-md: calc(var(--radius) * 1.1);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.8);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* ── Light ─────────────────────────────────────────────────── */
+:root {
+  color-scheme: light;
+  --radius: 0.25rem;
+  --background: oklch(0.976 0.003 264.5); /* #f6f7f9 */
+  --foreground: oklch(0.21 0.034 263.4); /* #101828 */
+  --card: oklch(1 0 0); /* #ffffff */
+  --card-foreground: oklch(0.21 0.034 263.4); /* #101828 */
+  --popover: oklch(1 0 0); /* #ffffff */
+  --popover-foreground: oklch(0.21 0.034 263.4); /* #101828 */
+  --primary: oklch(0.647 0.171 42.8); /* #e06328 */
+  --primary-foreground: oklch(1 0 0); /* #ffffff */
+  --secondary: oklch(0.966 0.005 258.3); /* #f2f4f7 */
+  --secondary-foreground: oklch(0.21 0.034 263.4); /* #101828 */
+  --muted: oklch(0.966 0.005 258.3); /* #f2f4f7 */
+  --muted-foreground: oklch(0.544 0.035 265.1); /* #667085 */
+  --accent: oklch(0.963 0.017 50.4); /* #fdf0e9 */
+  --accent-foreground: oklch(0.47 0.143 37.3); /* #9a3412 */
+  --destructive: oklch(0.576 0.209 29.5); /* #d92d20 */
+  --border: oklch(0.927 0.007 260.7); /* #e4e7ec */
+  --input: oklch(0.872 0.012 259.8); /* #d0d5dd */
+  --ring: oklch(0.647 0.171 42.8); /* #e06328 */
+  --field: oklch(1 0 0); /* #ffffff */
+  --brand: oklch(0.576 0.161 41.8); /* #c4501a, orange text on white */
+
+  /* Navy: owner badges, dark feature cards, avatars */
+  --navy: oklch(0.183 0.031 263.4); /* #0b1220 */
+  --navy-foreground: oklch(1 0 0); /* #ffffff */
+  --success: oklch(0.529 0.106 154.4); /* #2f7d4f */
+  --success-soft: oklch(0.955 0.017 159.1); /* #e7f4ec */
+  --warning: oklch(0.626 0.125 70.4); /* #b7791f */
+  --warning-soft: oklch(0.966 0.032 87.3); /* #fdf3dc */
+
+  --dept-contractor: oklch(0.647 0.171 42.8); /* #e06328 */
+  --dept-client-pm: oklch(0.641 0.131 251.4); /* #4a90d9 */
+  --dept-hse: oklch(0.581 0.12 155.6); /* #2f8f5b */
+  --dept-finance: oklch(0.696 0.137 80.1); /* #c9921c */
+
+  /* Hero: stays dark in BOTH modes (photo + dark overlay, light text) */
+  --hero-overlay: oklch(0.151 0.025 267.1 / 0.7); /* #070b16 @0.7 */
+  --hero-fade: oklch(0.151 0.025 267.1 / 0.9); /* #070b16 @0.9 */
+  --hero-foreground: oklch(1 0 0); /* #ffffff */
+  --hero-muted: oklch(0.9 0.015 263.2); /* soft light grey */
+  --hero-accent: oklch(0.754 0.166 44.6); /* bright orange */
+
+  --chart-1: oklch(0.647 0.171 42.8); /* #e06328 */
+  --chart-2: oklch(0.641 0.131 251.4); /* #4a90d9 */
+  --chart-3: oklch(0.581 0.12 155.6); /* #2f8f5b */
+  --chart-4: oklch(0.696 0.137 80.1); /* #c9921c */
+  --chart-5: oklch(0.609 0.031 265.3); /* #7a8396 */
+
+  /* Sidebar: dark navy in BOTH modes */
+  --sidebar: oklch(0.161 0.027 265.8); /* #080d19 */
+  --sidebar-foreground: oklch(0.851 0.015 264.5); /* #c9ced8 */
+  --sidebar-primary: oklch(0.647 0.171 42.8); /* #e06328 */
+  --sidebar-primary-foreground: oklch(1 0 0); /* #ffffff */
+  --sidebar-accent: oklch(0.254 0.049 263.2); /* #16223a */
+  --sidebar-accent-foreground: oklch(1 0 0); /* #ffffff */
+  --sidebar-border: oklch(0.279 0.037 260); /* #1e293b */
+  --sidebar-ring: oklch(0.647 0.171 42.8); /* #e06328 */
+}
+
+/* ── Dark ──────────────────────────────────────────────────── */
+.dark {
+  color-scheme: dark;
+  --background: oklch(0.171 0.028 267.4); /* #0a0f1c */
+  --foreground: oklch(0.96 0.008 253.9); /* #eef2f7 */
+  --card: oklch(0.219 0.038 263.3); /* #111a2c */
+  --card-foreground: oklch(0.96 0.008 253.9); /* #eef2f7 */
+  --popover: oklch(0.219 0.038 263.3); /* #111a2c */
+  --popover-foreground: oklch(0.96 0.008 253.9); /* #eef2f7 */
+  --primary: oklch(0.647 0.171 42.8); /* #e06328 */
+  --primary-foreground: oklch(1 0 0); /* #ffffff */
+  --secondary: oklch(0.258 0.046 264); /* #18233a */
+  --secondary-foreground: oklch(0.96 0.008 253.9); /* #eef2f7 */
+  --muted: oklch(0.233 0.041 265); /* #141d31 */
+  --muted-foreground: oklch(0.632 0.041 263.5); /* #7d8aa3 */
+  --accent: oklch(0.258 0.046 264); /* #18233a */
+  --accent-foreground: oklch(0.96 0.008 253.9); /* #eef2f7 */
+  --destructive: oklch(0.699 0.162 26.5); /* #f27066 */
+  --border: oklch(0.279 0.037 260); /* #1e293b */
+  --input: oklch(0.311 0.048 264.2); /* #243049 */
+  --ring: oklch(0.704 0.159 43.6); /* #ef7a45 */
+  --field: oklch(0.219 0.038 263.3); /* #111a2c */
+  --brand: oklch(0.704 0.159 43.6); /* #ef7a45 */
+
+  --navy: oklch(0.96 0.008 253.9); /* #eef2f7, inverted so it still contrasts */
+  --navy-foreground: oklch(0.183 0.031 263.4); /* #0b1220 */
+  --success: oklch(0.679 0.121 156.1); /* #4fae78 */
+  --success-soft: oklch(0.529 0.106 154.4 / 0.18); /* #2f7d4f @0.18 */
+  --warning: oklch(0.774 0.141 78.1); /* #e6a93b */
+  --warning-soft: oklch(0.626 0.125 70.4 / 0.18); /* #b7791f @0.18 */
+
+  --dept-contractor: oklch(0.704 0.159 43.6); /* #ef7a45 */
+  --dept-client-pm: oklch(0.715 0.112 249.6); /* #6aa8e6 */
+  --dept-hse: oklch(0.692 0.125 156.7); /* #4fb37c */
+  --dept-finance: oklch(0.773 0.139 83); /* #e0ac3a */
+
+  /* Hero: same as light so the panel looks identical in both modes */
+  --hero-overlay: oklch(0.151 0.025 267.1 / 0.7); /* #070b16 @0.7 */
+  --hero-fade: oklch(0.151 0.025 267.1 / 0.9); /* #070b16 @0.9 */
+  --hero-foreground: oklch(1 0 0); /* #ffffff */
+  --hero-muted: oklch(0.9 0.015 263.2); /* soft light grey */
+  --hero-accent: oklch(0.754 0.166 44.6); /* bright orange */
+
+  --chart-1: oklch(0.704 0.159 43.6); /* #ef7a45 */
+  --chart-2: oklch(0.715 0.112 249.6); /* #6aa8e6 */
+  --chart-3: oklch(0.692 0.125 156.7); /* #4fb37c */
+  --chart-4: oklch(0.773 0.139 83); /* #e0ac3a */
+  --chart-5: oklch(0.632 0.041 263.5); /* #7d8aa3 */
+  --sidebar: oklch(0.161 0.027 265.8); /* #080d19 */
+  --sidebar-foreground: oklch(0.851 0.015 264.5); /* #c9ced8 */
+  --sidebar-primary: oklch(0.647 0.171 42.8); /* #e06328 */
+  --sidebar-primary-foreground: oklch(1 0 0); /* #ffffff */
+  --sidebar-accent: oklch(0.254 0.049 263.2); /* #16223a */
+  --sidebar-accent-foreground: oklch(1 0 0); /* #ffffff */
+  --sidebar-border: oklch(0.279 0.037 260); /* #1e293b */
+  --sidebar-ring: oklch(0.647 0.171 42.8); /* #e06328 */
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans antialiased;
+    scrollbar-color: var(--muted-foreground) var(--background);
+  }
+  ::-webkit-scrollbar {
+    width: 0.75rem;
+    height: 0.75rem;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--background);
+  }
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid var(--background);
+    border-radius: 9999px;
+    background: var(--muted-foreground);
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-heading;
+  }
+  /* Native checkboxes / radios pick up the brand colour */
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--primary);
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--muted-foreground);
+    opacity: 1;
+  }
 }

@@ -33,6 +33,10 @@ ContractFlow follows a simple monorepo structure:
 docker compose -f infra/docker-compose.yml up -d
 ```
 
+The local stack includes Mailpit. The API sends verification messages to its
+SMTP server by default in development; view captured email at
+`http://localhost:8025`.
+
 2. Install workspace dependencies:
 
 ```bash
@@ -46,6 +50,9 @@ npm install
 DATABASE_URL=postgresql://contractflow:contractflow@localhost:5432/contractflow
 PORT=3001
 WEB_URL=http://localhost:3000
+MAIL_PROVIDER=smtp
+SMTP_HOST=localhost
+SMTP_PORT=1025
 ```
 
 4. Run the API:

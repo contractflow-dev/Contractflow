@@ -1,0 +1,133 @@
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
+import { CurrentCompanyId } from '../../../common/decorators/current-company-id.decorator';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { CompanyContextGuard } from '../../../common/guards/company-context.guard';
+import type { AuthenticatedUser } from '../../identity/interface/auth-context.interface';
+import { SiteOperationsService } from '../services/site-operations.service';
+
+@Controller('companies/:companyId/contracts/:contractId')
+@UseGuards(CompanyContextGuard)
+export class SiteOperationsController {
+  constructor(private readonly siteOperations: SiteOperationsService) {}
+
+  @Get('sites')
+  listSites(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @Param('contractId') contractId: string,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.siteOperations.sites.list(
+      user.id,
+      companyId,
+      contractId,
+      query,
+    );
+  }
+
+  @Get('sites/:siteId')
+  getSite(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @Param('contractId') contractId: string,
+    @Param('siteId') siteId: string,
+  ) {
+    return this.siteOperations.sites.get(
+      user.id,
+      companyId,
+      contractId,
+      siteId,
+    );
+  }
+
+  @Get('daily-logs')
+  listDailyLogs(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @Param('contractId') contractId: string,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.siteOperations.dailyLogs.list(
+      user.id,
+      companyId,
+      contractId,
+      query,
+    );
+  }
+
+  @Get('daily-logs/:logId')
+  getDailyLog(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @Param('contractId') contractId: string,
+    @Param('logId') logId: string,
+  ) {
+    return this.siteOperations.dailyLogs.get(
+      user.id,
+      companyId,
+      contractId,
+      logId,
+    );
+  }
+
+  @Get('inventory-items')
+  listInventoryItems(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @Param('contractId') contractId: string,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.siteOperations.inventoryItems.list(
+      user.id,
+      companyId,
+      contractId,
+      query,
+    );
+  }
+
+  @Get('inventory-items/:itemId')
+  getInventoryItem(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @Param('contractId') contractId: string,
+    @Param('itemId') itemId: string,
+  ) {
+    return this.siteOperations.inventoryItems.get(
+      user.id,
+      companyId,
+      contractId,
+      itemId,
+    );
+  }
+
+  @Get('inventory-transactions')
+  listInventoryTransactions(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @Param('contractId') contractId: string,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.siteOperations.inventoryTransactions.list(
+      user.id,
+      companyId,
+      contractId,
+      query,
+    );
+  }
+
+  @Get('inventory-transactions/:transactionId')
+  getInventoryTransaction(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @Param('contractId') contractId: string,
+    @Param('transactionId') transactionId: string,
+  ) {
+    return this.siteOperations.inventoryTransactions.get(
+      user.id,
+      companyId,
+      contractId,
+      transactionId,
+    );
+  }
+}

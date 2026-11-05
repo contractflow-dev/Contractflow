@@ -1,9 +1,8 @@
-
 export interface IUserSessionEntity {
-    userId : string
-    refreshTokenHash : string
-    ipAddress : string
-    userAgent : string
-    expiresAt : Date
-    revokedAt : Date
+  userId: string;
+  refreshTokenHash: string;
+  ipAddress: string | null;
+  userAgent: string;
+  expiresAt: Date;
+  revokedAt: Date | null;
 }

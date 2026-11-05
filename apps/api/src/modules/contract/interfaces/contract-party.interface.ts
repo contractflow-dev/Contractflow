@@ -1,13 +1,13 @@
-import { PartyType } from '@contractflow/contracts-schema';
+import { EPartyType } from '@contractflow/contracts-schema';
 
 export interface IContractPartyEntity {
   contractId: string;
   companyId: string;
-  partyType: PartyType;
-  signatoryFirstName: string;
-  signatoryLastName: string;
-  signatoryTitle: string;
-  signedAt: Date;
+  partyType: EPartyType;
+  signatoryFirstName: string | null;
+  signatoryLastName: string | null;
+  signatoryTitle: string | null;
+  signedAt: Date | null;
 }
 
 // IGetUserResponse for interface

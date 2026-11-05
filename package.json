@@ -4,13 +4,21 @@
   "private": true,
   "packageManager": "pnpm@9.15.0",
   "scripts": {
-    "dev:web": "pnpm --filter @contractflow/web dev",
-    "dev:api": "pnpm --filter @contractflow/api start:dev",
+    "dev:web": "pnpm --filter ./apps/web dev",
+    "dev:api": "pnpm --filter ./apps/api start:dev",
+    "dev:docker": "docker compose -f infra/docker-compose.yml --env-file infra/dev-docker.env --profile app up -d --build web",
+    "dev": "concurrently -n web,api,docker -c cyan,magenta,yellow \"pnpm run dev:web\" \"pnpm run dev:api\" \"pnpm run dev:docker\"",
     "build": "pnpm -r --if-present run build",
     "lint": "pnpm -r --if-present run lint",
     "format": "prettier --write ."
   },
   "devDependencies": {
-    "prettier": "^3.5.3"
+    "concurrently": "^10.0.5",
+    "prettier": "^3.5.3",
+    "tsx": "^4.23.15"
+  },
+  "dependencies": {
+    "i18n-iso-countries": "^7.14.0",
+    "ulid": "^3.0.2"
   }
 }

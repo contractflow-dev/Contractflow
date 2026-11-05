@@ -1,9 +1,4 @@
-import {
-  Entity,
-  Column,
-  ManyToOne,
-  JoinColumn,
-} from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { Contract } from '../../contract/entities/contract.entity';
 import { Company } from '../../identity/entities/company.entity';
 import { CompanyUser } from '../../identity/entities/company-user.entity';
@@ -11,7 +6,10 @@ import { BaseCustomEntity } from './base-custom.entity';
 import { IActivityLogEntity } from '../interfaces/activity-log.interface';
 
 @Entity('activity_log')
-export class ActivityLog extends BaseCustomEntity implements IActivityLogEntity {
+export class ActivityLog
+  extends BaseCustomEntity
+  implements IActivityLogEntity
+{
   @Column({ name: 'contract_id', type: 'varchar', length: 26 })
   contractId!: string;
   @ManyToOne(() => Contract, { onDelete: 'CASCADE' })
@@ -48,14 +46,14 @@ export class ActivityLog extends BaseCustomEntity implements IActivityLogEntity 
   @Column({ name: 'metadata', type: 'jsonb' })
   metadata!: Record<string, any>;
 
-  @Column({ name: 'ip_address', type: 'inet' })
-  ipAddress!: string;
+  @Column({ name: 'ip_address', type: 'inet', nullable: true })
+  ipAddress!: string | null;
 
-  @Column({ name: 'user_agent', type: 'varchar' })
-  userAgent!: string;
+  @Column({ name: 'user_agent', type: 'varchar', nullable: true })
+  userAgent!: string | null;
 
-  @Column({ name: 'request_id', type: 'uuid' })
-  requestId!: string;
+  @Column({ name: 'request_id', type: 'uuid', nullable: true })
+  requestId!: string | null;
 
   @Column({ name: 'occurred_at', type: 'timestamptz' })
   occurredAt!: Date;

@@ -1,6 +1,6 @@
-import { IsUUID } from 'class-validator';
+import { Matches } from 'class-validator';
 
 export class GetAppUserDto {
-  @IsUUID()
+  @Matches(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/i)
   id: string;
 }

@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from "typeorm";
+import { ECurrencyCode } from "@contractflow/contracts-schema";
+import { Entity, Column, ManyToOne, JoinColumn } from "typeorm";
 import { Invoice } from "./invoice.entity";
 import { Milestone } from "../../delivery/entities/milestone.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
@@ -39,5 +40,5 @@ export class InvoiceLineItem extends BaseCustomEntity implements IInvoiceLineIte
     amountMinor!: number
 
     @Column({name: "currency_code", type: "char", length: 3})
-    currencyCode!: string
+    currencyCode!: ECurrencyCode
 }

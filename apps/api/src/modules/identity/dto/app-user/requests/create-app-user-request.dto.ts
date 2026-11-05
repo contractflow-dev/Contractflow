@@ -6,11 +6,13 @@ import {
   IsNotEmpty,
   MaxLength,
   IsTimeZone,
+  IsOptional,
 } from 'class-validator';
+import type { RegisterRequest } from '@contractflow/contracts-schema';
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
 
-export class CreateAppUserRequestDto {
+export class CreateAppUserRequestDto implements RegisterRequest {
   @Transform(({ value }) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value,
   )
@@ -31,10 +33,10 @@ export class CreateAppUserRequestDto {
   lastName: string;
 
   @Transform(trim)
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(100)
-  middleName: string;
+  middleName?: string;
 
   @IsStrongPassword({
     minLength: 12,

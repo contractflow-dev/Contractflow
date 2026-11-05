@@ -39,12 +39,12 @@ export enum EHseIncidentStatus{
     IN_PROGRESS="in_progress",
     CLOSED="closed"
 }
-export enum EHseInpectionResult{
+export enum EHseInspectionResult{
     COMPLIANT="compliant",
     NON_COMPLIANT="non_compliant",
     NOT_APPLICABLE="not_applicable"
 }
-export enum EHseInpectionRiskLevel{
+export enum EHseInspectionRiskLevel{
     LOW="low",
     MEDIUM="medium",
     HIGH="high"

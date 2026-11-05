@@ -1,0 +1,83 @@
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import type {
+  DeepPartial,
+  FindOptionsOrder,
+  FindOptionsWhere,
+  Repository,
+} from 'typeorm';
+import { Document } from '../entities/document.entity';
+import {
+  CompanyScopedRepository,
+  requireCompanyId,
+} from '../../../common/database/repositories/company-scoped.repository';
+import { SelectQueryBuilder } from 'typeorm/browser';
+import { ICompanyScope } from '../../../common/database/repositories/company-scope.interface';
+
+/**
+ * Documents belong to one contract and are owned by one party company. Both
+ * boundaries apply: the company must be a party to the contract, and only
+ * documents it owns are visible.
+ */
+@Injectable()
+export class DocumentRepository extends CompanyScopedRepository<Document> {
+  constructor(@InjectRepository(Document) repository: Repository<Document>) {
+    super(repository);
+  }
+
+  protected override applyScope(
+    scope: ICompanyScope,
+    qb: SelectQueryBuilder<Document>,
+  ): void {
+    qb.andWhere(`${qb.alias}.ownerCompanyId = :__scopeOwnerCompanyId`, {
+      __scopeOwnerCompanyId: requireCompanyId(scope),
+    });
+  }
+
+  protected override scopeWhere(
+    scope: ICompanyScope,
+  ): FindOptionsWhere<Document> {
+    return {
+      ownerCompanyId: requireCompanyId(scope),
+    } as unknown as FindOptionsWhere<Document>;
+  }
+
+  protected override scopeValues(scope: ICompanyScope): DeepPartial<Document> {
+    return {
+      ownerCompanyId: requireCompanyId(scope),
+    } as unknown as DeepPartial<Document>;
+  }
+
+  findByContract(scope: ICompanyScope, contractId: string) {
+    return this.findAll(scope, {
+      where: { contractId } as FindOptionsWhere<Document>,
+      order: { createdAt: 'DESC' } satisfies FindOptionsOrder<Document>,
+    });
+  }
+
+  /** Company-level files: contract_id is null. */
+  findCompanyLevel(scope: ICompanyScope) {
+    return this.scopedQuery(scope)
+      .andWhere('e.contractId IS NULL')
+      .orderBy('e.createdAt', 'DESC')
+      .getMany();
+  }
+
+  findByCategory(scope: ICompanyScope, category: Document['category']) {
+    return this.findAll(scope, {
+      where: { category } as FindOptionsWhere<Document>,
+    });
+  }
+
+  findByStatus(scope: ICompanyScope, status: Document['status']) {
+    return this.findAll(scope, {
+      where: { status } as FindOptionsWhere<Document>,
+    });
+  }
+
+  findByDocumentNumber(scope: ICompanyScope, documentNumber: string) {
+    return this.findOne(scope, {
+      where: { documentNumber } as FindOptionsWhere<Document>,
+    });
+  }
+}

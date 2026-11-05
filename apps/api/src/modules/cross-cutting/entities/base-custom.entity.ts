@@ -1,30 +1,33 @@
-import { 
-    CreateDateColumn, 
-    UpdateDateColumn, 
-    PrimaryGeneratedColumn, 
-    BeforeInsert} from "typeorm";
-import { ulid } from 'ulid'
+import {
+  CreateDateColumn,
+  UpdateDateColumn,
+  PrimaryColumn,
+  BeforeInsert,
+} from 'typeorm';
+import { ulid } from 'ulid';
 
 export abstract class BaseCustomEntity {
-    @PrimaryGeneratedColumn("uuid", { name: "id" })
-    id!: string;
+  @PrimaryColumn({ name: 'id', type: 'varchar', length: 26 })
+  id!: string;
 
-    @CreateDateColumn({ 
-        name: "created_at", 
-        type: "timestamptz", 
-        default: () => "now()", })
-    createdAt!: Date;
+  @CreateDateColumn({
+    name: 'created_at',
+    type: 'timestamptz',
+    default: () => 'now()',
+  })
+  createdAt!: Date;
 
-    @UpdateDateColumn({ 
-        name: "updated_at", 
-        type: "timestamptz", 
-        default: () => "now()", })
-    updatedAt!: Date;
+  @UpdateDateColumn({
+    name: 'updated_at',
+    type: 'timestamptz',
+    default: () => 'now()',
+  })
+  updatedAt!: Date;
 
-    @BeforeInsert()
-    generatedId() {
-        if (!this.id){
-            this.id = ulid()
-        }
+  @BeforeInsert()
+  generateId() {
+    if (!this.id) {
+      this.id = ulid();
     }
+  }
 }

@@ -1,8 +1,8 @@
-import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from "typeorm";
+import { Entity, Column, ManyToOne, JoinColumn } from "typeorm";
 import { Contract } from "../../contract/entities/contract.entity";
 import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
 import { IContractSiteEntity } from "../interface/contract-site.interface";
-import { ContractSiteStatus } from "@contractflow/contracts-schema";
+import { EContractSiteStatus, ECountryCode } from "@contractflow/contracts-schema";
 
 
 @Entity("contract_site")
@@ -31,7 +31,7 @@ export class ContractSite extends BaseCustomEntity implements IContractSiteEntit
     stateRegion!: string
 
     @Column({name: "country_code", type: "char", length: 2})
-    countryCode!: string
+    countryCode!: ECountryCode
 
     @Column({name: "latitude_e6", type: "int"})
     latitudeE6!: number
@@ -39,6 +39,6 @@ export class ContractSite extends BaseCustomEntity implements IContractSiteEntit
     @Column({name: "longitude_e6", type: "int"})
     longitudeE6!: number
 
-    @Column({name:"status", type: "enum", enum: ContractSiteStatus})
-    status!: ContractSiteStatus
+    @Column({name:"status", type: "enum", enum: EContractSiteStatus})
+    status!: EContractSiteStatus
 }

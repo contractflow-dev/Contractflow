@@ -1,18 +1,23 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  ManyToOne,
-  JoinColumn,
-} from 'typeorm';
+import { Entity, Index, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { Company } from './company.entity';
 import { CompanyUser } from './company-user.entity';
 import { BaseCustomEntity } from '../../cross-cutting/entities/base-custom.entity';
 import { ICompanyInvitationEntity } from '../interface/company-invitation.interface';
-import { InvitationRole, InvitationStatus } from '@contractflow/contracts-schema';
-
+import {
+  EInvitationRole,
+  EInvitationStatus,
+} from '@contractflow/contracts-schema';
 
 @Entity('company_invitation')
+@Index('ix_company_invitation_company_status_expiry', [
+  'companyId',
+  'status',
+  'expiresAt',
+])
+@Index('uq_company_invitation_pending_company_email', ['companyId', 'email'], {
+  unique: true,
+  where: `"status" = 'pending'`,
+})
 export class CompanyInvitation
   extends BaseCustomEntity
   implements ICompanyInvitationEntity
@@ -20,7 +25,11 @@ export class CompanyInvitation
   @Column({ name: 'company_id', type: 'varchar', length: 26 })
   companyId!: string;
   @ManyToOne(() => Company, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'company_id', referencedColumnName: 'id' })
+  @JoinColumn({
+    name: 'company_id',
+    referencedColumnName: 'id',
+    foreignKeyConstraintName: 'FK_company_invitation_company',
+  })
   company!: Company;
 
   @Column({ name: 'invited_by_company_user_id', type: 'varchar', length: 26 })
@@ -29,35 +38,45 @@ export class CompanyInvitation
   @JoinColumn({
     name: 'invited_by_company_user_id',
     referencedColumnName: 'id',
+    foreignKeyConstraintName: 'FK_company_invitation_inviter',
   })
   CompanyUser!: CompanyUser;
 
   @Column({ name: 'email', type: 'citext' })
   email!: string;
 
-  @Column({ name: 'first_name', type: 'varchar', length: 100 })
-  firstName!: string;
+  @Column({ name: 'first_name', type: 'varchar', length: 100, nullable: true })
+  firstName!: string | null;
 
-  @Column({ name: 'last_name', type: 'varchar', length: 100 })
-  lastName!: string;
+  @Column({ name: 'last_name', type: 'varchar', length: 100, nullable: true })
+  lastName!: string | null;
 
-  @Column({ name: 'company_role', type: 'enum', enum: InvitationRole })
-  companyRole!: InvitationRole;
+  @Column({ name: 'company_role', type: 'enum', enum: EInvitationRole })
+  companyRole!: EInvitationRole;
 
-  @Column({ name: 'token_hash', type: 'varchar', length: 255, unique: true })
+  @Column({
+    name: 'token_hash',
+    type: 'varchar',
+    length: 255,
+    unique: true,
+    select: false,
+  })
   tokenHash!: string;
 
   @Column({
     name: 'status',
-    type: 'enum',
-    enum: InvitationStatus,
-    default: InvitationStatus.PENDING,
+    type: 'varchar',
+    length: 20,
+    default: EInvitationStatus.PENDING,
   })
-  status!: InvitationStatus;
+  status!: EInvitationStatus;
 
   @Column({ name: 'expires_at', type: 'timestamptz' })
   expiresAt!: Date;
 
-  @Column({ name: 'accepted_at', type: 'timestamptz' })
-  acceptedAt!: Date;
+  @Column({ name: 'accepted_at', type: 'timestamptz', nullable: true })
+  acceptedAt!: Date | null;
+
+  @Column({ name: 'revoked_at', type: 'timestamptz', nullable: true })
+  revokedAt!: Date | null;
 }

@@ -8,13 +8,13 @@ import { Contract } from '../../contract/entities/contract.entity';
 import { BaseCustomEntity } from './base-custom.entity';
 import { IConversationEntity } from '../interfaces/conversation.interface';
 import { CompanyUser } from '../../identity/entities/company-user.entity';  
-import { ConversationType, ConversationWorkspace } from '@contractflow/contracts-schema';
+import { EConversationType, EConversationWorkspace } from '@contractflow/contracts-schema';
 
 @Entity('conversation')
 export class Conversation extends BaseCustomEntity implements IConversationEntity {
 
-  @Column({ name: 'conversation_type', type: 'enum', enum: ConversationType })
-  conversationType!: ConversationType;
+  @Column({ name: 'conversation_type', type: 'enum', enum: EConversationType })
+  conversationType!: EConversationType;
 
   @Column({ name: 'contract_id', type: 'varchar', length: 26 })
   contractId!: string;
@@ -22,8 +22,8 @@ export class Conversation extends BaseCustomEntity implements IConversationEntit
   @JoinColumn({ name: 'contract_id', referencedColumnName: 'id' })
   contract!: Contract;
 
-  @Column({ name: 'workspace', type: 'enum', enum: ConversationWorkspace })
-  workspace!: ConversationWorkspace;
+  @Column({ name: 'workspace', type: 'enum', enum: EConversationWorkspace })
+  workspace!: EConversationWorkspace;
 
   @Column({ name: 'title', type: 'varchar', length: 126 })
   title!: string;

@@ -1,9 +1,9 @@
-import { ConversationType, ConversationWorkspace } from "@contractflow/contracts-schema"
+import { EConversationType, EConversationWorkspace } from "@contractflow/contracts-schema"
 
 export interface IConversationEntity {
-    conversationType : ConversationType
+    conversationType : EConversationType
     contractId : string
-    workspace : ConversationWorkspace
+    workspace : EConversationWorkspace
     title : string
     conversationCreatedAt : Date
     createdBy_id : string

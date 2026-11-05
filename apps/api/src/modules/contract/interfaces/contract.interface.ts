@@ -1,24 +1,27 @@
-import { ContractStatus, ContractType } from "@contractflow/contracts-schema"
+import { EContractStatus, EContractType, ECurrencyCode } from "@contractflow/contracts-schema"
 
 export interface IContractEntity {
     referenceNumber : string
     title : string
-    description : string
-    contractType : ContractType
-    status : ContractStatus
-    parentContractId : string
-    originalValueMinor : Number
-    currentValueMinor : number
-    currencyCode : string
+    description : string | null
+    contractType : EContractType
+    status : EContractStatus
+    parentContractId : string | null
+    originalValueMinor : string | number
+    currentValueMinor : string | number
+    currencyCode : ECurrencyCode
     retentionRateBps : number
-    advancePaymentRateBps : number
+    advancePaymentRateBps : number | null
     paymentTermsDays : number
-    liquidatedDamagesPerDayMinor : number
+    liquidatedDamagesPerDayMinor : string | number | null
     awardDate : Date
     startDate : Date
     endDate : Date
-    revisedEndDate : Date
-    actualCompletionDate : Date
+    revisedEndDate : Date | null
+    actualCompletionDate : Date | null
     defectsLiabilityDays : number
     timezone : string
+    createdByCompanyId: string | null
+    deletedAt: Date | null
+    deletedByCompanyUserId: string | null
 }

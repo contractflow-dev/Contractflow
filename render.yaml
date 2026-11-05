@@ -1,61 +1,73 @@
 services:
-  # =========================
   # ContractFlow API
-  # =========================
   - type: web
     name: contractflow-api
     runtime: node
+    plan: free
     rootDir: .
     healthCheckPath: /health
 
     buildCommand: |
       corepack enable
-      pnpm install --frozen-lockfile
-      pnpm --filter @contractflow/api build
+      pnpm install --frozen-lockfile --prod=false
+      pnpm --filter "@contractflow/api..." build
 
-    startCommand: pnpm --filter @contractflow/api start
+    startCommand: pnpm --filter @contractflow/api start:prod
 
     envVars:
       - key: NODE_VERSION
-        value: 20.11.0
+        value: "22"
 
       - key: NODE_ENV
         value: production
 
-      - key: PORT
-        value: 10000
-
       - key: DATABASE_URL
         sync: false
 
-      - key: JWT_SECRET
-        sync: false
+      - key: WEB_URL
+        value: https://contractflow-web-o6yz.onrender.com
 
       - key: CORS_ORIGIN
+        value: https://contractflow-web-o6yz.onrender.com
+
+      - key: JWT_SECRET
+        generateValue: true
+
+      - key: MAIL_PROVIDER
+        value: smtp
+
+      - key: SMTP_HOST
         sync: false
 
-  # =========================
+      - key: SMTP_PORT
+        sync: false
+
+      - key: SMTP_USER
+        sync: false
+
+      - key: SMTP_PASS
+        sync: false
+
   # ContractFlow Web
-  # =========================
   - type: web
     name: contractflow-web
     runtime: node
+    plan: free
     rootDir: .
-    healthCheckPath: /
 
     buildCommand: |
       corepack enable
-      pnpm install --frozen-lockfile
-      pnpm --filter @contractflow/web build
+      pnpm install --frozen-lockfile --prod=false
+      pnpm --filter "@contractflow/web..." build
 
     startCommand: pnpm --filter @contractflow/web start
 
     envVars:
       - key: NODE_VERSION
-        value: 20.11.0
+        value: "22"
 
       - key: NODE_ENV
         value: production
 
       - key: NEXT_PUBLIC_API_URL
-        sync: false
+        value: https://contractflow-api-5tu7.onrender.com/api
