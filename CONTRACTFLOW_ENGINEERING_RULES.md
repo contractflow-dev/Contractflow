@@ -252,7 +252,7 @@ apps/web/src/
 - The base query keeps an `X-Company-Id` header that an endpoint set itself.
   Otherwise it fills the header from `workspace.activeWorkspaceId`. Endpoints
   that must not carry company context (authentication, public invitations,
-  onboarding, company listing and creation, platform administration) are
+  company listing, access summary and creation, platform administration) are
   listed in `COMPANY_CONTEXT_EXEMPT_ENDPOINTS`; add new endpoints of that kind
   there.
   Page URLs must not carry `?companyId=` either: `CompanyAdminShell` removes

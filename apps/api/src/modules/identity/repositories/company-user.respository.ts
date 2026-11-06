@@ -76,6 +76,14 @@ export class CompanyUserRepository extends CompanyScopedRepository<
     });
   }
 
+  /** Every membership the user has ever held, active or not, with its company. */
+  findAllMembershipsForUser(userId: string): Promise<CompanyUser[]> {
+    return this.repository.find({
+      where: { userId },
+      relations: { company: true },
+    });
+  }
+
   findCurrentMembershipWithCompany(
     userId: string,
   ): Promise<CompanyUser | null> {

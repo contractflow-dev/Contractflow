@@ -21,6 +21,13 @@ import { PasswordService } from './services/auth/password.service';
 import { SessionService } from './services/auth/session.service';
 import { CompanyService } from './services/company/company.service';
 import { CompanyAdminService } from './services/company/company-admin.service';
+import { CompanyVerificationService } from './services/company/company-verification.service';
+import { CompanyVerificationToken } from './entities/company-verification-token.entity';
+import { CompanyVerificationContextFactory } from './repositories/company-verification-context.factory';
+import {
+  COMPANY_VERIFICATION_UNIT_OF_WORK,
+  type ICompanyVerificationContext,
+} from './interface/company-verification-persistence.interface';
 import { SessionAuthGuard } from '../../common/guards/session-auth.guard';
 import { CompanyContextGuard } from '../../common/guards/company-context.guard';
 import { MailService } from '../mail/mail.service';
@@ -66,6 +73,7 @@ import {
       ContractParty,
       UserSession,
       EmailVerificationToken,
+      CompanyVerificationToken,
     ]),
   ],
   controllers: [
@@ -125,6 +133,16 @@ import {
     SessionService,
     CompanyService,
     CompanyAdminService,
+    CompanyVerificationService,
+    {
+      provide: COMPANY_VERIFICATION_UNIT_OF_WORK,
+      useFactory: (dataSource: DataSource) =>
+        new TypeOrmUnitOfWork<ICompanyVerificationContext>(
+          dataSource,
+          new CompanyVerificationContextFactory(),
+        ),
+      inject: [DataSource],
+    },
     CompanyUserRepository,
     CompanyAuditLogRepository,
     CompanyRepository,

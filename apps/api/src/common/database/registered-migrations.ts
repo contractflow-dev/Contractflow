@@ -9,6 +9,8 @@ import { ContractRoleInvitations1791882600004 } from './migrations/1791882600004
 import { ContractLifecycle1792862700000 } from './migrations/1792862700000-contract-lifecycle';
 import { CompanyInvitationExpiryIndex1792862700001 } from './migrations/1792862700001-company-invitation-expiry-index';
 import { CompanyInvitationOptionalNames1793100000000 } from './migrations/1793100000000-company-invitation-optional-names';
+import { CompanyEmailVerification1793200000000 } from './migrations/1793200000000-company-email-verification';
+import { DocumentObjectStorage1793300000000 } from './migrations/1793300000000-document-object-storage';
 
 export const registeredMigrations = [
   IdentitySchemaBootstrap1749000000000,
@@ -22,4 +24,6 @@ export const registeredMigrations = [
   ContractLifecycle1792862700000,
   CompanyInvitationExpiryIndex1792862700001,
   CompanyInvitationOptionalNames1793100000000,
+  CompanyEmailVerification1793200000000,
+  DocumentObjectStorage1793300000000,
 ];

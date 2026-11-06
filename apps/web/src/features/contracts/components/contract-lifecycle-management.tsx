@@ -30,6 +30,7 @@ import {
   NativeSelectOption,
 } from "@workspace/ui/components/native-select";
 import { Textarea } from "@workspace/ui/components/textarea";
+import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { useGetCompanyMembershipQuery } from "@/services/companiesApi";
 import {
@@ -63,6 +64,33 @@ const transitionOptions: Record<
   ],
   [EContractStatus.SUSPENDED]: [{ transition: "resume", label: "Resume" }],
   [EContractStatus.COMPLETED]: [],
+};
+
+const transitionEffects: Record<
+  ContractTransition,
+  { effect: string; done: string; destructive: boolean }
+> = {
+  activate: {
+    effect: "will move from Draft to Active.",
+    done: "Contract activated.",
+    destructive: false,
+  },
+  hold: {
+    effect: "will be suspended until someone resumes it.",
+    done: "Contract suspended.",
+    destructive: true,
+  },
+  resume: {
+    effect: "will move from Suspended back to Active.",
+    done: "Contract resumed.",
+    destructive: false,
+  },
+  complete: {
+    effect:
+      "will be marked as completed. A completed contract can't change status again.",
+    done: "Contract completed.",
+    destructive: true,
+  },
 };
 
 export function CreateContractForm({ companyId }: { companyId: string }) {
@@ -351,6 +379,15 @@ export function ContractLifecycleManagement({
   const [title, setTitle] = useState(contract.title);
   const [description, setDescription] = useState(contract.description ?? "");
   const [reason, setReason] = useState("");
+  const [pendingTransition, setPendingTransition] = useState<{
+    transition: ContractTransition;
+    label: string;
+  } | null>(null);
+  const [statusFeedback, setStatusFeedback] = useState("");
+  const [invitationToRevoke, setInvitationToRevoke] = useState<{
+    id: string;
+    email: string;
+  } | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteType, setInviteType] = useState<EPartyType>(
     EPartyType.CONTRACTOR,
@@ -394,17 +431,34 @@ export function ContractLifecycleManagement({
     if (!("error" in result)) setSelectedWorkspaces(null);
   }
 
-  async function transition(
+  function requestTransition(
     event: FormEvent<HTMLFormElement>,
-    action: ContractTransition,
+    option: { transition: ContractTransition; label: string },
   ) {
     event.preventDefault();
+    if (!reason.trim()) return;
+    setStatusFeedback("");
+    setPendingTransition(option);
+  }
+
+  async function confirmTransition() {
+    if (!pendingTransition || transitionState.isLoading) return;
     const result = await transitionContract({
       ...query,
-      transition: action,
+      transition: pendingTransition.transition,
       reason: reason.trim(),
     });
-    if (!("error" in result)) setReason("");
+    if (!("error" in result)) {
+      setReason("");
+      setStatusFeedback(transitionEffects[pendingTransition.transition].done);
+    }
+    setPendingTransition(null);
+  }
+
+  async function confirmInvitationRevocation() {
+    if (!invitationToRevoke || revokeInvitationState.isLoading) return;
+    await revokeInvitation({ ...query, invitationId: invitationToRevoke.id });
+    setInvitationToRevoke(null);
   }
 
   async function invite(event: FormEvent<HTMLFormElement>) {
@@ -551,28 +605,31 @@ export function ContractLifecycleManagement({
                 />
               </Field>
               <div className="flex flex-wrap gap-2">
-                {transitionOptions[contract.status].map(
-                  ({ transition: action, label }) => (
-                    <form
-                      key={action}
-                      onSubmit={(event) => void transition(event, action)}
+                {transitionOptions[contract.status].map((option) => (
+                  <form
+                    key={option.transition}
+                    onSubmit={(event) => requestTransition(event, option)}
+                  >
+                    <input type="hidden" name="reason" value={reason} />
+                    <Button
+                      type="submit"
+                      disabled={transitionState.isLoading || !reason.trim()}
                     >
-                      <input type="hidden" name="reason" value={reason} />
-                      <Button
-                        type="submit"
-                        disabled={transitionState.isLoading || !reason.trim()}
-                      >
-                        {label}
-                      </Button>
-                    </form>
-                  ),
-                )}
+                      {option.label}
+                    </Button>
+                  </form>
+                ))}
               </div>
               {transitionState.error ? (
                 <ErrorAlert
                   error={transitionState.error}
                   fallback="Unable to change contract status."
                 />
+              ) : null}
+              {statusFeedback ? (
+                <Alert role="status">
+                  <AlertDescription>{statusFeedback}</AlertDescription>
+                </Alert>
               ) : null}
             </div>
           ) : null}
@@ -691,10 +748,11 @@ export function ContractLifecycleManagement({
                         <Button
                           type="button"
                           variant="outline"
+                          disabled={revokeInvitationState.isLoading}
                           onClick={() =>
-                            void revokeInvitation({
-                              ...query,
-                              invitationId: invitation.id,
+                            setInvitationToRevoke({
+                              id: invitation.id,
+                              email: invitation.email,
                             })
                           }
                         >
@@ -713,6 +771,50 @@ export function ContractLifecycleManagement({
           </CardContent>
         </Card>
       ) : null}
+
+      <ConfirmDialog
+        open={pendingTransition !== null}
+        title={
+          pendingTransition
+            ? `${pendingTransition.label} this contract?`
+            : "Change contract status?"
+        }
+        description={
+          pendingTransition
+            ? `${contract.referenceNumber} · ${contract.title} ${transitionEffects[pendingTransition.transition].effect} The reason below is recorded in the status history.`
+            : ""
+        }
+        confirmLabel={pendingTransition?.label ?? "Confirm"}
+        pendingLabel="Changing status…"
+        isPending={transitionState.isLoading}
+        destructive={
+          pendingTransition
+            ? transitionEffects[pendingTransition.transition].destructive
+            : false
+        }
+        onConfirm={() => void confirmTransition()}
+        onCancel={() => setPendingTransition(null)}
+      >
+        <blockquote className="max-h-32 overflow-y-auto border-s-2 ps-3 text-sm break-words whitespace-pre-wrap text-muted-foreground">
+          {reason.trim()}
+        </blockquote>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={invitationToRevoke !== null}
+        title="Revoke this company invitation?"
+        description={
+          invitationToRevoke
+            ? `The invitation sent to ${invitationToRevoke.email} will stop working, and that company won't be able to join this contract with it.`
+            : ""
+        }
+        confirmLabel="Revoke invitation"
+        pendingLabel="Revoking…"
+        isPending={revokeInvitationState.isLoading}
+        destructive
+        onConfirm={() => void confirmInvitationRevocation()}
+        onCancel={() => setInvitationToRevoke(null)}
+      />
     </section>
   );
 }

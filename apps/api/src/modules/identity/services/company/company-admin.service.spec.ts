@@ -16,6 +16,7 @@ import type {
 } from '../../interface/company-admin-persistence.interface';
 import { CompanyScopeService } from './company-scope.service';
 import { CompanyAdminService } from './company-admin.service';
+import type { CompanyVerificationService } from './company-verification.service';
 import { MailService } from '../../../mail/mail.service';
 
 const companyId = '01JCOMPANY00000000000000000';
@@ -43,6 +44,7 @@ describe('CompanyAdminService', () => {
   let users: Mocked<ICompanyAdminTransactionContext['users']>;
   let invitations: Mocked<ICompanyAdminTransactionContext['invitations']>;
   let execute: ReturnType<typeof vi.fn>;
+  let companyVerification: { sendAfterEmailChange: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     scope = { forUser: vi.fn().mockResolvedValue({ companyId }) };
@@ -115,11 +117,13 @@ describe('CompanyAdminService', () => {
       invitations,
     } as unknown as ICompanyAdminTransactionContext;
     execute = vi.fn(async (operation) => operation(context));
+    companyVerification = { sendAfterEmailChange: vi.fn() };
     service = new CompanyAdminService(
       scope as unknown as CompanyScopeService,
       mail as unknown as MailService,
       reads as unknown as ICompanyAdminReadRepository,
       { execute } as unknown as ICompanyAdminUnitOfWork,
+      companyVerification as unknown as CompanyVerificationService,
     );
   });
 
@@ -360,6 +364,44 @@ describe('CompanyAdminService', () => {
     expect(companies.save).toHaveBeenCalledWith(
       expect.objectContaining({ id: companyId, name: 'Updated name' }),
     );
+  });
+
+  it('clears verification and sends a new link when the company email changes', async () => {
+    companies.lockById.mockResolvedValue({
+      ...company,
+      email: 'old@example.com',
+      verifiedAt: new Date('2026-01-01T00:00:00Z'),
+    } as never);
+
+    await service.updateCompanyProfile(actorId, companyId, {
+      email: 'new@example.com',
+    });
+
+    expect(companies.save).toHaveBeenCalledWith(
+      expect.objectContaining({ email: 'new@example.com', verifiedAt: null }),
+    );
+    expect(companyVerification.sendAfterEmailChange).toHaveBeenCalledWith(
+      companyId,
+    );
+  });
+
+  it('keeps verification when the email only changes case or is unchanged', async () => {
+    const verifiedAt = new Date('2026-01-01T00:00:00Z');
+    companies.lockById.mockResolvedValue({
+      ...company,
+      email: 'office@example.com',
+      verifiedAt,
+    } as never);
+
+    await service.updateCompanyProfile(actorId, companyId, {
+      email: 'Office@Example.com',
+      name: 'Renamed',
+    });
+
+    expect(companies.save).toHaveBeenCalledWith(
+      expect.objectContaining({ verifiedAt }),
+    );
+    expect(companyVerification.sendAfterEmailChange).not.toHaveBeenCalled();
   });
 
   it('rejects empty company profile updates without opening a transaction', async () => {

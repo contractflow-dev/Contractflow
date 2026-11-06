@@ -20,6 +20,20 @@ import { ContractModule } from '../contract/contract-module';
 import { IdentityModule } from '../identity/identity.module';
 import { ActivityController } from './controllers/activity.controller';
 import { ActivityService } from './services/activity.service';
+import { DataSource } from 'typeorm';
+import { TypeOrmUnitOfWork } from '../../common/database/typeorm-unit-of-work';
+import { StorageModule } from '../../common/storage/storage.module';
+import { DocumentController } from './controllers/document.controller';
+import { DocumentService } from './services/document.service';
+import {
+  DocumentContextFactory,
+  TypeOrmDocumentContext,
+} from './repositories/document-context.factory';
+import {
+  DOCUMENT_PERSISTENCE,
+  DOCUMENT_UNIT_OF_WORK,
+  type IDocumentContext,
+} from './interfaces/document-persistence.interface';
 
 const REPOSITORIES = [
   ActivityLogRepository,
@@ -33,6 +47,7 @@ const REPOSITORIES = [
   imports: [
     ContractModule,
     IdentityModule,
+    StorageModule,
     TypeOrmModule.forFeature([
       ActivityLog,
       Comment,
@@ -47,8 +62,27 @@ const REPOSITORIES = [
       CompanyUser,
     ]),
   ],
-  controllers: [ActivityController],
-  providers: [...REPOSITORIES, ActivityService],
+  controllers: [ActivityController, DocumentController],
+  providers: [
+    ...REPOSITORIES,
+    ActivityService,
+    DocumentService,
+    {
+      provide: DOCUMENT_PERSISTENCE,
+      useFactory: (dataSource: DataSource) =>
+        new TypeOrmDocumentContext(dataSource.manager),
+      inject: [DataSource],
+    },
+    {
+      provide: DOCUMENT_UNIT_OF_WORK,
+      useFactory: (dataSource: DataSource) =>
+        new TypeOrmUnitOfWork<IDocumentContext>(
+          dataSource,
+          new DocumentContextFactory(),
+        ),
+      inject: [DataSource],
+    },
+  ],
   exports: [...REPOSITORIES, ActivityService],
 })
 export class CrossCuttingModule {}

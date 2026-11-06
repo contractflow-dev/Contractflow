@@ -63,6 +63,11 @@ services:
       MAIL_PROVIDER: smtp
       SMTP_HOST: mailpit
       SMTP_PORT: "1025"
+      # Document storage. No AWS keys are configured here; supply credentials
+      # through the standard AWS SDK environment if document storage is needed.
+      AWS_REGION: ${AWS_REGION:-eu-north-1}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-contractflow-app-storage-191518190571}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
     depends_on:
       postgres:
         condition: service_healthy

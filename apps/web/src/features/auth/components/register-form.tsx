@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
@@ -51,21 +51,38 @@ const nameFields = [
   { name: "lastName", placeholder: "Last name" },
 ] as const;
 
-export function RegisterForm() {
-  if (typeof window === "undefined") {
-    return null;
-  }
+// The server and browser can support different time zones, so the server
+// renders only UTC and the browser swaps in its own list after hydration.
+const serverTimezones = ["UTC"];
+let browserTimezones: string[] | null = null;
 
-  const router = useRouter();
-  const [registerUser] = useRegisterMutation();
-
-  const timezones = useMemo(() => {
+function getBrowserTimezones() {
+  if (!browserTimezones) {
     const supported =
       typeof Intl.supportedValuesOf === "function"
         ? Intl.supportedValuesOf("timeZone")
         : [];
-    return ["UTC", ...supported.filter((timezone) => timezone !== "UTC")];
-  }, []);
+    browserTimezones = [
+      "UTC",
+      ...supported.filter((timezone) => timezone !== "UTC"),
+    ];
+  }
+  return browserTimezones;
+}
+
+function subscribeToTimezones() {
+  return () => {};
+}
+
+export function RegisterForm() {
+  const router = useRouter();
+  const [registerUser] = useRegisterMutation();
+
+  const timezones = useSyncExternalStore(
+    subscribeToTimezones,
+    getBrowserTimezones,
+    () => serverTimezones,
+  );
 
   const form = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
@@ -88,12 +105,16 @@ export function RegisterForm() {
   useEffect(() => {
     if (!getValues("timezone")) {
       const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      // Effects run only in the browser, so check against the browser's full
+      // list; `timezones` is still the server list during hydration.
       setValue(
         "timezone",
-        timezones.includes(detectedTimezone) ? detectedTimezone : "UTC",
+        getBrowserTimezones().includes(detectedTimezone)
+          ? detectedTimezone
+          : "UTC",
       );
     }
-  }, [getValues, setValue, timezones]);
+  }, [getValues, setValue]);
 
   function applyServerError(err: unknown) {
     if (getApiErrorStatus(err) === 409) {

@@ -45,9 +45,8 @@ apps/web/src/
 ├── services/             # RTK Query API services (code-split)
 │   ├── api.ts            # Base createApi with baseQuery, tags, credentials
 │   ├── authApi.ts        # /users/me, /auth/login, /auth/logout
-│   ├── workspaceApi.ts   # /companies, /companies/:id, members
+│   ├── companiesApi.ts   # /companies, /company/... (members, invitations)
 │   ├── contractApi.ts    # /contract, /contract/:id
-│   └── onboardingApi.ts  # /onboarding/*
 │
 └── lib/                  # Generic utilities (e.g. server-side fetch)
     └── api.ts

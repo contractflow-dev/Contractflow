@@ -50,8 +50,19 @@ The identity endpoints are `POST /api/auth/register`,
 `POST /api/auth/resend-verification`, `POST /api/auth/logout`, and the
 authenticated `GET /api/users/me`. Company endpoints are authenticated
 `POST /api/companies`, `GET /api/companies`, `GET /api/companies/current`,
-`GET /api/company/membership`, and the administrator-only
-`GET /api/company/dashboard`.
+`GET /api/companies/access-summary`, `GET /api/company/membership`, and the
+administrator-only `GET /api/company/dashboard`. The access summary tells a
+user with no active company whether they are new, were removed from a
+company, or belong to an inactive company. It returns only counts and flags,
+not company names or IDs.
+
+A company must verify its company email before other companies can invite it
+to a contract, because contract invitations find the company by that email.
+Creating a company, or changing its email, sends a one-time link (valid for
+7 days) to the company email. The public `POST /api/companies/verify-email`
+takes the link's token. Administrators can request a new link with
+`POST /api/company/verification-email`, at most once a minute. Only one
+verified company may use each email address.
 
 Company and contract IDs are never part of the URL. Company-scoped routes
 (`/api/company/...`, `/api/contracts`) take the company from the
@@ -215,6 +226,179 @@ against the configured development database):
   }
 }
 ```
+
+## Document storage (Amazon S3)
+
+Contract documents are stored in a private S3 bucket. The browser uploads and
+downloads files directly through short-lived presigned URLs. The API never
+proxies file bytes and never returns AWS credentials.
+
+| Location | Responsibility |
+| --- | --- |
+| `src/common/storage/` | `IObjectStorage` port (`OBJECT_STORAGE` token), the S3 implementation, client configuration and error mapping. One `S3Client` is shared and destroyed on shutdown. |
+| `src/modules/cross-cutting/services/document.service.ts` | Authorization, upload lifecycle, versions, deletion and audit. It depends on the port, not the AWS SDK. |
+| `src/modules/cross-cutting/services/document-file-policy.ts` | File allowlist, file-signature checks, file-name sanitizing and storage-key generation. |
+
+### Environment variables
+
+| Variable | Required | Default | Notes |
+| --- | --- | --- | --- |
+| `AWS_REGION` | yes | — | `eu-north-1` |
+| `S3_BUCKET_NAME` | yes | — | `contractflow-app-storage-191518190571` |
+| `S3_ENDPOINT` | no | unset | S3-compatible endpoint for local work, such as MinIO. Leave unset for AWS. |
+| `S3_FORCE_PATH_STYLE` | no | on when `S3_ENDPOINT` is set | |
+| `DOCUMENT_MAX_UPLOAD_BYTES` | no | `26214400` (25 MB) | Up to 5 GiB (the single-PUT limit) |
+| `DOCUMENT_UPLOAD_URL_TTL_SECONDS` | no | `300` | 60–3600 |
+| `DOCUMENT_DOWNLOAD_URL_TTL_SECONDS` | no | `60` | 10–900 |
+
+The API refuses to start if the region or bucket is missing or malformed.
+`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are **not** configuration
+settings; do not add them to production environments.
+
+### Credentials
+
+The S3 client uses the AWS SDK default credential provider chain and never
+overrides it.
+
+- **Production (ECS/Fargate):** credentials come from the task role
+  `ContractFlowEcsTaskRole` (policy `ContractFlowS3AppStoragePolicy`). The SDK
+  refreshes them automatically. The task needs a route to S3, either through
+  NAT or through an S3 gateway VPC endpoint.
+- **Local development:** use an AWS CLI profile or SSO session, for example
+  `aws sso login --profile contractflow`, then start the API with
+  `AWS_PROFILE=contractflow`. For MinIO, set `S3_ENDPOINT` and the standard
+  `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` in your shell, never in a
+  committed file.
+
+### Required bucket and IAM configuration
+
+The integration assumes the following. Confirm each item; none can be
+verified from code.
+
+- **Block Public Access** is on, and objects are private. URLs are presigned
+  per request.
+- **IAM permissions** for the task role on `arn:aws:s3:::<bucket>/companies/*`:
+  `s3:PutObject` (presigned uploads), `s3:GetObject` (HeadObject, file
+  signature reads and presigned downloads) and `s3:DeleteObject`.
+  - `s3:ListBucket` on the bucket is recommended. Without it, S3 answers
+    HeadObject for a not-yet-uploaded file with `403` instead of `404`, and
+    "complete upload" reports storage as unavailable instead of "not uploaded
+    yet".
+- **CORS** must allow the web origin to PUT directly. For example:
+
+  ```json
+  [
+    {
+      "AllowedOrigins": ["https://<web-origin>"],
+      "AllowedMethods": ["PUT", "GET"],
+      "AllowedHeaders": ["content-type", "x-amz-checksum-sha256"],
+      "ExposeHeaders": ["ETag"],
+      "MaxAgeSeconds": 3000
+    }
+  ]
+  ```
+
+- **Versioning** is optional. When it is on, the verified object version ID
+  is recorded on the document version, and deletes add a delete marker that
+  lifecycle rules can expire.
+- **SSE-S3 or SSE-KMS** default bucket encryption is recommended. If SSE-KMS
+  is used, the task role also needs `kms:GenerateDataKey` and `kms:Decrypt` on
+  the key.
+
+### Object keys
+
+```text
+companies/{companyId}/contracts/{contractId}/documents/{documentId}/{versionId}.{ext}
+```
+
+Keys are generated only by the backend, from the authorized company and
+contract scope and server-generated ULIDs. Original file names are stored in
+the database, never in keys, and clients cannot supply keys. Key prefixes are
+not an authorization mechanism; access is enforced by `ContractAccessService`
+and the document repository scope.
+
+### API
+
+All routes require a session plus the `X-Company-Id` and `X-Contract-Id`
+headers. Scope IDs are never accepted in paths, query strings or bodies.
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| GET | `/api/contract/documents?page&limit` | List visible documents |
+| POST | `/api/contract/documents/upload-url` | Create a document and get a presigned PUT for version 1 |
+| GET | `/api/contract/documents/:documentId` | Document metadata and versions |
+| POST | `/api/contract/documents/:documentId/versions/upload-url` | Get a presigned PUT for a new version (owner company) |
+| POST | `/api/contract/documents/:documentId/versions/:versionId/complete` | Verify the uploaded object and make the version available |
+| GET | `/api/contract/documents/:documentId/download-url?versionId` | Short-lived presigned GET (latest available version by default) |
+| DELETE | `/api/contract/documents/:documentId` | Soft-delete the document and remove its objects (owner company), `204` |
+
+Request and response types are in `@contractflow/contracts-schema`
+(`CreateDocumentUploadRequest`, `DocumentUploadSession`, `DocumentDetail`, and
+so on).
+
+**Access rules.** Every call goes through `ContractAccessService.authorize`,
+which requires active company membership, contract-party status and a contract
+role. The workspace depends on the document category: `HSE` requires the `hse`
+workspace, `invoice` requires `finance`, and every other category accepts any
+contract role. Company administrators get no implicit bypass.
+
+`private` documents are visible only to the owner company. `public` documents
+are readable by every party to the contract. Uploading versions, completing
+uploads and deleting are owner-company only.
+
+### Upload workflow
+
+1. The browser computes the file's SHA-256 (`sha256Hex` in
+   `apps/web/src/lib/presignedUpload.ts`).
+2. `POST …/upload-url` with title, category, visibility, `fileName`,
+   `mimeType`, `sizeBytes` and `checksumSha256`. The API validates the file,
+   authorizes the caller and creates the document and a version in
+   `pending_upload`. It returns `upload.url`, `upload.method` (`PUT`) and
+   `upload.headers`.
+3. The browser PUTs the file to `upload.url` with exactly `upload.headers`.
+   The URL signs `Content-Type`, `Content-Length` and
+   `x-amz-checksum-sha256`, so S3 rejects any body with a different type, size
+   or checksum.
+4. `POST …/versions/:versionId/complete`. The API moves the version to
+   `processing`, checks that the object exists with the signed size, type and
+   checksum, and checks the file signature (magic bytes). It then marks the
+   version `available`, or `failed` and deletes the object. If the object
+   hasn't arrived yet, the call returns `409` and the upload stays retryable.
+   Once the upload URL has expired with no object, the version is marked
+   `failed`.
+
+Only `available` versions can be downloaded. Malware scanning is not yet
+implemented. If required, add it between `processing` and `available` (for
+example with GuardDuty Malware Protection for S3).
+
+### File validation
+
+The extension and declared MIME type must both match the allowlist:
+`pdf`, `png`, `jpg`/`jpeg`, `docx`, `xlsx`, `pptx`, `csv` and `txt`. The
+stored `Content-Type` comes from the allowlist, not from the browser.
+Macro-enabled and legacy binary Office formats, archives, executables, HTML
+and SVG are rejected. File names have path segments and control characters
+stripped. Size must be between 1 byte and `DOCUMENT_MAX_UPLOAD_BYTES`.
+
+### Audit trail
+
+`activity_log` records `document.upload_initiated`,
+`document.upload_completed`, `document.version_added`,
+`document.upload_failed`, `document.downloaded` and `document.deleted`, with
+the document and version IDs in `metadata`. Denied access attempts are logged
+server-side, because `activity_log` requires a company membership.
+Presigned URLs, credentials and file contents are never logged.
+
+### Testing
+
+- Unit tests mock the AWS SDK:
+  `pnpm --filter @contractflow/api test -- src/common/storage src/modules/cross-cutting`
+- PostgreSQL integration tests (migration, scoping, lifecycle, soft delete)
+  need `TEST_DATABASE_URL`: `pnpm --filter @contractflow/api test:integration`
+- An opt-in live check against a non-production bucket or MinIO runs only when
+  `TEST_S3_BUCKET` is set. It covers a presigned PUT, a tampered body and type
+  being rejected, a presigned GET and a delete:
+  `TEST_S3_BUCKET=<test-bucket> TEST_S3_REGION=eu-north-1 pnpm --filter @contractflow/api test:integration -- test/integration/storage`
 
 ## Project setup
 

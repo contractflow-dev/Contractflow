@@ -27,6 +27,7 @@ import {
   type ICompanyAdminUnitOfWork,
 } from '../../interface/company-admin-persistence.interface';
 import { CompanyScopeService } from './company-scope.service';
+import { CompanyVerificationService } from './company-verification.service';
 import { MailService } from '../../../mail/mail.service';
 import { CompanyResponseDto } from '../../dto/company/responses/company-response.dto';
 import {
@@ -74,6 +75,7 @@ export class CompanyAdminService {
     private readonly reads: ICompanyAdminReadRepository,
     @Inject(COMPANY_ADMIN_UNIT_OF_WORK)
     private readonly unitOfWork: ICompanyAdminUnitOfWork,
+    private readonly companyVerification: CompanyVerificationService,
   ) {}
 
   async listMembers(
@@ -422,16 +424,32 @@ export class CompanyAdminService {
       throw new BadRequestException('At least one company field is required.');
     }
 
-    return this.unitOfWork.execute(async (context) => {
-      const { scope } = await this.lockCompanyAdmin(context, userId, companyId);
-      const company = await context.companies.lockById(scope);
-      if (!company) {
-        throw new NotFoundException('Company was not found.');
-      }
-      Object.assign(company, dto);
-      const saved = await context.companies.save(company);
-      return CompanyResponseDto.fromEntity(saved);
-    });
+    const { response, emailChanged } = await this.unitOfWork.execute(
+      async (context) => {
+        const { scope } = await this.lockCompanyAdmin(
+          context,
+          userId,
+          companyId,
+        );
+        const company = await context.companies.lockById(scope);
+        if (!company) {
+          throw new NotFoundException('Company was not found.');
+        }
+        const emailChanged =
+          dto.email !== undefined &&
+          dto.email.toLowerCase() !== company.email.toLowerCase();
+        Object.assign(company, dto);
+        // Verification proves control of one inbox; a new address must be
+        // verified again before the company can receive contract invitations.
+        if (emailChanged) company.verifiedAt = null;
+        const saved = await context.companies.save(company);
+        return { response: CompanyResponseDto.fromEntity(saved), emailChanged };
+      },
+    );
+    if (emailChanged) {
+      await this.companyVerification.sendAfterEmailChange(companyId);
+    }
+    return response;
   }
 
   private async requireCompanyAdmin(

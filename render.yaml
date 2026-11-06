@@ -48,6 +48,14 @@ services:
       - key: SMTP_PASS
         sync: false
 
+      # Required at startup. Render has no AWS task role, so document storage
+      # works here only if AWS credentials are supplied separately.
+      - key: AWS_REGION
+        value: eu-north-1
+
+      - key: S3_BUCKET_NAME
+        value: contractflow-app-storage-191518190571
+
   # ContractFlow Web
   - type: web
     name: contractflow-web

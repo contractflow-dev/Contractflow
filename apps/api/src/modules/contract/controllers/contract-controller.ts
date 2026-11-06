@@ -221,12 +221,7 @@ export class ContractController {
     @CurrentContractId() contractId: string,
     @Body() body: RecordContractSignatoryRequestDto,
   ) {
-    return this.lifecycle.recordSignatory(
-      user.id,
-      companyId,
-      contractId,
-      body,
-    );
+    return this.lifecycle.recordSignatory(user.id, companyId, contractId, body);
   }
 
   @Get('contract/status-history')

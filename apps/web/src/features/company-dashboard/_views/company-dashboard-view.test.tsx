@@ -15,6 +15,7 @@ import { CompanyDashboardView } from "./company-dashboard-view";
 const mocks = vi.hoisted(() => ({
   getDashboard: vi.fn(),
   getCurrentUser: vi.fn(),
+  verifiedAt: new Date("2026-01-01T00:00:00Z") as Date | null,
 }));
 
 vi.mock("@/features/companies/CompanyAdminShell", () => ({
@@ -22,14 +23,31 @@ vi.mock("@/features/companies/CompanyAdminShell", () => ({
     children,
   }: {
     children: (access: {
-      company: { id: string; name: string };
+      company: {
+        id: string;
+        name: string;
+        email: string;
+        verifiedAt: Date | null;
+      };
       membership: { canManageCompany: boolean };
     }) => ReactNode;
   }) =>
     children({
-      company: { id: "company-1", name: "Acme Works" },
+      company: {
+        id: "company-1",
+        name: "Acme Works",
+        email: "office@acme.example",
+        verifiedAt: mocks.verifiedAt,
+      },
       membership: { canManageCompany: true },
     }),
+}));
+
+vi.mock("@/services/companiesApi", () => ({
+  useResendCompanyVerificationEmailMutation: () => [
+    vi.fn(),
+    { isLoading: false },
+  ],
 }));
 
 vi.mock("@/features/companies", () => ({
@@ -58,6 +76,7 @@ const dashboard: ICompanyDashboardResponse = {
     countryCode: ECountryCode.US,
     defaultCurrencyCode: ECurrencyCode.USD,
     status: ECompanyStatus.ACTIVE,
+    verifiedAt: null,
   },
   membership: {
     id: "membership-1",
@@ -98,6 +117,7 @@ const dashboard: ICompanyDashboardResponse = {
 
 describe("CompanyDashboardView", () => {
   beforeEach(() => {
+    mocks.verifiedAt = new Date("2026-01-01T00:00:00Z");
     mocks.getDashboard.mockReturnValue({
       currentData: dashboard,
       error: undefined,
@@ -108,6 +128,22 @@ describe("CompanyDashboardView", () => {
     mocks.getCurrentUser.mockReturnValue({
       data: { firstName: "Ari", lastName: "Admin" },
     });
+  });
+
+  it("asks an administrator to verify an unverified company email", () => {
+    mocks.verifiedAt = null;
+
+    const markup = renderToStaticMarkup(<CompanyDashboardView />);
+
+    expect(markup).toContain("Verify your company email");
+    expect(markup).toContain("office@acme.example");
+    expect(markup).toContain("Send a new link");
+  });
+
+  it("hides the verification notice once the company email is verified", () => {
+    const markup = renderToStaticMarkup(<CompanyDashboardView />);
+
+    expect(markup).not.toContain("Verify your company email");
   });
 
   it("renders real expiring and recently updated contract links", () => {
@@ -124,8 +160,9 @@ describe("CompanyDashboardView", () => {
     expect(markup).toContain("End date: Date not available");
     expect(markup).toContain(">Manage team and invitations</a>");
     expect(markup).toContain(">Edit company profile</a>");
-    expect(markup).toContain("Activity and company documents");
-    expect(markup).toContain("No activity or document data is shown here");
+    // The developer-facing placeholder card for unbuilt features is gone.
+    expect(markup).not.toContain("Activity and company documents");
+    expect(markup).not.toContain("dashboard API");
   });
 
   it("shows explicit empty states instead of invented contract rows", () => {

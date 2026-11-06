@@ -30,6 +30,8 @@ describe('database migration configuration', () => {
       'ContractLifecycle1792862700000',
       'CompanyInvitationExpiryIndex1792862700001',
       'CompanyInvitationOptionalNames1793100000000',
+      'CompanyEmailVerification1793200000000',
+      'DocumentObjectStorage1793300000000',
     ]);
   });
 

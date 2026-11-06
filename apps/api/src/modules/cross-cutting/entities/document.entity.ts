@@ -1,6 +1,7 @@
 import { Entity, Column, ManyToOne, JoinColumn } from "typeorm";
 import { Contract } from "../../contract/entities/contract.entity";
 import { Company } from "../../identity/entities/company.entity";
+import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "./base-custom.entity";
 import { IDocumentEntity } from "../interfaces/document.interface";
 import { EDocumentCategory, EDocumentStatus, EDocumentVisibility } from "@contractflow/contracts-schema";
@@ -35,4 +36,14 @@ export class Document extends BaseCustomEntity implements IDocumentEntity {
 
     @Column({name: "status", type:"enum", enum: EDocumentStatus})
     status!: EDocumentStatus
+
+    // Soft delete: the row and its version history are retained for audit.
+    @Column({name: "deleted_at", type: "timestamptz", nullable: true})
+    deletedAt!: Date | null
+
+    @Column({name: "deleted_by_id", type: "varchar", length: 26, nullable: true})
+    deletedById!: string | null
+    @ManyToOne(() => CompanyUser, {onDelete:"NO ACTION"})
+    @JoinColumn({name:"deleted_by_id", referencedColumnName:"id"})
+    deletedBy!: CompanyUser | null
 }

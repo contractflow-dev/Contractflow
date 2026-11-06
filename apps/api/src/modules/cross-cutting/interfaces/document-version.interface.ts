@@ -1,3 +1,4 @@
+import { EDocumentUploadStatus } from "@contractflow/contracts-schema"
 
 export interface IDocumentVersionEntity {
     documentId : string
@@ -5,10 +6,15 @@ export interface IDocumentVersionEntity {
     storageKey : string
     fileName : string
     mimeType : string
-    sizeBytes : bigint
+    sizeBytes : number
     checksumSha256 : string
     changeNote : string
     uploadedById : string
     uploadedAt : Date
-
+    uploadStatus : EDocumentUploadStatus
+    storageProvider : string
+    storageBucket : string
+    storageVersionId : string | null
+    uploadExpiresAt : Date | null
+    failureReason : string | null
 }

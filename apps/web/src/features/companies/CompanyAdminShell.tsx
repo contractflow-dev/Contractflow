@@ -44,13 +44,20 @@ import {
 } from "@/features/workspace/workspaceSlice";
 import {
   clearPersistedActiveCompanyId,
+  companyAccessState,
+  companyLandingPath,
   persistActiveCompanyId,
   readPersistedActiveCompanyId,
   resolveActiveCompanyId,
+  resolveWorkspaceRedirect,
+  type CompanyAccessState,
 } from "@/features/workspace";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { cn } from "@/lib/utils";
-import { useGetCompaniesQuery } from "@/services/companiesApi";
+import {
+  useGetCompaniesQuery,
+  useGetCompanyAccessSummaryQuery,
+} from "@/services/companiesApi";
 import type { ICompanyAccessResponse } from "@contractflow/contracts-schema";
 
 const links = [
@@ -79,6 +86,32 @@ const links = [
     adminOnly: true,
   },
 ] as const;
+
+const noCompanyNotices: Partial<
+  Record<
+    CompanyAccessState,
+    { title: string; description: string; setupLabel: string }
+  >
+> = {
+  new: {
+    title: "Set up your company",
+    description:
+      "You aren't a member of a company yet. Taking you to company setup…",
+    setupLabel: "Continue to company setup",
+  },
+  ended: {
+    title: "Your company access has ended",
+    description:
+      "You're no longer a member of the company you used before. If you think this is a mistake, ask its administrator to invite you again.",
+    setupLabel: "Create a new company instead",
+  },
+  "company-inactive": {
+    title: "Your company's workspace is inactive",
+    description:
+      "The company you belong to has been deactivated, so its workspace isn't available. Contact your company administrator or ContractFlow support.",
+    setupLabel: "Create a new company instead",
+  },
+};
 
 function isActiveRoute(pathname: string, href: string): boolean {
   return (
@@ -126,6 +159,31 @@ export function CompanyAdminShell({
   const access = availableCompanies.find(
     ({ company }) => company.id === selectedId,
   );
+  // Only asked for when the user has no usable company, to tell a new user
+  // from one whose access ended.
+  const needsAccessSummary = !!companies && !error && !availableCompanies.length;
+  const accessSummary = useGetCompanyAccessSummaryQuery(undefined, {
+    skip: !needsAccessSummary,
+  });
+  const accessState = companyAccessState(
+    availableCompanies.length > 0,
+    accessSummary.currentData,
+  );
+  const redirectPath =
+    companies && !error
+      ? resolveWorkspaceRedirect({
+          pathname,
+          access: accessState,
+          canManageCompany:
+            access && activeWorkspaceId === access.company.id
+              ? access.membership.canManageCompany
+              : null,
+        })
+      : null;
+
+  useEffect(() => {
+    if (redirectPath) router.replace(redirectPath);
+  }, [redirectPath, router]);
 
   useEffect(() => {
     const params = new URLSearchParams(search);
@@ -223,16 +281,45 @@ export function CompanyAdminShell({
   }
 
   if (!availableCompanies.length) {
+    if (accessSummary.error) {
+      return (
+        <WorkspaceNotice
+          title="Unable to check your company access"
+          description={getApiErrorMessage(
+            accessSummary.error,
+            "Please try again in a moment.",
+          )}
+          action={
+            <Button
+              variant="outline"
+              onClick={() => void accessSummary.refetch()}
+            >
+              Retry
+            </Button>
+          }
+        />
+      );
+    }
+    const notice = noCompanyNotices[accessState];
+    if (!notice) {
+      return (
+        <main className="grid min-h-svh place-items-center p-6">
+          <p role="status" className="text-sm text-muted-foreground">
+            Checking your company access…
+          </p>
+        </main>
+      );
+    }
     return (
       <WorkspaceNotice
-        title="No active company"
-        description="Create a company or ask an administrator to invite you."
+        title={notice.title}
+        description={notice.description}
         action={
           <Link
-            className="text-primary underline-offset-4 hover:underline"
+            className="text-brand underline-offset-4 hover:underline"
             href="/onboarding"
           >
-            Continue to onboarding
+            {notice.setupLabel}
           </Link>
         }
       />
@@ -266,6 +353,18 @@ export function CompanyAdminShell({
     );
   }
 
+  if (redirectPath) {
+    return (
+      <main className="grid min-h-svh place-items-center p-6">
+        <p role="status" className="text-sm text-muted-foreground">
+          Opening your workspace…
+        </p>
+      </main>
+    );
+  }
+
+  const homePath = companyLandingPath(access.membership.canManageCompany);
+  const hasMultipleCompanies = availableCompanies.length > 1;
   const isAdminRoute = links.some(
     ({ href, adminOnly }) => adminOnly && isActiveRoute(pathname, href),
   );
@@ -290,7 +389,7 @@ export function CompanyAdminShell({
     <div className="min-h-svh bg-background">
       <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
         <div className="space-y-3 border-b border-sidebar-border px-5 py-4">
-          <Link href="/dashboards" className="flex items-center gap-3">
+          <Link href={homePath} className="flex items-center gap-3">
             <span className="grid size-9 place-items-center rounded-lg bg-primary text-primary-foreground">
               <RiBuilding4Line className="size-5" />
             </span>
@@ -298,19 +397,13 @@ export function CompanyAdminShell({
               ContractFlow
             </span>
           </Link>
-          {availableCompanies.length > 1 && (
-            <NativeSelect
-              aria-label="Select company"
-              className="max-w-40 sm:max-w-56"
+          {hasMultipleCompanies && (
+            <CompanySwitcher
+              companies={availableCompanies}
               value={access.company.id}
-              onChange={(event) => selectCompany(event.target.value)}
-            >
-              {availableCompanies.map(({ company }) => (
-                <NativeSelectOption key={company.id} value={company.id}>
-                  {company.name}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
+              onChange={selectCompany}
+              className="w-full"
+            />
           )}
         </div>
         <nav aria-label="Company dashboard" className="space-y-1 p-3">
@@ -338,11 +431,25 @@ export function CompanyAdminShell({
       <div className="md:pl-64">
         <header className="sticky top-0 z-20 border-b bg-card/90 px-4 py-2 backdrop-blur sm:px-6">
           <div className="flex min-h-12 flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-xs text-muted-foreground">Company workspace</p>
-              <p className="truncate text-sm font-semibold">
+              <p
+                className={cn(
+                  "truncate text-sm font-semibold",
+                  hasMultipleCompanies && "hidden md:block",
+                )}
+              >
                 {access.company.name}
               </p>
+              {/* The sidebar holding the desktop switcher is hidden below md. */}
+              {hasMultipleCompanies && (
+                <CompanySwitcher
+                  companies={availableCompanies}
+                  value={access.company.id}
+                  onChange={selectCompany}
+                  className="mt-1 w-full max-w-xs md:hidden [&_select]:h-10 [&_select]:font-semibold"
+                />
+              )}
             </div>
             <div className="flex items-center gap-2">
               <ThemeToggle />
@@ -428,6 +535,33 @@ export function CompanyAdminShell({
         </main>
       </div>
     </div>
+  );
+}
+
+function CompanySwitcher({
+  companies,
+  value,
+  onChange,
+  className,
+}: {
+  companies: readonly ICompanyAccessResponse[];
+  value: string;
+  onChange: (companyId: string) => void;
+  className?: string;
+}) {
+  return (
+    <NativeSelect
+      aria-label="Select company"
+      className={className}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    >
+      {companies.map(({ company }) => (
+        <NativeSelectOption key={company.id} value={company.id}>
+          {company.name}
+        </NativeSelectOption>
+      ))}
+    </NativeSelect>
   );
 }
 

@@ -6,6 +6,7 @@ import { CompanyAdminShell } from "./CompanyAdminShell";
 const mocks = vi.hoisted(() => ({
   dispatch: vi.fn(),
   getCompanies: vi.fn(),
+  getAccessSummary: vi.fn(),
   getCurrentUser: vi.fn(),
   logout: vi.fn(),
   pathname: "/dashboards/contracts",
@@ -37,6 +38,7 @@ vi.mock("@/features/workspace/workspaceSlice", () => ({
 
 vi.mock("@/services/companiesApi", () => ({
   useGetCompaniesQuery: mocks.getCompanies,
+  useGetCompanyAccessSummaryQuery: mocks.getAccessSummary,
 }));
 
 vi.mock("@/services/authApi", () => ({
@@ -100,6 +102,11 @@ describe("CompanyAdminShell", () => {
       currentData: companies,
       error: undefined,
       isFetching: false,
+      refetch: vi.fn(),
+    });
+    mocks.getAccessSummary.mockReturnValue({
+      currentData: undefined,
+      error: undefined,
       refetch: vi.fn(),
     });
     mocks.getCurrentUser.mockReturnValue({
@@ -200,9 +207,124 @@ describe("CompanyAdminShell", () => {
     expect(markup).not.toContain("Company content");
   });
 
-  it("offers onboarding when the user has no active company memberships", () => {
+  function renderWithoutCompanies(summary: {
+    currentData?: {
+      activeCompanyCount: number;
+      hasEndedMembership: boolean;
+      hasInactiveCompanyMembership: boolean;
+    };
+    error?: unknown;
+  }) {
     mocks.getCompanies.mockReturnValue({
       currentData: [],
+      error: undefined,
+      isFetching: false,
+      refetch: vi.fn(),
+    });
+    mocks.getAccessSummary.mockReturnValue({ refetch: vi.fn(), ...summary });
+    return renderToStaticMarkup(
+      <CompanyAdminShell>{() => <p>Company content</p>}</CompanyAdminShell>,
+    );
+  }
+
+  const noAccess = {
+    activeCompanyCount: 0,
+    hasEndedMembership: false,
+    hasInactiveCompanyMembership: false,
+  };
+
+  it("offers onboarding to a user who has never had a company", () => {
+    const markup = renderWithoutCompanies({ currentData: noAccess });
+
+    expect(markup).toContain("Set up your company");
+    expect(markup).toContain('href="/onboarding"');
+    expect(markup).not.toContain("Company content");
+  });
+
+  it("asks for the access summary only when there is no usable company", () => {
+    renderWithoutCompanies({ currentData: noAccess });
+    expect(mocks.getAccessSummary).toHaveBeenLastCalledWith(undefined, {
+      skip: false,
+    });
+
+    mocks.getAccessSummary.mockClear();
+    mocks.getCompanies.mockReturnValue({
+      currentData: companies,
+      error: undefined,
+      isFetching: false,
+      refetch: vi.fn(),
+    });
+    renderToStaticMarkup(
+      <CompanyAdminShell>{() => <p>Company content</p>}</CompanyAdminShell>,
+    );
+    expect(mocks.getAccessSummary).toHaveBeenLastCalledWith(undefined, {
+      skip: true,
+    });
+  });
+
+  it("explains ended access instead of treating a removed member as new", () => {
+    const markup = renderWithoutCompanies({
+      currentData: { ...noAccess, hasEndedMembership: true },
+    });
+
+    expect(markup).toContain("Your company access has ended");
+    expect(markup).toContain("ask its administrator to invite you again");
+    expect(markup).toContain("Create a new company instead");
+    expect(markup).not.toContain("Set up your company");
+  });
+
+  it("explains an inactive company workspace", () => {
+    const markup = renderWithoutCompanies({
+      currentData: { ...noAccess, hasInactiveCompanyMembership: true },
+    });
+
+    expect(markup).toContain("Your company&#x27;s workspace is inactive");
+    expect(markup).not.toContain("Set up your company");
+  });
+
+  it("checks access before deciding where a user without a company belongs", () => {
+    const markup = renderWithoutCompanies({ currentData: undefined });
+
+    expect(markup).toContain("Checking your company access");
+    expect(markup).not.toContain("Set up your company");
+  });
+
+  it("offers a retry when the access summary cannot be loaded", () => {
+    const markup = renderWithoutCompanies({
+      error: { status: 500, data: { message: "Unavailable" } },
+    });
+
+    expect(markup).toContain("Unable to check your company access");
+    expect(markup).toContain("Retry");
+  });
+
+  it("does not show the admin overview or an access-denied card to a member landing on it", () => {
+    mocks.pathname = "/dashboards";
+    mocks.activeCompanyId = "company-2";
+
+    const markup = renderToStaticMarkup(
+      <CompanyAdminShell>{() => <p>Admin overview</p>}</CompanyAdminShell>,
+    );
+
+    expect(markup).toContain("Opening your workspace");
+    expect(markup).not.toContain("Admin overview");
+    expect(markup).not.toContain("Company administrator access required");
+  });
+
+  it("offers the company switcher in the mobile header as well as the sidebar", () => {
+    const markup = renderToStaticMarkup(
+      <CompanyAdminShell>{() => <p>Company content</p>}</CompanyAdminShell>,
+    );
+
+    const switchers = markup.match(/aria-label="Select company"/g) ?? [];
+    expect(switchers).toHaveLength(2);
+    expect(markup).toMatch(/class="[^"]*md:hidden[^"]*"[^>]*><select[^>]*aria-label="Select company"/);
+    expect(markup).toContain(">Northstar Build</option>");
+  });
+
+  it("shows only the active company name when there is nothing to switch to", () => {
+    mocks.getCompanies.mockReturnValue({
+      currentData: [companies[0]],
       error: undefined,
       isFetching: false,
       refetch: vi.fn(),
@@ -212,8 +334,18 @@ describe("CompanyAdminShell", () => {
       <CompanyAdminShell>{() => <p>Company content</p>}</CompanyAdminShell>,
     );
 
-    expect(markup).toContain("No active company");
-    expect(markup).toContain('href="/onboarding"');
-    expect(markup).not.toContain("Company content");
+    expect(markup).not.toContain('aria-label="Select company"');
+    expect(markup).toContain("Acme Works");
+  });
+
+  it("renders the overview for a company administrator", () => {
+    mocks.pathname = "/dashboards";
+
+    const markup = renderToStaticMarkup(
+      <CompanyAdminShell>{() => <p>Admin overview</p>}</CompanyAdminShell>,
+    );
+
+    expect(markup).toContain("Admin overview");
+    expect(markup).toContain(">Overview</a>");
   });
 });

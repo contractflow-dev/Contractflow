@@ -1,4 +1,4 @@
-import { Entity, Column } from 'typeorm';
+import { Entity, Column, Index } from 'typeorm';
 import { BaseCustomEntity } from '../../cross-cutting/entities/base-custom.entity';
 import { ICompanyEntity } from '../interface/company.interface';
 import {
@@ -8,6 +8,12 @@ import {
 } from '@contractflow/contracts-schema';
 
 @Entity('company')
+// Contract invitations find a company by email, so at most one verified
+// company may hold each address (email is citext, so case-insensitive).
+@Index('ux_company_verified_email', ['email'], {
+  unique: true,
+  where: '"verified_at" IS NOT NULL',
+})
 export class Company extends BaseCustomEntity implements ICompanyEntity {
   @Column({ name: 'name', type: 'varchar', length: 255 })
   name!: string;

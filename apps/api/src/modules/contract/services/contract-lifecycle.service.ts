@@ -744,9 +744,10 @@ export class ContractLifecycleService {
       const targets = await context.companies.findActiveVerifiedByEmail(
         dto.email,
       );
+      // At most one verified company holds each email (ux_company_verified_email).
       if (targets.length !== 1) {
         throw new NotFoundException(
-          'No single active, verified company was found for this email.',
+          'No verified company uses this email. The company must sign up and verify its company email before it can be invited.',
         );
       }
       const target = targets[0];
@@ -797,10 +798,11 @@ export class ContractLifecycleService {
       });
       // Known risk: the email is sent before the transaction commits, so a
       // later failure rolls back the invitation after the recipient was mailed.
+      const inviter = await context.companies.findActiveForShare(companyId);
       await this.mail.sendContractPartyInvitationEmail(
         target.email,
         contract.title,
-        target.name,
+        inviter?.name ?? 'A company',
         dto.partyType,
         token,
       );

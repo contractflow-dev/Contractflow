@@ -7,6 +7,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
+import { THEME_STORAGE_KEY } from "./theme-script";
 
 type Theme = "light" | "dark";
 
@@ -15,7 +16,7 @@ interface ThemeContextValue {
   toggleTheme: () => void;
 }
 
-const STORAGE_KEY = "contractflow-theme";
+const STORAGE_KEY = THEME_STORAGE_KEY;
 const THEME_CHANGE_EVENT = "contractflow-theme-change";
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
@@ -102,16 +103,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useTheme() {
-  const context = useContext(ThemeContext);
-  if (!context) {
-    // Return safe fallback during build/prerender instead of throwing
-    return {
-      theme: 'light',
-      setTheme: () => {},
-      resolvedTheme: 'light',
-      systemTheme: 'light',
-    } as any;
-  }
-  return context;
+const fallbackThemeContext: ThemeContextValue = {
+  theme: "light",
+  toggleTheme: () => {},
+};
+
+export function useTheme(): ThemeContextValue {
+  // Fall back instead of throwing so prerendering outside the provider works.
+  return useContext(ThemeContext) ?? fallbackThemeContext;
 }

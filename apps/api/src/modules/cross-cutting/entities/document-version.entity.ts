@@ -3,6 +3,7 @@ import { Document} from "./document.entity";
 import { CompanyUser } from "../../identity/entities/company-user.entity";
 import { BaseCustomEntity } from "./base-custom.entity";
 import { IDocumentVersionEntity } from "../interfaces/document-version.interface";
+import { EDocumentUploadStatus } from "@contractflow/contracts-schema";
 
 
 @Entity("document_version")
@@ -26,8 +27,12 @@ export class DocumentVersion extends BaseCustomEntity implements IDocumentVersio
     @Column({name: "mime_type", type:"varchar", length:127})
     mimeType!: string
 
-    @Column({name: "size_bytes", type:"bigint"})
-    sizeBytes!: bigint
+    // pg returns bigint as a string; uploads are capped well below 2^53.
+    @Column({name: "size_bytes", type:"bigint", transformer: {
+        to: (value: number) => value,
+        from: (value: string | null) => (value === null ? value : Number(value)),
+    }})
+    sizeBytes!: number
 
     @Column({name: "checksum_sha256", type:"char", length:64})
     checksumSha256!: string
@@ -44,4 +49,22 @@ export class DocumentVersion extends BaseCustomEntity implements IDocumentVersio
     @Column({name: "uploaded_at", type:"timestamptz"})
     uploadedAt!: Date
 
+    @Column({name: "upload_status", type:"enum", enum: EDocumentUploadStatus, enumName: "document_version_upload_status_enum", default: EDocumentUploadStatus.PENDING_UPLOAD})
+    uploadStatus!: EDocumentUploadStatus
+
+    @Column({name: "storage_provider", type:"varchar", length:32})
+    storageProvider!: string
+
+    @Column({name: "storage_bucket", type:"varchar", length:255})
+    storageBucket!: string
+
+    /** Provider object version id when bucket versioning is enabled. */
+    @Column({name: "storage_version_id", type:"varchar", length:1024, nullable: true})
+    storageVersionId!: string | null
+
+    @Column({name: "upload_expires_at", type:"timestamptz", nullable: true})
+    uploadExpiresAt!: Date | null
+
+    @Column({name: "failure_reason", type:"varchar", length:255, nullable: true})
+    failureReason!: string | null
 }

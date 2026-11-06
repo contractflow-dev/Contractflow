@@ -3,6 +3,7 @@ import type {
   ECompanyRole,
   ECompanyUserStatus,
   ICompanyAccessResponse,
+  ICompanyAccessSummaryResponse,
   ICompanyDashboardResponse,
   ICompanyInvitation,
   ICompanyInvitationResponseRequest,
@@ -40,6 +41,35 @@ export const companiesApi = api.injectEndpoints({
         result
           ? [{ type: "Company", id: result.id }]
           : [{ type: "Company", id: "CURRENT" }],
+    }),
+
+    getCompanyAccessSummary: builder.query<ICompanyAccessSummaryResponse, void>(
+      {
+        query: () => "/companies/access-summary",
+        providesTags: [{ type: "Company", id: "ACCESS_SUMMARY" }],
+      },
+    ),
+
+    verifyCompanyEmail: builder.mutation<
+      { message: string; companyName: string },
+      { token: string }
+    >({
+      query: (body) => ({
+        url: "/companies/verify-email",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: [{ type: "Company", id: "LIST" }, "Dashboard"],
+    }),
+
+    resendCompanyVerificationEmail: builder.mutation<
+      { message: string },
+      { companyId: string }
+    >({
+      query: ({ companyId }) => ({
+        ...companyRoute(companyId, "/verification-email"),
+        method: "POST",
+      }),
     }),
 
     getCompanyMembership: builder.query<
@@ -202,7 +232,7 @@ export const companiesApi = api.injectEndpoints({
       }),
       invalidatesTags: [
         { type: "Company", id: "LIST" },
-        "Onboarding",
+        { type: "Company", id: "ACCESS_SUMMARY" },
         "Dashboard",
       ],
     }),
@@ -213,6 +243,9 @@ export const companiesApi = api.injectEndpoints({
 export const {
   useGetCompaniesQuery,
   useGetCurrentCompanyQuery,
+  useGetCompanyAccessSummaryQuery,
+  useVerifyCompanyEmailMutation,
+  useResendCompanyVerificationEmailMutation,
   useGetCompanyMembershipQuery,
   useGetCompanyDashboardQuery,
   useGetCompanyMembersQuery,

@@ -11,6 +11,7 @@ import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import {
   Field,
+  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -25,6 +26,7 @@ import { useUpdateCompanyProfileMutation } from "@/features/companies";
 import type { ICompanyProfileResponse } from "@contractflow/contracts-schema";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { CompanyAdminShell } from "@/features/companies/CompanyAdminShell";
+import { CompanyVerificationNotice } from "@/features/companies/company-verification-notice";
 
 const profileSchema = z.object({
   name: z.string().trim().min(1, "Company name is required").max(255),
@@ -56,12 +58,19 @@ const fields: Array<{
   key: keyof ProfileValues;
   label: string;
   autoComplete?: string;
+  description?: string;
 }> = [
   { key: "name", label: "Company name", autoComplete: "organization" },
   { key: "legalName", label: "Legal name", autoComplete: "organization" },
   { key: "registrationNumber", label: "Registration number" },
   { key: "taxIdentificationNumber", label: "Tax identification number" },
-  { key: "email", label: "Contact email", autoComplete: "email" },
+  {
+    key: "email",
+    label: "Company email",
+    autoComplete: "email",
+    description:
+      "Other companies invite you to contracts at this address. A new address must be verified again.",
+  },
   { key: "phoneNumber", label: "Phone number", autoComplete: "tel" },
   { key: "website", label: "Website", autoComplete: "url" },
   {
@@ -86,7 +95,12 @@ const fields: Array<{
 export function CompanyProfileView() {
   return (
     <CompanyAdminShell>
-      {(access) => <ProfileContent company={access.company} />}
+      {(access) => (
+        <div className="space-y-6">
+          <CompanyVerificationNotice company={access.company} />
+          <ProfileContent company={access.company} />
+        </div>
+      )}
     </CompanyAdminShell>
   );
 }
@@ -168,7 +182,7 @@ function ProfileForm({ company }: { company: ICompanyProfileResponse }) {
             </Alert>
           )}
           <FieldGroup className="grid gap-4 sm:grid-cols-2">
-            {fields.map(({ key, label, autoComplete }) => (
+            {fields.map(({ key, label, autoComplete, description }) => (
               <Field key={key} data-invalid={Boolean(errors[key])}>
                 <FieldLabel htmlFor={`profile-${key}`}>{label}</FieldLabel>
                 <Input
@@ -177,6 +191,9 @@ function ProfileForm({ company }: { company: ICompanyProfileResponse }) {
                   autoComplete={autoComplete}
                   aria-invalid={Boolean(errors[key])}
                 />
+                {description && (
+                  <FieldDescription>{description}</FieldDescription>
+                )}
                 <FieldError>{errors[key]?.message}</FieldError>
               </Field>
             ))}

@@ -88,6 +88,60 @@ describe("company context request headers", () => {
     expect(request.headers.has("X-Company-Id")).toBe(false);
   });
 
+  it("checks company access without any company context", async () => {
+    store.dispatch(setActiveWorkspaceId("company-a"));
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          activeCompanyCount: 0,
+          hasEndedMembership: true,
+          hasInactiveCompanyMembership: false,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    await store
+      .dispatch(companiesApi.endpoints.getCompanyAccessSummary.initiate())
+      .unwrap();
+
+    const request = new Request(...fetchMock.mock.calls[0]);
+    expect(new URL(request.url).pathname).toBe("/api/companies/access-summary");
+    expect(request.headers.has("X-Company-Id")).toBe(false);
+  });
+
+  it("verifies a company email without company context, but resends with it", async () => {
+    store.dispatch(setActiveWorkspaceId("company-a"));
+    fetchMock.mockImplementation(async () =>
+      new Response(JSON.stringify({ message: "ok", companyName: "Acme" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await store
+      .dispatch(
+        companiesApi.endpoints.verifyCompanyEmail.initiate({ token: "t" }),
+      )
+      .unwrap();
+    await store
+      .dispatch(
+        companiesApi.endpoints.resendCompanyVerificationEmail.initiate({
+          companyId: "company-b",
+        }),
+      )
+      .unwrap();
+
+    const [verify, resend] = fetchMock.mock.calls.map(
+      ([input, init]) => new Request(input, init),
+    );
+    expect(new URL(verify!.url).pathname).toBe("/api/companies/verify-email");
+    expect(verify!.headers.has("X-Company-Id")).toBe(false);
+    expect(new URL(resend!.url).pathname).toBe(
+      "/api/company/verification-email",
+    );
+    expect(resend!.headers.get("X-Company-Id")).toBe("company-b");
+  });
+
   it("sends the requested company even when another company is active", async () => {
     store.dispatch(setActiveWorkspaceId("company-b"));
     await store
