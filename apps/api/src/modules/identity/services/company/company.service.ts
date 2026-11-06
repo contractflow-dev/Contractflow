@@ -19,6 +19,7 @@ import type { DashboardContractRow } from '../../../contract/interfaces/dashboar
 import { CompanyResponseDto } from '../../dto/company/responses/company-response.dto';
 import { CreateCompanyRequestDto } from '../../dto/company/requests/create-company-request.dto';
 import { CompanyUserRepository } from '../../repositories/company-user.respository';
+import { CompanyVerificationService } from './company-verification.service';
 import {
   COMPANY_CREATION_UNIT_OF_WORK,
   type ICompanyCreationUnitOfWork,
@@ -26,6 +27,7 @@ import {
 
 import type {
   ICompanyAccessResponse,
+  ICompanyAccessSummaryResponse,
   ICompanyDashboardContractResponse,
   ICompanyDashboardResponse,
   ICompanyMembershipResponse,
@@ -44,6 +46,7 @@ export class CompanyService {
     private readonly companyUserRepository: CompanyUserRepository,
     private readonly invitationRepository: CompanyInvitationRepository,
     private readonly contractPartyRepository: ContractPartyRepository,
+    private readonly companyVerification: CompanyVerificationService,
   ) {}
 
   async create(
@@ -87,6 +90,8 @@ export class CompanyService {
       };
     });
 
+    await this.companyVerification.sendAfterEmailChange(result.company.id);
+
     return {
       company: CompanyResponseDto.fromEntity(result.company),
       membership: this.mapMembership(result.membership),
@@ -105,6 +110,34 @@ export class CompanyService {
         company: CompanyResponseDto.fromEntity(membership.company),
         membership: this.mapMembership(membership),
       }));
+  }
+
+  async getAccessSummary(
+    userId: string,
+  ): Promise<ICompanyAccessSummaryResponse> {
+    const memberships =
+      await this.companyUserRepository.findAllMembershipsForUser(userId);
+    const summary: ICompanyAccessSummaryResponse = {
+      activeCompanyCount: 0,
+      hasEndedMembership: false,
+      hasInactiveCompanyMembership: false,
+    };
+
+    for (const membership of memberships) {
+      // Same definition of "active" as findActiveMembershipsForUser.
+      if (
+        membership.status !== ECompanyUserStatus.ACTIVE ||
+        membership.leftAt !== null
+      ) {
+        summary.hasEndedMembership = true;
+      } else if (membership.company?.status === ECompanyStatus.ACTIVE) {
+        summary.activeCompanyCount += 1;
+      } else {
+        summary.hasInactiveCompanyMembership = true;
+      }
+    }
+
+    return summary;
   }
 
   async getCurrent(userId: string): Promise<ICompanyProfileResponse> {

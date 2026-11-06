@@ -1,49 +1,47 @@
 import { cn } from "@/lib/utils";
 
-type Metric = {
-  value: string;
-  label: string;
-  spokenValue?: string;
+type Highlight = {
+  title: string;
+  description: string;
 };
 
-const METRICS: readonly Metric[] = [
-  { value: "4.2 Days", label: "Avg Claim Resolution Velocity" },
-  { value: "99.8%", label: "Live Compliance Visibility" },
+// Product capabilities, not performance figures: there is no measured data to
+// back statistics here, so none are shown.
+const HIGHLIGHTS: readonly Highlight[] = [
   {
-    value: "−65%",
-    label: "Progressive Billing Cycle Time",
-    spokenValue: "minus 65 percent",
+    title: "One register",
+    description: "Contracts, parties and status in one place",
+  },
+  {
+    title: "Role-based access",
+    description: "Access follows company membership and contract roles",
+  },
+  {
+    title: "Full history",
+    description: "Every status change is recorded with its reason",
   },
 ];
 
 export function HeroMetrics({ className = "" }: { className?: string }) {
   return (
     <dl
-      aria-label="Platform performance highlights"
+      aria-label="ContractFlow highlights"
       className={cn(
         "mt-6 grid w-full max-w-xl grid-cols-1 gap-3 xl:mt-8 xl:grid-cols-3 xl:gap-6",
         className,
       )}
     >
-      {METRICS.map((metric, index) => (
+      {HIGHLIGHTS.map((highlight, index) => (
         <div
-          key={metric.label}
-          className="flex min-w-0 flex-col-reverse justify-end text-left motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:fill-mode-backwards motion-safe:duration-500"
+          key={highlight.title}
+          className="flex min-w-0 flex-col justify-start text-left motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:fill-mode-backwards motion-safe:duration-500"
           style={{ animationDelay: `${index * 100}ms` }}
         >
-          <dt className="mt-1 text-xs font-medium leading-snug text-hero-foreground text-pretty sm:text-sm">
-            {metric.label}
+          <dt className="font-heading text-lg font-bold leading-tight tracking-tight text-hero-accent sm:text-xl">
+            {highlight.title}
           </dt>
-
-          <dd className="font-heading text-xl font-bold leading-tight tracking-tight text-hero-accent tabular-nums sm:text-2xl">
-            {metric.spokenValue ? (
-              <>
-                <span aria-hidden="true">{metric.value}</span>
-                <span className="sr-only">{metric.spokenValue}</span>
-              </>
-            ) : (
-              metric.value
-            )}
+          <dd className="mt-1 text-xs font-medium leading-snug text-hero-foreground text-pretty sm:text-sm">
+            {highlight.description}
           </dd>
         </div>
       ))}

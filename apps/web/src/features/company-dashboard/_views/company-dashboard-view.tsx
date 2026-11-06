@@ -29,6 +29,7 @@ import { getApiErrorMessage } from "@/lib/apiError";
 import { useGetCompanyDashboardQuery } from "@/features/companies";
 import { useGetCurrentUserQuery } from "@/services/authApi";
 import { CompanyAdminShell } from "@/features/companies/CompanyAdminShell";
+import { CompanyVerificationNotice } from "@/features/companies/company-verification-notice";
 
 const summaryCards = [
   {
@@ -66,7 +67,12 @@ const summaryCards = [
 export function CompanyDashboardView() {
   return (
     <CompanyAdminShell>
-      {(access) => <DashboardContent companyId={access.company.id} />}
+      {(access) => (
+        <div className="space-y-6">
+          <CompanyVerificationNotice company={access.company} />
+          <DashboardContent companyId={access.company.id} />
+        </div>
+      )}
     </CompanyAdminShell>
   );
 }
@@ -323,24 +329,6 @@ function DashboardContent({ companyId }: { companyId: string }) {
               >
                 Edit company profile
               </Link>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                <h2 className="text-lg">Activity and company documents</h2>
-              </CardTitle>
-              <CardDescription>
-                Company-wide activity and document listings are not available in
-                this dashboard yet.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                No activity or document data is shown here because the current
-                dashboard API does not provide these company-level lists.
-              </p>
             </CardContent>
           </Card>
 

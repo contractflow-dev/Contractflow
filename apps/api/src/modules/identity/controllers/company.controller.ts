@@ -11,11 +11,14 @@ import {
 } from '@nestjs/common';
 import { CurrentCompanyId } from '../../../common/decorators/current-company-id.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { Public } from '../../../common/decorators/public.decorator';
 import { CompanyContextGuard } from '../../../common/guards/company-context.guard';
 import type { AuthenticatedUser } from '../interface/auth-context.interface';
 import { CreateCompanyRequestDto } from '../dto/company/requests/create-company-request.dto';
 import { CompanyService } from '../services/company/company.service';
 import { CompanyAdminService } from '../services/company/company-admin.service';
+import { CompanyVerificationService } from '../services/company/company-verification.service';
+import { VerifyCompanyEmailRequestDto } from '../dto/company/requests/verify-company-email-request.dto';
 import { ListCompanyMembersRequestDto } from '../dto/company/requests/list-company-members-request.dto';
 import { InviteCompanyMemberRequestDto } from '../dto/company/requests/invite-company-member-request.dto';
 import { UpdateCompanyMemberRoleRequestDto } from '../dto/company/requests/update-company-member-role-request.dto';
@@ -27,6 +30,7 @@ export class CompanyController {
   constructor(
     private readonly companyService: CompanyService,
     private readonly companyAdminService: CompanyAdminService,
+    private readonly companyVerification: CompanyVerificationService,
   ) {}
 
   @Post('companies')
@@ -40,6 +44,19 @@ export class CompanyController {
   @Get('companies')
   list(@CurrentUser() user: AuthenticatedUser) {
     return this.companyService.listForUser(user.id);
+  }
+
+  @Get('companies/access-summary')
+  getAccessSummary(@CurrentUser() user: AuthenticatedUser) {
+    return this.companyService.getAccessSummary(user.id);
+  }
+
+  // Public: the link may be opened by whoever reads the company inbox, in a
+  // browser that isn't signed in. The one-time token is the proof.
+  @Public()
+  @Post('companies/verify-email')
+  verifyEmail(@Body() body: VerifyCompanyEmailRequestDto) {
+    return this.companyVerification.verify(body.token);
   }
 
   @Get('companies/current')
@@ -77,6 +94,15 @@ export class CompanyController {
       companyId,
       body,
     );
+  }
+
+  @Post('company/verification-email')
+  @UseGuards(CompanyContextGuard)
+  resendVerificationEmail(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+  ) {
+    return this.companyVerification.resend(user.id, companyId);
   }
 
   @Get('company/members')

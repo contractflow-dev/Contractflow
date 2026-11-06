@@ -21,7 +21,10 @@ vi.mock("../CompanyAdminShell", () => ({
 }));
 
 vi.mock("@/features/companies", () => ({
-  useChangeCompanyMemberRoleMutation: () => [mocks.changeRole],
+  useChangeCompanyMemberRoleMutation: () => [
+    mocks.changeRole,
+    { isLoading: false },
+  ],
   useGetCompanyInvitationsQuery: mocks.getInvitations,
   useGetCompanyMembersQuery: mocks.getMembers,
   useInviteCompanyMemberMutation: () => [

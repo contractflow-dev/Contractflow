@@ -45,6 +45,7 @@ import {
   useRevokeCompanyInvitationMutation,
 } from "@/features/companies";
 import type { ICompanyMember } from "@contractflow/contracts-schema";
+import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
 import { DataPagination } from "@/components/pagination/data-pagination";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useKeepPageInRange, usePagination } from "@/hooks/use-pagination";
@@ -78,6 +79,11 @@ function TeamContent({ companyId }: { companyId: string }) {
   const [inviteError, setInviteError] = useState("");
   const [inviteSuccess, setInviteSuccess] = useState("");
   const [actionError, setActionError] = useState("");
+  const [actionSuccess, setActionSuccess] = useState("");
+  const [pendingRoleChange, setPendingRoleChange] = useState<{
+    member: ICompanyMember;
+    companyRole: ECompanyRole;
+  } | null>(null);
   const [busyMemberId, setBusyMemberId] = useState("");
   const [busyInvitationId, setBusyInvitationId] = useState("");
   const [email, setEmail] = useState("");
@@ -112,7 +118,7 @@ function TeamContent({ companyId }: { companyId: string }) {
     invitationsInitialLoading || (invitationsFetching && !invitations);
   useKeepPageInRange(invitations?.meta, invitationPages.setPage);
   const [inviteMember, inviteState] = useInviteCompanyMemberMutation();
-  const [changeRole] = useChangeCompanyMemberRoleMutation();
+  const [changeRole, changeRoleState] = useChangeCompanyMemberRoleMutation();
   const [removeMember] = useRemoveCompanyMemberMutation();
   const [revokeInvitation] = useRevokeCompanyInvitationMutation();
 
@@ -137,22 +143,36 @@ function TeamContent({ companyId }: { companyId: string }) {
     }
   }
 
-  async function updateRole(member: ICompanyMember, value: string) {
-    if (!memberRoles.includes(value as ECompanyRole)) return;
+  // The role select stays on the saved role until the change is confirmed,
+  // so cancelling leaves it unchanged.
+  function requestRoleChange(member: ICompanyMember, value: string) {
+    const companyRole = memberRoles.find((option) => option === value);
+    if (!companyRole || companyRole === member.companyRole) return;
+    setPendingRoleChange({ member, companyRole });
+  }
+
+  async function confirmRoleChange() {
+    if (!pendingRoleChange || changeRoleState.isLoading) return;
+    const { member, companyRole } = pendingRoleChange;
     setActionError("");
+    setActionSuccess("");
     setBusyMemberId(member.id);
     try {
       await changeRole({
         companyId,
         membershipId: member.id,
-        companyRole: value as ECompanyRole,
+        companyRole,
       }).unwrap();
+      setActionSuccess(
+        `${member.firstName} ${member.lastName} is now ${companyRole}.`,
+      );
     } catch (error) {
       setActionError(
         getApiErrorMessage(error, "The member role could not be changed."),
       );
     } finally {
       setBusyMemberId("");
+      setPendingRoleChange(null);
     }
   }
 
@@ -319,6 +339,11 @@ function TeamContent({ companyId }: { companyId: string }) {
             <AlertDescription>{actionError}</AlertDescription>
           </Alert>
         )}
+        {actionSuccess && (
+          <Alert role="status">
+            <AlertDescription>{actionSuccess}</AlertDescription>
+          </Alert>
+        )}
 
         {membersLoading ? (
           <Alert role="status">
@@ -341,7 +366,7 @@ function TeamContent({ companyId }: { companyId: string }) {
                   key={member.id}
                   member={member}
                   busy={busyMemberId === member.id}
-                  onRoleChange={(value) => void updateRole(member, value)}
+                  onRoleChange={(value) => requestRoleChange(member, value)}
                   onRemove={() => void remove(member)}
                 />
               ))}
@@ -374,7 +399,7 @@ function TeamContent({ companyId }: { companyId: string }) {
                         <MemberRoleSelect
                           member={member}
                           busy={busyMemberId === member.id}
-                          onChange={(value) => void updateRole(member, value)}
+                          onChange={(value) => requestRoleChange(member, value)}
                         />
                       </TableCell>
                       <TableCell className="px-4 py-3">
@@ -508,8 +533,44 @@ function TeamContent({ companyId }: { companyId: string }) {
           </Card>
         )}
       </section>
+
+      <ConfirmDialog
+        open={pendingRoleChange !== null}
+        title="Change this member's role?"
+        description={
+          pendingRoleChange
+            ? describeRoleChange(
+                pendingRoleChange.member,
+                pendingRoleChange.companyRole,
+              )
+            : ""
+        }
+        confirmLabel="Change role"
+        pendingLabel="Changing role…"
+        isPending={changeRoleState.isLoading}
+        destructive={
+          pendingRoleChange?.member.companyRole === ECompanyRole.COMPANY_ADMIN
+        }
+        onConfirm={() => void confirmRoleChange()}
+        onCancel={() => setPendingRoleChange(null)}
+      />
     </div>
   );
+}
+
+function describeRoleChange(
+  member: ICompanyMember,
+  companyRole: ECompanyRole,
+): string {
+  const name = `${member.firstName} ${member.lastName}`;
+  const change = `${name} will change from ${member.companyRole} to ${companyRole}.`;
+  if (member.companyRole === ECompanyRole.COMPANY_ADMIN) {
+    return `${change} They will lose access to company administration: the overview, team management, invitations, and the company profile.`;
+  }
+  if (companyRole === ECompanyRole.COMPANY_ADMIN) {
+    return `${change} They will be able to manage members, invitations, and the company profile.`;
+  }
+  return change;
 }
 
 function MemberRoleSelect({

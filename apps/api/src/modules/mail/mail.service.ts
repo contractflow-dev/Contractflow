@@ -80,6 +80,34 @@ export class MailService {
     );
   }
 
+  async sendCompanyVerificationEmail(
+    email: string,
+    companyName: string,
+    token: string,
+  ): Promise<void> {
+    const isProduction = this.config.get<string>('NODE_ENV') === 'production';
+    const webUrl =
+      this.config.get<string>('WEB_URL') ??
+      (isProduction ? undefined : 'http://localhost:3000');
+    if (!webUrl) {
+      throw new ServiceUnavailableException(
+        'Email delivery is not configured. Set WEB_URL.',
+      );
+    }
+
+    const verificationUrl = new URL('/auth/verify-company', webUrl);
+    verificationUrl.searchParams.set('token', token);
+    const text =
+      `Confirm that ${email} is the company email for ${companyName} on ContractFlow: ${verificationUrl.toString()}\n\n` +
+      'Other companies can only invite a verified company to their contracts.\n\n' +
+      'This link expires in 7 days and can only be used once.';
+    await this.sendEmail(
+      email,
+      `Verify the company email for ${companyName}`,
+      text,
+    );
+  }
+
   async sendContractPartyInvitationEmail(
     email: string,
     contractTitle: string,

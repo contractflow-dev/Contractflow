@@ -16,6 +16,7 @@ import { CompanyInvitationRepository } from '../../repositories/company-invitati
 import { CompanyUserRepository } from '../../repositories/company-user.respository';
 import { ContractPartyRepository } from '../../../contract/repositories/contract-party.repository';
 import { CompanyService } from './company.service';
+import type { CompanyVerificationService } from './company-verification.service';
 
 const companyData = {
   id: '01JCOMPANY00000000000000000',
@@ -58,6 +59,7 @@ describe('CompanyService', () => {
   let membershipRepository: Record<string, ReturnType<typeof vi.fn>>;
   let invitationRepository: Record<string, ReturnType<typeof vi.fn>>;
   let contractPartyRepository: Record<string, ReturnType<typeof vi.fn>>;
+  let companyVerification: { sendAfterEmailChange: ReturnType<typeof vi.fn> };
   let configService: { get: ReturnType<typeof vi.fn> };
   let execute: ReturnType<typeof vi.fn>;
   let companyCreationContext: Record<string, ReturnType<typeof vi.fn>>;
@@ -82,6 +84,7 @@ describe('CompanyService', () => {
         ...value,
       })),
       findActiveMembershipsForUser: vi.fn(),
+      findAllMembershipsForUser: vi.fn(),
       findCurrentMembershipWithCompany: vi.fn(),
       findActiveMembershipWithCompany: vi.fn(),
       countActiveMembers: vi.fn(),
@@ -111,12 +114,14 @@ describe('CompanyService', () => {
       async <T>(work: (context: typeof companyCreationContext) => Promise<T>) =>
         work(companyCreationContext),
     );
+    companyVerification = { sendAfterEmailChange: vi.fn() };
     service = new CompanyService(
       configService as unknown as ConfigService,
       { execute } as unknown as ConstructorParameters<typeof CompanyService>[1],
       membershipRepository as unknown as CompanyUserRepository,
       invitationRepository as unknown as CompanyInvitationRepository,
       contractPartyRepository as unknown as ContractPartyRepository,
+      companyVerification as unknown as CompanyVerificationService,
     );
   });
 
@@ -135,6 +140,9 @@ describe('CompanyService', () => {
     expect(response.company).toMatchObject({ id: companyData.id });
     expect(response.membership.canManageCompany).toBe(true);
     expect(response.membership).not.toHaveProperty('userId');
+    expect(companyVerification.sendAfterEmailChange).toHaveBeenCalledWith(
+      companyData.id,
+    );
   });
 
   it('rejects unauthenticated identity and unverified accounts before writes', async () => {
@@ -192,6 +200,50 @@ describe('CompanyService', () => {
     ).toHaveBeenCalledWith('current-user');
     expect(companies).toHaveLength(1);
     expect(companies[0].company.id).toBe(companyData.id);
+  });
+
+  it('summarizes why a user has or lacks company access without exposing companies', async () => {
+    const active = {
+      id: 'active-membership',
+      status: ECompanyUserStatus.ACTIVE,
+      leftAt: null,
+      company: companyData,
+    };
+    const removed = {
+      ...active,
+      id: 'removed-membership',
+      status: ECompanyUserStatus.INACTIVE,
+      leftAt: new Date('2026-01-01T00:00:00Z'),
+    };
+    const inactiveCompany = {
+      ...active,
+      id: 'inactive-company-membership',
+      company: { ...companyData, status: ECompanyStatus.INACTIVE },
+    };
+    membershipRepository.findAllMembershipsForUser.mockResolvedValue([
+      active,
+      removed,
+      inactiveCompany,
+    ]);
+
+    await expect(service.getAccessSummary('current-user')).resolves.toEqual({
+      activeCompanyCount: 1,
+      hasEndedMembership: true,
+      hasInactiveCompanyMembership: true,
+    });
+    expect(
+      membershipRepository.findAllMembershipsForUser,
+    ).toHaveBeenCalledWith('current-user');
+  });
+
+  it('reports a new user with no memberships as having nothing to recover', async () => {
+    membershipRepository.findAllMembershipsForUser.mockResolvedValue([]);
+
+    await expect(service.getAccessSummary('new-user')).resolves.toEqual({
+      activeCompanyCount: 0,
+      hasEndedMembership: false,
+      hasInactiveCompanyMembership: false,
+    });
   });
 
   it('requires active membership and administrator role for dashboard data', async () => {

@@ -45,6 +45,8 @@ export interface ICompanyProfileResponse {
   countryCode: ECountryCode;
   defaultCurrencyCode: ECurrencyCode;
   status: ECompanyStatus;
+  /** When the company email was verified; null until then. */
+  verifiedAt: Date | null;
 }
 
 export interface ICompanyMembershipResponse {
@@ -58,6 +60,20 @@ export interface ICompanyMembershipResponse {
 export interface ICompanyAccessResponse {
   company: ICompanyProfileResponse;
   membership: ICompanyMembershipResponse;
+}
+
+/**
+ * Why the current user does or doesn't have company access. Lets the web app
+ * tell a new user (send to company setup) from one whose access has ended.
+ * Contains no company names or IDs.
+ */
+export interface ICompanyAccessSummaryResponse {
+  /** Active memberships of active companies (what GET /companies lists). */
+  activeCompanyCount: number;
+  /** The user was removed from, or left, at least one company. */
+  hasEndedMembership: boolean;
+  /** The user is still a member of at least one company that is inactive. */
+  hasInactiveCompanyMembership: boolean;
 }
 
 export interface ICompanyDashboardResponse extends ICompanyAccessResponse {
@@ -147,7 +163,7 @@ export interface IInviteCompanyMemberRequest {
 
 export type ICreateCompanyRequest = Omit<
   ICompanyProfileResponse,
-  "id" | "status"
+  "id" | "status" | "verifiedAt"
 >;
 
 export type IUpdateCompanyProfileRequest = Partial<ICreateCompanyRequest>;

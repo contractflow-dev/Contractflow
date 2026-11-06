@@ -58,3 +58,10 @@ export enum EConversationWorkspace {
     Finance = 'finance',
     HSE = 'hse',
 }
+/** Storage lifecycle of one uploaded document version. */
+export enum EDocumentUploadStatus {
+    PENDING_UPLOAD = 'pending_upload',
+    PROCESSING = 'processing',
+    AVAILABLE = 'available',
+    FAILED = 'failed',
+}

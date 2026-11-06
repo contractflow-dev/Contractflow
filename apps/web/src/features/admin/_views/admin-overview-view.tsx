@@ -106,7 +106,7 @@ export function AdminOverviewView() {
               <AlertDescription className="text-xs">
                 {getApiErrorMessage(
                   error,
-                  "An error occurred while communicating with the database or server.",
+                  "The platform overview couldn't be loaded. Please try again.",
                 )}
               </AlertDescription>
             </div>

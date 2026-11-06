@@ -265,9 +265,9 @@ export function OnboardingView() {
             {createdCompany.name} is ready
           </h1>
           <p role="status" className="text-sm leading-6 text-muted-foreground">
-            The server confirmed company creation.
+            Your company has been created.
             {createdCompany.isAdmin
-              ? " Your company administrator access is active."
+              ? " You're its administrator, so you can invite your team and set up contracts."
               : " Your membership is active."}
           </p>
           <Link
@@ -350,7 +350,9 @@ export function OnboardingView() {
         </h1>
         <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
           Add your organization details to set up its ContractFlow workspace.
-          Your company membership and permissions are assigned by the server.
+          You&apos;ll be the administrator of the company you create. If you were
+          invited to join an existing company, open the invitation link in your
+          email instead.
         </p>
       </header>
 

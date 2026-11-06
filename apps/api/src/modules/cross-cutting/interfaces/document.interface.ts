@@ -8,4 +8,6 @@ export interface IDocumentEntity {
     category : EDocumentCategory
     visibility : EDocumentVisibility
     status : EDocumentStatus
+    deletedAt : Date | null
+    deletedById : string | null
 }

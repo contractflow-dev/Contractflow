@@ -17,3 +17,9 @@ export {
   readPersistedActiveCompanyId,
   resolveActiveCompanyId,
 } from "./companySelection";
+export {
+  companyAccessState,
+  companyLandingPath,
+  resolveWorkspaceRedirect,
+} from "./workspaceLanding";
+export type { CompanyAccessState } from "./workspaceLanding";
