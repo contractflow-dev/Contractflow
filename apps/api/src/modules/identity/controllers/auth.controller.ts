@@ -83,21 +83,38 @@ export class AuthController {
   ): Promise<LogoutResponse> {
     const cookieName = this.authService.sessionCookieName();
     await this.authService.logout(sessionToken(request, cookieName));
-    const secure =
-      this.config.get<string>('NODE_ENV') === 'production' ? '; Secure' : '';
-    const sameSite = secure ? 'None' : 'Lax';
+    // Clearing only works when the attributes match the ones it was set with.
     response.setHeader(
       'Set-Cookie',
-      `${cookieName}=; HttpOnly; Path=/; SameSite=${sameSite}; Max-Age=0${secure}`,
+      this.sessionCookieHeader(cookieName, '', 0),
     );
     return { success: true, message: 'You have been signed out.' };
   }
 
   private sessionCookie(sessionToken: string, expiresAt: Date): string {
-    const secure =
-      this.config.get<string>('NODE_ENV') === 'production' ? '; Secure' : '';
-    const sameSite = secure ? 'None' : 'Lax';
     const maxAge = Math.floor((expiresAt.getTime() - Date.now()) / 1000);
-    return `${this.authService.sessionCookieName()}=${sessionToken}; HttpOnly; Path=/; SameSite=${sameSite}; Max-Age=${maxAge}${secure}`;
+    return this.sessionCookieHeader(
+      this.authService.sessionCookieName(),
+      sessionToken,
+      maxAge,
+    );
+  }
+
+  /**
+   * In production the web app and API are on different onrender.com
+   * subdomains. onrender.com is a public suffix, so they are different sites
+   * and the cookie must be SameSite=None, which browsers only accept with
+   * Secure. Locally both run on localhost (the same site) over plain HTTP, so
+   * Lax without Secure is used.
+   */
+  private sessionCookieHeader(
+    name: string,
+    value: string,
+    maxAge: number,
+  ): string {
+    const production = this.config.get<string>('NODE_ENV') === 'production';
+    const sameSite = production ? 'None' : 'Lax';
+    const secure = production ? '; Secure' : '';
+    return `${name}=${value}; HttpOnly; Path=/; SameSite=${sameSite}; Max-Age=${maxAge}${secure}`;
   }
 }

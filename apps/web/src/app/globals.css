@@ -123,7 +123,10 @@
   --input: oklch(0.872 0.012 259.8); /* #d0d5dd */
   --ring: oklch(0.548 0.155 40.6); /* #b8491a */
   --field: oklch(1 0 0); /* #ffffff */
-  --brand: oklch(0.576 0.161 41.8); /* #c4501a, orange text on white */
+  /* Orange text and fills. Same hue as before, darker for WCAG AA: as text
+     4.97:1 on the page background and 5.33:1 on cards; white on it 5.33:1,
+     and 4.53:1 on its 90% hover fill. #c4501a was 4.34:1 on the page. */
+  --brand: oklch(0.546 0.161 41.8); /* #b9460a */
 
   /* Navy: owner badges, dark feature cards, avatars */
   --navy: oklch(0.183 0.031 263.4); /* #0b1220 */

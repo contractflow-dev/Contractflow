@@ -30,7 +30,7 @@ describe('AuthController', () => {
     setHeader = vi.fn();
   });
 
-  it('sets the session cookie while returning only the user body', async () => {
+  function login() {
     const body = Object.assign(new LoginAppUserDto(), {
       email: 'user@example.com',
       password: 'StrongPassword123!',
@@ -39,26 +39,36 @@ describe('AuthController', () => {
       ip: '127.0.0.1',
       get: vi.fn().mockReturnValue('test-agent'),
     } as unknown as Request;
-    const response = { setHeader } as unknown as Response;
+    return controller.login(body, request, {
+      setHeader,
+    } as unknown as Response);
+  }
 
-    const result = await controller.login(body, request, response);
+  function logout() {
+    const request = {
+      headers: { cookie: 'other=value; contractflow_session=session-token' },
+    } as Request;
+    return controller.logout(request, { setHeader } as unknown as Response);
+  }
+
+  function useEnvironment(nodeEnv: string) {
+    config.get.mockImplementation((key: string) =>
+      key === 'NODE_ENV' ? nodeEnv : undefined,
+    );
+  }
+
+  it('sets the session cookie while returning only the user body', async () => {
+    const result = await login();
 
     expect(result).toEqual({ user: { id: 'user-id' } });
     expect(setHeader).toHaveBeenCalledWith(
       'Set-Cookie',
-      expect.stringMatching(
-        /^contractflow_session=session-token; HttpOnly; Path=\/; SameSite=Lax; Max-Age=\d+; Secure$/,
-      ),
+      expect.stringMatching(/^contractflow_session=session-token; HttpOnly; /),
     );
   });
 
   it('revokes the request session and clears its cookie on logout', async () => {
-    const request = {
-      headers: { cookie: 'other=value; contractflow_session=session-token' },
-    } as Request;
-    const response = { setHeader } as unknown as Response;
-
-    await expect(controller.logout(request, response)).resolves.toEqual({
+    await expect(logout()).resolves.toEqual({
       success: true,
       message: 'You have been signed out.',
     });
@@ -66,7 +76,73 @@ describe('AuthController', () => {
     expect(authService.logout).toHaveBeenCalledWith('session-token');
     expect(setHeader).toHaveBeenCalledWith(
       'Set-Cookie',
-      'contractflow_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0; Secure',
+      expect.stringMatching(/^contractflow_session=; HttpOnly; .*Max-Age=0/),
     );
   });
+
+  describe('in production, where the web app and API are different sites', () => {
+    beforeEach(() => useEnvironment('production'));
+
+    it('sends the session cookie cross-site, and only over HTTPS', async () => {
+      await login();
+
+      expect(setHeader).toHaveBeenCalledWith(
+        'Set-Cookie',
+        expect.stringMatching(
+          /^contractflow_session=session-token; HttpOnly; Path=\/; SameSite=None; Max-Age=\d+; Secure$/,
+        ),
+      );
+    });
+
+    it('clears the cookie with the same attributes it was set with', async () => {
+      await logout();
+
+      expect(setHeader).toHaveBeenCalledWith(
+        'Set-Cookie',
+        'contractflow_session=; HttpOnly; Path=/; SameSite=None; Max-Age=0; Secure',
+      );
+    });
+  });
+
+  describe.each(['development', 'test'])(
+    'in %s, where the web app and API share localhost over HTTP',
+    (nodeEnv) => {
+      beforeEach(() => useEnvironment(nodeEnv));
+
+      it('keeps the session cookie same-site and usable without HTTPS', async () => {
+        await login();
+
+        expect(setHeader).toHaveBeenCalledWith(
+          'Set-Cookie',
+          expect.stringMatching(
+            /^contractflow_session=session-token; HttpOnly; Path=\/; SameSite=Lax; Max-Age=\d+$/,
+          ),
+        );
+      });
+
+      it('clears the cookie with the same attributes it was set with', async () => {
+        await logout();
+
+        expect(setHeader).toHaveBeenCalledWith(
+          'Set-Cookie',
+          'contractflow_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0',
+        );
+      });
+    },
+  );
+
+  it.each(['production', 'development'])(
+    'never sends SameSite=None without Secure (%s)',
+    async (nodeEnv) => {
+      useEnvironment(nodeEnv);
+      await login();
+      await logout();
+
+      for (const [, cookie] of setHeader.mock.calls as [string, string][]) {
+        if (cookie.includes('SameSite=None')) {
+          expect(cookie).toMatch(/; Secure$/);
+        }
+      }
+    },
+  );
 });
