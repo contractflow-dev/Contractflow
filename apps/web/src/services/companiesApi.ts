@@ -1,4 +1,5 @@
 import { api, companyRoute } from "@/services/api";
+import { EInvitationStatus } from "@contractflow/contracts-schema";
 import type {
   ECompanyRole,
   ECompanyUserStatus,
@@ -18,6 +19,11 @@ import type {
   IPublicCompanyInvitation,
   IUpdateCompanyProfileRequest,
 } from "@contractflow/contracts-schema";
+
+/** The token's invitation preview; distinct from the per-company admin lists. */
+function publicInvitationTag(token: string) {
+  return { type: "CompanyInvitation" as const, id: `PUBLIC_${token}` };
+}
 
 export const companiesApi = api.injectEndpoints({
   endpoints: (builder) => ({
@@ -208,6 +214,9 @@ export const companiesApi = api.injectEndpoints({
         method: "POST",
         body,
       }),
+      providesTags: (_result, _error, { token }) => [
+        publicInvitationTag(token),
+      ],
     }),
 
     respondToCompanyInvitation: builder.mutation<
@@ -219,6 +228,23 @@ export const companiesApi = api.injectEndpoints({
         method: "POST",
         body,
       }),
+      // Nothing changed on the server when the request failed.
+      invalidatesTags: (result, error, { token }) => {
+        if (error || !result) return [];
+        // The invitation is no longer pending, whatever the outcome. Only
+        // accepting adds a membership; declined and expired invitations leave
+        // the user's companies unchanged.
+        return [
+          publicInvitationTag(token),
+          ...(result.status === EInvitationStatus.ACCEPTED
+            ? [
+                { type: "Company" as const, id: "LIST" },
+                { type: "Company" as const, id: "ACCESS_SUMMARY" },
+                { type: "Company" as const, id: "CURRENT" },
+              ]
+            : []),
+        ];
+      },
     }),
 
     createCompany: builder.mutation<

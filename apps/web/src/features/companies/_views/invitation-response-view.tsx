@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { EInvitationStatus } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
 import {
@@ -20,7 +21,13 @@ import { useGetCurrentUserQuery } from "@/services/authApi";
 
 export function InvitationResponseView({ token }: { token: string }) {
   const router = useRouter();
-  const [result, setResult] = useState("");
+  // The final message once the invitation can no longer be answered. The
+  // invitation preview is refetched after responding and then reports "no
+  // longer active", so this takes priority over it.
+  const [result, setResult] = useState<{
+    message: string;
+    isError: boolean;
+  } | null>(null);
   const [responseError, setResponseError] = useState("");
   const {
     currentData: invitation,
@@ -41,15 +48,37 @@ export function InvitationResponseView({ token }: { token: string }) {
 
   async function makeDecision(decision: "accept" | "decline") {
     setResponseError("");
-    setResult("");
+    setResult(null);
     try {
-      await respond({ token, decision }).unwrap();
-      if (decision === "accept") {
+      const { status } = await respond({ token, decision }).unwrap();
+      // A 2xx response is not proof of acceptance: act on the status.
+      if (status === EInvitationStatus.ACCEPTED) {
         router.replace("/dashboards");
+      } else if (status === EInvitationStatus.DECLINED) {
+        setResult({
+          message: "You declined this company invitation.",
+          isError: false,
+        });
       } else {
-        setResult("You declined this company invitation.");
+        setResult({
+          message:
+            "This invitation has expired. Ask the company administrator to send a new one.",
+          isError: true,
+        });
       }
     } catch (error) {
+      // 409: the invitation expired, was already used, or the user is already
+      // a member. It can't be answered again, so stop offering the actions.
+      if (getApiErrorStatus(error) === 409) {
+        setResult({
+          message: getApiErrorMessage(
+            error,
+            "This invitation can no longer be answered.",
+          ),
+          isError: true,
+        });
+        return;
+      }
       setResponseError(
         getApiErrorMessage(error, "Your response could not be submitted."),
       );
@@ -71,6 +100,13 @@ export function InvitationResponseView({ token }: { token: string }) {
               <AlertDescription>
                 This invitation link is missing its token.
               </AlertDescription>
+            </Alert>
+          ) : result ? (
+            <Alert
+              variant={result.isError ? "destructive" : "default"}
+              role={result.isError ? "alert" : "status"}
+            >
+              <AlertDescription>{result.message}</AlertDescription>
             </Alert>
           ) : isLoadingInvitation || isLoadingUser ? (
             <Alert role="status">
@@ -139,11 +175,6 @@ export function InvitationResponseView({ token }: { token: string }) {
                   {responseError && (
                     <Alert variant="destructive">
                       <AlertDescription>{responseError}</AlertDescription>
-                    </Alert>
-                  )}
-                  {result && (
-                    <Alert role="status">
-                      <AlertDescription>{result}</AlertDescription>
                     </Alert>
                   )}
                   <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
