@@ -16,6 +16,7 @@ import {
   useRespondToContractRoleInvitationMutation,
 } from "@/services/contractApi";
 import { getApiErrorMessage, getApiErrorStatus } from "@/lib/apiError";
+import { formatDateTime } from "@/lib/format";
 import { useGetCurrentUserQuery } from "@/services/authApi";
 
 export function ContractRoleInvitationResponse({ token }: { token: string }) {
@@ -62,7 +63,7 @@ export function ContractRoleInvitationResponse({ token }: { token: string }) {
         <CardHeader>
           <p className="text-sm font-semibold text-primary">ContractFlow</p>
           <CardTitle>
-            <h1 className="mt-2 text-2xl">Contract role invitation</h1>
+            <h1 className="mt-2 type-page-title">Contract role invitation</h1>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -103,7 +104,7 @@ export function ContractRoleInvitationResponse({ token }: { token: string }) {
                   .
                 </p>
                 <p className="text-muted-foreground">
-                  Expires {new Date(invitation.expiresAt).toLocaleString()}.
+                  Expires {formatDateTime(invitation.expiresAt)}.
                 </p>
               </div>
               {isSignedOut ? (

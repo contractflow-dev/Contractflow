@@ -10,13 +10,21 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@workspace/ui/components/alert-dialog";
+import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
+
+/**
+ * Confirms an action before it runs. The caller keeps `open` true until the
+ * request succeeds; on failure it passes `error`, which is shown inside the
+ * dialog so the user can retry or cancel without losing context.
+ */
 
 export function ConfirmDialog({
   open,
   title,
   description,
   children,
+  error,
   confirmLabel,
   pendingLabel,
   isPending = false,
@@ -30,6 +38,8 @@ export function ConfirmDialog({
   description: ReactNode;
   /** Extra content between the description and the actions, such as a field. */
   children?: ReactNode;
+  /** Why the last attempt failed, shown above the actions. */
+  error?: ReactNode;
   confirmLabel: string;
   pendingLabel: string;
   isPending?: boolean;
@@ -52,6 +62,11 @@ export function ConfirmDialog({
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         {children}
+        {error ? (
+          <Alert variant="destructive" role="alert">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
           <Button

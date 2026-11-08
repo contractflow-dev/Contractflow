@@ -3,6 +3,15 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
 
   if ("status" in error) {
     const status = error.status;
+    // A server failure's message describes the server, not the user's
+    // request, so it is never shown.
+    if (typeof status === "number" && status >= 500) {
+      return `${fallback} The server could not complete the request. Try again shortly.`;
+    }
+    if (status === "TIMEOUT_ERROR") {
+      return "The request took too long. Check your connection and try again.";
+    }
+    if (status === "PARSING_ERROR") return fallback;
     const data = "data" in error ? error.data : undefined;
     if (data && typeof data === "object" && "message" in data) {
       const message = data.message;

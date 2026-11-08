@@ -25,7 +25,15 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import { Skeleton } from "@workspace/ui/components/skeleton";
+import { StatusBadge } from "@/components/status-badge/status-badge";
+import { useUserTimeZone } from "@/hooks/use-user-time-zone";
 import { getApiErrorMessage } from "@/lib/apiError";
+import {
+  daysUntilCalendarDate,
+  formatCalendarDate,
+  formatDate,
+  formatNumber,
+} from "@/lib/format";
 import { useGetCompanyDashboardQuery } from "@/features/companies";
 import { useGetCurrentUserQuery } from "@/services/authApi";
 import { CompanyAdminShell } from "@/features/companies/CompanyAdminShell";
@@ -89,6 +97,7 @@ function DashboardContent({ companyId }: { companyId: string }) {
     { refetchOnMountOrArgChange: true },
   );
   const { data: user } = useGetCurrentUserQuery();
+  const timeZone = useUserTimeZone();
   const displayName = user
     ? `${user.firstName} ${user.lastName}`.trim()
     : "Company Administrator";
@@ -103,10 +112,8 @@ function DashboardContent({ companyId }: { companyId: string }) {
               Company Administrator
             </Badge>
           </div>
-          <h1 className="font-heading text-2xl font-semibold tracking-tight sm:text-3xl">
-            Welcome, {displayName}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="type-page-title">Welcome, {displayName}</h1>
+          <p className="mt-1 type-lead">
             A current view of your company’s team and contract portfolio.
           </p>
         </div>
@@ -175,7 +182,7 @@ function DashboardContent({ companyId }: { companyId: string }) {
                 </CardHeader>
                 <CardContent>
                   <p className="font-heading text-3xl font-semibold tabular-nums">
-                    {data.summary[key].toLocaleString()}
+                    {formatNumber(data.summary[key])}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {key === "expiringContractCount"
@@ -194,7 +201,7 @@ function DashboardContent({ companyId }: { companyId: string }) {
             <Card>
               <CardHeader>
                 <CardTitle>
-                  <h2 className="text-lg">Contracts expiring soon</h2>
+                  <h2>Contracts expiring soon</h2>
                 </CardTitle>
                 <CardDescription>
                   Active contracts ending in the next {data.expiryWindowDays}{" "}
@@ -207,7 +214,7 @@ function DashboardContent({ companyId }: { companyId: string }) {
                     {data.expiringContracts.map((contract) => (
                       <li
                         key={contract.id}
-                        className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                        className="grid gap-2 py-3 first:pt-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-4"
                       >
                         <div className="min-w-0">
                           <Link
@@ -220,10 +227,8 @@ function DashboardContent({ companyId }: { companyId: string }) {
                             {contract.referenceNumber}
                           </p>
                         </div>
-                        <div className="flex shrink-0 flex-col items-end gap-1">
-                          <Badge variant="outline" className="capitalize">
-                            {contract.status}
-                          </Badge>
+                        <div className="flex flex-col items-start gap-1 sm:items-end sm:text-end">
+                          <StatusBadge status={contract.status} />
                           <span className="text-xs text-muted-foreground">
                             {daysUntil(contract.endDate)}
                           </span>
@@ -231,7 +236,7 @@ function DashboardContent({ companyId }: { companyId: string }) {
                             className="text-xs text-muted-foreground"
                             dateTime={contract.endDate ?? undefined}
                           >
-                            {formatDate(contract.endDate)}
+                            {formatEndDate(contract.endDate)}
                           </time>
                         </div>
                       </li>
@@ -250,7 +255,7 @@ function DashboardContent({ companyId }: { companyId: string }) {
             <Card>
               <CardHeader>
                 <CardTitle>
-                  <h2 className="text-lg">Recently updated contracts</h2>
+                  <h2>Recently updated contracts</h2>
                 </CardTitle>
                 <CardDescription>
                   Contracts updated in the last 30 days, newest first.
@@ -262,7 +267,7 @@ function DashboardContent({ companyId }: { companyId: string }) {
                     {data.recentlyUpdatedContracts.map((contract) => (
                       <li
                         key={contract.id}
-                        className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                        className="grid gap-2 py-3 first:pt-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-4"
                       >
                         <div className="min-w-0">
                           <Link
@@ -275,18 +280,20 @@ function DashboardContent({ companyId }: { companyId: string }) {
                             {contract.referenceNumber}
                           </p>
                         </div>
-                        <div className="flex shrink-0 flex-col items-end gap-1">
-                          <Badge variant="outline" className="capitalize">
-                            {contract.status}
-                          </Badge>
+                        <div className="flex flex-col items-start gap-1 sm:items-end sm:text-end">
+                          <StatusBadge status={contract.status} />
                           <time
                             className="text-xs text-muted-foreground"
                             dateTime={contract.updatedAt}
                           >
-                            Updated {formatTimestamp(contract.updatedAt)}
+                            Updated{" "}
+                            {formatDate(contract.updatedAt, {
+                              timeZone,
+                              fallback: "Date not available",
+                            })}
                           </time>
                           <span className="text-xs text-muted-foreground">
-                            End date: {formatDate(contract.endDate)}
+                            End date: {formatEndDate(contract.endDate)}
                           </span>
                         </div>
                       </li>
@@ -304,7 +311,7 @@ function DashboardContent({ companyId }: { companyId: string }) {
           <Card>
             <CardHeader>
               <CardTitle>
-                <h2 className="text-lg">Quick actions</h2>
+                <h2>Quick actions</h2>
               </CardTitle>
               <CardDescription>
                 Shortcuts to company and contract workflows.
@@ -336,7 +343,7 @@ function DashboardContent({ companyId }: { companyId: string }) {
             <Card>
               <CardHeader>
                 <CardTitle>
-                  <h2 className="text-lg">Company profile</h2>
+                  <h2>Company profile</h2>
                 </CardTitle>
                 <CardDescription>
                   Company information currently registered with ContractFlow.
@@ -381,14 +388,14 @@ function DashboardContent({ companyId }: { companyId: string }) {
             <Card>
               <CardHeader>
                 <CardTitle>
-                  <h2 className="text-lg">Your access</h2>
+                  <h2>Your access</h2>
                 </CardTitle>
                 <CardDescription>
                   Permissions are determined by your current company membership.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex items-start gap-3 rounded-sm bg-muted/60 p-4">
+                <div className="flex items-start gap-3 rounded-2xl bg-muted/60 p-4">
                   <RiShieldUserLine className="mt-0.5 size-5 shrink-0 text-primary" />
                   <div>
                     <p className="text-sm font-medium">
@@ -422,35 +429,14 @@ function contractHref(contractId: string): string {
   return `/dashboards/contracts/${encodeURIComponent(contractId)}`;
 }
 
-function formatDate(value: string | null): string {
-  if (!value) return "Date not available";
-  const date = new Date(`${value.slice(0, 10)}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime())) return "Date not available";
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeZone: "UTC",
-  }).format(date);
-}
-
-function formatTimestamp(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Date not available";
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeZone: "UTC",
-  }).format(date);
+function formatEndDate(value: string | null): string {
+  return formatCalendarDate(value, { fallback: "Date not available" });
 }
 
 function daysUntil(value: string | null): string {
-  if (!value) return "End date unavailable";
-  const expiry = new Date(`${value.slice(0, 10)}T00:00:00.000Z`);
-  if (Number.isNaN(expiry.getTime())) return "End date unavailable";
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
-  const remaining = Math.max(
-    0,
-    Math.ceil((expiry.getTime() - today.getTime()) / 86400000),
-  );
+  const days = daysUntilCalendarDate(value);
+  if (days === null) return "End date unavailable";
+  const remaining = Math.max(0, days);
   return remaining === 0
     ? "Ends today"
     : `Ends in ${remaining} day${remaining === 1 ? "" : "s"}`;

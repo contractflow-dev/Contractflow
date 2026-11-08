@@ -37,12 +37,11 @@ export function AttentionItemsCard({ attention }: AttentionItemsCardProps) {
     user_verification: RiUserFollowLine,
   };
 
-  const urgencyStyles = {
-    high: "bg-destructive/10 text-destructive border-destructive/20",
-    medium:
-      "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20",
-    low: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20",
-  };
+  const urgencyBadges = {
+    high: { variant: "destructive", label: "High priority" },
+    medium: { variant: "warning", label: "Medium priority" },
+    low: { variant: "info", label: "Low priority" },
+  } as const;
 
   return (
     <Card className="flex flex-col">
@@ -93,7 +92,7 @@ export function AttentionItemsCard({ attention }: AttentionItemsCardProps) {
               return (
                 <div
                   key={item.id}
-                  className="flex items-start justify-between gap-3 rounded-lg border bg-background/50 p-3.5 transition-colors hover:bg-muted/40"
+                  className="flex items-start justify-between gap-3 rounded-2xl border bg-background/50 p-3.5 transition-colors hover:bg-muted/40"
                 >
                   <div className="flex items-start gap-3">
                     <div className="grid size-8 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground mt-0.5">
@@ -109,12 +108,10 @@ export function AttentionItemsCard({ attention }: AttentionItemsCardProps) {
                     </div>
                   </div>
                   <Badge
-                    variant="outline"
-                    className={`shrink-0 text-[10px] uppercase font-semibold ${
-                      urgencyStyles[item.urgency]
-                    }`}
+                    variant={urgencyBadges[item.urgency].variant}
+                    className="shrink-0"
                   >
-                    {item.urgency}
+                    {urgencyBadges[item.urgency].label}
                   </Badge>
                 </div>
               );

@@ -84,4 +84,64 @@ describe.each([":root", ".dark"] as const)("%s colour tokens", (selector) => {
       AA,
     );
   });
+
+  // Status badges put *-soft-foreground text on the *-soft fill, which is
+  // translucent in dark mode, so it is measured over both cards and the page.
+  it.each(["success", "warning", "info"])(
+    "keeps %s status badge text readable on its soft fill",
+    (tone) => {
+      const soft = translucentToken(selector, `${tone}-soft`);
+      for (const backdrop of [t.card!, t.background!]) {
+        const fill =
+          soft.alpha < 1 ? over(soft.color, backdrop, soft.alpha) : soft.color;
+        expect(
+          contrast(t[`${tone}-soft-foreground`]!, fill),
+        ).toBeGreaterThanOrEqual(AA);
+      }
+    },
+  );
+
+  // Destructive badges, buttons and bubbles use bg-destructive/10 (light) or
+  // /20 (dark), and their hover states /20 or /30.
+  it("keeps destructive text readable on its tinted fills, at rest and on hover", () => {
+    const alphas = selector === ":root" ? [0.1, 0.2] : [0.2, 0.3];
+    for (const alpha of alphas) {
+      for (const backdrop of [t.card!, t.background!]) {
+        const fill = over(t.destructive!, backdrop, alpha);
+        expect(
+          contrast(t["destructive-soft-foreground"]!, fill),
+        ).toBeGreaterThanOrEqual(AA);
+      }
+    }
+  });
+
+  it("keeps destructive alert text readable on cards", () => {
+    expect(contrast(t.destructive!, t.card!)).toBeGreaterThanOrEqual(AA);
+  });
+
+  it("keeps select and input values readable on the input fill", () => {
+    // Controls use bg-input/50 over cards and the page.
+    for (const backdrop of [t.card!, t.background!]) {
+      const fill = over(t.input!, backdrop, 0.5);
+      expect(contrast(t.foreground!, fill)).toBeGreaterThanOrEqual(AA);
+    }
+  });
 });
+
+/** Reads a token that may carry an alpha channel (`oklch(l c h / a)`). */
+function translucentToken(
+  selector: ":root" | ".dark",
+  name: string,
+): { color: Rgb; alpha: number } {
+  const start = css.indexOf(`${selector} {`);
+  const block = css.slice(start, css.indexOf("\n}", start));
+  const match = new RegExp(
+    `--${name}:\\s*oklch\\(([\\d.]+) ([\\d.]+) ([\\d.]+)(?: / ([\\d.]+))?\\);`,
+  ).exec(block);
+  if (!match) throw new Error(`Missing --${name} in ${selector}`);
+  const [, l, c, h, alpha] = match;
+  return {
+    color: oklchToSrgb(Number(l), Number(c), Number(h)),
+    alpha: alpha ? Number(alpha) : 1,
+  };
+}

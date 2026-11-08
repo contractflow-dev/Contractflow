@@ -7,7 +7,6 @@ import {
   ECountryCode,
 } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
-import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import {
   Card,
@@ -16,7 +15,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
-import { Field, FieldLabel } from "@workspace/ui/components/field";
 import { Input } from "@workspace/ui/components/input";
 import {
   NativeSelect,
@@ -30,7 +28,17 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components/table";
+import {
+  FormField,
+  FormGrid,
+  FormSection,
+  RequiredFieldsNote,
+} from "@/components/forms/form-field";
+import { StatusBadge } from "@/components/status-badge/status-badge";
 import { getApiErrorMessage } from "@/lib/apiError";
+import { countryName, countryOptions } from "@/lib/countries";
+import { humanizeEnumValue } from "@/lib/format";
+import { notifySuccess } from "@/lib/notify";
 import {
   useCreateContractSiteMutation,
   useGetContractLifecyclePermissionsQuery,
@@ -42,7 +50,6 @@ import {
 
 const MICRO_DEGREES = 1_000_000;
 const siteStatuses = Object.values(EContractSiteStatus);
-const countryCodes = Object.values(ECountryCode).sort();
 
 /** Converts decimal degrees to the integer micro-degrees the API stores. */
 export function toMicroDegrees(value: string): number {
@@ -148,14 +155,14 @@ export function ContractSiteManagement({
                     </TableCell>
                     <TableCell>
                       {site.addressLine1}, {site.city}, {site.stateRegion},{" "}
-                      {site.countryCode}
+                      {countryName(site.countryCode)}
                     </TableCell>
                     <TableCell className="whitespace-nowrap font-mono text-xs">
                       {fromMicroDegrees(site.latitudeE6)},{" "}
                       {fromMicroDegrees(site.longitudeE6)}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{formatLabel(site.status)}</Badge>
+                      <StatusBadge status={site.status} />
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
@@ -216,108 +223,141 @@ function SiteForm({
     const result = site
       ? await updateSite({ companyId, contractId, siteId: site.id, body })
       : await createSite({ companyId, contractId, body });
-    if (!("error" in result)) onDone();
+    if (!("error" in result)) {
+      notifySuccess(site ? "Site updated" : "Site added", body.name);
+      onDone();
+    }
   }
 
   const idPrefix = site ? `site-${site.id}` : "site-new";
   return (
     <form
       onSubmit={submit}
-      className="space-y-4 rounded-lg border p-4"
+      className="space-y-6 rounded-2xl border p-4 sm:p-5"
       aria-label={site ? `Edit site ${site.name}` : "Add a site"}
     >
-      <h3 className="text-sm font-semibold">
-        {site ? `Edit ${site.name}` : "New site"}
-      </h3>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <SiteInput
-          id={`${idPrefix}-name`}
-          name="name"
-          label="Site name"
-          defaultValue={site?.name}
-          maxLength={255}
-        />
-        <SiteInput
-          id={`${idPrefix}-code`}
-          name="siteCode"
-          label="Site code"
-          defaultValue={site?.siteCode}
-          maxLength={40}
-        />
-        <SiteInput
-          id={`${idPrefix}-address`}
-          name="addressLine1"
-          label="Address"
-          defaultValue={site?.addressLine1}
-          maxLength={255}
-        />
-        <SiteInput
-          id={`${idPrefix}-city`}
-          name="city"
-          label="City"
-          defaultValue={site?.city}
-          maxLength={100}
-        />
-        <SiteInput
-          id={`${idPrefix}-region`}
-          name="stateRegion"
-          label="State / region"
-          defaultValue={site?.stateRegion}
-          maxLength={100}
-        />
-        <Field>
-          <FieldLabel htmlFor={`${idPrefix}-country`}>Country</FieldLabel>
-          <NativeSelect
-            id={`${idPrefix}-country`}
-            name="countryCode"
-            defaultValue={site?.countryCode ?? ""}
-            required
-          >
-            <NativeSelectOption value="" disabled>
-              Select a country
-            </NativeSelectOption>
-            {countryCodes.map((code) => (
-              <NativeSelectOption key={code} value={code}>
-                {code}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </Field>
-        <SiteInput
-          id={`${idPrefix}-latitude`}
-          name="latitude"
-          label="Latitude (decimal degrees)"
-          type="number"
-          step="0.000001"
-          min="-90"
-          max="90"
-          defaultValue={site ? fromMicroDegrees(site.latitudeE6) : undefined}
-        />
-        <SiteInput
-          id={`${idPrefix}-longitude`}
-          name="longitude"
-          label="Longitude (decimal degrees)"
-          type="number"
-          step="0.000001"
-          min="-180"
-          max="180"
-          defaultValue={site ? fromMicroDegrees(site.longitudeE6) : undefined}
-        />
-        <Field>
-          <FieldLabel htmlFor={`${idPrefix}-status`}>Status</FieldLabel>
-          <NativeSelect
-            id={`${idPrefix}-status`}
-            name="status"
-            defaultValue={site?.status ?? EContractSiteStatus.PLANNED}
-          >
-            {siteStatuses.map((status) => (
-              <NativeSelectOption key={status} value={status}>
-                {formatLabel(status)}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </Field>
+      <div className="space-y-1">
+        <h3 className="type-subsection-title">
+          {site ? `Edit ${site.name}` : "New site"}
+        </h3>
+        <RequiredFieldsNote />
       </div>
+
+      <FormSection legend="Site details">
+        <FormGrid columns={3}>
+          <SiteInput
+            id={`${idPrefix}-name`}
+            name="name"
+            label="Site name"
+            defaultValue={site?.name}
+            maxLength={255}
+          />
+          <SiteInput
+            id={`${idPrefix}-code`}
+            name="siteCode"
+            label="Site code"
+            description="Up to 40 characters. Saved in capital letters."
+            defaultValue={site?.siteCode}
+            maxLength={40}
+            autoCapitalize="characters"
+          />
+          <FormField id={`${idPrefix}-status`} label="Status" required>
+            {(control) => (
+              <NativeSelect
+                {...control}
+                name="status"
+                className="w-full"
+                defaultValue={site?.status ?? EContractSiteStatus.PLANNED}
+              >
+                {siteStatuses.map((status) => (
+                  <NativeSelectOption key={status} value={status}>
+                    {humanizeEnumValue(status)}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            )}
+          </FormField>
+        </FormGrid>
+      </FormSection>
+
+      <FormSection legend="Address">
+        <FormGrid columns={2}>
+          <SiteInput
+            id={`${idPrefix}-address`}
+            name="addressLine1"
+            label="Street address"
+            defaultValue={site?.addressLine1}
+            maxLength={255}
+            className="sm:col-span-2"
+          />
+          <SiteInput
+            id={`${idPrefix}-city`}
+            name="city"
+            label="City"
+            defaultValue={site?.city}
+            maxLength={100}
+          />
+          <SiteInput
+            id={`${idPrefix}-region`}
+            name="stateRegion"
+            label="State or region"
+            defaultValue={site?.stateRegion}
+            maxLength={100}
+          />
+          <FormField id={`${idPrefix}-country`} label="Country" required>
+            {(control) => (
+              <NativeSelect
+                {...control}
+                name="countryCode"
+                className="w-full"
+                defaultValue={site?.countryCode ?? ""}
+                required
+              >
+                <NativeSelectOption value="" disabled>
+                  Select a country
+                </NativeSelectOption>
+                {countryOptions.map(({ code, name }) => (
+                  <NativeSelectOption key={code} value={code}>
+                    {name}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            )}
+          </FormField>
+        </FormGrid>
+      </FormSection>
+
+      <FormSection
+        legend="Map coordinates"
+        description="Decimal degrees with up to six decimal places, for example 6.524379 and 3.379206."
+      >
+        <FormGrid columns={2}>
+          <SiteInput
+            id={`${idPrefix}-latitude`}
+            name="latitude"
+            label="Latitude"
+            description="Between -90 and 90. Negative values are south of the equator."
+            type="number"
+            inputMode="decimal"
+            step="0.000001"
+            min="-90"
+            max="90"
+            defaultValue={site ? fromMicroDegrees(site.latitudeE6) : undefined}
+          />
+          <SiteInput
+            id={`${idPrefix}-longitude`}
+            name="longitude"
+            label="Longitude"
+            description="Between -180 and 180. Negative values are west of Greenwich."
+            type="number"
+            inputMode="decimal"
+            step="0.000001"
+            min="-180"
+            max="180"
+            defaultValue={site ? fromMicroDegrees(site.longitudeE6) : undefined}
+          />
+        </FormGrid>
+      </FormSection>
       {error ? (
         <Alert variant="destructive">
           <AlertDescription>
@@ -337,24 +377,27 @@ function SiteForm({
   );
 }
 
+/** A required text or number field of the site form. */
 function SiteInput({
   id,
   label,
+  description,
+  className,
   ...props
-}: InputHTMLAttributes<HTMLInputElement> & {
+}: Omit<InputHTMLAttributes<HTMLInputElement>, "id"> & {
   id: string;
   label: string;
+  description?: string;
 }) {
   return (
-    <Field>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <Input id={id} required {...props} />
-    </Field>
+    <FormField
+      id={id}
+      label={label}
+      required
+      description={description}
+      className={className}
+    >
+      {(control) => <Input {...props} {...control} required />}
+    </FormField>
   );
-}
-
-function formatLabel(value: string): string {
-  return value
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

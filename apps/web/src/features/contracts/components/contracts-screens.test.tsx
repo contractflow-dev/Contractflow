@@ -30,6 +30,10 @@ vi.mock("./contract-site-management", () => ({
   ContractSiteManagement: () => <div>Contract site management</div>,
 }));
 
+vi.mock("@/hooks/use-user-time-zone", () => ({
+  useUserTimeZone: () => "UTC",
+}));
+
 const contractDetail: ContractDetailResponse = {
   contract: {
     id: "contract-1",
@@ -121,5 +125,65 @@ describe("ContractDetail query states", () => {
     expect(markup).toContain("Loading status history…");
     expect(markup).not.toContain("No party details are available.");
     expect(markup).not.toContain("No status changes have been recorded.");
+  });
+
+  it("formats the contract value in its currency and dates as calendar days", () => {
+    useContractDetailsMock.mockReturnValue({
+      detail: {
+        ...contractDetail,
+        contract: {
+          ...contractDetail.contract,
+          originalValueMinor: "250000000",
+          currentValueMinor: "260000050",
+          currencyCode: ECurrencyCode.EUR,
+          endDate: "2026-12-31",
+          status: EContractStatus.SUSPENDED,
+        },
+      },
+      error: undefined,
+      isLoading: false,
+      refetch: vi.fn(),
+      parties: [],
+      partiesError: undefined,
+      partiesLoading: false,
+      history: {
+        data: [
+          {
+            id: "history-1",
+            fromStatus: "draft",
+            toStatus: "active",
+            reason: "Mobilised",
+            changedAt: "2026-02-01T09:30:00.000Z",
+          },
+        ],
+        meta: {
+          totalItems: 1,
+          itemCount: 1,
+          itemsPerPage: 10,
+          totalPages: 1,
+          currentPage: 1,
+        },
+      },
+      historyError: undefined,
+      historyLoading: false,
+      historyFetching: false,
+      setHistoryPage: vi.fn(),
+      setHistoryPageSize: vi.fn(),
+    } as unknown as ReturnType<typeof useContractDetails>);
+
+    const markup = renderToStaticMarkup(
+      <ContractDetail companyId="company-1" contractId="contract-1" />,
+    );
+
+    // 250,000,000 euro cents, never shown in NGN or as raw minor units.
+    expect(markup).toMatch(/2[,.\s\u00a0]500[,.\s\u00a0]000/);
+    expect(markup).not.toContain("250000000");
+    expect(markup).toContain("€");
+    expect(markup).toMatch(/Dec 31, 2026|31 Dec 2026/);
+    expect(markup).toContain('data-status="suspended"');
+    expect(markup).toContain(">Suspended</span>");
+    expect(markup).toContain(">Draft</span>");
+    expect(markup).toContain(">Active</span>");
+    expect(markup).not.toContain(">draft<");
   });
 });

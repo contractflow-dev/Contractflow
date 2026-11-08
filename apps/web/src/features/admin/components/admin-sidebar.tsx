@@ -160,7 +160,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
               <span className="font-heading text-sm font-bold tracking-tight text-foreground leading-none">
                 ContractFlow
               </span>
-              <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mt-0.5">
+              <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground mt-0.5">
                 Platform Admin
               </span>
             </div>
@@ -184,7 +184,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
         <nav className="space-y-6 px-3 py-4 overflow-y-auto max-h-[calc(100vh-8rem)]">
           {NAVIGATION_GROUPS.map((group) => (
             <div key={group.label} className="space-y-1">
-              <h3 className="px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+              <h3 className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">
                 {group.label}
               </h3>
               <div className="space-y-0.5 pt-1">
@@ -229,7 +229,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
                       </div>
                       <Badge
                         variant="secondary"
-                        className="text-[9px] px-1.5 py-0 font-normal uppercase tracking-wider text-muted-foreground/80 bg-muted/60"
+                        className="px-1.5 font-normal text-muted-foreground"
                       >
                         Planned
                       </Badge>

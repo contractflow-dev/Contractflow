@@ -60,7 +60,7 @@ function VerifyCompanyEmailContent() {
         <div className="w-full min-w-0 max-w-md space-y-5 py-4 sm:py-6">
           {state === "verifying" ? (
             <>
-              <h1 className="text-2xl font-semibold tracking-tight">
+              <h1 className="type-page-title">
                 Verifying your company email
               </h1>
               <p role="status" className="text-sm text-muted-foreground">
@@ -69,7 +69,7 @@ function VerifyCompanyEmailContent() {
             </>
           ) : state === "verified" ? (
             <>
-              <h1 className="text-2xl font-semibold tracking-tight">
+              <h1 className="type-page-title">
                 Company email verified
               </h1>
               <p role="status" className="text-sm text-muted-foreground">
@@ -84,7 +84,7 @@ function VerifyCompanyEmailContent() {
             </>
           ) : (
             <>
-              <h1 className="text-2xl font-semibold tracking-tight">
+              <h1 className="type-page-title">
                 {token
                   ? "We couldn’t verify this link"
                   : "Verification link is incomplete"}

@@ -64,7 +64,7 @@ function VerifyEmailContent() {
             <header className="space-y-5">
               {state === "verifying" ? (
                 <>
-                  <h1 className="text-2xl font-semibold tracking-tight">
+                  <h1 className="type-page-title">
                     Verifying your email
                   </h1>
                   <p role="status" className="text-sm text-muted-foreground">
@@ -73,7 +73,7 @@ function VerifyEmailContent() {
                 </>
               ) : !token ? (
                 <>
-                  <h1 className="text-2xl font-semibold tracking-tight">
+                  <h1 className="type-page-title">
                     Verification link is incomplete
                   </h1>
                   <Alert variant="destructive" className="break-words">
@@ -93,7 +93,7 @@ function VerifyEmailContent() {
                 </>
               ) : state === "verified" ? (
                 <>
-                  <h1 className="text-2xl font-semibold tracking-tight">
+                  <h1 className="type-page-title">
                     Email verified
                   </h1>
                   <p role="status" className="text-sm text-muted-foreground">
@@ -108,7 +108,7 @@ function VerifyEmailContent() {
                 </>
               ) : (
                 <>
-                  <h1 className="text-2xl font-semibold tracking-tight">
+                  <h1 className="type-page-title">
                     We couldn’t verify this link
                   </h1>
                   <Alert variant="destructive" className="break-words">

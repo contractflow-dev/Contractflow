@@ -76,7 +76,7 @@ function InvitationContent() {
       <Card className="w-full max-w-lg">
         <CardHeader>
           <p className="text-sm font-semibold text-primary">ContractFlow</p>
-          <CardTitle role="heading" aria-level={1} className="text-2xl font-semibold tracking-tight">
+          <CardTitle role="heading" aria-level={1} className="type-page-title">
             Company invitation
           </CardTitle>
           <CardDescription>

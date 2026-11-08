@@ -11,6 +11,7 @@ import {
 } from "@remixicon/react";
 import { Badge } from "@workspace/ui/components/badge";
 import { Card } from "@workspace/ui/components/card";
+import { formatNumber } from "@/lib/format";
 import type { IAdminOverviewResponse } from "@contractflow/contracts-schema";
 
 interface OverviewKpiGridProps {
@@ -35,7 +36,7 @@ export function OverviewKpiGrid({ data }: OverviewKpiGridProps) {
         <div className="mt-4">
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-bold tracking-tight text-foreground">
-              {companies.total.toLocaleString()}
+              {formatNumber(companies.total)}
             </span>
             {companies.newThisMonth > 0 && (
               <Badge variant="secondary" className="text-xs font-normal">
@@ -67,7 +68,7 @@ export function OverviewKpiGrid({ data }: OverviewKpiGridProps) {
         <div className="mt-4">
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-bold tracking-tight text-foreground">
-              {users.total.toLocaleString()}
+              {formatNumber(users.total)}
             </span>
             <Badge variant="outline" className="gap-1 text-xs">
               <RiShieldUserLine className="size-3 text-brand" />
@@ -100,7 +101,7 @@ export function OverviewKpiGrid({ data }: OverviewKpiGridProps) {
         <div className="mt-4">
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-bold tracking-tight text-foreground">
-              {contracts.total.toLocaleString()}
+              {formatNumber(contracts.total)}
             </span>
             {contracts.expiringSoon > 0 ? (
               <Badge variant="destructive" className="gap-1 text-xs">
@@ -139,7 +140,7 @@ export function OverviewKpiGrid({ data }: OverviewKpiGridProps) {
         <div className="mt-4">
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-bold tracking-tight text-foreground">
-              {invitations.total.toLocaleString()}
+              {formatNumber(invitations.total)}
             </span>
             {invitations.pending > 0 && (
               <Badge variant="secondary" className="gap-1 text-xs font-medium text-amber-700 dark:text-amber-400">

@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import { getApiErrorMessage, getApiErrorStatus } from "@/lib/apiError";
+import { formatDateTime } from "@/lib/format";
 import { useGetCurrentUserQuery } from "@/services/authApi";
 import {
   useGetPublicContractPartyInvitationQuery,
@@ -74,7 +75,7 @@ export function ContractPartyInvitationResponse({
         <CardHeader>
           <p className="text-sm font-semibold text-primary">ContractFlow</p>
           <CardTitle>
-            <h1 className="mt-2 text-2xl">Company contract invitation</h1>
+            <h1 className="mt-2 type-page-title">Company contract invitation</h1>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -110,7 +111,7 @@ export function ContractPartyInvitationResponse({
                 </p>
                 <p className="text-muted-foreground">
                   A Company Administrator for the invited company must respond.
-                  Expires {new Date(invitation.expiresAt).toLocaleString()}.
+                  Expires {formatDateTime(invitation.expiresAt)}.
                 </p>
               </div>
               {isSignedOut ? (

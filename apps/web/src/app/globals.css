@@ -64,6 +64,14 @@
   --color-success-soft: var(--success-soft);
   --color-warning: var(--warning);
   --color-warning-soft: var(--warning-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  /* Text on the matching *-soft fill (status badges): 4.5:1 or better. */
+  --color-success-soft-foreground: var(--success-soft-foreground);
+  --color-warning-soft-foreground: var(--warning-soft-foreground);
+  --color-info-soft-foreground: var(--info-soft-foreground);
+  /* Text on destructive tints (bg-destructive/10–30): badges, buttons. */
+  --color-destructive-soft-foreground: var(--destructive-soft-foreground);
 
   /* Department workspaces */
   --color-dept-contractor: var(--dept-contractor);
@@ -88,7 +96,10 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Radius (inputs and buttons = rounded-md ≈ 8px) */
+  /* Radius, from --radius (4px). Conventions used by the shared components:
+   *   controls: buttons, inputs, selects, badges, menus, popovers = rounded-2xl (≈7px)
+   *   surfaces: cards, dialogs, alert dialogs = min(radius-4xl, 24px) (≈10px)
+   *   pills: avatars and status dots = rounded-full */
   --radius-sm: calc(var(--radius) * 0.8);
   --radius-md: calc(var(--radius) * 1.1);
   --radius-lg: var(--radius);
@@ -135,6 +146,14 @@
   --success-soft: oklch(0.955 0.017 159.1); /* #e7f4ec */
   --warning: oklch(0.626 0.125 70.4); /* #b7791f */
   --warning-soft: oklch(0.966 0.032 87.3); /* #fdf3dc */
+  --info: oklch(0.55 0.13 251.4); /* #2e74ba */
+  --info-soft: oklch(0.955 0.02 250); /* #e6f2fe */
+  --success-soft-foreground: oklch(0.42 0.09 154.4); /* #1a5b36 */
+  --warning-soft-foreground: oklch(0.45 0.1 60); /* #7d460b */
+  --info-soft-foreground: oklch(0.42 0.11 255); /* #1d4d87 */
+  /* Same hue as --destructive, darker: 4.9:1 or better on its 10% fill and
+     20% hover fill, over cards and the page. #d92d20 was 3.3–4.2:1. */
+  --destructive-soft-foreground: oklch(0.48 0.17 28); /* #a9231e */
 
   --dept-contractor: oklch(0.647 0.171 42.8); /* #e06328 */
   --dept-client-pm: oklch(0.641 0.131 251.4); /* #4a90d9 */
@@ -197,6 +216,14 @@
   --success-soft: oklch(0.529 0.106 154.4 / 0.18); /* #2f7d4f @0.18 */
   --warning: oklch(0.774 0.141 78.1); /* #e6a93b */
   --warning-soft: oklch(0.626 0.125 70.4 / 0.18); /* #b7791f @0.18 */
+  --info: oklch(0.715 0.112 249.6); /* #6aa8e6 */
+  --info-soft: oklch(0.641 0.131 251.4 / 0.18); /* #4a90d9 @0.18 */
+  --success-soft-foreground: oklch(0.8 0.12 156); /* #78d59d */
+  --warning-soft-foreground: oklch(0.83 0.13 80); /* #f3bd5c */
+  --info-soft-foreground: oklch(0.8 0.09 250); /* #91c3f6 */
+  /* Lighter than --destructive: 5.5:1 or better on its 20% fill and 30%
+     hover fill. #f27066 was 3.8:1 on the hover fill. */
+  --destructive-soft-foreground: oklch(0.8 0.11 25); /* #fda19a */
 
   --dept-contractor: oklch(0.704 0.159 43.6); /* #ef7a45 */
   --dept-client-pm: oklch(0.715 0.112 249.6); /* #6aa8e6 */
@@ -263,5 +290,50 @@
   textarea::placeholder {
     color: var(--muted-foreground);
     opacity: 1;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────
+ * Typography scale
+ *
+ * One class per text role, so headings and supporting text read the same
+ * on every screen. Card titles use <CardTitle>, form labels <FieldLabel>,
+ * helper text <FieldDescription>, and table text the <Table> primitives.
+ * ─────────────────────────────────────────────────────────────── */
+
+/* The h1/h2 at the top of a screen or auth form. Same size on every viewport. */
+@utility type-page-title {
+  @apply font-heading text-2xl leading-tight font-semibold tracking-tight text-balance;
+}
+
+/* A heading that groups several cards or a table within a screen. */
+@utility type-section-title {
+  @apply font-heading text-lg leading-snug font-semibold tracking-tight;
+}
+
+/* A heading inside a card or form section, below the card title. */
+@utility type-subsection-title {
+  @apply font-heading text-sm leading-snug font-semibold;
+}
+
+/* The small label above a page title, such as "Company administration". */
+@utility type-eyebrow {
+  @apply text-sm font-medium text-primary;
+}
+
+/* The paragraph under a page or section title. */
+@utility type-lead {
+  @apply text-sm leading-6 text-muted-foreground;
+}
+
+/* Respect reduced-motion preferences for the app's own transitions. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

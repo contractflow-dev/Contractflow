@@ -2,9 +2,9 @@ import { z } from "zod";
 
 export const registerSchema = z
   .object({
-    firstName: z.string().trim().min(1, "Required").max(100),
+    firstName: z.string().trim().min(1, "Enter your first name").max(100),
     middleName: z.string().trim().max(100).optional(),
-    lastName: z.string().trim().min(1, "Required").max(100),
+    lastName: z.string().trim().min(1, "Enter your last name").max(100),
     email: z.string().trim().email("Enter a valid email").max(254),
     phone: z.string().trim().max(100).optional(),
     timezone: z.string().min(1, "Select a timezone"),

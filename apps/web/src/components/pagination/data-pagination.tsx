@@ -72,6 +72,9 @@ export function DataPagination({
             <NativeSelect
               id={pageSizeId}
               size="sm"
+              // The row's muted text colour would otherwise reach the
+              // selected value (4.1:1 on the input fill).
+              className="text-foreground"
               value={String(meta.itemsPerPage)}
               disabled={isFetching}
               onChange={(event) => onPageSizeChange(Number(event.target.value))}

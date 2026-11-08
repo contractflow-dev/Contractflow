@@ -52,7 +52,8 @@ export function RequireAuth({ children }: { children: ReactNode }) {
             <Button
               type="button"
               onClick={() => void refetch()}
-              className="h-11 w-full"
+              size="xl"
+              className="w-full"
             >
               Try again
             </Button>

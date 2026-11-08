@@ -91,6 +91,23 @@ describe("ConfirmDialog", () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
+  it("shows why the last attempt failed and keeps the actions available", () => {
+    const markup = renderDialog({
+      error: "You do not have permission to perform this action.",
+    });
+
+    expect(markup).toContain('role="alert"');
+    expect(markup).toContain(
+      "You do not have permission to perform this action.",
+    );
+    expect(markup).not.toMatch(/\sdisabled=""/);
+  });
+
+  it("uses the destructive treatment for destructive actions", () => {
+    expect(renderDialog({ destructive: true })).toContain("text-destructive");
+    expect(renderDialog({})).not.toContain("text-destructive");
+  });
+
   it("renders nothing when closed", () => {
     expect(renderDialog({ open: false })).toBe("");
   });
