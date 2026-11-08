@@ -8,20 +8,21 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
-import {
-  Field,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from "@workspace/ui/components/field";
+import { FieldGroup } from "@workspace/ui/components/field";
 import { Input } from "@workspace/ui/components/input";
+import { FormField } from "@/components/forms/form-field";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { useLoginMutation } from "@/services/authApi";
 import { HeroMetrics } from "@/components/auth/HeroMetrics";
 import { AuthTopBar } from "@/components/auth/authTopBar";
 
 const loginSchema = z.object({
-  email: z.string().trim().toLowerCase().max(254).pipe(z.email()),
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .max(254)
+    .pipe(z.email("Enter a valid email address")),
   password: z.string().min(1, "Enter your password"),
 });
 type LoginValues = z.infer<typeof loginSchema>;
@@ -71,7 +72,7 @@ export function LoginView() {
         <div className="flex flex-1 items-center justify-center p-4 sm:p-6 lg:p-10">
           <div className="w-full min-w-0 max-w-md space-y-6 py-4 sm:py-6">
             <header className="space-y-2">
-              <h1 className="text-2xl font-semibold tracking-tight">
+              <h1 className="type-page-title">
                 Welcome back
               </h1>
               <p className="text-sm text-muted-foreground">
@@ -94,42 +95,39 @@ export function LoginView() {
                     </AlertDescription>
                   </Alert>
                 )}
-                <Field data-invalid={!!errors.email}>
-                  <FieldLabel htmlFor="login-email">Email</FieldLabel>
-                  <Input
-                    id="login-email"
-                    type="email"
-                    autoComplete="email"
-                    aria-invalid={!!errors.email}
-                    className="h-11 rounded-md"
-                    {...register("email")}
-                  />
-                  {errors.email && (
-                    <FieldError className="break-words text-xs">
-                      {errors.email.message}
-                    </FieldError>
+                <FormField
+                  id="login-email"
+                  label="Email"
+                  error={errors.email?.message}
+                >
+                  {(control) => (
+                    <Input
+                      {...control}
+                      type="email"
+                      autoComplete="email"
+                      {...register("email")}
+                    />
                   )}
-                </Field>
-                <Field data-invalid={!!errors.password}>
-                  <FieldLabel htmlFor="login-password">Password</FieldLabel>
-                  <Input
-                    id="login-password"
-                    type="password"
-                    autoComplete="current-password"
-                    aria-invalid={!!errors.password}
-                    className="h-11 rounded-md"
-                    {...register("password")}
-                  />
-                  {errors.password && (
-                    <FieldError className="break-words text-xs">
-                      {errors.password.message}
-                    </FieldError>
+                </FormField>
+                <FormField
+                  id="login-password"
+                  label="Password"
+                  error={errors.password?.message}
+                >
+                  {(control) => (
+                    <Input
+                      {...control}
+                      type="password"
+                      autoComplete="current-password"
+                      {...register("password")}
+                    />
                   )}
-                </Field>
+                </FormField>
                 <Button
                   type="submit"
                   disabled={isSubmitting}
-                  className="h-11 w-full rounded-md"
+                  size="xl"
+                  className="w-full"
                 >
                   {isSubmitting ? "Signing in…" : "Sign in"}
                 </Button>

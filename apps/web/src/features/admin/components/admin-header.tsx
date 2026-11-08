@@ -68,7 +68,7 @@ export function AdminHeader({ onToggleMobileNav }: AdminHeaderProps) {
             <span className="text-xs font-semibold leading-none text-foreground">
               {displayName}
             </span>
-            <span className="text-[10px] text-muted-foreground mt-0.5 max-w-[140px] truncate">
+            <span className="text-xs text-muted-foreground mt-0.5 max-w-[140px] truncate">
               {user?.email}
             </span>
           </div>

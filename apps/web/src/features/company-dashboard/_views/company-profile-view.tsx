@@ -9,14 +9,13 @@ import { countryCodes, countryOptions } from "@/lib/countries";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent } from "@workspace/ui/components/card";
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from "@workspace/ui/components/field";
 import { Input } from "@workspace/ui/components/input";
+import {
+  FormField,
+  FormGrid,
+  FormSection,
+  RequiredFieldsNote,
+} from "@/components/forms/form-field";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -25,54 +24,94 @@ import { Separator } from "@workspace/ui/components/separator";
 import { useUpdateCompanyProfileMutation } from "@/features/companies";
 import type { ICompanyProfileResponse } from "@contractflow/contracts-schema";
 import { getApiErrorMessage } from "@/lib/apiError";
+import { notifySuccess } from "@/lib/notify";
 import { CompanyAdminShell } from "@/features/companies/CompanyAdminShell";
 import { CompanyVerificationNotice } from "@/features/companies/company-verification-notice";
 
 const profileSchema = z.object({
   name: z.string().trim().min(1, "Company name is required").max(255),
   legalName: z.string().trim().min(1, "Legal name is required").max(255),
-  registrationNumber: z.string().trim().min(1).max(64),
-  taxIdentificationNumber: z.string().trim().min(1).max(64),
+  registrationNumber: z
+    .string()
+    .trim()
+    .min(1, "Registration number is required")
+    .max(64),
+  taxIdentificationNumber: z
+    .string()
+    .trim()
+    .min(1, "Tax identification number is required")
+    .max(64),
   email: z
     .string()
     .trim()
     .toLowerCase()
     .max(254)
     .pipe(z.email("Enter a valid email")),
-  phoneNumber: z.string().trim().min(1).max(20),
+  phoneNumber: z.string().trim().min(1, "Phone number is required").max(20),
   website: z.union([z.literal(""), z.string().trim().url("Enter a valid URL")]),
-  addressLine1: z.string().trim().min(1).max(255),
+  addressLine1: z.string().trim().min(1, "Address is required").max(255),
   addressLine2: z.string().trim().max(255),
-  city: z.string().trim().min(1).max(100),
-  stateRegion: z.string().trim().min(1).max(100),
-  postalCode: z.string().trim().min(1).max(20),
+  city: z.string().trim().min(1, "City is required").max(100),
+  stateRegion: z.string().trim().min(1, "State or region is required").max(100),
+  postalCode: z.string().trim().min(1, "Postal code is required").max(20),
   countryCode: z.enum(countryCodes, { message: "Select a country" }),
   defaultCurrencyCode: z.enum(
     Object.values(ECurrencyCode) as [ECurrencyCode, ...ECurrencyCode[]],
+    { message: "Select a currency" },
   ),
 });
 
 type ProfileValues = z.infer<typeof profileSchema>;
 
-const fields: Array<{
-  key: keyof ProfileValues;
+type TextFieldKey = Exclude<
+  keyof ProfileValues,
+  "countryCode" | "defaultCurrencyCode"
+>;
+
+interface ProfileTextField {
+  key: TextFieldKey;
   label: string;
+  /** Matches the schema: every field is required unless marked optional. */
+  optional?: boolean;
+  type?: "email" | "tel" | "url";
   autoComplete?: string;
   description?: string;
-}> = [
+  className?: string;
+}
+
+const organizationFields: ProfileTextField[] = [
   { key: "name", label: "Company name", autoComplete: "organization" },
-  { key: "legalName", label: "Legal name", autoComplete: "organization" },
+  {
+    key: "legalName",
+    label: "Legal name",
+    autoComplete: "organization",
+    description: "The name the company is registered under.",
+  },
   { key: "registrationNumber", label: "Registration number" },
   { key: "taxIdentificationNumber", label: "Tax identification number" },
+];
+
+const contactFields: ProfileTextField[] = [
   {
     key: "email",
     label: "Company email",
+    type: "email",
     autoComplete: "email",
     description:
       "Other companies invite you to contracts at this address. A new address must be verified again.",
+    className: "sm:col-span-2",
   },
-  { key: "phoneNumber", label: "Phone number", autoComplete: "tel" },
-  { key: "website", label: "Website", autoComplete: "url" },
+  { key: "phoneNumber", label: "Phone number", type: "tel", autoComplete: "tel" },
+  {
+    key: "website",
+    label: "Website",
+    optional: true,
+    type: "url",
+    autoComplete: "url",
+  },
+];
+
+const addressFields: ProfileTextField[] = [
   {
     key: "addressLine1",
     label: "Address line 1",
@@ -81,6 +120,7 @@ const fields: Array<{
   {
     key: "addressLine2",
     label: "Address line 2",
+    optional: true,
     autoComplete: "address-line2",
   },
   { key: "city", label: "City", autoComplete: "address-level2" },
@@ -109,13 +149,9 @@ function ProfileContent({ company }: { company: ICompanyProfileResponse }) {
   return (
     <section className="mx-auto max-w-4xl space-y-6">
       <header>
-        <p className="text-sm font-medium text-primary">
-          Company administration
-        </p>
-        <h2 className="mt-1 font-heading text-2xl font-semibold tracking-tight">
-          Company profile
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="type-eyebrow">Company administration</p>
+        <h2 className="mt-1 type-page-title">Company profile</h2>
+        <p className="mt-1 type-lead">
           Update the registered company and contact details.
         </p>
       </header>
@@ -127,7 +163,6 @@ function ProfileContent({ company }: { company: ICompanyProfileResponse }) {
 function ProfileForm({ company }: { company: ICompanyProfileResponse }) {
   const [updateProfile, { isLoading }] = useUpdateCompanyProfileMutation();
   const [submitError, setSubmitError] = useState("");
-  const [saved, setSaved] = useState(false);
   const {
     register,
     handleSubmit,
@@ -155,11 +190,10 @@ function ProfileForm({ company }: { company: ICompanyProfileResponse }) {
 
   async function save(values: ProfileValues) {
     setSubmitError("");
-    setSaved(false);
     try {
       await updateProfile({ companyId: company.id, data: values }).unwrap();
       reset(values);
-      setSaved(true);
+      notifySuccess("Company profile updated");
     } catch (error) {
       setSubmitError(
         getApiErrorMessage(error, "Company profile could not be saved."),
@@ -167,72 +201,103 @@ function ProfileForm({ company }: { company: ICompanyProfileResponse }) {
     }
   }
 
+  function textFields(list: ProfileTextField[]) {
+    return list.map(
+      ({ key, label, optional, type, autoComplete, description, className }) => (
+        <FormField
+          key={key}
+          id={`profile-${key}`}
+          label={label}
+          required={!optional}
+          optional={optional}
+          description={description}
+          error={errors[key]?.message}
+          className={className}
+        >
+          {(control) => (
+            <Input
+              {...control}
+              {...register(key)}
+              type={type}
+              autoComplete={autoComplete}
+            />
+          )}
+        </FormField>
+      ),
+    );
+  }
+
   return (
     <Card>
       <CardContent>
-        <form onSubmit={handleSubmit(save)} noValidate className="space-y-6">
+        <form
+          onSubmit={handleSubmit(save)}
+          noValidate
+          aria-label="Company profile"
+          className="space-y-6"
+        >
           {submitError && (
             <Alert variant="destructive">
               <AlertDescription>{submitError}</AlertDescription>
             </Alert>
           )}
-          {saved && (
-            <Alert role="status">
-              <AlertDescription>Company profile updated.</AlertDescription>
-            </Alert>
-          )}
-          <FieldGroup className="grid gap-4 sm:grid-cols-2">
-            {fields.map(({ key, label, autoComplete, description }) => (
-              <Field key={key} data-invalid={Boolean(errors[key])}>
-                <FieldLabel htmlFor={`profile-${key}`}>{label}</FieldLabel>
-                <Input
-                  id={`profile-${key}`}
-                  {...register(key)}
-                  autoComplete={autoComplete}
-                  aria-invalid={Boolean(errors[key])}
-                />
-                {description && (
-                  <FieldDescription>{description}</FieldDescription>
-                )}
-                <FieldError>{errors[key]?.message}</FieldError>
-              </Field>
-            ))}
-            <Field data-invalid={Boolean(errors.countryCode)}>
-              <FieldLabel htmlFor="profile-countryCode">Country</FieldLabel>
-              <NativeSelect
+          <RequiredFieldsNote />
+
+          <FormSection legend="Organization information">
+            <FormGrid columns={2}>{textFields(organizationFields)}</FormGrid>
+          </FormSection>
+
+          <FormSection legend="Contact information">
+            <FormGrid columns={2}>{textFields(contactFields)}</FormGrid>
+          </FormSection>
+
+          <FormSection legend="Business address and currency">
+            <FormGrid columns={2}>
+              {textFields(addressFields)}
+              <FormField
                 id="profile-countryCode"
-                className="w-full"
-                {...register("countryCode")}
-                autoComplete="country"
-                aria-invalid={Boolean(errors.countryCode)}
+                label="Country"
+                required
+                error={errors.countryCode?.message}
               >
-                {countryOptions.map(({ code, name }) => (
-                  <NativeSelectOption key={code} value={code}>
-                    {name}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
-              <FieldError>{errors.countryCode?.message}</FieldError>
-            </Field>
-            <Field data-invalid={Boolean(errors.defaultCurrencyCode)}>
-              <FieldLabel htmlFor="profile-defaultCurrencyCode">
-                Default currency
-              </FieldLabel>
-              <NativeSelect
+                {(control) => (
+                  <NativeSelect
+                    {...control}
+                    className="w-full"
+                    {...register("countryCode")}
+                    autoComplete="country"
+                  >
+                    {countryOptions.map(({ code, name }) => (
+                      <NativeSelectOption key={code} value={code}>
+                        {name}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                )}
+              </FormField>
+              <FormField
                 id="profile-defaultCurrencyCode"
-                className="w-full"
-                {...register("defaultCurrencyCode")}
-                aria-invalid={Boolean(errors.defaultCurrencyCode)}
+                label="Default currency"
+                required
+                error={errors.defaultCurrencyCode?.message}
               >
-                {Object.values(ECurrencyCode).map((currency) => (
-                  <NativeSelectOption key={currency} value={currency}>
-                    {currency}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
-              <FieldError>{errors.defaultCurrencyCode?.message}</FieldError>
-            </Field>
-          </FieldGroup>
+                {(control) => (
+                  <NativeSelect
+                    {...control}
+                    className="w-full"
+                    {...register("defaultCurrencyCode")}
+                  >
+                    {Object.values(ECurrencyCode).map((currency) => (
+                      <NativeSelectOption key={currency} value={currency}>
+                        {currency}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                )}
+              </FormField>
+            </FormGrid>
+          </FormSection>
+
           <Separator />
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button

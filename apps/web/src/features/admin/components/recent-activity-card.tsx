@@ -24,23 +24,10 @@ import {
 } from "@workspace/ui/components/empty";
 import { Separator } from "@workspace/ui/components/separator";
 import type { IAdminRecentActivityItem } from "@contractflow/contracts-schema";
+import { formatDateTime, humanizeEnumValue } from "@/lib/format";
 
 interface RecentActivityCardProps {
   activity: IAdminRecentActivityItem[];
-}
-
-function formatDate(isoString: string): string {
-  try {
-    const date = new Date(isoString);
-    return date.toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return isoString;
-  }
 }
 
 export function RecentActivityCard({ activity }: RecentActivityCardProps) {
@@ -96,7 +83,7 @@ export function RecentActivityCard({ activity }: RecentActivityCardProps) {
                       <p className="text-xs font-medium text-foreground leading-snug">
                         {item.summary}
                       </p>
-                      <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <span className="font-medium text-foreground/80">
                           {item.actorName}
                         </span>
@@ -110,14 +97,17 @@ export function RecentActivityCard({ activity }: RecentActivityCardProps) {
                           </>
                         )}
                         <span>•</span>
-                        <Badge variant="outline" className="text-[10px] px-1.5 font-mono">
-                          {item.action}
+                        <Badge variant="outline" title={item.action}>
+                          {humanizeEnumValue(item.action)}
                         </Badge>
                       </div>
                     </div>
                   </div>
-                  <time className="shrink-0 text-[11px] font-mono text-muted-foreground">
-                    {formatDate(item.occurredAt)}
+                  <time
+                    dateTime={item.occurredAt}
+                    className="shrink-0 text-xs text-muted-foreground tabular-nums"
+                  >
+                    {formatDateTime(item.occurredAt)}
                   </time>
                 </div>
               </React.Fragment>

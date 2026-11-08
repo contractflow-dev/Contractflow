@@ -22,15 +22,13 @@ import {
 import { countryCodes, countryOptions } from "@/lib/countries";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button, buttonVariants } from "@workspace/ui/components/button";
-import {
-  Field,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-  FieldLegend,
-  FieldSet,
-} from "@workspace/ui/components/field";
 import { Input } from "@workspace/ui/components/input";
+import {
+  FormField,
+  FormGrid,
+  FormSection,
+  RequiredFieldsNote,
+} from "@/components/forms/form-field";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -40,8 +38,7 @@ import { Separator } from "@workspace/ui/components/separator";
 const currencyCodes = Object.values(ECurrencyCode);
 
 // One column in the narrow half-width panel (lg), two columns when there's room.
-const FIELD_GRID_CLASS =
-  "grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2";
+const FIELD_GRID_CLASS = "lg:grid-cols-1 xl:grid-cols-2";
 
 const companySchema = z.object({
   name: z.string().trim().min(1, "Company name is required").max(255),
@@ -137,26 +134,6 @@ function OnboardingShell({
         </div>
       </aside>
     </main>
-  );
-}
-
-function CompanyField({
-  id,
-  label,
-  error,
-  children,
-}: {
-  id: string;
-  label: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Field data-invalid={!!error} className="gap-1.5">
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      {children}
-      <FieldError>{error}</FieldError>
-    </Field>
   );
 }
 
@@ -261,7 +238,7 @@ export function OnboardingView() {
     return (
       <OnboardingShell>
         <div className="space-y-5">
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="type-page-title">
             {createdCompany.name} is ready
           </h1>
           <p role="status" className="text-sm leading-6 text-muted-foreground">
@@ -273,8 +250,8 @@ export function OnboardingView() {
           <Link
             href="/dashboards"
             className={buttonVariants({
-              size: "lg",
-              className: "h-11 w-full px-4",
+              size: "xl",
+              className: "w-full",
             })}
           >
             Open company dashboard
@@ -345,7 +322,7 @@ export function OnboardingView() {
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Company setup
         </p>
-        <h1 className="text-2xl font-semibold tracking-tight">
+        <h1 className="type-page-title">
           Create your company
         </h1>
         <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
@@ -362,210 +339,241 @@ export function OnboardingView() {
             variant="destructive"
             className="border-destructive/30 bg-destructive/10"
           >
-            <AlertDescription className="text-destructive">
+            <AlertDescription className="text-destructive-soft-foreground">
               {serverError}
             </AlertDescription>
           </Alert>
         )}
 
-        <FieldSet>
-          <FieldLegend>Company information</FieldLegend>
-          <FieldGroup className={FIELD_GRID_CLASS}>
-            <CompanyField
+        <RequiredFieldsNote />
+
+        <FormSection legend="Organization information">
+          <FormGrid className={FIELD_GRID_CLASS}>
+            <FormField
               id="name"
               label="Company name"
+              required
               error={errors.name?.message}
             >
-              <Input
-                id="name"
-                aria-invalid={!!errors.name}
-                {...register("name")}
-              />
-            </CompanyField>
-            <CompanyField
+              {(control) => (
+                <Input
+                  {...control}
+                  autoComplete="organization"
+                  {...register("name")}
+                />
+              )}
+            </FormField>
+            <FormField
               id="legalName"
               label="Legal name"
+              required
+              description="The name the company is registered under."
               error={errors.legalName?.message}
             >
-              <Input
-                id="legalName"
-                aria-invalid={!!errors.legalName}
-                {...register("legalName")}
-              />
-            </CompanyField>
-            <CompanyField
+              {(control) => <Input {...control} {...register("legalName")} />}
+            </FormField>
+            <FormField
               id="registrationNumber"
               label="Registration number"
+              required
               error={errors.registrationNumber?.message}
             >
-              <Input
-                id="registrationNumber"
-                aria-invalid={!!errors.registrationNumber}
-                {...register("registrationNumber")}
-              />
-            </CompanyField>
-            <CompanyField
+              {(control) => (
+                <Input {...control} {...register("registrationNumber")} />
+              )}
+            </FormField>
+            <FormField
               id="taxIdentificationNumber"
               label="Tax identification number"
+              required
               error={errors.taxIdentificationNumber?.message}
             >
-              <Input
-                id="taxIdentificationNumber"
-                aria-invalid={!!errors.taxIdentificationNumber}
-                {...register("taxIdentificationNumber")}
-              />
-            </CompanyField>
-            <CompanyField
+              {(control) => (
+                <Input {...control} {...register("taxIdentificationNumber")} />
+              )}
+            </FormField>
+          </FormGrid>
+        </FormSection>
+
+        <FormSection legend="Contact information">
+          <FormGrid className={FIELD_GRID_CLASS}>
+            <FormField
               id="email"
               label="Company email"
+              required
+              description="Other companies invite you to contracts at this address. You'll verify it after creating the company."
               error={errors.email?.message}
             >
-              <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                aria-invalid={!!errors.email}
-                {...register("email")}
-              />
-            </CompanyField>
-            <CompanyField
+              {(control) => (
+                <Input
+                  {...control}
+                  type="email"
+                  autoComplete="email"
+                  {...register("email")}
+                />
+              )}
+            </FormField>
+            <FormField
               id="phoneNumber"
               label="Phone number"
+              required
               error={errors.phoneNumber?.message}
             >
-              <Input
-                id="phoneNumber"
-                type="tel"
-                autoComplete="tel"
-                aria-invalid={!!errors.phoneNumber}
-                {...register("phoneNumber")}
-              />
-            </CompanyField>
-            <CompanyField
+              {(control) => (
+                <Input
+                  {...control}
+                  type="tel"
+                  autoComplete="tel"
+                  {...register("phoneNumber")}
+                />
+              )}
+            </FormField>
+            <FormField
               id="website"
               label="Website"
+              optional
+              description="Include https://, for example https://example.com."
               error={errors.website?.message}
             >
-              <Input
-                id="website"
-                type="url"
-                placeholder="https://example.com"
-                aria-invalid={!!errors.website}
-                {...register("website")}
-              />
-            </CompanyField>
-          </FieldGroup>
-        </FieldSet>
+              {(control) => (
+                <Input
+                  {...control}
+                  type="url"
+                  autoComplete="url"
+                  {...register("website")}
+                />
+              )}
+            </FormField>
+          </FormGrid>
+        </FormSection>
 
-        <FieldSet>
-          <FieldLegend>Business address</FieldLegend>
-          <FieldGroup className={FIELD_GRID_CLASS}>
-            <CompanyField
+        <FormSection legend="Business address and currency">
+          <FormGrid className={FIELD_GRID_CLASS}>
+            <FormField
               id="addressLine1"
               label="Address line 1"
+              required
               error={errors.addressLine1?.message}
             >
-              <Input
-                id="addressLine1"
-                autoComplete="address-line1"
-                aria-invalid={!!errors.addressLine1}
-                {...register("addressLine1")}
-              />
-            </CompanyField>
-            <CompanyField
+              {(control) => (
+                <Input
+                  {...control}
+                  autoComplete="address-line1"
+                  {...register("addressLine1")}
+                />
+              )}
+            </FormField>
+            <FormField
               id="addressLine2"
               label="Address line 2"
+              optional
               error={errors.addressLine2?.message}
             >
-              <Input
-                id="addressLine2"
-                autoComplete="address-line2"
-                aria-invalid={!!errors.addressLine2}
-                {...register("addressLine2")}
-              />
-            </CompanyField>
-            <CompanyField id="city" label="City" error={errors.city?.message}>
-              <Input
-                id="city"
-                autoComplete="address-level2"
-                aria-invalid={!!errors.city}
-                {...register("city")}
-              />
-            </CompanyField>
-            <CompanyField
+              {(control) => (
+                <Input
+                  {...control}
+                  autoComplete="address-line2"
+                  {...register("addressLine2")}
+                />
+              )}
+            </FormField>
+            <FormField
+              id="city"
+              label="City"
+              required
+              error={errors.city?.message}
+            >
+              {(control) => (
+                <Input
+                  {...control}
+                  autoComplete="address-level2"
+                  {...register("city")}
+                />
+              )}
+            </FormField>
+            <FormField
               id="stateRegion"
               label="State or region"
+              required
               error={errors.stateRegion?.message}
             >
-              <Input
-                id="stateRegion"
-                autoComplete="address-level1"
-                aria-invalid={!!errors.stateRegion}
-                {...register("stateRegion")}
-              />
-            </CompanyField>
-            <CompanyField
+              {(control) => (
+                <Input
+                  {...control}
+                  autoComplete="address-level1"
+                  {...register("stateRegion")}
+                />
+              )}
+            </FormField>
+            <FormField
               id="postalCode"
               label="Postal code"
+              required
               error={errors.postalCode?.message}
             >
-              <Input
-                id="postalCode"
-                autoComplete="postal-code"
-                aria-invalid={!!errors.postalCode}
-                {...register("postalCode")}
-              />
-            </CompanyField>
-            <CompanyField
+              {(control) => (
+                <Input
+                  {...control}
+                  autoComplete="postal-code"
+                  {...register("postalCode")}
+                />
+              )}
+            </FormField>
+            <FormField
               id="countryCode"
               label="Country"
+              required
               error={errors.countryCode?.message}
             >
-              <NativeSelect
-                id="countryCode"
-                autoComplete="country"
-                className="w-full"
-                aria-invalid={!!errors.countryCode}
-                {...register("countryCode")}
-              >
-                <NativeSelectOption value="">
-                  Select a country
-                </NativeSelectOption>
-                {countryOptions.map(({ code, name }) => (
-                  <NativeSelectOption key={code} value={code}>
-                    {name}
+              {(control) => (
+                <NativeSelect
+                  {...control}
+                  autoComplete="country"
+                  className="w-full"
+                  {...register("countryCode")}
+                >
+                  <NativeSelectOption value="">
+                    Select a country
                   </NativeSelectOption>
-                ))}
-              </NativeSelect>
-            </CompanyField>
-            <CompanyField
+                  {countryOptions.map(({ code, name }) => (
+                    <NativeSelectOption key={code} value={code}>
+                      {name}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              )}
+            </FormField>
+            <FormField
               id="defaultCurrencyCode"
-              label="Default currency code"
+              label="Default currency"
+              required
+              description="Filled in from the country you select. You can change it."
               error={errors.defaultCurrencyCode?.message}
             >
-              <NativeSelect
-                id="defaultCurrencyCode"
-                className="w-full"
-                aria-invalid={!!errors.defaultCurrencyCode}
-                value={defaultCurrencyCode}
-                onChange={(event) =>
-                  setValue("defaultCurrencyCode", event.target.value, {
-                    shouldValidate: true,
-                  })
-                }
-              >
-                <NativeSelectOption value="">
-                  Select a currency
-                </NativeSelectOption>
-                {currencyCodes.map((currency) => (
-                  <NativeSelectOption key={currency} value={currency}>
-                    {currency}
+              {(control) => (
+                <NativeSelect
+                  {...control}
+                  className="w-full"
+                  value={defaultCurrencyCode}
+                  onChange={(event) =>
+                    setValue("defaultCurrencyCode", event.target.value, {
+                      shouldValidate: true,
+                    })
+                  }
+                >
+                  <NativeSelectOption value="">
+                    Select a currency
                   </NativeSelectOption>
-                ))}
-              </NativeSelect>
-            </CompanyField>
-          </FieldGroup>
-        </FieldSet>
+                  {currencyCodes.map((currency) => (
+                    <NativeSelectOption key={currency} value={currency}>
+                      {currency}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              )}
+            </FormField>
+          </FormGrid>
+        </FormSection>
 
         <Separator />
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -577,9 +585,8 @@ export function OnboardingView() {
           </Link>
           <Button
             type="submit"
-            size="lg"
+            size="xl"
             disabled={isSubmitting}
-            className="h-11 px-5"
           >
             {isSubmitting ? "Creating company…" : "Create company"}
           </Button>

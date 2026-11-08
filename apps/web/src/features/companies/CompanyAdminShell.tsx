@@ -457,7 +457,7 @@ export function CompanyAdminShell({
                 <DropdownMenuTrigger
                   type="button"
                   aria-label="Open account menu"
-                  className="flex min-h-9 items-center gap-2 rounded-md border bg-background px-2 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex min-h-9 items-center gap-2 rounded-2xl border bg-background px-2 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <span className="grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
                     {initials || <RiUserLine className="size-4" />}
@@ -466,7 +466,7 @@ export function CompanyAdminShell({
                     <span className="block max-w-36 truncate text-xs font-medium">
                       {displayName}
                     </span>
-                    <span className="block max-w-36 truncate text-[11px] text-muted-foreground">
+                    <span className="block max-w-36 truncate text-xs text-muted-foreground">
                       {user?.email ?? "Your account"}
                     </span>
                   </span>
@@ -502,7 +502,7 @@ export function CompanyAdminShell({
                   href={href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-xs",
+                    "inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2 text-xs",
                     active
                       ? "bg-primary/10 font-medium text-primary"
                       : "text-muted-foreground",

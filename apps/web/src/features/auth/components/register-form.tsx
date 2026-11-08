@@ -18,11 +18,15 @@ import { Checkbox } from "@workspace/ui/components/checkbox";
 import { Input } from "@workspace/ui/components/input";
 import {
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
 } from "@workspace/ui/components/field";
+import {
+  FormField,
+  FormSection,
+  RequiredFieldsNote,
+} from "@/components/forms/form-field";
 import {
   InputGroup,
   InputGroupAddon,
@@ -42,13 +46,25 @@ import { getApiErrorMessage, getApiErrorStatus } from "@/lib/apiError";
 import { useRegisterMutation } from "@/services/authApi";
 import type { RegisterRequest } from "@/services/authApi";
 
-const labelClass =
-  "text-[11px] font-semibold uppercase tracking-wide text-muted-foreground";
-
 const nameFields = [
-  { name: "firstName", placeholder: "First name" },
-  { name: "middleName", placeholder: "Middle name (optional)" },
-  { name: "lastName", placeholder: "Last name" },
+  {
+    name: "firstName",
+    label: "First name",
+    required: true,
+    autoComplete: "given-name",
+  },
+  {
+    name: "middleName",
+    label: "Middle name",
+    required: false,
+    autoComplete: "additional-name",
+  },
+  {
+    name: "lastName",
+    label: "Last name",
+    required: true,
+    autoComplete: "family-name",
+  },
 ] as const;
 
 // The server and browser can support different time zones, so the server
@@ -156,10 +172,10 @@ export function RegisterForm() {
       className="flex flex-col gap-5"
     >
       <header className="flex flex-col gap-2">
-        <Badge variant="outline" className="w-fit text-[10px]">
+        <Badge variant="outline" className="w-fit">
           STEP 1 OF 4
         </Badge>
-        <h1 className="font-heading text-2xl font-bold">
+        <h1 className="type-page-title">
           Create your ContractFlow account
         </h1>
         <p className="text-xs text-muted-foreground">
@@ -168,60 +184,67 @@ export function RegisterForm() {
         </p>
       </header>
 
-      <FieldGroup className="gap-4">
-        <div className="flex flex-col gap-1.5">
-          <span className={labelClass}>Full name</span>
-          <div className="grid grid-cols-3 gap-2">
-            {nameFields.map(({ name, placeholder }) => (
+      <FieldGroup className="gap-5">
+        <RequiredFieldsNote />
+
+        <FormSection legend="Full name">
+          <div className="grid gap-3 sm:grid-cols-3 sm:gap-2">
+            {nameFields.map(({ name, label, required, autoComplete }) => (
               <Controller
                 key={name}
                 name={name}
                 control={form.control}
                 render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <Input
-                      {...field}
-                      value={field.value ?? ""}
-                      placeholder={placeholder}
-                      aria-label={placeholder}
-                      aria-invalid={fieldState.invalid}
-                      maxLength={100}
-                      className="text-xs"
-                    />
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
+                  <FormField
+                    id={name}
+                    label={label}
+                    required={required}
+                    optional={!required}
+                    error={fieldState.error?.message}
+                  >
+                    {(control) => (
+                      <Input
+                        {...field}
+                        {...control}
+                        value={field.value ?? ""}
+                        autoComplete={autoComplete}
+                        maxLength={100}
+                      />
                     )}
-                  </Field>
+                  </FormField>
                 )}
               />
             ))}
           </div>
-        </div>
+        </FormSection>
 
         <Controller
           name="email"
           control={form.control}
           render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="email" className={labelClass}>
-                Email * · Max 254 characters
-              </FieldLabel>
-              <InputGroup>
-                <InputGroupAddon>
-                  <RiMailLine />
-                </InputGroupAddon>
-                <InputGroupInput
-                  {...field}
-                  id="email"
-                  type="email"
-                  maxLength={254}
-                  autoComplete="email"
-                  placeholder="name@company.com"
-                  aria-invalid={fieldState.invalid}
-                />
-              </InputGroup>
-              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-            </Field>
+            <FormField
+              id="email"
+              label="Email"
+              required
+              description="We'll send a verification link to this address."
+              error={fieldState.error?.message}
+            >
+              {(control) => (
+                <InputGroup>
+                  <InputGroupAddon>
+                    <RiMailLine aria-hidden="true" />
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    {...field}
+                    {...control}
+                    type="email"
+                    maxLength={254}
+                    autoComplete="email"
+                    placeholder="name@company.com"
+                  />
+                </InputGroup>
+              )}
+            </FormField>
           )}
         />
 
@@ -229,27 +252,29 @@ export function RegisterForm() {
           name="phone"
           control={form.control}
           render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="phone" className={labelClass}>
-                Phone number · Optional · Max 100 characters
-              </FieldLabel>
-              <InputGroup>
-                <InputGroupAddon>
-                  <RiPhoneLine />
-                </InputGroupAddon>
-                <InputGroupInput
-                  {...field}
-                  value={field.value ?? ""}
-                  id="phone"
-                  type="tel"
-                  maxLength={100}
-                  autoComplete="tel"
-                  placeholder="+1 (555) 000-0000"
-                  aria-invalid={fieldState.invalid}
-                />
-              </InputGroup>
-              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-            </Field>
+            <FormField
+              id="phone"
+              label="Phone number"
+              optional
+              error={fieldState.error?.message}
+            >
+              {(control) => (
+                <InputGroup>
+                  <InputGroupAddon>
+                    <RiPhoneLine aria-hidden="true" />
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    {...field}
+                    {...control}
+                    value={field.value ?? ""}
+                    type="tel"
+                    maxLength={100}
+                    autoComplete="tel"
+                    placeholder="+1 (555) 000-0000"
+                  />
+                </InputGroup>
+              )}
+            </FormField>
           )}
         />
 
@@ -257,33 +282,36 @@ export function RegisterForm() {
           name="timezone"
           control={form.control}
           render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="timezone" className={labelClass}>
-                Timezone *
-              </FieldLabel>
-              <Select
-                name={field.name}
-                value={field.value}
-                onValueChange={(v) => field.onChange(v ?? "")}
-              >
-                <SelectTrigger
-                  id="timezone"
-                  className="w-full"
-                  aria-invalid={fieldState.invalid}
+            <FormField
+              id="timezone"
+              label="Time zone"
+              required
+              description="Detected from your browser. Dates and times are shown in this time zone."
+              error={fieldState.error?.message}
+            >
+              {(control) => (
+                <Select
+                  name={field.name}
+                  value={field.value}
+                  onValueChange={(v) => field.onChange(v ?? "")}
                 >
-                  <RiGlobalLine className="text-muted-foreground" />
-                  <SelectValue placeholder="Select timezone" />
-                </SelectTrigger>
-                <SelectContent className="max-h-72">
-                  {timezones.map((tz) => (
-                    <SelectItem key={tz} value={tz}>
-                      {tz}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-            </Field>
+                  <SelectTrigger {...control} className="w-full">
+                    <RiGlobalLine
+                      aria-hidden="true"
+                      className="text-muted-foreground"
+                    />
+                    <SelectValue placeholder="Select a time zone" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {timezones.map((tz) => (
+                      <SelectItem key={tz} value={tz}>
+                        {tz}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </FormField>
           )}
         />
 
@@ -291,22 +319,21 @@ export function RegisterForm() {
           name="password"
           control={form.control}
           render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="password" className={labelClass}>
-                Password *
-              </FieldLabel>
-              <PasswordInput
-                {...field}
-                id="password"
-                autoComplete="new-password"
-                aria-invalid={fieldState.invalid}
-              />
-              <FieldDescription className="text-[11px]">
-                12–255 characters, including a lowercase letter, uppercase
-                letter, number, and symbol.
-              </FieldDescription>
-              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-            </Field>
+            <FormField
+              id="password"
+              label="Password"
+              required
+              description="12–255 characters, including a lowercase letter, uppercase letter, number, and symbol."
+              error={fieldState.error?.message}
+            >
+              {(control) => (
+                <PasswordInput
+                  {...field}
+                  {...control}
+                  autoComplete="new-password"
+                />
+              )}
+            </FormField>
           )}
         />
 
@@ -314,18 +341,20 @@ export function RegisterForm() {
           name="confirmPassword"
           control={form.control}
           render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="confirmPassword" className={labelClass}>
-                Confirm password
-              </FieldLabel>
-              <PasswordInput
-                {...field}
-                id="confirmPassword"
-                autoComplete="new-password"
-                aria-invalid={fieldState.invalid}
-              />
-              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-            </Field>
+            <FormField
+              id="confirmPassword"
+              label="Confirm password"
+              required
+              error={fieldState.error?.message}
+            >
+              {(control) => (
+                <PasswordInput
+                  {...field}
+                  {...control}
+                  autoComplete="new-password"
+                />
+              )}
+            </FormField>
           )}
         />
 
@@ -340,6 +369,10 @@ export function RegisterForm() {
                 checked={field.value}
                 onCheckedChange={(checked) => field.onChange(checked === true)}
                 aria-invalid={fieldState.invalid}
+                aria-required
+                aria-describedby={
+                  fieldState.invalid ? "acceptTerms-error" : undefined
+                }
               />
               <FieldLabel htmlFor="acceptTerms" className="text-xs font-normal">
                 <span>
@@ -359,7 +392,9 @@ export function RegisterForm() {
                   </Link>
                 </span>
               </FieldLabel>
-              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+              {fieldState.invalid && (
+                <FieldError id="acceptTerms-error" errors={[fieldState.error]} />
+              )}
             </Field>
           )}
         />
@@ -371,7 +406,7 @@ export function RegisterForm() {
 
       <Button
         type="submit"
-        size="lg"
+        size="xl"
         className="w-full"
         disabled={form.formState.isSubmitting}
       >

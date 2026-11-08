@@ -4,7 +4,6 @@ import Link from "next/link";
 import { ContractLifecycleManagement } from "./contract-lifecycle-management";
 import { EContractStatus } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
-import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import {
   Card,
@@ -28,7 +27,24 @@ import {
   TableRow,
 } from "@workspace/ui/components/table";
 import { DataPagination } from "@/components/pagination/data-pagination";
+import {
+  ARCHIVED_STATUS,
+  StatusBadge,
+} from "@/components/status-badge/status-badge";
+import {
+  StatusLegendDisclosure,
+  type StatusLegendItem,
+} from "@/components/status-badge/status-legend";
+import { useUserTimeZone } from "@/hooks/use-user-time-zone";
 import { getApiErrorMessage } from "@/lib/apiError";
+import {
+  EMPTY_VALUE,
+  formatCalendarDate,
+  formatDateTime,
+  formatMoneyMinor,
+  humanizeEnumValue,
+} from "@/lib/format";
+import { notifySuccess } from "@/lib/notify";
 import { CreateContractForm } from "./contract-lifecycle-management";
 import { useRestoreContractMutation } from "@/services/contractApi";
 import { ContractRoleAssignmentManagement } from "./contract-role-assignment-management";
@@ -41,6 +57,32 @@ import {
 } from "../_hooks/use-contracts-list";
 
 const contractStatuses = Object.values(EContractStatus);
+
+/** What each contract status means, in the terms the lifecycle actions use. */
+const contractStatusLegend: StatusLegendItem[] = [
+  {
+    status: EContractStatus.DRAFT,
+    description: "Created and being set up. It can be activated.",
+  },
+  {
+    status: EContractStatus.ACTIVE,
+    description: "In progress. It can be suspended or completed.",
+  },
+  {
+    status: EContractStatus.SUSPENDED,
+    description: "On hold until someone resumes it.",
+  },
+  {
+    status: EContractStatus.COMPLETED,
+    description: "Finished. A completed contract can't change status again.",
+  },
+];
+
+const archivedStatusLegend: StatusLegendItem = {
+  status: ARCHIVED_STATUS,
+  description:
+    "Removed from the register. A Company Administrator can restore it.",
+};
 
 export function ContractsList({ companyId }: { companyId: string }) {
   const {
@@ -67,12 +109,8 @@ export function ContractsList({ companyId }: { companyId: string }) {
     <div className="space-y-6">
       <CreateContractForm companyId={companyId} />
       <header>
-        <h2 className="font-heading text-2xl font-semibold tracking-tight">
-          Contracts
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Contracts shared with this company.
-        </p>
+        <h2 className="type-page-title">Contracts</h2>
+        <p className="mt-1 type-lead">Contracts shared with this company.</p>
       </header>
 
       <Card>
@@ -120,7 +158,7 @@ export function ContractsList({ companyId }: { companyId: string }) {
                     key={contractStatus}
                     value={contractStatus}
                   >
-                    {formatLabel(contractStatus)}
+                    {humanizeEnumValue(contractStatus)}
                   </NativeSelectOption>
                 ))}
               </NativeSelect>
@@ -146,14 +184,25 @@ export function ContractsList({ companyId }: { companyId: string }) {
               </Button>
             </div>
           </form>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={includeDeleted}
-              onChange={(event) => setIncludeDeleted(event.target.checked)}
+          <div className="space-y-1">
+            <label className="flex min-h-7 w-fit items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="size-4 accent-primary"
+                checked={includeDeleted}
+                onChange={(event) => setIncludeDeleted(event.target.checked)}
+              />
+              Include archived contracts
+            </label>
+            <StatusLegendDisclosure
+              label="What do contract statuses mean?"
+              items={
+                includeDeleted
+                  ? [...contractStatusLegend, archivedStatusLegend]
+                  : contractStatusLegend
+              }
             />
-            Include archived contracts
-          </label>
+          </div>
 
           {error ? (
             <Alert variant="destructive">
@@ -207,16 +256,20 @@ export function ContractsList({ companyId }: { companyId: string }) {
                       )}
                     </TableCell>
                     <TableCell>{contract.title}</TableCell>
-                    <TableCell>{formatLabel(contract.contractType)}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">
-                        {contract.deletedAt
-                          ? "Archived"
-                          : formatLabel(contract.status)}
-                      </Badge>
+                      {humanizeEnumValue(contract.contractType)}
                     </TableCell>
                     <TableCell>
-                      {formatDate(contract.revisedEndDate || contract.endDate)}
+                      <StatusBadge
+                        status={
+                          contract.deletedAt ? ARCHIVED_STATUS : contract.status
+                        }
+                      />
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {formatCalendarDate(
+                        contract.revisedEndDate || contract.endDate,
+                      )}
                     </TableCell>
                     {includeDeleted ? (
                       <TableCell>
@@ -262,15 +315,28 @@ function RestoreContractButton({
   contractId: string;
 }) {
   const [restore, state] = useRestoreContractMutation();
+
+  async function restoreContract() {
+    const result = await restore({ companyId, contractId });
+    if (!("error" in result)) {
+      notifySuccess(
+        "Contract restored",
+        "It is back in the contract register. Assign roles again to give members access.",
+      );
+    }
+  }
+
   return (
     <div className="space-y-2">
       <Button
         type="button"
         variant="outline"
+        size="sm"
         disabled={state.isLoading}
-        onClick={() => void restore({ companyId, contractId })}
+        aria-busy={state.isLoading || undefined}
+        onClick={() => void restoreContract()}
       >
-        Restore
+        {state.isLoading ? "Restoring…" : "Restore"}
       </Button>
       {state.error ? (
         <p className="max-w-48 text-xs text-destructive">
@@ -289,6 +355,7 @@ export function ContractDetail({
   contractId: string;
 }) {
   const query = { companyId, contractId };
+  const timeZone = useUserTimeZone();
   const {
     detail,
     error: contractError,
@@ -361,13 +428,14 @@ export function ContractDetail({
         <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-sm text-muted-foreground">
-              {contract.referenceNumber} · {formatLabel(contract.contractType)}
+              {contract.referenceNumber} ·{" "}
+              {humanizeEnumValue(contract.contractType)}
             </p>
-            <h2 className="mt-1 font-heading text-2xl font-semibold tracking-tight">
+            <h2 className="mt-1 type-page-title break-words">
               {contract.title}
             </h2>
           </div>
-          <Badge variant="outline">{formatLabel(contract.status)}</Badge>
+          <StatusBadge status={contract.status} />
         </div>
         {contract.description ? (
           <p className="mt-3 max-w-3xl text-sm text-muted-foreground">
@@ -391,22 +459,38 @@ export function ContractDetail({
         <CardHeader>
           <CardTitle>Contract details</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <DetailValue
             label="Your party"
-            value={formatLabel(detail.membership.partyType)}
+            value={humanizeEnumValue(detail.membership.partyType)}
+          />
+          <DetailValue
+            label="Original value"
+            value={formatMoneyMinor(
+              contract.originalValueMinor,
+              contract.currencyCode,
+            )}
+          />
+          <DetailValue
+            label="Current value"
+            value={formatMoneyMinor(
+              contract.currentValueMinor,
+              contract.currencyCode,
+            )}
           />
           <DetailValue
             label="Award date"
-            value={formatDate(contract.awardDate)}
+            value={formatCalendarDate(contract.awardDate)}
           />
           <DetailValue
             label="Start date"
-            value={formatDate(contract.startDate)}
+            value={formatCalendarDate(contract.startDate)}
           />
           <DetailValue
-            label="End date"
-            value={formatDate(contract.revisedEndDate || contract.endDate)}
+            label={contract.revisedEndDate ? "Revised end date" : "End date"}
+            value={formatCalendarDate(
+              contract.revisedEndDate || contract.endDate,
+            )}
           />
         </CardContent>
       </Card>
@@ -453,11 +537,12 @@ export function ContractDetail({
                 {parties.map((party) => (
                   <TableRow key={party.id}>
                     <TableCell>{party.companyName}</TableCell>
-                    <TableCell>{formatLabel(party.partyType)}</TableCell>
-                    <TableCell>
-                      {party.signedAt
-                        ? formatDate(party.signedAt)
-                        : "Not signed"}
+                    <TableCell>{humanizeEnumValue(party.partyType)}</TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {/* Recorded as a signing date, so shown as one. */}
+                      {formatCalendarDate(party.signedAt, {
+                        fallback: "Not signed",
+                      })}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -504,12 +589,24 @@ export function ContractDetail({
                 <TableBody>
                   {history.data.map((entry) => (
                     <TableRow key={entry.id}>
-                      <TableCell>{formatDate(entry.changedAt)}</TableCell>
-                      <TableCell>
-                        {entry.fromStatus ? formatLabel(entry.fromStatus) : "—"}
+                      <TableCell className="whitespace-nowrap">
+                        <time dateTime={entry.changedAt}>
+                          {formatDateTime(entry.changedAt, { timeZone })}
+                        </time>
                       </TableCell>
-                      <TableCell>{formatLabel(entry.toStatus)}</TableCell>
-                      <TableCell>{entry.reason || "—"}</TableCell>
+                      <TableCell>
+                        {entry.fromStatus ? (
+                          <StatusBadge status={entry.fromStatus} />
+                        ) : (
+                          EMPTY_VALUE
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={entry.toStatus} />
+                      </TableCell>
+                      <TableCell className="min-w-48 whitespace-normal break-words">
+                        {entry.reason || EMPTY_VALUE}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -537,22 +634,9 @@ function DetailValue({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 text-sm font-medium">{value || "—"}</p>
+      <p className="mt-1 text-sm font-medium break-words tabular-nums">
+        {value || EMPTY_VALUE}
+      </p>
     </div>
-  );
-}
-
-function formatLabel(value: string): string {
-  return value
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function formatDate(value?: string | null): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
-    date,
   );
 }

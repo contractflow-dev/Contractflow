@@ -61,7 +61,7 @@ export function VerificationPendingView() {
               <RiMailLine className="size-6" aria-hidden="true" />
             </div>
             <div className="space-y-2">
-              <h1 className="text-2xl font-semibold tracking-tight">
+              <h1 className="type-page-title">
                 Check your inbox
               </h1>
               <p className="text-sm leading-6 text-muted-foreground">
@@ -84,7 +84,6 @@ export function VerificationPendingView() {
                   autoComplete="email"
                   required
                   maxLength={254}
-                  className="h-11"
                   placeholder="you@company.com"
                   value={emailInput}
                   onChange={(event) => setEmailInput(event.target.value)}
@@ -107,7 +106,8 @@ export function VerificationPendingView() {
                 disabled={
                   isLoading || cooldownSeconds > 0 || !emailInput.trim()
                 }
-                className="h-11 w-full"
+                size="xl"
+                className="w-full"
               >
                 {isLoading
                   ? "Sending…"

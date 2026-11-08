@@ -13,17 +13,18 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@workspace/ui/components/alert";
-import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import {
   Card,
   CardContent,
+  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
-import { Field, FieldGroup, FieldLabel } from "@workspace/ui/components/field";
+import { FieldLabel } from "@workspace/ui/components/field";
 import { Input } from "@workspace/ui/components/input";
+import { FormField, FormGrid } from "@/components/forms/form-field";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -47,13 +48,48 @@ import {
 import type { ICompanyMember } from "@contractflow/contracts-schema";
 import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
 import { DataPagination } from "@/components/pagination/data-pagination";
+import {
+  StatusBadge,
+  effectiveInvitationStatus,
+} from "@/components/status-badge/status-badge";
+import {
+  StatusLegendDisclosure,
+  type StatusLegendItem,
+} from "@/components/status-badge/status-legend";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useKeepPageInRange, usePagination } from "@/hooks/use-pagination";
+import { useUserTimeZone } from "@/hooks/use-user-time-zone";
 import { getApiErrorMessage } from "@/lib/apiError";
+import { formatDate } from "@/lib/format";
+import { notifySuccess } from "@/lib/notify";
 import { CompanyAdminShell } from "../CompanyAdminShell";
 
 const invitationRoles = Object.values(EInvitationRole);
 const memberRoles = Object.values(ECompanyRole);
+
+/** What each company invitation status means for the person invited. */
+const invitationStatusLegend: StatusLegendItem[] = [
+  {
+    status: EInvitationStatus.PENDING,
+    description: "Sent and waiting for a response. It can still be revoked.",
+  },
+  {
+    status: EInvitationStatus.ACCEPTED,
+    description: "The recipient accepted and joined the company.",
+  },
+  {
+    status: EInvitationStatus.DECLINED,
+    description: "The recipient declined the invitation.",
+  },
+  {
+    status: EInvitationStatus.EXPIRED,
+    description: "Not accepted within seven days. The link no longer works.",
+  },
+  {
+    status: EInvitationStatus.REVOKED,
+    description: "Cancelled by an administrator. The link no longer works.",
+  },
+];
 
 export function CompanyTeamView() {
   return (
@@ -76,14 +112,22 @@ function TeamContent({ companyId }: { companyId: string }) {
     setAppliedSearch(debouncedSearch);
     memberPages.resetPage();
   }
+  const timeZone = useUserTimeZone();
   const [inviteError, setInviteError] = useState("");
-  const [inviteSuccess, setInviteSuccess] = useState("");
-  const [actionError, setActionError] = useState("");
-  const [actionSuccess, setActionSuccess] = useState("");
+  // Each confirmation keeps its target open with the last failure, so a
+  // failed request stays in the dialog until it succeeds or is cancelled.
   const [pendingRoleChange, setPendingRoleChange] = useState<{
     member: ICompanyMember;
     companyRole: ECompanyRole;
   } | null>(null);
+  const [memberToRemove, setMemberToRemove] = useState<ICompanyMember | null>(
+    null,
+  );
+  const [invitationToRevoke, setInvitationToRevoke] = useState<{
+    id: string;
+    email: string;
+  } | null>(null);
+  const [dialogError, setDialogError] = useState("");
   const [busyMemberId, setBusyMemberId] = useState("");
   const [busyInvitationId, setBusyInvitationId] = useState("");
   const [email, setEmail] = useState("");
@@ -119,13 +163,13 @@ function TeamContent({ companyId }: { companyId: string }) {
   useKeepPageInRange(invitations?.meta, invitationPages.setPage);
   const [inviteMember, inviteState] = useInviteCompanyMemberMutation();
   const [changeRole, changeRoleState] = useChangeCompanyMemberRoleMutation();
-  const [removeMember] = useRemoveCompanyMemberMutation();
-  const [revokeInvitation] = useRevokeCompanyInvitationMutation();
+  const [removeMember, removeMemberState] = useRemoveCompanyMemberMutation();
+  const [revokeInvitation, revokeInvitationState] =
+    useRevokeCompanyInvitationMutation();
 
   async function submitInvitation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setInviteError("");
-    setInviteSuccess("");
     try {
       await inviteMember({
         companyId,
@@ -134,7 +178,10 @@ function TeamContent({ companyId }: { companyId: string }) {
           companyRole: role,
         },
       }).unwrap();
-      setInviteSuccess(`Invitation sent to ${email.trim()}.`);
+      notifySuccess(
+        "Invitation sent",
+        `${email.trim()} can now join the team.`,
+      );
       setEmail("");
     } catch (error) {
       setInviteError(
@@ -148,14 +195,14 @@ function TeamContent({ companyId }: { companyId: string }) {
   function requestRoleChange(member: ICompanyMember, value: string) {
     const companyRole = memberRoles.find((option) => option === value);
     if (!companyRole || companyRole === member.companyRole) return;
+    setDialogError("");
     setPendingRoleChange({ member, companyRole });
   }
 
   async function confirmRoleChange() {
     if (!pendingRoleChange || changeRoleState.isLoading) return;
     const { member, companyRole } = pendingRoleChange;
-    setActionError("");
-    setActionSuccess("");
+    setDialogError("");
     setBusyMemberId(member.id);
     try {
       await changeRole({
@@ -163,33 +210,39 @@ function TeamContent({ companyId }: { companyId: string }) {
         membershipId: member.id,
         companyRole,
       }).unwrap();
-      setActionSuccess(
+      setPendingRoleChange(null);
+      notifySuccess(
+        "Role changed",
         `${member.firstName} ${member.lastName} is now ${companyRole}.`,
       );
     } catch (error) {
-      setActionError(
+      setDialogError(
         getApiErrorMessage(error, "The member role could not be changed."),
       );
     } finally {
       setBusyMemberId("");
-      setPendingRoleChange(null);
     }
   }
 
-  async function remove(member: ICompanyMember) {
-    if (
-      !window.confirm(
-        `Remove ${member.firstName} ${member.lastName} from this company? Their user account will not be deleted.`,
-      )
-    ) {
-      return;
-    }
-    setActionError("");
+  function requestRemoval(member: ICompanyMember) {
+    setDialogError("");
+    setMemberToRemove(member);
+  }
+
+  async function confirmRemoval() {
+    if (!memberToRemove || removeMemberState.isLoading) return;
+    const member = memberToRemove;
+    setDialogError("");
     setBusyMemberId(member.id);
     try {
       await removeMember({ companyId, membershipId: member.id }).unwrap();
+      setMemberToRemove(null);
+      notifySuccess(
+        "Member removed",
+        `${member.firstName} ${member.lastName} no longer has access to this company.`,
+      );
     } catch (error) {
-      setActionError(
+      setDialogError(
         getApiErrorMessage(error, "The member could not be removed."),
       );
     } finally {
@@ -197,16 +250,28 @@ function TeamContent({ companyId }: { companyId: string }) {
     }
   }
 
-  async function revoke(invitationId: string, invitedEmail: string) {
-    if (!window.confirm(`Revoke the pending invitation for ${invitedEmail}?`)) {
-      return;
-    }
-    setActionError("");
-    setBusyInvitationId(invitationId);
+  function requestRevocation(invitationId: string, invitedEmail: string) {
+    setDialogError("");
+    setInvitationToRevoke({ id: invitationId, email: invitedEmail });
+  }
+
+  async function confirmRevocation() {
+    if (!invitationToRevoke || revokeInvitationState.isLoading) return;
+    const invitation = invitationToRevoke;
+    setDialogError("");
+    setBusyInvitationId(invitation.id);
     try {
-      await revokeInvitation({ companyId, invitationId }).unwrap();
+      await revokeInvitation({
+        companyId,
+        invitationId: invitation.id,
+      }).unwrap();
+      setInvitationToRevoke(null);
+      notifySuccess(
+        "Invitation revoked",
+        `The invitation for ${invitation.email} no longer works.`,
+      );
     } catch (error) {
-      setActionError(
+      setDialogError(
         getApiErrorMessage(error, "The invitation could not be revoked."),
       );
     } finally {
@@ -217,13 +282,9 @@ function TeamContent({ companyId }: { companyId: string }) {
   return (
     <div className="space-y-8">
       <header>
-        <p className="text-sm font-medium text-primary">
-          Company administration
-        </p>
-        <h2 className="mt-1 font-heading text-2xl font-semibold tracking-tight">
-          Team & invitations
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="type-eyebrow">Company administration</p>
+        <h2 className="mt-1 type-page-title">Team & invitations</h2>
+        <p className="mt-1 type-lead">
           Manage company memberships and invite colleagues. Removing a member
           does not delete their account.
         </p>
@@ -232,60 +293,63 @@ function TeamContent({ companyId }: { companyId: string }) {
       <Card>
         <CardHeader>
           <CardTitle>
-            <h3 className="text-lg">Invite a team member</h3>
+            <h3>Invite a team member</h3>
           </CardTitle>
+          <CardDescription>
+            We&apos;ll email a single-use invitation link that expires after
+            seven days.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form onSubmit={(event) => void submitInvitation(event)}>
-            <FieldGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <Field>
-                <FieldLabel htmlFor="invite-email">Email</FieldLabel>
-                <Input
-                  id="invite-email"
-                  required
-                  type="email"
-                  maxLength={254}
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  autoComplete="email"
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="invite-role">Company role</FieldLabel>
-                <NativeSelect
-                  id="invite-role"
-                  className="w-full"
-                  value={role}
-                  onChange={(event) =>
-                    setRole(event.target.value as EInvitationRole)
-                  }
-                >
-                  {invitationRoles.map((option) => (
-                    <NativeSelectOption key={option} value={option}>
-                      {option}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              </Field>
-              <div className="flex items-end">
-                <Button
-                  type="submit"
-                  disabled={inviteState.isLoading}
-                  className="w-full"
-                >
-                  {inviteState.isLoading ? "Sending…" : "Send invitation"}
-                </Button>
-              </div>
-            </FieldGroup>
+          <form
+            onSubmit={(event) => void submitInvitation(event)}
+            aria-label="Invite a team member"
+          >
+            <FormGrid columns={3} className="items-end">
+              <FormField id="invite-email" label="Email">
+                {(control) => (
+                  <Input
+                    {...control}
+                    required
+                    type="email"
+                    maxLength={254}
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    autoComplete="off"
+                  />
+                )}
+              </FormField>
+              <FormField id="invite-role" label="Company role">
+                {(control) => (
+                  <NativeSelect
+                    {...control}
+                    className="w-full"
+                    value={role}
+                    onChange={(event) =>
+                      setRole(event.target.value as EInvitationRole)
+                    }
+                  >
+                    {invitationRoles.map((option) => (
+                      <NativeSelectOption key={option} value={option}>
+                        {option}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                )}
+              </FormField>
+              <Button
+                type="submit"
+                disabled={inviteState.isLoading}
+                aria-busy={inviteState.isLoading || undefined}
+                className="w-full sm:w-auto lg:w-full"
+              >
+                {inviteState.isLoading ? "Sending…" : "Send invitation"}
+              </Button>
+            </FormGrid>
           </form>
           {inviteError && (
             <Alert variant="destructive">
               <AlertDescription>{inviteError}</AlertDescription>
-            </Alert>
-          )}
-          {inviteSuccess && (
-            <Alert role="status">
-              <AlertDescription>{inviteSuccess}</AlertDescription>
             </Alert>
           )}
         </CardContent>
@@ -294,9 +358,7 @@ function TeamContent({ companyId }: { companyId: string }) {
       <section className="space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h3 className="font-heading text-lg font-semibold">
-              Company members
-            </h3>
+            <h3 className="type-section-title">Company members</h3>
             <p className="text-sm text-muted-foreground">
               {members?.meta.totalItems ?? 0} membership
               {members?.meta.totalItems === 1 ? "" : "s"}
@@ -334,17 +396,6 @@ function TeamContent({ companyId }: { companyId: string }) {
             </NativeSelect>
           </div>
         </div>
-        {actionError && (
-          <Alert variant="destructive">
-            <AlertDescription>{actionError}</AlertDescription>
-          </Alert>
-        )}
-        {actionSuccess && (
-          <Alert role="status">
-            <AlertDescription>{actionSuccess}</AlertDescription>
-          </Alert>
-        )}
-
         {membersLoading ? (
           <Alert role="status">
             <AlertDescription>Loading company members…</AlertDescription>
@@ -367,7 +418,8 @@ function TeamContent({ companyId }: { companyId: string }) {
                   member={member}
                   busy={busyMemberId === member.id}
                   onRoleChange={(value) => requestRoleChange(member, value)}
-                  onRemove={() => void remove(member)}
+                  timeZone={timeZone}
+                  onRemove={() => requestRemoval(member)}
                 />
               ))}
             </div>
@@ -403,12 +455,10 @@ function TeamContent({ companyId }: { companyId: string }) {
                         />
                       </TableCell>
                       <TableCell className="px-4 py-3">
-                        <Badge variant="secondary" className="capitalize">
-                          {member.status}
-                        </Badge>
+                        <StatusBadge status={member.status} />
                       </TableCell>
                       <TableCell className="px-4 py-3">
-                        {new Date(member.joinedAt).toLocaleDateString()}
+                        {formatDate(member.joinedAt, { timeZone })}
                       </TableCell>
                       <TableCell className="px-4 py-3 text-right">
                         {member.status === ECompanyUserStatus.ACTIVE && (
@@ -416,7 +466,7 @@ function TeamContent({ companyId }: { companyId: string }) {
                             variant="outline"
                             size="sm"
                             disabled={busyMemberId === member.id}
-                            onClick={() => void remove(member)}
+                            onClick={() => requestRemoval(member)}
                           >
                             {busyMemberId === member.id ? "Saving…" : "Remove"}
                           </Button>
@@ -443,10 +493,15 @@ function TeamContent({ companyId }: { companyId: string }) {
 
       <section className="space-y-4">
         <div>
-          <h3 className="font-heading text-lg font-semibold">Invitations</h3>
-          <p className="text-sm text-muted-foreground">
-            Invitation links are single-use and expire after seven days.
+          <h3 className="type-section-title">Invitations</h3>
+          <p className="type-lead">
+            Invitations sent from this company and where each one stands.
           </p>
+          <StatusLegendDisclosure
+            className="mt-1"
+            label="What do invitation statuses mean?"
+            items={invitationStatusLegend}
+          />
         </div>
         {invitationsLoading ? (
           <Alert role="status">
@@ -492,12 +547,15 @@ function TeamContent({ companyId }: { companyId: string }) {
                       {invitation.companyRole}
                     </TableCell>
                     <TableCell className="px-4 py-3">
-                      <Badge variant="secondary" className="capitalize">
-                        {invitation.status}
-                      </Badge>
+                      <StatusBadge
+                        status={effectiveInvitationStatus(
+                          invitation.status,
+                          invitation.expiresAt,
+                        )}
+                      />
                     </TableCell>
                     <TableCell className="px-4 py-3">
-                      {new Date(invitation.expiresAt).toLocaleDateString()}
+                      {formatDate(invitation.expiresAt, { timeZone })}
                     </TableCell>
                     <TableCell className="px-4 py-3 text-right">
                       {invitation.status === EInvitationStatus.PENDING &&
@@ -507,7 +565,7 @@ function TeamContent({ companyId }: { companyId: string }) {
                             size="sm"
                             disabled={busyInvitationId === invitation.id}
                             onClick={() =>
-                              void revoke(invitation.id, invitation.email)
+                              requestRevocation(invitation.id, invitation.email)
                             }
                           >
                             {busyInvitationId === invitation.id
@@ -548,11 +606,46 @@ function TeamContent({ companyId }: { companyId: string }) {
         confirmLabel="Change role"
         pendingLabel="Changing role…"
         isPending={changeRoleState.isLoading}
+        error={pendingRoleChange ? dialogError : undefined}
         destructive={
           pendingRoleChange?.member.companyRole === ECompanyRole.COMPANY_ADMIN
         }
         onConfirm={() => void confirmRoleChange()}
         onCancel={() => setPendingRoleChange(null)}
+      />
+
+      <ConfirmDialog
+        open={memberToRemove !== null}
+        title="Remove this member?"
+        description={
+          memberToRemove
+            ? `${memberToRemove.firstName} ${memberToRemove.lastName} (${memberToRemove.email}) will lose access to this company and its contracts. Their user account is not deleted, and they can be invited again later.`
+            : ""
+        }
+        confirmLabel="Remove member"
+        pendingLabel="Removing…"
+        isPending={removeMemberState.isLoading}
+        error={memberToRemove ? dialogError : undefined}
+        destructive
+        onConfirm={() => void confirmRemoval()}
+        onCancel={() => setMemberToRemove(null)}
+      />
+
+      <ConfirmDialog
+        open={invitationToRevoke !== null}
+        title="Revoke this invitation?"
+        description={
+          invitationToRevoke
+            ? `The invitation sent to ${invitationToRevoke.email} will stop working. This can't be undone, but you can send a new invitation.`
+            : ""
+        }
+        confirmLabel="Revoke invitation"
+        pendingLabel="Revoking…"
+        isPending={revokeInvitationState.isLoading}
+        error={invitationToRevoke ? dialogError : undefined}
+        destructive
+        onConfirm={() => void confirmRevocation()}
+        onCancel={() => setInvitationToRevoke(null)}
       />
     </div>
   );
@@ -605,11 +698,13 @@ function MemberRoleSelect({
 function MemberCard({
   member,
   busy,
+  timeZone,
   onRoleChange,
   onRemove,
 }: {
   member: ICompanyMember;
   busy: boolean;
+  timeZone: string | undefined;
   onRoleChange: (value: string) => void;
   onRemove: () => void;
 }) {
@@ -621,9 +716,9 @@ function MemberCard({
         </p>
         <p className="text-xs text-muted-foreground">{member.email}</p>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Status: <span className="capitalize">{member.status}</span> · Joined{" "}
-        {new Date(member.joinedAt).toLocaleDateString()}
+      <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <StatusBadge status={member.status} />
+        <span>Joined {formatDate(member.joinedAt, { timeZone })}</span>
       </p>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <MemberRoleSelect member={member} busy={busy} onChange={onRoleChange} />

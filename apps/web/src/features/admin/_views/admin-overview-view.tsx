@@ -14,25 +14,13 @@ import {
 } from "@workspace/ui/components/alert";
 import { Separator } from "@workspace/ui/components/separator";
 import { getApiErrorMessage } from "@/lib/apiError";
+import { formatTime } from "@/lib/format";
 import { useGetAdminOverviewQuery } from "@/services/adminApi";
 import { OverviewKpiGrid } from "@/features/admin/components/overview-kpi-grid";
 import { ContractLifecycleCard } from "@/features/admin/components/contract-lifecycle-card";
 import { AttentionItemsCard } from "@/features/admin/components/attention-items-card";
 import { RecentActivityCard } from "@/features/admin/components/recent-activity-card";
 import { AdminOverviewSkeleton } from "@/features/admin/components/admin-overview-skeleton";
-
-function formatTimestamp(isoString: string): string {
-  try {
-    const d = new Date(isoString);
-    return d.toLocaleTimeString(undefined, {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-  } catch {
-    return isoString;
-  }
-}
 
 export function AdminOverviewView() {
   const { data, error, isLoading, isFetching, refetch } =
@@ -47,9 +35,7 @@ export function AdminOverviewView() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight text-foreground font-heading">
-                Platform Overview
-              </h1>
+              <h1 className="type-page-title">Platform Overview</h1>
               <Badge
                 variant="outline"
                 className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs gap-1 font-medium"
@@ -58,7 +44,7 @@ export function AdminOverviewView() {
                 Live Telemetry
               </Badge>
             </div>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+            <p className="mt-1 type-lead">
               Aggregated metrics, tenancy operations, and system-wide contract
               oversight.
             </p>
@@ -69,7 +55,7 @@ export function AdminOverviewView() {
             {data?.generatedAt && (
               <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
                 <RiTimeLine className="size-3.5" />
-                <span>Synced at {formatTimestamp(data.generatedAt)}</span>
+                <span>Synced at {formatTime(data.generatedAt)}</span>
               </div>
             )}
             <Button

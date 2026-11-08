@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { StoreProvider } from "@/store/provider";
 import { ThemeProvider } from "@/components/theme/theme-provider";
+import { AppToastProvider } from "@/components/toast/app-toast-provider";
 import { themeInitScript } from "@/components/theme/theme-script";
 
 export const metadata: Metadata = {
@@ -43,7 +44,9 @@ export default function RootLayout({
       </head>
       <body>
         <StoreProvider>
-          <ThemeProvider>{children}</ThemeProvider>
+          <ThemeProvider>
+            <AppToastProvider>{children}</AppToastProvider>
+          </ThemeProvider>
         </StoreProvider>
       </body>
     </html>

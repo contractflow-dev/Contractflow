@@ -76,7 +76,7 @@ export function LegalDocumentDialog({
           >
             Open full policy page
           </Link>
-          <DialogClose render={<Button className="h-10 px-4" />}>
+          <DialogClose render={<Button size="lg" />}>
             Close
           </DialogClose>
         </DialogFooter>

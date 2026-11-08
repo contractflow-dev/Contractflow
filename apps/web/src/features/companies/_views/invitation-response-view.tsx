@@ -17,6 +17,7 @@ import {
   useRespondToCompanyInvitationMutation,
 } from "@/features/companies";
 import { getApiErrorMessage, getApiErrorStatus } from "@/lib/apiError";
+import { formatDateTime } from "@/lib/format";
 import { useGetCurrentUserQuery } from "@/services/authApi";
 
 export function InvitationResponseView({ token }: { token: string }) {
@@ -91,7 +92,7 @@ export function InvitationResponseView({ token }: { token: string }) {
         <CardHeader>
           <p className="text-sm font-semibold text-primary">ContractFlow</p>
           <CardTitle>
-            <h1 className="mt-2 text-2xl">Company invitation</h1>
+            <h1 className="mt-2 type-page-title">Company invitation</h1>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -131,7 +132,7 @@ export function InvitationResponseView({ token }: { token: string }) {
                   <span className="font-medium">{invitation.companyRole}</span>.
                 </p>
                 <p className="text-muted-foreground">
-                  Expires {new Date(invitation.expiresAt).toLocaleString()}.
+                  Expires {formatDateTime(invitation.expiresAt)}.
                 </p>
               </div>
               {isSignedOut ? (

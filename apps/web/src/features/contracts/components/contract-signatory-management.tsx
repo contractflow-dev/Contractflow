@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import type { FormEvent } from "react";
 import { ECompanyRole } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
@@ -12,9 +11,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
-import { Field, FieldLabel } from "@workspace/ui/components/field";
 import { Input } from "@workspace/ui/components/input";
+import {
+  FormField,
+  FormGrid,
+  RequiredFieldsNote,
+} from "@/components/forms/form-field";
 import { getApiErrorMessage } from "@/lib/apiError";
+import { todayAsCalendarDate } from "@/lib/format";
+import { notifySuccess } from "@/lib/notify";
 import { useGetCompanyMembershipQuery } from "@/services/companiesApi";
 import {
   useGetContractSignatoryQuery,
@@ -100,12 +105,11 @@ function SignatoryForm({
   signatory: ContractPartySignatory;
 }) {
   const [recordSignatory, recordState] = useRecordContractSignatoryMutation();
-  const [saved, setSaved] = useState(false);
-  const today = new Date().toISOString().slice(0, 10);
+  // The local date: a UTC date would reject today's signing near midnight.
+  const today = todayAsCalendarDate();
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSaved(false);
     const form = new FormData(event.currentTarget);
     const result = await recordSignatory({
       companyId,
@@ -117,54 +121,76 @@ function SignatoryForm({
         signedAt: String(form.get("signedAt") ?? ""),
       },
     });
-    if (!("error" in result)) setSaved(true);
+    if (!("error" in result)) notifySuccess("Signatory saved");
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Field>
-          <FieldLabel htmlFor="signatory-first-name">First name</FieldLabel>
-          <Input
-            id="signatory-first-name"
-            name="signatoryFirstName"
-            defaultValue={signatory.signatoryFirstName ?? ""}
-            maxLength={100}
-            required
-          />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="signatory-last-name">Last name</FieldLabel>
-          <Input
-            id="signatory-last-name"
-            name="signatoryLastName"
-            defaultValue={signatory.signatoryLastName ?? ""}
-            maxLength={100}
-            required
-          />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="signatory-title">Title</FieldLabel>
-          <Input
-            id="signatory-title"
-            name="signatoryTitle"
-            defaultValue={signatory.signatoryTitle ?? ""}
-            maxLength={150}
-            required
-          />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="signatory-signed-at">Signing date</FieldLabel>
-          <Input
-            id="signatory-signed-at"
-            name="signedAt"
-            type="date"
-            max={today}
-            defaultValue={signatory.signedAt?.slice(0, 10) ?? ""}
-            required
-          />
-        </Field>
-      </div>
+    <form
+      onSubmit={submit}
+      aria-label="Your company's signatory"
+      className="space-y-4"
+    >
+      <RequiredFieldsNote />
+      <FormGrid columns={2} className="lg:grid-cols-4">
+        <FormField id="signatory-first-name" label="First name" required>
+          {(control) => (
+            <Input
+              {...control}
+              name="signatoryFirstName"
+              autoComplete="off"
+              defaultValue={signatory.signatoryFirstName ?? ""}
+              maxLength={100}
+              required
+            />
+          )}
+        </FormField>
+        <FormField id="signatory-last-name" label="Last name" required>
+          {(control) => (
+            <Input
+              {...control}
+              name="signatoryLastName"
+              autoComplete="off"
+              defaultValue={signatory.signatoryLastName ?? ""}
+              maxLength={100}
+              required
+            />
+          )}
+        </FormField>
+        <FormField
+          id="signatory-title"
+          label="Job title"
+          required
+          description="Their position in your company."
+        >
+          {(control) => (
+            <Input
+              {...control}
+              name="signatoryTitle"
+              autoComplete="off"
+              defaultValue={signatory.signatoryTitle ?? ""}
+              maxLength={150}
+              required
+            />
+          )}
+        </FormField>
+        <FormField
+          id="signatory-signed-at"
+          label="Signing date"
+          required
+          description="Can't be later than today."
+        >
+          {(control) => (
+            <Input
+              {...control}
+              name="signedAt"
+              type="date"
+              max={today}
+              defaultValue={signatory.signedAt?.slice(0, 10) ?? ""}
+              required
+            />
+          )}
+        </FormField>
+      </FormGrid>
       {recordState.error ? (
         <Alert variant="destructive">
           <AlertDescription>
@@ -175,12 +201,11 @@ function SignatoryForm({
           </AlertDescription>
         </Alert>
       ) : null}
-      {saved ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          Signatory saved.
-        </p>
-      ) : null}
-      <Button type="submit" disabled={recordState.isLoading}>
+      <Button
+        type="submit"
+        disabled={recordState.isLoading}
+        aria-busy={recordState.isLoading || undefined}
+      >
         {recordState.isLoading ? "Saving…" : "Save signatory"}
       </Button>
     </form>
