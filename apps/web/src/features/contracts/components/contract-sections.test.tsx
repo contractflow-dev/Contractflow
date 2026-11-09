@@ -43,6 +43,9 @@ vi.mock("./create-contract-form", () => ({
 vi.mock("./contract-signatory-management", () => ({
   ContractSignatoryManagement: () => <div>SIGNATORY</div>,
 }));
+vi.mock("./contract-documents", () => ({
+  ContractDocuments: () => <div>DOCUMENTS</div>,
+}));
 vi.mock("./contract-site-management", () => ({
   ContractSiteManagement: () => <div>SITES</div>,
 }));
@@ -119,6 +122,7 @@ const sectionMarkers: Record<ContractSection, string> = {
   roles: "ROLE ASSIGNMENTS",
   sites: "SITES",
   signatories: "SIGNATORY",
+  documents: "DOCUMENTS",
   history: "No status changes have been recorded.",
 };
 
@@ -210,6 +214,7 @@ describe("ContractSectionNav", () => {
       ["Roles", "/dashboards/contracts/c-1/roles"],
       ["Sites", "/dashboards/contracts/c-1/sites"],
       ["Signatories", "/dashboards/contracts/c-1/signatories"],
+      ["Documents", "/dashboards/contracts/c-1/documents"],
       ["History", "/dashboards/contracts/c-1/history"],
     ]) {
       expect(markup).toMatch(new RegExp(`href="${href}"[^>]*>${label}</a>`));
@@ -235,6 +240,7 @@ describe("ContractSectionNav", () => {
     expect(markup).not.toContain(">Sites<");
     expect(markup).toContain(">Signatories<");
     expect(markup).toContain(">Parties<");
+    expect(markup).toContain(">Documents<");
     expect(markup).toContain(">History<");
   });
 

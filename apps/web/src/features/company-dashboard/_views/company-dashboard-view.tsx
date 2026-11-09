@@ -1,20 +1,25 @@
 "use client";
 
 import Link from "next/link";
+import type { ComponentType } from "react";
 import {
-  RiAlertLine,
+  RiArrowRightLine,
+  RiBarChart2Line,
   RiFileList3Line,
-  RiGroupLine,
-  RiMailLine,
+  RiFileTextLine,
+  RiMoneyDollarCircleLine,
   RiRefreshLine,
-  RiShieldUserLine,
+  RiSettings3Line,
+  RiShieldCheckLine,
+  RiTimeLine,
+  RiUserAddLine,
 } from "@remixicon/react";
+import type { ICompanyDashboardResponse } from "@contractflow/contracts-schema";
 import {
   Alert,
   AlertDescription,
   AlertTitle,
 } from "@workspace/ui/components/alert";
-import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button, buttonVariants } from "@workspace/ui/components/button";
 import {
@@ -33,44 +38,17 @@ import {
   formatCalendarDate,
   formatDate,
   formatNumber,
+  resolveTimeZone,
 } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { useGetCompanyDashboardQuery } from "@/features/companies";
 import { useGetCurrentUserQuery } from "@/services/authApi";
 import { CompanyAdminShell } from "@/features/companies/CompanyAdminShell";
 import { CompanyVerificationNotice } from "@/features/companies/company-verification-notice";
+import { NEW_CONTRACT_ANCHOR } from "@/features/contracts/components/create-contract-form";
+import { IncomingContractInvitations } from "@/features/contracts/components/incoming-contract-invitations";
 
-const summaryCards = [
-  {
-    key: "activeMembershipCount",
-    label: "Active members",
-    description: "Current company memberships",
-    icon: RiGroupLine,
-  },
-  {
-    key: "pendingInvitationCount",
-    label: "Pending invitations",
-    description: "Invitations that have not expired",
-    icon: RiMailLine,
-  },
-  {
-    key: "totalContractCount",
-    label: "Total contracts",
-    description: "Contracts involving this company",
-    icon: RiFileList3Line,
-  },
-  {
-    key: "activeContractCount",
-    label: "Active contracts",
-    description: "Contracts involving this company",
-    icon: RiFileList3Line,
-  },
-  {
-    key: "expiringContractCount",
-    label: "Expiring soon",
-    description: "Active contracts approaching their end date",
-    icon: RiAlertLine,
-  },
-] as const;
+const NEW_CONTRACT_HREF = `/dashboards/contracts#${NEW_CONTRACT_ANCHOR}`;
 
 export function CompanyDashboardView() {
   return (
@@ -98,23 +76,20 @@ function DashboardContent({ companyId }: { companyId: string }) {
   );
   const { data: user } = useGetCurrentUserQuery();
   const timeZone = useUserTimeZone();
-  const displayName = user
-    ? `${user.firstName} ${user.lastName}`.trim()
-    : "Company Administrator";
+  const firstTime = data?.summary.totalContractCount === 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="gap-1">
-              <RiShieldUserLine className="size-3.5" />
-              Company Administrator
-            </Badge>
-          </div>
-          <h1 className="type-page-title">Welcome, {displayName}</h1>
-          <p className="mt-1 type-lead">
-            A current view of your company’s team and contract portfolio.
+          <h1 className="type-page-title">
+            {greeting(timeZone)}
+            {user?.firstName ? `, ${user.firstName}` : ""}
+          </h1>
+          <p className="mt-1 max-w-2xl type-lead">
+            {firstTime
+              ? "Welcome to your ContractFlow workspace. Let’s get your contract operations up and running."
+              : "Here’s where your contracts stand today."}
           </p>
         </div>
         <Button
@@ -125,20 +100,24 @@ function DashboardContent({ companyId }: { companyId: string }) {
           className="self-start gap-2 sm:self-auto"
         >
           <RiRefreshLine
-            className={`size-4 ${isFetching ? "animate-spin" : ""}`}
+            className={cn("size-4", isFetching && "animate-spin")}
+            aria-hidden="true"
           />
           Refresh
         </Button>
       </div>
 
+      {/* After the page heading, so the outline stays <h1> then <h2>. */}
+      <IncomingContractInvitations companyId={companyId} />
+
       {isLoading ? (
         <div
           role="status"
           aria-label="Loading company dashboard"
-          className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"
+          className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
         >
-          {summaryCards.map(({ key }) => (
-            <Skeleton key={key} className="h-36 rounded-xl" />
+          {[0, 1, 2, 3].map((index) => (
+            <Skeleton key={index} className="h-32 rounded-xl" />
           ))}
         </div>
       ) : error ? (
@@ -162,267 +141,424 @@ function DashboardContent({ companyId }: { companyId: string }) {
         </Alert>
       ) : data ? (
         <>
-          <section
-            aria-label="Company summary"
-            className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"
-          >
-            {summaryCards.map(({ key, label, description, icon: Icon }) => (
-              <Card key={key} highlight>
-                <CardHeader>
-                  <div className="flex items-center justify-between gap-3">
-                    <CardDescription className="font-medium">
-                      {label}
-                    </CardDescription>
-                    <Avatar className="rounded-lg after:rounded-lg">
-                      <AvatarFallback className="rounded-lg bg-primary/10 text-primary transition-colors group-hover/card:bg-primary group-hover/card:text-primary-foreground">
-                        <Icon className="size-5" aria-hidden="true" />
-                      </AvatarFallback>
-                    </Avatar>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="font-heading text-3xl font-semibold tabular-nums">
-                    {formatNumber(data.summary[key])}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {key === "expiringContractCount"
-                      ? `Active contracts ending within ${data.expiryWindowDays} days`
-                      : description}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </section>
-
-          <section
-            aria-label="Contract activity"
-            className="grid gap-4 lg:grid-cols-2"
-          >
-            <Card>
-              <CardHeader>
-                <CardTitle>
-                  <h2>Contracts expiring soon</h2>
-                </CardTitle>
-                <CardDescription>
-                  Active contracts ending in the next {data.expiryWindowDays}{" "}
-                  days. Showing up to five, soonest first.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {data.expiringContracts.length ? (
-                  <ul className="divide-y">
-                    {data.expiringContracts.map((contract) => (
-                      <li
-                        key={contract.id}
-                        className="grid gap-2 py-3 first:pt-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-4"
-                      >
-                        <div className="min-w-0">
-                          <Link
-                            href={contractHref(contract.id)}
-                            className="font-medium text-primary underline-offset-4 hover:underline"
-                          >
-                            {contract.title}
-                          </Link>
-                          <p className="text-xs text-muted-foreground">
-                            {contract.referenceNumber}
-                          </p>
-                        </div>
-                        <div className="flex flex-col items-start gap-1 sm:items-end sm:text-end">
-                          <StatusBadge status={contract.status} />
-                          <span className="text-xs text-muted-foreground">
-                            {daysUntil(contract.endDate)}
-                          </span>
-                          <time
-                            className="text-xs text-muted-foreground"
-                            dateTime={contract.endDate ?? undefined}
-                          >
-                            {formatEndDate(contract.endDate)}
-                          </time>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="py-3 text-sm text-muted-foreground">
-                    {data.summary.activeContractCount === 0
-                      ? "There are no active contracts for this company."
-                      : `No active contracts end within the next ${data.expiryWindowDays} days.`}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>
-                  <h2>Recently updated contracts</h2>
-                </CardTitle>
-                <CardDescription>
-                  Contracts updated in the last 30 days, newest first.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {data.recentlyUpdatedContracts.length ? (
-                  <ul className="divide-y">
-                    {data.recentlyUpdatedContracts.map((contract) => (
-                      <li
-                        key={contract.id}
-                        className="grid gap-2 py-3 first:pt-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-4"
-                      >
-                        <div className="min-w-0">
-                          <Link
-                            href={contractHref(contract.id)}
-                            className="font-medium text-primary underline-offset-4 hover:underline"
-                          >
-                            {contract.title}
-                          </Link>
-                          <p className="text-xs text-muted-foreground">
-                            {contract.referenceNumber}
-                          </p>
-                        </div>
-                        <div className="flex flex-col items-start gap-1 sm:items-end sm:text-end">
-                          <StatusBadge status={contract.status} />
-                          <time
-                            className="text-xs text-muted-foreground"
-                            dateTime={contract.updatedAt}
-                          >
-                            Updated{" "}
-                            {formatDate(contract.updatedAt, {
-                              timeZone,
-                              fallback: "Date not available",
-                            })}
-                          </time>
-                          <span className="text-xs text-muted-foreground">
-                            End date: {formatEndDate(contract.endDate)}
-                          </span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="py-3 text-sm text-muted-foreground">
-                    No contracts have been updated in the last 30 days.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          </section>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                <h2>Quick actions</h2>
-              </CardTitle>
-              <CardDescription>
-                Shortcuts to company and contract workflows.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-wrap gap-2">
-              <Link
-                className={buttonVariants({ variant: "outline" })}
-                href="/dashboards/contracts"
-              >
-                View contracts
-              </Link>
-              <Link
-                className={buttonVariants({ variant: "outline" })}
-                href="/dashboards/team"
-              >
-                Manage team and invitations
-              </Link>
-              <Link
-                className={buttonVariants({ variant: "outline" })}
-                href="/dashboards/profile"
-              >
-                Edit company profile
-              </Link>
-            </CardContent>
-          </Card>
-
-          <section className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-            <Card>
-              <CardHeader>
-                <CardTitle>
-                  <h2>Company profile</h2>
-                </CardTitle>
-                <CardDescription>
-                  Company information currently registered with ContractFlow.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-                  <ProfileField
-                    label="Legal name"
-                    value={data.company.legalName}
-                  />
-                  <ProfileField
-                    label="Registration number"
-                    value={data.company.registrationNumber}
-                  />
-                  <ProfileField
-                    label="Contact email"
-                    value={data.company.email}
-                  />
-                  <ProfileField
-                    label="Phone"
-                    value={data.company.phoneNumber}
-                  />
-                  <ProfileField
-                    label="Location"
-                    value={`${data.company.city}, ${data.company.countryCode}`}
-                  />
-                  <ProfileField
-                    label="Default currency"
-                    value={data.company.defaultCurrencyCode}
-                  />
-                </dl>
-                <Link
-                  className="mt-5 inline-flex text-sm font-medium text-primary underline-offset-4 hover:underline"
-                  href="/dashboards/profile"
-                >
-                  Edit company profile
-                </Link>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>
-                  <h2>Your access</h2>
-                </CardTitle>
-                <CardDescription>
-                  Permissions are determined by your current company membership.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-start gap-3 rounded-2xl bg-muted/60 p-4">
-                  <RiShieldUserLine className="mt-0.5 size-5 shrink-0 text-primary" />
-                  <div>
-                    <p className="text-sm font-medium">
-                      {data.membership.companyRole}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      You can administer this company workspace. Platform
-                      administration is a separate role.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </section>
+          <PortfolioHealth data={data} />
+          <DepartmentWorkspaces data={data} />
+          <QuickActions data={data} />
+          <RecentActivity data={data} timeZone={timeZone} />
+          <EndingSoon data={data} />
         </>
       ) : null}
     </div>
   );
 }
 
-function ProfileField({ label, value }: { label: string; value: string }) {
+function SectionHeading({
+  id,
+  title,
+  description,
+}: {
+  id: string;
+  title: string;
+  description: string;
+}) {
   return (
-    <div className="min-w-0">
-      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-      <dd className="mt-1 break-words text-sm">{value || "Not provided"}</dd>
+    <div className="mb-3">
+      <h2 id={id} className="type-section-title">
+        {title}
+      </h2>
+      <p className="type-lead">{description}</p>
     </div>
   );
+}
+
+function PortfolioHealth({ data }: { data: ICompanyDashboardResponse }) {
+  const health = data.portfolioHealth;
+  const tiles = [
+    {
+      label: "Active contracts",
+      value: data.summary.activeContractCount,
+      description: "Contracts in progress, across all departments.",
+      risk: false,
+    },
+    {
+      label: "Stalled contracts",
+      value: health.stalledContractCount,
+      description: `Active, with no recorded change in ${health.stalledAfterDays}+ days.`,
+      risk: true,
+    },
+    {
+      label: "Non-compliant contractors",
+      value: health.nonCompliantContractorCount,
+      description: "With an expired, rejected or non-compliant record.",
+      risk: true,
+    },
+    {
+      label: "Payments overdue",
+      value: health.overduePaymentCount,
+      description: "Unpaid invoices past their due date.",
+      risk: true,
+    },
+  ];
+  return (
+    <section aria-labelledby="portfolio-heading">
+      <SectionHeading
+        id="portfolio-heading"
+        title="Portfolio health"
+        description="What’s holding up progress across your contracts, plus payment and compliance risk."
+      />
+      <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {tiles.map((tile) => (
+          <li key={tile.label}>
+            <Card highlight className="h-full">
+              <CardContent className="space-y-1">
+                <p
+                  className={cn(
+                    "font-heading text-3xl font-semibold tabular-nums",
+                    tile.risk && tile.value > 0
+                      ? // Red reads poorly on the flipped card; the label says what it is.
+                        "text-destructive-soft-foreground group-hover/card:text-card-foreground"
+                      : "text-foreground",
+                  )}
+                >
+                  {formatNumber(tile.value)}
+                </p>
+                <p className="text-sm font-medium">{tile.label}</p>
+                <p className="text-xs leading-5 text-muted-foreground">
+                  {tile.description}
+                </p>
+              </CardContent>
+            </Card>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function DepartmentWorkspaces({ data }: { data: ICompanyDashboardResponse }) {
+  const departments: Array<{
+    name: string;
+    icon: ComponentType<{ className?: string }>;
+    tint: string;
+    value: number;
+    label: string;
+  }> = [
+    {
+      name: "Contractor",
+      icon: RiFileTextLine,
+      tint: "bg-dept-contractor/15 text-dept-contractor",
+      value: data.departments.complianceAttentionCount,
+      label: "Compliance records needing attention",
+    },
+    {
+      name: "Client PM",
+      icon: RiBarChart2Line,
+      tint: "bg-dept-client-pm/15 text-dept-client-pm",
+      value: data.departments.contractsNeedingAttentionCount,
+      label: "Contracts needing attention",
+    },
+    {
+      name: "HSE",
+      icon: RiShieldCheckLine,
+      tint: "bg-dept-hse/15 text-dept-hse",
+      value: data.departments.openIncidentCount,
+      label: "Open incidents",
+    },
+    {
+      name: "Finance",
+      icon: RiMoneyDollarCircleLine,
+      tint: "bg-dept-finance/15 text-dept-finance",
+      value: data.departments.invoicesDueSoonCount,
+      label: `Invoices due in the next ${data.departments.dueWindowDays} days`,
+    },
+  ];
+  return (
+    <section aria-labelledby="departments-heading">
+      <SectionHeading
+        id="departments-heading"
+        title="Department workspaces"
+        description="Each department sees your contracts through its own lens."
+      />
+      <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {departments.map(({ name, icon: Icon, tint, value, label }) => (
+          <li key={name}>
+            <Card highlight className="h-full">
+              <CardContent className="flex h-full flex-col gap-3">
+                <div className="flex items-center gap-3">
+                  <span
+                    className={cn(
+                      "grid size-9 place-items-center rounded-xl",
+                      tint,
+                    )}
+                  >
+                    <Icon className="size-5" aria-hidden="true" />
+                  </span>
+                  <h3 className="type-subsection-title">{name}</h3>
+                </div>
+                <div>
+                  <p className="font-heading text-2xl font-semibold tabular-nums">
+                    {formatNumber(value)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                </div>
+                {/* Workspaces are not built yet: no link to a missing page. */}
+                <p className="mt-auto flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <RiTimeLine className="size-3.5" aria-hidden="true" />
+                  Workspace planned
+                </p>
+              </CardContent>
+            </Card>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function QuickActions({ data }: { data: ICompanyDashboardResponse }) {
+  const { activeMembershipCount, pendingInvitationCount } = data.summary;
+  return (
+    <section aria-labelledby="quick-actions-heading">
+      <SectionHeading
+        id="quick-actions-heading"
+        title="Quick actions"
+        description="Common next steps for your company."
+      />
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card highlight>
+          <CardContent className="flex h-full flex-col gap-3">
+            <span className="grid size-9 place-items-center rounded-xl bg-accent text-accent-foreground">
+              <RiFileList3Line className="size-5" aria-hidden="true" />
+            </span>
+            <h3 className="font-heading text-base font-semibold">
+              Create a contract
+            </h3>
+            <p className="text-sm leading-6 text-muted-foreground">
+              Set up a contract with its parties, commercial terms and
+              department workspaces. Each workspace sees it as soon as it’s
+              created.
+            </p>
+            <Link
+              href={NEW_CONTRACT_HREF}
+              className={cn(buttonVariants(), "mt-auto self-start")}
+            >
+              Create a contract
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card highlight>
+          <CardContent className="flex h-full flex-col gap-3">
+            <span className="grid size-9 place-items-center rounded-xl bg-accent text-accent-foreground">
+              <RiUserAddLine className="size-5" aria-hidden="true" />
+            </span>
+            <h3 className="font-heading text-base font-semibold">
+              Invite your team
+            </h3>
+            <p className="text-sm leading-6 text-muted-foreground">
+              Add people, then give each one a role on the contracts and
+              workspaces they need. {formatNumber(activeMembershipCount)} member
+              {activeMembershipCount === 1 ? "" : "s"},{" "}
+              {formatNumber(pendingInvitationCount)} pending invitation
+              {pendingInvitationCount === 1 ? "" : "s"}.
+            </p>
+            <Link
+              href="/dashboards/team"
+              className="mt-auto inline-flex items-center gap-1.5 self-start text-sm font-medium text-primary underline-offset-4 group-hover/card:text-card-foreground group-hover/card:underline hover:underline"
+            >
+              Invite members
+              <RiArrowRightLine className="size-4" aria-hidden="true" />
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card highlight>
+          <CardContent className="flex h-full flex-col gap-3">
+            <span className="grid size-9 place-items-center rounded-xl bg-muted text-muted-foreground group-hover/card:bg-card-foreground/10 group-hover/card:text-card-foreground">
+              <RiSettings3Line className="size-5" aria-hidden="true" />
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="font-heading text-base font-semibold">
+                Configure contract stages
+              </h3>
+              <Badge variant="secondary">Planned</Badge>
+            </div>
+            <p className="text-sm leading-6 text-muted-foreground">
+              Choosing the stages your contracts move through, from bid to
+              commissioning, isn’t available yet.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    </section>
+  );
+}
+
+function RecentActivity({
+  data,
+  timeZone,
+}: {
+  data: ICompanyDashboardResponse;
+  timeZone?: string;
+}) {
+  const noContracts = data.summary.totalContractCount === 0;
+  return (
+    <Card>
+      <CardHeader className="border-b">
+        <CardTitle>
+          <h2>Recent activity</h2>
+        </CardTitle>
+        {noContracts ? null : (
+          <CardDescription>
+            Contracts updated in the last 30 days, newest first.
+          </CardDescription>
+        )}
+      </CardHeader>
+      <CardContent>
+        {noContracts ? (
+          <div className="flex flex-col items-center gap-3 py-8 text-center">
+            <span className="grid size-11 place-items-center rounded-2xl bg-muted text-muted-foreground">
+              <RiFileTextLine className="size-5" aria-hidden="true" />
+            </span>
+            <h3 className="font-semibold">No contracts yet</h3>
+            <p className="max-w-md text-sm leading-6 text-muted-foreground">
+              Once you create a contract, its status, parties and updates show
+              here and in every department workspace.
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Link href={NEW_CONTRACT_HREF} className={buttonVariants()}>
+                Create a contract
+              </Link>
+              <Link
+                href="/dashboards/team"
+                className={buttonVariants({ variant: "outline" })}
+              >
+                Invite your team
+              </Link>
+            </div>
+          </div>
+        ) : data.recentlyUpdatedContracts.length ? (
+          <ul className="divide-y">
+            {data.recentlyUpdatedContracts.map((contract) => (
+              <li
+                key={contract.id}
+                className="grid gap-2 py-3 first:pt-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-4"
+              >
+                <div className="min-w-0">
+                  <Link
+                    href={contractHref(contract.id)}
+                    className="font-medium break-words text-primary underline-offset-4 hover:underline"
+                  >
+                    {contract.title}
+                  </Link>
+                  <p className="text-xs text-muted-foreground">
+                    {contract.referenceNumber} · End date:{" "}
+                    {formatEndDate(contract.endDate)}
+                  </p>
+                </div>
+                <div className="flex flex-col items-start gap-1 sm:items-end sm:text-end">
+                  <StatusBadge status={contract.status} />
+                  <time
+                    className="text-xs text-muted-foreground"
+                    dateTime={contract.updatedAt}
+                  >
+                    Updated{" "}
+                    {formatDate(contract.updatedAt, {
+                      timeZone,
+                      fallback: "Date not available",
+                    })}
+                  </time>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="py-3 text-sm text-muted-foreground">
+            No contracts have been updated in the last 30 days.
+          </p>
+        )}
+        {noContracts ? null : (
+          <Link
+            href="/dashboards/contracts"
+            className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-primary underline-offset-4 hover:underline"
+          >
+            View all contracts
+            <RiArrowRightLine className="size-4" aria-hidden="true" />
+          </Link>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function EndingSoon({ data }: { data: ICompanyDashboardResponse }) {
+  if (data.summary.totalContractCount === 0) return null;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          <h2>Contracts ending soon</h2>
+        </CardTitle>
+        <CardDescription>
+          Active contracts ending in the next {data.expiryWindowDays} days.
+          Showing up to five, soonest first.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {data.expiringContracts.length ? (
+          <ul className="divide-y">
+            {data.expiringContracts.map((contract) => (
+              <li
+                key={contract.id}
+                className="grid gap-2 py-3 first:pt-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-4"
+              >
+                <div className="min-w-0">
+                  <Link
+                    href={contractHref(contract.id)}
+                    className="font-medium break-words text-primary underline-offset-4 hover:underline"
+                  >
+                    {contract.title}
+                  </Link>
+                  <p className="text-xs text-muted-foreground">
+                    {contract.referenceNumber}
+                  </p>
+                </div>
+                <div className="flex flex-col items-start gap-1 sm:items-end sm:text-end">
+                  <StatusBadge status={contract.status} />
+                  <span className="text-xs text-muted-foreground">
+                    {daysUntil(contract.endDate)} ·{" "}
+                    <time dateTime={contract.endDate ?? undefined}>
+                      {formatEndDate(contract.endDate)}
+                    </time>
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="py-3 text-sm text-muted-foreground">
+            {data.summary.activeContractCount === 0
+              ? "There are no active contracts for this company."
+              : `No active contracts end within the next ${data.expiryWindowDays} days.`}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** "Good morning" / "Good afternoon" / "Good evening" in the user's time zone. */
+export function greeting(timeZone?: string, now: Date = new Date()): string {
+  const hour = Number(
+    new Intl.DateTimeFormat("en-GB", {
+      hour: "numeric",
+      hourCycle: "h23",
+      timeZone: resolveTimeZone(timeZone),
+    }).format(now),
+  );
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
 }
 
 function contractHref(contractId: string): string {

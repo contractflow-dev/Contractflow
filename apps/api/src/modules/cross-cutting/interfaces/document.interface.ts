@@ -1,7 +1,7 @@
 import { EDocumentCategory, EDocumentStatus, EDocumentVisibility } from "@contractflow/contracts-schema"
 
 export interface IDocumentEntity {
-    contractId : string
+    contractId : string | null
     ownerCompanyId : string
     title : string
     documentNumber : string

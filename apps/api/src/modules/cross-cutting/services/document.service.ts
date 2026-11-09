@@ -10,9 +10,11 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  ECompanyRole,
   EDocumentCategory,
   EDocumentStatus,
   EDocumentUploadStatus,
+  type CreateCompanyDocumentUploadRequest,
   type CreateDocumentUploadRequest,
   type CreateDocumentVersionUploadRequest,
   type DocumentDetail,
@@ -40,6 +42,8 @@ import type { DocumentVersion } from '../entities/document-version.entity';
 import {
   DOCUMENT_PERSISTENCE,
   DOCUMENT_UNIT_OF_WORK,
+  type IDocumentActivityRecord,
+  type IDocumentActivityRecords,
   type IDocumentContext,
   type IDocumentUnitOfWork,
 } from '../interfaces/document-persistence.interface';
@@ -74,10 +78,30 @@ export interface IDocumentActor {
   contractId: string;
 }
 
+/** A member acting on their own company's company-wide documents. */
+export interface ICompanyDocumentActor {
+  userId: string;
+  companyId: string;
+}
+
+/**
+ * Where a document lives: a contract the company is party to, or (with a
+ * null contract) the company's own private library.
+ */
+interface IDocumentPlace {
+  companyId: string;
+  contractId: string | null;
+}
+
 interface IAuthorizedDocument {
   scope: IContractCompanyScope;
   document: Document;
+  /** The contract is archived: its documents stay readable but not editable. */
+  archived: boolean;
 }
+
+const ARCHIVED_READ_ONLY =
+  'This contract is archived, so its documents are read-only.';
 
 @Injectable()
 export class DocumentService {
@@ -114,7 +138,7 @@ export class DocumentService {
     actor: IDocumentActor,
     query: IPageQuery,
   ): Promise<IPaginatedResponse<DocumentSummary>> {
-    const scope = await this.authorize(actor, 'general', 'list');
+    const { scope } = await this.authorize(actor, 'general', 'list');
     const categories = await this.accessibleCategories(actor);
     const page = await this.persistence.documents.listVisible(
       scope,
@@ -155,42 +179,7 @@ export class DocumentService {
       documentId,
       'download',
     );
-    const versions = await this.persistence.versions.listForDocuments([
-      document.id,
-    ]);
-    const version = versionId
-      ? versions.find(({ id }) => id === versionId)
-      : latestAvailable(versions);
-    if (!version || version.uploadStatus !== EDocumentUploadStatus.AVAILABLE) {
-      throw new NotFoundException('No downloadable file was found');
-    }
-    const member = await this.requireMember(actor);
-
-    const download = await this.storage.createDownloadUrl({
-      key: version.storageKey,
-      fileName: version.fileName,
-      contentType: version.mimeType,
-      expiresInSeconds: this.downloadUrlTtlSeconds,
-    });
-    // The URL itself is a bearer credential and is never recorded.
-    await this.persistence.activity.record({
-      contractId: scope.contractId,
-      companyId: scope.companyId,
-      actorCompanyUserId: member.id,
-      action: 'document.downloaded',
-      summary: `Downloaded "${document.title}" (version ${version.versionNumber})`,
-      documentId: document.id,
-      versionId: version.id,
-      details: { ownerCompanyId: document.ownerCompanyId },
-      occurredAt: new Date(),
-    });
-    return {
-      url: download.url,
-      expiresAt: download.expiresAt.toISOString(),
-      fileName: version.fileName,
-      mimeType: version.mimeType,
-      sizeBytes: version.sizeBytes,
-    };
+    return this.downloadUrl(scope, document, versionId, actor);
   }
 
   // -------------------------------------------------------------------------
@@ -202,11 +191,12 @@ export class DocumentService {
     request: CreateDocumentUploadRequest,
   ): Promise<DocumentUploadSession> {
     const file = validateDocumentFile(request, this.maxUploadBytes);
-    const scope = await this.authorize(
+    const { scope, archived } = await this.authorize(
       actor,
       CATEGORY_WORKSPACE[request.category],
       'upload',
     );
+    assertWritable(archived);
     const now = new Date();
 
     return this.unitOfWork.execute(async (context) => {
@@ -237,7 +227,12 @@ export class DocumentService {
     request: CreateDocumentVersionUploadRequest,
   ): Promise<DocumentUploadSession> {
     const file = validateDocumentFile(request, this.maxUploadBytes);
-    const { scope } = await this.authorizeOwned(actor, documentId, 'replace');
+    const { scope, archived } = await this.authorizeOwned(
+      actor,
+      documentId,
+      'replace',
+    );
+    assertWritable(archived);
     const now = new Date();
 
     return this.unitOfWork.execute(async (context) => {
@@ -271,19 +266,214 @@ export class DocumentService {
     documentId: string,
     versionId: string,
   ): Promise<DocumentDetail> {
-    const { scope, document } = await this.authorizeOwned(
+    const { scope, document, archived } = await this.authorizeOwned(
       actor,
       documentId,
       'complete upload',
     );
+    assertWritable(archived);
     const member = await this.requireMember(actor);
+    return this.completeVersion(scope, document, member.id, versionId);
+  }
+
+  // -------------------------------------------------------------------------
+  // Deletion
+  // -------------------------------------------------------------------------
+
+  /**
+   * Soft-deletes the document record first, so it is immediately inaccessible,
+   * then deletes its stored objects. A storage failure after the commit leaves
+   * an orphaned object to clean up, never a visible record without a file.
+   */
+  async delete(actor: IDocumentActor, documentId: string): Promise<void> {
+    const { scope, document, archived } = await this.authorizeOwned(
+      actor,
+      documentId,
+      'delete',
+    );
+    assertWritable(archived);
+    const now = new Date();
+    await this.unitOfWork.execute(async (context) => {
+      const member = await this.requireMember(actor, context);
+      const deleted = await context.documents.softDelete(
+        scope,
+        document.id,
+        member.id,
+        now,
+      );
+      if (!deleted) throw new NotFoundException('Document was not found');
+      await this.recordActivity(context.activity, scope, {
+        actorCompanyUserId: member.id,
+        action: 'document.deleted',
+        summary: `Deleted "${document.title}"`,
+        documentId: document.id,
+        details: { documentNumber: document.documentNumber },
+        occurredAt: now,
+      });
+    });
+    await this.removeStoredObjects(document);
+  }
+
+  // -------------------------------------------------------------------------
+  // Company-wide documents. They belong to the company named by X-Company-Id
+  // and are never visible to another company, whatever contracts the two
+  // share. Any active member may read them; only a Company Administrator may
+  // add, replace or delete them.
+  // -------------------------------------------------------------------------
+
+  async listCompany(
+    actor: ICompanyDocumentActor,
+    query: IPageQuery,
+  ): Promise<IPaginatedResponse<DocumentSummary>> {
+    const place = await this.authorizeCompany(actor, 'list', false);
+    const page = await this.persistence.documents.listCompanyLevel(place, {
+      skip: pageOffset(query),
+      take: query.limit,
+    });
+    const versions = await this.persistence.versions.listForDocuments(
+      page.items.map(({ id }) => id),
+    );
+    const items = page.items.map((document) =>
+      toDocumentSummary(
+        document,
+        versions.filter((version) => version.documentId === document.id),
+      ),
+    );
+    return toPaginatedResponse({ items, total: page.total }, query);
+  }
+
+  async getCompany(
+    actor: ICompanyDocumentActor,
+    documentId: string,
+  ): Promise<DocumentDetail> {
+    const place = await this.authorizeCompany(actor, 'view', false);
+    const document = await this.findCompanyDocument(place, documentId);
+    return this.detail(place, document);
+  }
+
+  async createCompanyDownloadUrl(
+    actor: ICompanyDocumentActor,
+    documentId: string,
+    versionId?: string,
+  ): Promise<DocumentDownloadUrl> {
+    const place = await this.authorizeCompany(actor, 'download', false);
+    const document = await this.findCompanyDocument(place, documentId);
+    return this.downloadUrl(place, document, versionId, actor);
+  }
+
+  async createCompanyUpload(
+    actor: ICompanyDocumentActor,
+    request: CreateCompanyDocumentUploadRequest,
+  ): Promise<DocumentUploadSession> {
+    const file = validateDocumentFile(request, this.maxUploadBytes);
+    const place = await this.authorizeCompany(actor, 'upload', true);
+    const now = new Date();
+    return this.unitOfWork.execute(async (context) => {
+      const member = await this.requireCompanyAdmin(actor, context);
+      const document = await context.documents.createCompanyLevel(place, {
+        title: request.title,
+        documentNumber: request.documentNumber ?? generateDocumentNumber(),
+        category: request.category,
+        status: EDocumentStatus.VERIFICATION_PENDING,
+      });
+      return this.startVersionUpload(context, {
+        scope: place,
+        document,
+        versionNumber: 1,
+        file,
+        checksumSha256: request.checksumSha256,
+        changeNote: request.changeNote,
+        uploadedById: member.id,
+        now,
+      });
+    });
+  }
+
+  async createCompanyVersionUpload(
+    actor: ICompanyDocumentActor,
+    documentId: string,
+    request: CreateDocumentVersionUploadRequest,
+  ): Promise<DocumentUploadSession> {
+    const file = validateDocumentFile(request, this.maxUploadBytes);
+    const place = await this.authorizeCompany(actor, 'replace', true);
+    const now = new Date();
+    return this.unitOfWork.execute(async (context) => {
+      const member = await this.requireCompanyAdmin(actor, context);
+      // The row lock serializes version numbering for this document.
+      const document = await context.documents.findCompanyLevelForUpdate(
+        place,
+        documentId,
+      );
+      if (!document) throw new NotFoundException('Document was not found');
+      return this.startVersionUpload(context, {
+        scope: place,
+        document,
+        versionNumber: await context.versions.nextVersionNumber(document.id),
+        file,
+        checksumSha256: request.checksumSha256,
+        changeNote: request.changeNote,
+        uploadedById: member.id,
+        now,
+      });
+    });
+  }
+
+  async completeCompanyUpload(
+    actor: ICompanyDocumentActor,
+    documentId: string,
+    versionId: string,
+  ): Promise<DocumentDetail> {
+    const place = await this.authorizeCompany(actor, 'complete upload', true);
+    const document = await this.findCompanyDocument(place, documentId);
+    const member = await this.requireCompanyAdmin(actor);
+    return this.completeVersion(place, document, member.id, versionId);
+  }
+
+  async deleteCompany(
+    actor: ICompanyDocumentActor,
+    documentId: string,
+  ): Promise<void> {
+    const place = await this.authorizeCompany(actor, 'delete', true);
+    const document = await this.findCompanyDocument(place, documentId);
+    const now = new Date();
+    await this.unitOfWork.execute(async (context) => {
+      const member = await this.requireCompanyAdmin(actor, context);
+      const deleted = await context.documents.softDeleteCompanyLevel(
+        place,
+        document.id,
+        member.id,
+        now,
+      );
+      if (!deleted) throw new NotFoundException('Document was not found');
+      await this.recordActivity(context.activity, place, {
+        actorCompanyUserId: member.id,
+        action: 'document.deleted',
+        summary: `Deleted "${document.title}"`,
+        documentId: document.id,
+        details: { documentNumber: document.documentNumber },
+        occurredAt: now,
+      });
+    });
+    await this.removeStoredObjects(document);
+  }
+
+  // -------------------------------------------------------------------------
+  // Shared by contract and company-wide documents
+  // -------------------------------------------------------------------------
+
+  private async completeVersion(
+    place: IDocumentPlace,
+    document: Document,
+    memberId: string,
+    versionId: string,
+  ): Promise<DocumentDetail> {
     const version = await this.persistence.versions.findForDocument(
       document.id,
       versionId,
     );
     if (!version) throw new NotFoundException('Document version was not found');
     if (version.uploadStatus === EDocumentUploadStatus.AVAILABLE) {
-      return this.detail(scope, document);
+      return this.detail(place, document);
     }
     if (version.uploadStatus === EDocumentUploadStatus.FAILED) {
       throw new UnprocessableEntityException(
@@ -319,7 +509,7 @@ export class DocumentService {
     }
 
     if (failure) {
-      await this.failUpload(scope, document, version, member.id, failure);
+      await this.failUpload(place, document, version, memberId, failure);
       throw new UnprocessableEntityException(
         'The uploaded file could not be verified and was rejected.',
       );
@@ -331,10 +521,8 @@ export class DocumentService {
         storageVersionId,
         uploadedAt: now,
       });
-      await context.activity.record({
-        contractId: scope.contractId,
-        companyId: scope.companyId,
-        actorCompanyUserId: member.id,
+      await this.recordActivity(context.activity, place, {
+        actorCompanyUserId: memberId,
         action:
           version.versionNumber > 1
             ? 'document.version_added'
@@ -353,46 +541,52 @@ export class DocumentService {
         occurredAt: now,
       });
     });
-    return this.detail(scope, document);
+    return this.detail(place, document);
   }
 
-  // -------------------------------------------------------------------------
-  // Deletion
-  // -------------------------------------------------------------------------
+  private async downloadUrl(
+    place: IDocumentPlace,
+    document: Document,
+    versionId: string | undefined,
+    actor: ICompanyDocumentActor,
+  ): Promise<DocumentDownloadUrl> {
+    const versions = await this.persistence.versions.listForDocuments([
+      document.id,
+    ]);
+    const version = versionId
+      ? versions.find(({ id }) => id === versionId)
+      : latestAvailable(versions);
+    if (!version || version.uploadStatus !== EDocumentUploadStatus.AVAILABLE) {
+      throw new NotFoundException('No downloadable file was found');
+    }
+    const member = await this.requireMember(actor);
 
-  /**
-   * Soft-deletes the document record first, so it is immediately inaccessible,
-   * then deletes its stored objects. A storage failure after the commit leaves
-   * an orphaned object to clean up, never a visible record without a file.
-   */
-  async delete(actor: IDocumentActor, documentId: string): Promise<void> {
-    const { scope, document } = await this.authorizeOwned(
-      actor,
-      documentId,
-      'delete',
-    );
-    const now = new Date();
-    await this.unitOfWork.execute(async (context) => {
-      const member = await this.requireMember(actor, context);
-      const deleted = await context.documents.softDelete(
-        scope,
-        document.id,
-        member.id,
-        now,
-      );
-      if (!deleted) throw new NotFoundException('Document was not found');
-      await context.activity.record({
-        contractId: scope.contractId,
-        companyId: scope.companyId,
-        actorCompanyUserId: member.id,
-        action: 'document.deleted',
-        summary: `Deleted "${document.title}"`,
-        documentId: document.id,
-        details: { documentNumber: document.documentNumber },
-        occurredAt: now,
-      });
+    const download = await this.storage.createDownloadUrl({
+      key: version.storageKey,
+      fileName: version.fileName,
+      contentType: version.mimeType,
+      expiresInSeconds: this.downloadUrlTtlSeconds,
     });
+    // The URL itself is a bearer credential and is never recorded.
+    await this.recordActivity(this.persistence.activity, place, {
+      actorCompanyUserId: member.id,
+      action: 'document.downloaded',
+      summary: `Downloaded "${document.title}" (version ${version.versionNumber})`,
+      documentId: document.id,
+      versionId: version.id,
+      details: { ownerCompanyId: document.ownerCompanyId },
+      occurredAt: new Date(),
+    });
+    return {
+      url: download.url,
+      expiresAt: download.expiresAt.toISOString(),
+      fileName: version.fileName,
+      mimeType: version.mimeType,
+      sizeBytes: version.sizeBytes,
+    };
+  }
 
+  private async removeStoredObjects(document: Document): Promise<void> {
     const versions = await this.persistence.versions.listForDocuments([
       document.id,
     ]);
@@ -411,6 +605,92 @@ export class DocumentService {
     }
   }
 
+  /**
+   * Contract document events go to the contract's activity log. That log
+   * belongs to a contract, so company-wide document events are written to the
+   * application log instead.
+   */
+  private async recordActivity(
+    records: IDocumentActivityRecords,
+    place: IDocumentPlace,
+    entry: Omit<IDocumentActivityRecord, 'contractId' | 'companyId'>,
+  ): Promise<void> {
+    if (place.contractId === null) {
+      this.logger.log(
+        `Company document ${entry.action}: document ${entry.documentId}${entry.versionId ? ` version ${entry.versionId}` : ''} by member ${entry.actorCompanyUserId} of company ${place.companyId}`,
+      );
+      return;
+    }
+    await records.record({
+      ...entry,
+      contractId: place.contractId,
+      companyId: place.companyId,
+    });
+  }
+
+  /** Active membership of the header company; writes need administrators. */
+  private async authorizeCompany(
+    actor: ICompanyDocumentActor,
+    operation: string,
+    write: boolean,
+  ): Promise<IDocumentPlace> {
+    const member = await this.persistence.memberships.findActive(
+      actor.userId,
+      actor.companyId,
+    );
+    if (!member) {
+      this.logCompanyDenied(actor, operation, 'no active membership');
+      throw new ForbiddenException('Active company membership is required');
+    }
+    if (write && member.companyRole !== ECompanyRole.COMPANY_ADMIN) {
+      this.logCompanyDenied(actor, operation, 'not a Company Administrator');
+      throw new ForbiddenException(
+        'Only a Company Administrator can change company documents',
+      );
+    }
+    return { companyId: actor.companyId, contractId: null };
+  }
+
+  /** Re-checks administrator rights inside the write's own transaction. */
+  private async requireCompanyAdmin(
+    actor: ICompanyDocumentActor,
+    context: IDocumentContext = this.persistence,
+  ): Promise<{ id: string }> {
+    const member = await context.memberships.findActive(
+      actor.userId,
+      actor.companyId,
+    );
+    if (!member || member.companyRole !== ECompanyRole.COMPANY_ADMIN) {
+      throw new ForbiddenException(
+        'Only a Company Administrator can change company documents',
+      );
+    }
+    return member;
+  }
+
+  /** Another company's document, or a contract document, is "not found". */
+  private async findCompanyDocument(
+    place: IDocumentPlace,
+    documentId: string,
+  ): Promise<Document> {
+    const document = await this.persistence.documents.findCompanyLevel(
+      place,
+      documentId,
+    );
+    if (!document) throw new NotFoundException('Document was not found');
+    return document;
+  }
+
+  private logCompanyDenied(
+    actor: ICompanyDocumentActor,
+    operation: string,
+    reason: string,
+  ): void {
+    this.logger.warn(
+      `Company document ${operation} denied for user ${actor.userId} (company ${actor.companyId}): ${reason}`,
+    );
+  }
+
   // -------------------------------------------------------------------------
   // Helpers
   // -------------------------------------------------------------------------
@@ -418,7 +698,7 @@ export class DocumentService {
   private async startVersionUpload(
     context: IDocumentContext,
     input: {
-      scope: IContractCompanyScope;
+      scope: IDocumentPlace;
       document: Document;
       versionNumber: number;
       file: IValidatedDocumentFile;
@@ -460,9 +740,7 @@ export class DocumentService {
       uploadedAt: now,
       uploadExpiresAt: upload.expiresAt,
     });
-    await context.activity.record({
-      contractId: scope.contractId,
-      companyId: scope.companyId,
+    await this.recordActivity(context.activity, scope, {
       actorCompanyUserId: input.uploadedById,
       action: 'document.upload_initiated',
       summary: `Started uploading version ${input.versionNumber} of "${document.title}"`,
@@ -536,7 +814,7 @@ export class DocumentService {
   }
 
   private async failUpload(
-    scope: IContractCompanyScope,
+    scope: IDocumentPlace,
     document: Document,
     version: DocumentVersion,
     actorCompanyUserId: string,
@@ -544,9 +822,7 @@ export class DocumentService {
   ): Promise<void> {
     await this.unitOfWork.execute(async (context) => {
       await context.versions.markFailed(version.id, reason);
-      await context.activity.record({
-        contractId: scope.contractId,
-        companyId: scope.companyId,
+      await this.recordActivity(context.activity, scope, {
         actorCompanyUserId,
         action: 'document.upload_failed',
         summary: `Rejected upload of version ${version.versionNumber} of "${document.title}"`,
@@ -568,7 +844,7 @@ export class DocumentService {
   }
 
   private async detail(
-    scope: IContractCompanyScope,
+    scope: IDocumentPlace,
     document: Document,
   ): Promise<DocumentDetail> {
     const versions = await this.persistence.versions.listForDocuments([
@@ -595,7 +871,7 @@ export class DocumentService {
     const restricted = await Promise.all(
       RESTRICTED_WORKSPACES.map(async (workspace) => {
         try {
-          await this.access.authorize(
+          await this.access.authorizeIncludingArchived(
             actor.userId,
             actor.companyId,
             actor.contractId,
@@ -622,12 +898,16 @@ export class DocumentService {
     documentId: string,
     operation: string,
   ): Promise<IAuthorizedDocument> {
-    const scope = await this.authorize(actor, 'general', operation);
+    const { scope, archived } = await this.authorize(
+      actor,
+      'general',
+      operation,
+    );
     const document = await this.persistence.documents.findVisible(
       scope,
       documentId,
     );
-    return this.authorizeCategory(actor, scope, document, operation);
+    return this.authorizeCategory(actor, scope, archived, document, operation);
   }
 
   /** Writes are limited to the company that owns the document. */
@@ -636,17 +916,22 @@ export class DocumentService {
     documentId: string,
     operation: string,
   ): Promise<IAuthorizedDocument> {
-    const scope = await this.authorize(actor, 'general', operation);
+    const { scope, archived } = await this.authorize(
+      actor,
+      'general',
+      operation,
+    );
     const document = await this.persistence.documents.findOwned(
       scope,
       documentId,
     );
-    return this.authorizeCategory(actor, scope, document, operation);
+    return this.authorizeCategory(actor, scope, archived, document, operation);
   }
 
   private async authorizeCategory(
     actor: IDocumentActor,
     scope: IContractCompanyScope,
+    archived: boolean,
     document: Document | null,
     operation: string,
   ): Promise<IAuthorizedDocument> {
@@ -658,16 +943,20 @@ export class DocumentService {
     if (workspace !== 'general') {
       await this.authorize(actor, workspace, operation);
     }
-    return { scope, document };
+    return { scope, document, archived };
   }
 
+  /**
+   * Contract access, including an archived contract: its documents stay
+   * readable, and every write checks `archived` with assertWritable.
+   */
   private async authorize(
     actor: IDocumentActor,
     workspace: ContractWorkspace,
     operation: string,
-  ): Promise<IContractCompanyScope> {
+  ): Promise<{ scope: IContractCompanyScope; archived: boolean }> {
     try {
-      return await this.access.authorize(
+      return await this.access.authorizeIncludingArchived(
         actor.userId,
         actor.companyId,
         actor.contractId,
@@ -686,7 +975,7 @@ export class DocumentService {
   }
 
   private async requireMember(
-    actor: IDocumentActor,
+    actor: ICompanyDocumentActor,
     context: IDocumentContext = this.persistence,
   ): Promise<{ id: string }> {
     const member = await context.memberships.findActive(
@@ -708,6 +997,11 @@ export class DocumentService {
       `Document ${operation} denied for user ${actor.userId} (company ${actor.companyId}, contract ${actor.contractId}): ${reason}`,
     );
   }
+}
+
+/** Documents of an archived contract are read-only for everyone. */
+function assertWritable(archived: boolean): void {
+  if (archived) throw new ConflictException(ARCHIVED_READ_ONLY);
 }
 
 function generateDocumentNumber(): string {

@@ -277,6 +277,56 @@ export class ContractLifecycleContextFactory implements ITransactionContextFacto
             where: { id: invitationId, sourceContractPartyId: sourcePartyId },
             lock: { mode: 'pessimistic_write' },
           }),
+        listPendingForTarget: async (targetCompanyId, now) => {
+          const rows = await invitations
+            .createQueryBuilder('invitation')
+            .innerJoin(
+              ContractParty,
+              'source',
+              'source.id = invitation.sourceContractPartyId',
+            )
+            .innerJoin(Contract, 'contract', 'contract.id = source.contractId')
+            .innerJoin(Company, 'inviter', 'inviter.id = source.companyId')
+            .where('invitation.targetCompanyId = :targetCompanyId', {
+              targetCompanyId,
+            })
+            .andWhere('invitation.status = :pending', { pending: 'pending' })
+            .andWhere('invitation.revokedAt IS NULL')
+            .andWhere('invitation.expiresAt > :now', { now })
+            .andWhere('contract.deletedAt IS NULL')
+            .select('invitation.id', 'id')
+            .addSelect('invitation.partyType', 'partyType')
+            .addSelect('invitation.email', 'email')
+            .addSelect('invitation.createdAt', 'createdAt')
+            .addSelect('invitation.expiresAt', 'expiresAt')
+            .addSelect('contract.title', 'contractTitle')
+            .addSelect('contract.referenceNumber', 'contractReference')
+            .addSelect('inviter.name', 'invitingCompanyName')
+            .orderBy('invitation.createdAt', 'DESC')
+            .addOrderBy('invitation.id', 'ASC')
+            .getRawMany<{
+              id: string;
+              partyType: ContractPartyInvitation['partyType'];
+              email: string;
+              createdAt: Date | string;
+              expiresAt: Date | string;
+              contractTitle: string;
+              contractReference: string;
+              invitingCompanyName: string;
+            }>();
+          return rows.map((row) => ({
+            ...row,
+            createdAt: new Date(row.createdAt),
+            expiresAt: new Date(row.expiresAt),
+          }));
+        },
+        findByIdForTarget: (invitationId, targetCompanyId) =>
+          invitations.findOne({ where: { id: invitationId, targetCompanyId } }),
+        findByIdForTargetForUpdate: (invitationId, targetCompanyId) =>
+          invitations.findOne({
+            where: { id: invitationId, targetCompanyId },
+            lock: { mode: 'pessimistic_write' },
+          }),
         findByTokenHash: (tokenHash) =>
           invitations.findOne({ where: { tokenHash } }),
         findByTokenHashForUpdate: (tokenHash) =>

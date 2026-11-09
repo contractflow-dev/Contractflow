@@ -23,6 +23,7 @@ import { ActivityService } from './services/activity.service';
 import { DataSource } from 'typeorm';
 import { TypeOrmUnitOfWork } from '../../common/database/typeorm-unit-of-work';
 import { StorageModule } from '../../common/storage/storage.module';
+import { CompanyDocumentController } from './controllers/company-document.controller';
 import { DocumentController } from './controllers/document.controller';
 import { DocumentService } from './services/document.service';
 import {
@@ -62,7 +63,7 @@ const REPOSITORIES = [
       CompanyUser,
     ]),
   ],
-  controllers: [ActivityController, DocumentController],
+  controllers: [ActivityController, DocumentController, CompanyDocumentController],
   providers: [
     ...REPOSITORIES,
     ActivityService,

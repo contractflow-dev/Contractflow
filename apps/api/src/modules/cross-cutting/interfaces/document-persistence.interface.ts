@@ -1,9 +1,11 @@
 import type {
+  ECompanyRole,
   EDocumentCategory,
   EDocumentStatus,
   EDocumentVisibility,
 } from '@contractflow/contracts-schema';
 import type { IUnitOfWork } from '../../../common/application/unit-of-work.interface';
+import type { ICompanyScope } from '../../../common/database/repositories/company-scope.interface';
 import type { IContractCompanyScope } from '../../../common/database/repositories/contract-scope.interface';
 import type { Document } from '../entities/document.entity';
 import type { DocumentVersion } from '../entities/document-version.entity';
@@ -77,6 +79,33 @@ export interface IDocumentRecords {
     deletedById: string,
     now: Date,
   ): Promise<boolean>;
+
+  // Company-wide documents (no contract). Reached only through the owner
+  // company's scope, never through a contract scope.
+  findCompanyLevel(
+    scope: ICompanyScope,
+    documentId: string,
+  ): Promise<Document | null>;
+  /** Locks the company-wide row for the rest of the transaction. */
+  findCompanyLevelForUpdate(
+    scope: ICompanyScope,
+    documentId: string,
+  ): Promise<Document | null>;
+  listCompanyLevel(
+    scope: ICompanyScope,
+    page: { skip: number; take: number },
+  ): Promise<IDocumentPage>;
+  /** Always private: the database refuses a shared company-wide document. */
+  createCompanyLevel(
+    scope: ICompanyScope,
+    data: Omit<ICreateDocumentRecord, 'visibility'>,
+  ): Promise<Document>;
+  softDeleteCompanyLevel(
+    scope: ICompanyScope,
+    documentId: string,
+    deletedById: string,
+    now: Date,
+  ): Promise<boolean>;
 }
 
 /** Version access is only used after the parent document is authorized. */
@@ -100,7 +129,10 @@ export interface IDocumentVersionRecords {
 }
 
 export interface IDocumentMembershipRecords {
-  findActive(userId: string, companyId: string): Promise<{ id: string } | null>;
+  findActive(
+    userId: string,
+    companyId: string,
+  ): Promise<{ id: string; companyRole: ECompanyRole } | null>;
 }
 
 export interface IDocumentActivityRecord {

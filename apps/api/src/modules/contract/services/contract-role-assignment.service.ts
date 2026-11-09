@@ -6,8 +6,18 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ECompanyRole, EContractRole } from '@contractflow/contracts-schema';
+import {
+  ECompanyRole,
+  EContractRole,
+  type CompanyRoleAssignment,
+  type IPaginatedResponse,
+} from '@contractflow/contracts-schema';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import {
+  pageOffset,
+  toPaginatedResponse,
+} from '../../../common/application/pagination';
+import type { IPageQuery } from '../../../common/application/pagination.interface';
 import type { IUnitOfWork } from '../../../common/application/unit-of-work.interface';
 import { MailService } from '../../mail/mail.service';
 import {
@@ -97,6 +107,57 @@ export class ContractRoleAssignmentService {
       workspace,
     );
     return this.persistence.memberships.listEligible(companyId);
+  }
+
+  /**
+   * Every active contract role held by the company's members, across its
+   * contracts that are not archived. Company Administrators only. Read-only:
+   * changes go through each contract's own role routes and their checks.
+   */
+  async listForCompany(
+    userId: string,
+    companyId: string,
+    query: IPageQuery & {
+      companyUserId?: string;
+      workspace?: AssignableContractWorkspace;
+    },
+  ): Promise<IPaginatedResponse<CompanyRoleAssignment>> {
+    const membership = await this.persistence.memberships.findActiveMember(
+      companyId,
+      userId,
+    );
+    if (!membership) {
+      throw new ForbiddenException('Active company membership is required.');
+    }
+    if (membership.companyRole !== ECompanyRole.COMPANY_ADMIN) {
+      throw new ForbiddenException(
+        'Only a Company Administrator can view contract roles across the company.',
+      );
+    }
+    const page = await this.persistence.assignments.listActiveForCompany(
+      companyId,
+      {
+        companyUserId: query.companyUserId,
+        roles: query.workspace ? WORKSPACE_ROLES[query.workspace] : undefined,
+      },
+      { skip: pageOffset(query), take: query.limit },
+    );
+    const items = page.items.map((row) => ({
+      id: row.id,
+      contractId: row.contractId,
+      contractReference: row.contractReference,
+      contractTitle: row.contractTitle,
+      contractStatus: row.contractStatus,
+      companyUserId: row.companyUserId,
+      firstName: row.firstName,
+      lastName: row.lastName,
+      email: row.email,
+      role: row.role,
+      workspace: workspaceForRole(row.role),
+      isWorkspaceAdmin: row.isWorkspaceAdmin,
+      assignedAt: row.assignedAt.toISOString(),
+    }));
+    return toPaginatedResponse({ items, total: page.total }, query);
   }
 
   async list(

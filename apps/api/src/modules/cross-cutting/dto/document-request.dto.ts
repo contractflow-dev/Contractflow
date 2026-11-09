@@ -1,6 +1,7 @@
 import {
   EDocumentCategory,
   EDocumentVisibility,
+  type CreateCompanyDocumentUploadRequest,
   type CreateDocumentUploadRequest,
   type CreateDocumentVersionUploadRequest,
 } from '@contractflow/contracts-schema';
@@ -73,6 +74,30 @@ export class CreateDocumentUploadRequestDto
 
   @IsEnum(EDocumentVisibility)
   visibility!: EDocumentVisibility;
+}
+
+/**
+ * A company-wide document. It is always private to the header company, so
+ * there is no visibility field: one sent anyway is stripped by validation,
+ * and the database refuses a shared company-wide document.
+ */
+export class CreateCompanyDocumentUploadRequestDto
+  extends DocumentFileRequestDto
+  implements CreateCompanyDocumentUploadRequest
+{
+  @Transform(trim)
+  @IsString()
+  @Length(1, 255)
+  title!: string;
+
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @Length(1, 60)
+  documentNumber?: string;
+
+  @IsEnum(EDocumentCategory)
+  category!: EDocumentCategory;
 }
 
 export class DocumentDownloadQueryDto {

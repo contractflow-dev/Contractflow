@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import {
   ECompanyUserStatus,
   EDocumentUploadStatus,
+  EDocumentVisibility,
 } from '@contractflow/contracts-schema';
 import { In, IsNull, type EntityManager } from 'typeorm';
 import type { ITransactionContextFactory } from '../../../common/database/transaction-context.factory.interface';
@@ -58,6 +59,25 @@ export class TypeOrmDocumentContext implements IDocumentContext {
         ),
       softDelete: (scope, documentId, deletedById, now) =>
         documents.softDeleteInContract(scope, documentId, deletedById, now),
+      findCompanyLevel: (scope, documentId) =>
+        documents.findCompanyLevelById(scope, documentId),
+      findCompanyLevelForUpdate: (scope, documentId) =>
+        documents.findCompanyLevelById(scope, documentId, {
+          lockForUpdate: true,
+        }),
+      listCompanyLevel: (scope, page) =>
+        documents.findCompanyLevelPage(scope, page),
+      createCompanyLevel: (scope, data) =>
+        documents.save(
+          scope,
+          documents.create(scope, {
+            ...data,
+            contractId: null,
+            visibility: EDocumentVisibility.PRIVATE,
+          }),
+        ),
+      softDeleteCompanyLevel: (scope, documentId, deletedById, now) =>
+        documents.softDeleteCompanyLevel(scope, documentId, deletedById, now),
     };
 
     this.versions = {
@@ -137,7 +157,7 @@ export class TypeOrmDocumentContext implements IDocumentContext {
             status: ECompanyUserStatus.ACTIVE,
             leftAt: IsNull(),
           },
-          select: { id: true },
+          select: { id: true, companyRole: true },
         }),
     };
 

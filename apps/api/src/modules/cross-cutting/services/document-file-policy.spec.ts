@@ -144,6 +144,18 @@ describe('buildDocumentStorageKey', () => {
     );
   });
 
+  it('keeps company-wide documents under the company, outside any contract', () => {
+    expect(
+      buildDocumentStorageKey({
+        companyId: COMPANY,
+        contractId: null,
+        documentId: DOCUMENT,
+        versionId: VERSION,
+        extension: 'pdf',
+      }),
+    ).toBe(`companies/${COMPANY}/documents/${DOCUMENT}/${VERSION}.pdf`);
+  });
+
   it.each([
     { companyId: '../other-company' },
     { documentId: 'a/b' },

@@ -7,17 +7,19 @@ import {
   MaxLength,
   ValidateIf,
 } from 'class-validator';
-import { CreateCompanyRequestDto } from './requests/create-company-request.dto';
+import {
+  CreateCompanyRequestDto,
+  normalizeWebsite,
+  WEBSITE_URL_OPTIONS,
+} from './requests/create-company-request.dto';
 
 export class UpdateCompanyRequestDto extends PartialType(
   OmitType(CreateCompanyRequestDto, ['website', 'addressLine2'] as const),
 ) {
-  @Transform(({ value }) =>
-    typeof value === 'string' ? value.trim() : value,
-  )
+  @Transform(({ value }) => normalizeWebsite(value))
   @IsOptional()
   @ValidateIf((_object, value) => value !== '')
-  @IsUrl({ require_protocol: true })
+  @IsUrl(WEBSITE_URL_OPTIONS)
   @MaxLength(255)
   website?: string;
 

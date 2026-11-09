@@ -13,6 +13,11 @@ const mocks = vi.hoisted(() => ({
   revokeInvitation: vi.fn(),
 }));
 
+// Covered by its own tests. It renders its own <h2> on the page.
+vi.mock("../components/company-contract-roles", () => ({
+  CompanyContractRoles: () => <h2>Contract roles</h2>,
+}));
+
 vi.mock("../CompanyAdminShell", () => ({
   CompanyAdminShell: ({
     children,

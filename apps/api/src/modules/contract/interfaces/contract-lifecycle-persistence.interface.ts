@@ -150,6 +150,18 @@ export interface IPendingInvitationCriteria {
   partyType: InvitableContractPartyType;
 }
 
+/** A pending invitation addressed to a company, with what it needs to see. */
+export interface IIncomingPartyInvitationRow {
+  id: string;
+  partyType: InvitableContractPartyType;
+  email: string;
+  createdAt: Date;
+  expiresAt: Date;
+  contractTitle: string;
+  contractReference: string;
+  invitingCompanyName: string;
+}
+
 export interface ILifecyclePartyInvitationRepository {
   expirePendingBySource(sourcePartyId: string, now: Date): Promise<void>;
   expireDuplicatePending(
@@ -163,6 +175,23 @@ export interface ILifecyclePartyInvitationRepository {
   findBySourceAndIdForUpdate(
     invitationId: string,
     sourcePartyId: string,
+  ): Promise<ContractPartyInvitation | null>;
+  /**
+   * Pending, unexpired invitations addressed to the company, on contracts
+   * that are not archived. Newest first.
+   */
+  listPendingForTarget(
+    targetCompanyId: string,
+    now: Date,
+  ): Promise<IIncomingPartyInvitationRow[]>;
+  /** Only ever finds an invitation addressed to the given company. */
+  findByIdForTarget(
+    invitationId: string,
+    targetCompanyId: string,
+  ): Promise<ContractPartyInvitation | null>;
+  findByIdForTargetForUpdate(
+    invitationId: string,
+    targetCompanyId: string,
   ): Promise<ContractPartyInvitation | null>;
   findByTokenHash(tokenHash: string): Promise<ContractPartyInvitation | null>;
   findByTokenHashForUpdate(

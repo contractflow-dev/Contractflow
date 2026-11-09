@@ -23,6 +23,7 @@ import {
   COUNTRY_CURRENCY_MAP,
 } from "@contractflow/contracts-schema";
 import { countryCodes, countryOptions } from "@/lib/countries";
+import { websiteSchema } from "@/lib/website";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button, buttonVariants } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
@@ -60,7 +61,7 @@ const companySchema = z.object({
     .max(254)
     .pipe(z.email("Enter a valid company email")),
   phoneNumber: z.string().trim().min(1, "Phone number is required").max(20),
-  website: z.union([z.literal(""), z.string().trim().url("Enter a valid URL")]),
+  website: websiteSchema,
   addressLine1: z.string().trim().min(1, "Address is required").max(255),
   addressLine2: z.string().trim().max(255),
   city: z.string().trim().min(1, "City is required").max(100),
@@ -589,7 +590,7 @@ export function OnboardingView() {
                 id="website"
                 label="Website"
                 optional
-                description="Include https://, for example https://example.com."
+                description="Enter a domain such as www.example.com or include https://."
                 error={errors.website?.message}
               >
                 {(control) => (

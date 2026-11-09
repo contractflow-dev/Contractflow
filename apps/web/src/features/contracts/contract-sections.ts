@@ -8,6 +8,7 @@ export const CONTRACT_SECTIONS = [
   { id: "roles", label: "Roles" },
   { id: "sites", label: "Sites" },
   { id: "signatories", label: "Signatories" },
+  { id: "documents", label: "Documents" },
   { id: "history", label: "History" },
 ] as const;
 

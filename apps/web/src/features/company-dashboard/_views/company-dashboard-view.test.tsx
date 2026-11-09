@@ -10,7 +10,7 @@ import {
   EContractStatus,
 } from "@contractflow/contracts-schema";
 import type { ICompanyDashboardResponse } from "@contractflow/contracts-schema";
-import { CompanyDashboardView } from "./company-dashboard-view";
+import { CompanyDashboardView, greeting } from "./company-dashboard-view";
 
 const mocks = vi.hoisted(() => ({
   getDashboard: vi.fn(),
@@ -54,6 +54,14 @@ vi.mock("@/features/companies", () => ({
   useGetCompanyDashboardQuery: mocks.getDashboard,
 }));
 
+// Covered by its own tests; here it only needs to stay out of the way.
+vi.mock(
+  "@/features/contracts/components/incoming-contract-invitations",
+  () => ({
+    IncomingContractInvitations: () => null,
+  }),
+);
+
 vi.mock("@/services/authApi", () => ({
   useGetCurrentUserQuery: mocks.getCurrentUser,
 }));
@@ -86,6 +94,19 @@ const dashboard: ICompanyDashboardResponse = {
     canManageCompany: true,
   },
   expiryWindowDays: 30,
+  portfolioHealth: {
+    stalledAfterDays: 14,
+    stalledContractCount: 2,
+    nonCompliantContractorCount: 1,
+    overduePaymentCount: 3,
+  },
+  departments: {
+    complianceAttentionCount: 4,
+    contractsNeedingAttentionCount: 5,
+    openIncidentCount: 6,
+    invoicesDueSoonCount: 7,
+    dueWindowDays: 30,
+  },
   summary: {
     activeMembershipCount: 1,
     pendingInvitationCount: 0,
@@ -115,25 +136,31 @@ const dashboard: ICompanyDashboardResponse = {
   ],
 };
 
+const loaded = (currentData: ICompanyDashboardResponse | undefined) => ({
+  currentData,
+  error: undefined,
+  isLoading: false,
+  isFetching: false,
+  refetch: vi.fn(),
+});
+
 describe("CompanyDashboardView", () => {
   beforeEach(() => {
     mocks.verifiedAt = new Date("2026-01-01T00:00:00Z");
-    mocks.getDashboard.mockReturnValue({
-      currentData: dashboard,
-      error: undefined,
-      isLoading: false,
-      isFetching: false,
-      refetch: vi.fn(),
-    });
+    mocks.getDashboard.mockReturnValue(loaded(dashboard));
     mocks.getCurrentUser.mockReturnValue({
       data: { firstName: "Ari", lastName: "Admin" },
     });
   });
 
+  const render = () => renderToStaticMarkup(<CompanyDashboardView />);
+  const withData = (overrides: Partial<ICompanyDashboardResponse>) =>
+    mocks.getDashboard.mockReturnValue(loaded({ ...dashboard, ...overrides }));
+
   it("asks an administrator to verify an unverified company email", () => {
     mocks.verifiedAt = null;
 
-    const markup = renderToStaticMarkup(<CompanyDashboardView />);
+    const markup = render();
 
     expect(markup).toContain("Verify your company email");
     expect(markup).toContain("office@acme.example");
@@ -141,49 +168,111 @@ describe("CompanyDashboardView", () => {
   });
 
   it("hides the verification notice once the company email is verified", () => {
-    const markup = renderToStaticMarkup(<CompanyDashboardView />);
-
-    expect(markup).not.toContain("Verify your company email");
+    expect(render()).not.toContain("Verify your company email");
   });
 
-  it("renders real expiring and recently updated contract links", () => {
-    const markup = renderToStaticMarkup(<CompanyDashboardView />);
+  it("greets the administrator by first name, under one page heading", () => {
+    const markup = render();
 
-    expect(markup).toContain("Contracts expiring soon");
-    expect(markup).toContain("Site services agreement");
-    expect(markup).toContain("CTR-001");
-    expect(markup).toContain("Total contracts");
-    expect(markup).toContain('href="/dashboards/contracts/contract-1"');
-    expect(markup).toContain("Recently updated contracts");
-    expect(markup).toContain("ending in the next 30 days");
+    expect(markup).toMatch(
+      /<h1[^>]*>Good (morning|afternoon|evening), Ari<\/h1>/,
+    );
+    expect(markup.match(/<h1/g)).toHaveLength(1);
+    expect(markup).toContain("Here’s where your contracts stand today.");
+  });
+
+  it("shows portfolio health and department figures from the API", () => {
+    const markup = render();
+
+    expect(markup).toContain(">Portfolio health</h2>");
+    for (const [value, label] of [
+      ["1", "Active contracts"],
+      ["2", "Stalled contracts"],
+      ["1", "Non-compliant contractors"],
+      ["3", "Payments overdue"],
+    ]) {
+      expect(markup).toMatch(new RegExp(`>${value}</p><p[^>]*>${label}</p>`));
+    }
+    expect(markup).toContain("no recorded change in 14+ days");
+
+    expect(markup).toContain(">Department workspaces</h2>");
+    for (const [value, label] of [
+      ["4", "Compliance records needing attention"],
+      ["5", "Contracts needing attention"],
+      ["6", "Open incidents"],
+      ["7", "Invoices due in the next 30 days"],
+    ]) {
+      expect(markup).toMatch(new RegExp(`>${value}</p><p[^>]*>${label}</p>`));
+    }
+    // Workspaces aren't built yet: they say so and link nowhere.
+    expect(markup.match(/Workspace planned/g)).toHaveLength(4);
+    expect(markup).not.toContain('href="#planned');
+  });
+
+  it("offers real quick actions and marks stage configuration as planned", () => {
+    const markup = render();
+
+    expect(markup).toMatch(
+      /href="\/dashboards\/contracts#new-contract"[^>]*>Create a contract<\/a>/,
+    );
+    expect(markup).toContain('href="/dashboards/team"');
+    expect(markup).toContain("1 member, 0 pending invitations.");
+    expect(markup).toContain("Configure contract stages");
+    expect(markup).toMatch(/>Planned<\/span>/);
+  });
+
+  it("flips the KPI, department and quick-action cards to the other theme on hover", () => {
+    const markup = render();
+    // 4 portfolio KPIs, 4 department cards and all 3 quick actions, which
+    // now look alike: none of them is dark at rest.
+    expect(markup.match(/data-highlight="true"/g)).toHaveLength(11);
+    expect(markup).not.toContain("bg-navy");
+  });
+
+  it("lists recent activity and contracts ending soon from real data", () => {
+    const markup = render();
+
+    expect(markup).toContain(">Recent activity</h2>");
     expect(markup).toContain("Equipment supply");
-    expect(markup).toContain("End date: Date not available");
-    expect(markup).toContain(">Manage team and invitations</a>");
-    expect(markup).toContain(">Edit company profile</a>");
-    // The developer-facing placeholder card for unbuilt features is gone.
-    expect(markup).not.toContain("Activity and company documents");
-    expect(markup).not.toContain("dashboard API");
+    expect(markup).toContain("CTR-002 · End date: Date not available");
+    expect(markup).toContain(">Contracts ending soon</h2>");
+    expect(markup).toContain("Site services agreement");
+    expect(markup).toContain('href="/dashboards/contracts/contract-1"');
+    expect(markup).toContain("ending in the next 30 days");
+  });
+
+  it("welcomes a first-time owner with a no-contracts state", () => {
+    withData({
+      summary: {
+        ...dashboard.summary,
+        totalContractCount: 0,
+        activeContractCount: 0,
+        expiringContractCount: 0,
+      },
+      expiringContracts: [],
+      recentlyUpdatedContracts: [],
+    });
+
+    const markup = render();
+
+    expect(markup).toContain("Welcome to your ContractFlow workspace.");
+    expect(markup).toContain(">No contracts yet</h3>");
+    expect(markup).toContain(">Invite your team</a>");
+    expect(markup).not.toContain(">Contracts ending soon</h2>");
   });
 
   it("shows explicit empty states instead of invented contract rows", () => {
-    mocks.getDashboard.mockReturnValue({
-      currentData: {
-        ...dashboard,
-        summary: {
-          ...dashboard.summary,
-          activeContractCount: 0,
-          expiringContractCount: 0,
-        },
-        expiringContracts: [],
-        recentlyUpdatedContracts: [],
+    withData({
+      summary: {
+        ...dashboard.summary,
+        activeContractCount: 0,
+        expiringContractCount: 0,
       },
-      error: undefined,
-      isLoading: false,
-      isFetching: false,
-      refetch: vi.fn(),
+      expiringContracts: [],
+      recentlyUpdatedContracts: [],
     });
 
-    const markup = renderToStaticMarkup(<CompanyDashboardView />);
+    const markup = render();
 
     expect(markup).toContain("There are no active contracts for this company.");
     expect(markup).toContain(
@@ -200,7 +289,7 @@ describe("CompanyDashboardView", () => {
       isFetching: true,
       refetch: vi.fn(),
     });
-    const loadingMarkup = renderToStaticMarkup(<CompanyDashboardView />);
+    const loadingMarkup = render();
     expect(loadingMarkup).toContain("Loading company dashboard");
     expect(loadingMarkup).not.toContain("Site services agreement");
 
@@ -211,32 +300,40 @@ describe("CompanyDashboardView", () => {
       isFetching: false,
       refetch: vi.fn(),
     });
-    const errorMarkup = renderToStaticMarkup(<CompanyDashboardView />);
+    const errorMarkup = render();
     expect(errorMarkup).toContain("Dashboard data could not be loaded");
     expect(errorMarkup).toContain("Retry");
     expect(errorMarkup).not.toContain("Site services agreement");
   });
 
-  it("uses the configured expiry window for the overview copy", () => {
-    mocks.getDashboard.mockReturnValue({
-      currentData: {
-        ...dashboard,
-        expiryWindowDays: 45,
-        summary: { ...dashboard.summary, activeContractCount: 2 },
-        expiringContracts: [],
-        recentlyUpdatedContracts: [],
-      },
-      error: undefined,
-      isLoading: false,
-      isFetching: false,
-      refetch: vi.fn(),
+  it("uses the configured expiry window for the ending-soon copy", () => {
+    withData({
+      expiryWindowDays: 45,
+      summary: { ...dashboard.summary, activeContractCount: 2 },
+      expiringContracts: [],
+      recentlyUpdatedContracts: [],
     });
 
-    const markup = renderToStaticMarkup(<CompanyDashboardView />);
+    const markup = render();
 
-    expect(markup).toContain("ending within 45 days");
+    expect(markup).toContain("ending in the next 45 days");
     expect(markup).toContain(
       "No active contracts end within the next 45 days.",
+    );
+  });
+});
+
+describe("greeting", () => {
+  it("follows the time of day in the user's time zone", () => {
+    expect(greeting("UTC", new Date("2026-11-09T09:30:00Z"))).toBe(
+      "Good morning",
+    );
+    // Lagos is UTC+1: 13:00 UTC is 14:00 there, and 17:30 UTC is 18:30.
+    expect(greeting("Africa/Lagos", new Date("2026-11-09T13:00:00Z"))).toBe(
+      "Good afternoon",
+    );
+    expect(greeting("Africa/Lagos", new Date("2026-11-09T17:30:00Z"))).toBe(
+      "Good evening",
     );
   });
 });

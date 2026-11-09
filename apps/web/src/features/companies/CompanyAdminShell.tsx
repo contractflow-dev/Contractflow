@@ -47,7 +47,10 @@ import {
   useGetCompanyAccessSummaryQuery,
 } from "@/services/companiesApi";
 import type { ICompanyAccessResponse } from "@contractflow/contracts-schema";
-import { COMPANY_NAVIGATION } from "./company-navigation";
+import {
+  COMPANY_NAVIGATION,
+  companyNavigationFor,
+} from "./company-navigation";
 
 const noCompanyNotices: Partial<
   Record<
@@ -325,9 +328,7 @@ export function CompanyAdminShell({
     (item) => item.adminOnly && isNavItemActive(pathname, item),
   );
 
-  const navigation = COMPANY_NAVIGATION.filter(
-    ({ adminOnly }) => !adminOnly || access.membership.canManageCompany,
-  );
+  const navigation = companyNavigationFor(access.membership.canManageCompany);
   return (
     <AppShell
       navigationLabel="Company dashboard"
@@ -364,7 +365,7 @@ export function CompanyAdminShell({
           </div>
         )
       }
-      navigation={[{ items: navigation }]}
+      navigation={navigation}
       sidebarFooter={
         <p className="px-1 text-xs text-sidebar-foreground/70">
           Contract access is based on active company membership and contract

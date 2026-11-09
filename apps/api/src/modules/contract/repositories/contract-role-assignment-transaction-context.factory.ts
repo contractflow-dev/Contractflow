@@ -147,6 +147,78 @@ export class TypeOrmContractRoleAssignmentContext implements IContractRoleAssign
   };
 
   assignments = {
+    listActiveForCompany: async (
+      companyId: string,
+      filters: {
+        companyUserId?: string;
+        roles?: ContractRoleAssignment['role'][];
+      },
+      page: { skip: number; take: number },
+    ) => {
+      const query = this.manager
+        .getRepository(ContractRoleAssignment)
+        .createQueryBuilder('assignment')
+        .innerJoin('assignment.contractParty', 'party')
+        .innerJoin(Contract, 'contract', 'contract.id = party.contractId')
+        .innerJoin('assignment.companyUser', 'companyUser')
+        .innerJoin('companyUser.user', 'user')
+        .where('assignment.companyId = :companyId', { companyId })
+        // The role must come through the company's own party.
+        .andWhere('party.companyId = :companyId', { companyId })
+        .andWhere('assignment.revokedAt IS NULL')
+        .andWhere('contract.deletedAt IS NULL');
+      if (filters.companyUserId) {
+        query.andWhere('assignment.companyUserId = :companyUserId', {
+          companyUserId: filters.companyUserId,
+        });
+      }
+      if (filters.roles) {
+        query.andWhere('assignment.role IN (:...roles)', {
+          roles: filters.roles,
+        });
+      }
+      const total = await query.clone().getCount();
+      const rows = await query
+        .select('assignment.id', 'id')
+        .addSelect('contract.id', 'contractId')
+        .addSelect('contract.referenceNumber', 'contractReference')
+        .addSelect('contract.title', 'contractTitle')
+        .addSelect('contract.status', 'contractStatus')
+        .addSelect('assignment.companyUserId', 'companyUserId')
+        .addSelect('user.firstName', 'firstName')
+        .addSelect('user.lastName', 'lastName')
+        .addSelect('user.email', 'email')
+        .addSelect('assignment.role', 'role')
+        .addSelect('assignment.isWorkspaceAdmin', 'isWorkspaceAdmin')
+        .addSelect('assignment.assignedAt', 'assignedAt')
+        .orderBy('contract.referenceNumber', 'ASC')
+        .addOrderBy('user.lastName', 'ASC')
+        .addOrderBy('user.firstName', 'ASC')
+        .addOrderBy('assignment.id', 'ASC')
+        .offset(page.skip)
+        .limit(page.take)
+        .getRawMany<{
+          id: string;
+          contractId: string;
+          contractReference: string;
+          contractTitle: string;
+          contractStatus: Contract['status'];
+          companyUserId: string;
+          firstName: string;
+          lastName: string;
+          email: string;
+          role: ContractRoleAssignment['role'];
+          isWorkspaceAdmin: boolean;
+          assignedAt: Date | string;
+        }>();
+      return {
+        total,
+        items: rows.map((row) => ({
+          ...row,
+          assignedAt: new Date(row.assignedAt),
+        })),
+      };
+    },
     findActiveForParty: (
       companyId: string,
       partyId: string,

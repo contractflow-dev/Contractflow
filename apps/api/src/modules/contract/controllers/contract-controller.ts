@@ -18,6 +18,7 @@ import type { AuthenticatedUser } from '../../identity/interface/auth-context.in
 import {
   CreateContractRoleAssignmentRequestDto,
   CreateContractRoleInvitationRequestDto,
+  ListCompanyRoleAssignmentsRequestDto,
   ListContractRoleAssignmentsRequestDto,
   SetWorkspaceAdminRequestDto,
 } from '../dto/contract-role-assignment.dto';
@@ -275,6 +276,16 @@ export class ContractController {
       contractId,
       invitationId,
     );
+  }
+
+  /** Contract roles held across the header company. Administrators only. */
+  @Get('company/role-assignments')
+  listCompanyRoleAssignments(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @Query() query: ListCompanyRoleAssignmentsRequestDto,
+  ) {
+    return this.roleAssignments.listForCompany(user.id, companyId, query);
   }
 
   @Get('contract/role-assignments')

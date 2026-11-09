@@ -3,6 +3,7 @@ import {
   ECompanyUserStatus,
   EContractSiteStatus,
   EContractStatus,
+  EDocumentUploadStatus,
   EFromStatus,
   EInvitationStatus,
   EToStatus,
@@ -42,6 +43,7 @@ export type KnownStatus =
   | `${ECompanyUserStatus}`
   | `${ECompanyStatus}`
   | `${EContractSiteStatus}`
+  | `${EDocumentUploadStatus}`
   | ContractInvitationStatus
   | typeof ARCHIVED_STATUS;
 
@@ -69,6 +71,14 @@ const STATUS_PRESENTATION: Record<
   // Contract sites
   [EContractSiteStatus.PLANNED]: { label: "Planned", tone: "neutral" },
   [EContractSiteStatus.CLOSED]: { label: "Closed", tone: "inactive" },
+  // Document file uploads
+  [EDocumentUploadStatus.PENDING_UPLOAD]: {
+    label: "Upload pending",
+    tone: "warning",
+  },
+  [EDocumentUploadStatus.PROCESSING]: { label: "Checking file", tone: "info" },
+  [EDocumentUploadStatus.AVAILABLE]: { label: "Available", tone: "success" },
+  [EDocumentUploadStatus.FAILED]: { label: "Upload failed", tone: "danger" },
 };
 
 /** The badge variant that renders each tone. */

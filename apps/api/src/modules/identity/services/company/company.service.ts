@@ -36,6 +36,10 @@ import type {
 
 const COMPANY_DASHBOARD_RECENT_WINDOW_DAYS = 30;
 const COMPANY_DASHBOARD_CONTRACT_LIMIT = 5;
+/** An active contract with no recorded change for this long is stalled. */
+const COMPANY_DASHBOARD_STALLED_AFTER_DAYS = 14;
+/** Finance looks this far ahead for invoices falling due. */
+const COMPANY_DASHBOARD_DUE_WINDOW_DAYS = 30;
 
 @Injectable()
 export class CompanyService {
@@ -240,6 +244,19 @@ export class CompanyService {
         )
         .then((rows) => rows.map(mapDashboardContract)),
     ]);
+    const dueLimit = new Date(today);
+    dueLimit.setUTCDate(
+      dueLimit.getUTCDate() + COMPANY_DASHBOARD_DUE_WINDOW_DAYS,
+    );
+    const portfolio =
+      await this.contractPartyRepository.getCompanyPortfolioCounts(companyId, {
+        stalledBefore: new Date(
+          now.getTime() - COMPANY_DASHBOARD_STALLED_AFTER_DAYS * 86400000,
+        ),
+        today: todayDate,
+        expiryLimit: expiryDate,
+        dueLimit: dueLimit.toISOString().slice(0, 10),
+      });
     const recentlyUpdatedContracts = (
       await this.contractPartyRepository.findRecentlyUpdatedCompanyContracts(
         companyId,
@@ -261,6 +278,19 @@ export class CompanyService {
         expiringContractCount,
       },
       expiryWindowDays,
+      portfolioHealth: {
+        stalledAfterDays: COMPANY_DASHBOARD_STALLED_AFTER_DAYS,
+        stalledContractCount: portfolio.stalledContractCount,
+        nonCompliantContractorCount: portfolio.nonCompliantContractorCount,
+        overduePaymentCount: portfolio.overduePaymentCount,
+      },
+      departments: {
+        complianceAttentionCount: portfolio.complianceAttentionCount,
+        contractsNeedingAttentionCount: portfolio.contractsNeedingAttentionCount,
+        openIncidentCount: portfolio.openIncidentCount,
+        invoicesDueSoonCount: portfolio.invoicesDueSoonCount,
+        dueWindowDays: COMPANY_DASHBOARD_DUE_WINDOW_DAYS,
+      },
       expiringContracts,
       recentlyUpdatedContracts,
     };

@@ -1,4 +1,5 @@
 import type {
+  CreateCompanyDocumentUploadRequest,
   CreateDocumentUploadRequest,
   CreateDocumentVersionUploadRequest,
   DocumentDetail,
@@ -8,9 +9,10 @@ import type {
   IPaginatedResponse,
   IPaginationQuery,
 } from "@contractflow/contracts-schema";
-import { api, contractRoute } from "./api";
+import { api, companyRoute, contractRoute } from "./api";
 
 export type {
+  CreateCompanyDocumentUploadRequest,
   CreateDocumentUploadRequest,
   CreateDocumentVersionUploadRequest,
   DocumentDetail,
@@ -19,17 +21,28 @@ export type {
   DocumentUploadSession,
 } from "@contractflow/contracts-schema";
 
-type ContractScope = { companyId: string; contractId: string };
+/**
+ * Where the documents live: a contract the company is party to, or, with no
+ * contract, the company's own private library.
+ */
+type ContractScope = { companyId: string; contractId?: string };
 type DocumentScope = ContractScope & { documentId: string };
 
-const listTag = (contractId: string) => ({
+/** Contract routes for a contract's documents, company routes otherwise. */
+function documentRoute({ companyId, contractId }: ContractScope, path = "") {
+  return contractId
+    ? contractRoute(companyId, contractId, `/documents${path}`)
+    : companyRoute(companyId, `/documents${path}`);
+}
+
+const listTag = ({ companyId, contractId }: ContractScope) => ({
   type: "ContractDocument" as const,
-  id: `list:${contractId}`,
+  id: contractId ? `list:${contractId}` : `list:company:${companyId}`,
 });
 
 /**
- * Contract documents. Company and contract travel only in the scope headers
- * set by `contractRoute`. Upload and download URLs are short-lived bearer
+ * Contract and company documents. Company and contract travel only in the
+ * scope headers set by `contractRoute` and `companyRoute`. Upload and download URLs are short-lived bearer
  * credentials, so they come from mutations and are never cached.
  */
 export const documentsApi = api
@@ -41,11 +54,11 @@ export const documentsApi = api
         ContractScope & IPaginationQuery
       >({
         query: ({ companyId, contractId, ...params }) => ({
-          ...contractRoute(companyId, contractId, "/documents"),
+          ...documentRoute({ companyId, contractId }),
           params,
         }),
-        providesTags: (result, _error, { contractId }) => [
-          listTag(contractId),
+        providesTags: (result, _error, { companyId, contractId }) => [
+          listTag({ companyId, contractId }),
           ...(result?.data ?? []).map(({ id }) => ({
             type: "ContractDocument" as const,
             id,
@@ -55,7 +68,7 @@ export const documentsApi = api
 
       getContractDocument: builder.query<DocumentDetail, DocumentScope>({
         query: ({ companyId, contractId, documentId }) =>
-          contractRoute(companyId, contractId, `/documents/${documentId}`),
+          documentRoute({ companyId, contractId }, `/${documentId}`),
         providesTags: (_result, _error, { documentId }) => [
           { type: "ContractDocument", id: documentId },
         ],
@@ -63,15 +76,18 @@ export const documentsApi = api
 
       createDocumentUpload: builder.mutation<
         DocumentUploadSession,
-        ContractScope & { body: CreateDocumentUploadRequest }
+        ContractScope & {
+          body:
+            CreateDocumentUploadRequest | CreateCompanyDocumentUploadRequest;
+        }
       >({
         query: ({ companyId, contractId, body }) => ({
-          ...contractRoute(companyId, contractId, "/documents/upload-url"),
+          ...documentRoute({ companyId, contractId }, "/upload-url"),
           method: "POST",
           body,
         }),
-        invalidatesTags: (_result, _error, { contractId }) => [
-          listTag(contractId),
+        invalidatesTags: (_result, _error, { companyId, contractId }) => [
+          listTag({ companyId, contractId }),
         ],
       }),
 
@@ -80,10 +96,9 @@ export const documentsApi = api
         DocumentScope & { body: CreateDocumentVersionUploadRequest }
       >({
         query: ({ companyId, contractId, documentId, body }) => ({
-          ...contractRoute(
-            companyId,
-            contractId,
-            `/documents/${documentId}/versions/upload-url`,
+          ...documentRoute(
+            { companyId, contractId },
+            `/${documentId}/versions/upload-url`,
           ),
           method: "POST",
           body,
@@ -98,15 +113,18 @@ export const documentsApi = api
         DocumentScope & { versionId: string }
       >({
         query: ({ companyId, contractId, documentId, versionId }) => ({
-          ...contractRoute(
-            companyId,
-            contractId,
-            `/documents/${documentId}/versions/${versionId}/complete`,
+          ...documentRoute(
+            { companyId, contractId },
+            `/${documentId}/versions/${versionId}/complete`,
           ),
           method: "POST",
         }),
-        invalidatesTags: (_result, _error, { contractId, documentId }) => [
-          listTag(contractId),
+        invalidatesTags: (
+          _result,
+          _error,
+          { companyId, contractId, documentId },
+        ) => [
+          listTag({ companyId, contractId }),
           { type: "ContractDocument", id: documentId },
         ],
       }),
@@ -116,10 +134,9 @@ export const documentsApi = api
         DocumentScope & { versionId?: string }
       >({
         query: ({ companyId, contractId, documentId, versionId }) => ({
-          ...contractRoute(
-            companyId,
-            contractId,
-            `/documents/${documentId}/download-url`,
+          ...documentRoute(
+            { companyId, contractId },
+            `/${documentId}/download-url`,
           ),
           method: "GET",
           params: versionId ? { versionId } : undefined,
@@ -128,12 +145,12 @@ export const documentsApi = api
 
       deleteContractDocument: builder.mutation<void, DocumentScope>({
         query: ({ companyId, contractId, documentId }) => ({
-          ...contractRoute(companyId, contractId, `/documents/${documentId}`),
+          ...documentRoute({ companyId, contractId }, `/${documentId}`),
           method: "DELETE",
         }),
-        invalidatesTags: (_result, _error, { contractId, documentId }) => [
-          listTag(contractId),
-          { type: "ContractDocument", id: documentId },
+        // Only the list: refetching the deleted document itself would 404.
+        invalidatesTags: (_result, _error, { companyId, contractId }) => [
+          listTag({ companyId, contractId }),
         ],
       }),
     }),

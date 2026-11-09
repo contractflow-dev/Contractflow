@@ -145,6 +145,62 @@ export class DocumentRepository extends CompanyScopedRepository<Document> {
       );
   }
 
+  // -------------------------------------------------------------------------
+  // Company-wide documents (contract_id is null). Only the owner company's
+  // scope reaches them; contract scopes never do, because every
+  // contract-scoped query above requires a matching contract id.
+  // -------------------------------------------------------------------------
+
+  /** An active company-wide document owned by the scope company. */
+  findCompanyLevelById(
+    scope: ICompanyScope,
+    documentId: string,
+    options: { lockForUpdate?: boolean } = {},
+  ): Promise<Document | null> {
+    return this.findOne(scope, {
+      where: {
+        id: documentId,
+        contractId: IsNull(),
+      } as FindOptionsWhere<Document>,
+      ...(options.lockForUpdate
+        ? { lock: { mode: 'pessimistic_write' as const } }
+        : {}),
+    });
+  }
+
+  async findCompanyLevelPage(
+    scope: ICompanyScope,
+    page: { skip: number; take: number },
+  ): Promise<{ items: Document[]; total: number }> {
+    const [items, total] = await this.scopedQuery(scope, 'document')
+      .andWhere('document.contractId IS NULL')
+      .orderBy('document.createdAt', 'DESC')
+      .addOrderBy('document.id', 'ASC')
+      .skip(page.skip)
+      .take(page.take)
+      .getManyAndCount();
+    return { items, total };
+  }
+
+  /** Marks an active company-wide document deleted. False if none matched. */
+  async softDeleteCompanyLevel(
+    scope: ICompanyScope,
+    documentId: string,
+    deletedById: string,
+    now: Date,
+  ): Promise<boolean> {
+    const result = await this.repository.update(
+      {
+        id: documentId,
+        contractId: IsNull(),
+        ownerCompanyId: requireCompanyId(scope),
+        deletedAt: IsNull(),
+      },
+      { deletedAt: now, deletedById },
+    );
+    return Boolean(result.affected);
+  }
+
   findByContract(scope: ICompanyScope, contractId: string) {
     return this.findAll(scope, {
       where: { contractId } as FindOptionsWhere<Document>,

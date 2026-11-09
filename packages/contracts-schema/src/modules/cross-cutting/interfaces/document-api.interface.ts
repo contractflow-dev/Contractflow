@@ -23,6 +23,16 @@ export interface CreateDocumentUploadRequest {
   changeNote?: string;
 }
 
+/**
+ * Upload-permission request for a company-wide document. These belong to the
+ * company named by X-Company-Id and are never shared with other companies,
+ * so there is no visibility choice.
+ */
+export type CreateCompanyDocumentUploadRequest = Omit<
+  CreateDocumentUploadRequest,
+  "visibility"
+>;
+
 /** Upload-permission request for a new version of an existing document. */
 export interface CreateDocumentVersionUploadRequest {
   fileName: string;
@@ -58,7 +68,8 @@ export interface DocumentVersionSummary {
 
 export interface DocumentSummary {
   id: string;
-  contractId: string;
+  /** Null for a company-wide document, which belongs to no contract. */
+  contractId: string | null;
   ownerCompanyId: string;
   title: string;
   documentNumber: string;

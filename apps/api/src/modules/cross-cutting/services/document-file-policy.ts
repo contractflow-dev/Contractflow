@@ -178,18 +178,21 @@ export function fileExtension(fileName: string): string | null {
 
 /**
  * Object keys are generated only here, from server-side identifiers. The
- * original file name is never part of the key.
+ * original file name is never part of the key. Company-wide documents (no
+ * contract) live under the company's own "documents" prefix. Keys are an
+ * address, not an access control: every read and write is authorized from
+ * the database record first.
  */
 export function buildDocumentStorageKey(parts: {
   companyId: string;
-  contractId: string;
+  contractId: string | null;
   documentId: string;
   versionId: string;
   extension: string;
 }): string {
   for (const value of [
     parts.companyId,
-    parts.contractId,
+    parts.contractId ?? parts.companyId,
     parts.documentId,
     parts.versionId,
   ]) {
@@ -203,8 +206,7 @@ export function buildDocumentStorageKey(parts: {
   return [
     'companies',
     parts.companyId,
-    'contracts',
-    parts.contractId,
+    ...(parts.contractId ? ['contracts', parts.contractId] : []),
     'documents',
     parts.documentId,
     `${parts.versionId}.${parts.extension}`,
