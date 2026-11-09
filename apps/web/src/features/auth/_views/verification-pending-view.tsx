@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { RiMailLine } from "@remixicon/react";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
@@ -10,10 +10,29 @@ import { Input } from "@workspace/ui/components/input";
 import { useResendVerificationEmailMutation } from "@/services/authApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { AuthTopBar } from "@/components/auth/authTopBar";
-import { HeroMetrics } from "@/components/auth/HeroMetrics";
+import { AuthHero } from "@/components/auth/auth-hero";
+import {
+  maskEmail,
+  readPendingVerificationEmail,
+  rememberPendingVerificationEmail,
+} from "../pendingVerificationEmail";
+
+// sessionStorage doesn't announce changes made in this tab; the address is
+// read once per render, and the server render has none.
+function subscribeToPendingEmail() {
+  return () => {};
+}
 
 export function VerificationPendingView() {
-  const [emailInput, setEmailInput] = useState("");
+  const pendingEmail = useSyncExternalStore(
+    subscribeToPendingEmail,
+    readPendingVerificationEmail,
+    () => null,
+  );
+  // null until the user edits the field: until then it shows the address
+  // the link was sent to.
+  const [typedEmail, setTypedEmail] = useState<string | null>(null);
+  const emailInput = typedEmail ?? pendingEmail ?? "";
   const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
@@ -35,10 +54,10 @@ export function VerificationPendingView() {
     setMessage(null);
     setErrorMessage(null);
 
+    const email = emailInput.trim().toLowerCase();
     try {
-      const response = await resendVerification({
-        email: emailInput.trim().toLowerCase(),
-      }).unwrap();
+      const response = await resendVerification({ email }).unwrap();
+      rememberPendingVerificationEmail(email);
       setMessage(
         response.message ??
           "If an account needs verification, a new link will be sent.",
@@ -65,9 +84,20 @@ export function VerificationPendingView() {
                 Check your inbox
               </h1>
               <p className="text-sm leading-6 text-muted-foreground">
-                We sent you a verification link. Open it to verify your email
-                address and finish setting up your ContractFlow account. If you
-                don’t see it, check your spam folder.
+                {pendingEmail ? (
+                  <>
+                    We sent a verification link to{" "}
+                    <span className="font-medium text-foreground">
+                      {maskEmail(pendingEmail)}
+                    </span>
+                    .
+                  </>
+                ) : (
+                  "We sent you a verification link."
+                )}{" "}
+                Open it to verify your email address and finish setting up
+                your ContractFlow account. If you don’t see it, check your spam
+                folder.
               </p>
             </div>
           </header>
@@ -86,7 +116,7 @@ export function VerificationPendingView() {
                   maxLength={254}
                   placeholder="you@company.com"
                   value={emailInput}
-                  onChange={(event) => setEmailInput(event.target.value)}
+                  onChange={(event) => setTypedEmail(event.target.value)}
                 />
               </Field>
 
@@ -129,28 +159,7 @@ export function VerificationPendingView() {
           </p>
         </div>
       </section>
-      <aside className="relative hidden min-w-0 flex-col justify-between bg-auth-hero bg-cover bg-center p-10 text-white lg:sticky lg:top-0 lg:flex lg:min-h-svh lg:self-start">
-        <div className="absolute inset-0 bg-black/60" aria-hidden="true" />
-        <span className="relative z-10 text-lg font-semibold tracking-tight">
-          ContractFlow
-        </span>
-
-        <div className="relative z-10 space-y-6">
-          <div className="space-y-3">
-            <h2 className="text-3xl font-semibold leading-tight">
-              Every contract, from tender to close-out, in one place.
-            </h2>
-            <p className="max-w-md text-sm text-white/80">
-              Track vendors, approvals, milestones and obligations across your
-              oil and gas operations.
-            </p>
-          </div>
-          <HeroMetrics className="mt-4 gap-8 xl:mt-2 xl:gap-1" />
-          <p className="text-xs text-white/70">
-            &copy; {new Date().getFullYear()} ContractFlow
-          </p>
-        </div>
-      </aside>
+      <AuthHero />
     </main>
   );
 }

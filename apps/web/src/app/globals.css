@@ -51,6 +51,7 @@
 
   /* ContractFlow additions */
   --color-field: var(--field);
+  --color-field-border: var(--field-border);
   --color-brand: var(--brand);
   --color-brand-foreground: var(--primary-foreground);
   --color-hero-overlay: var(--hero-overlay);
@@ -99,7 +100,13 @@
   /* Radius, from --radius (4px). Conventions used by the shared components:
    *   controls: buttons, inputs, selects, badges, menus, popovers = rounded-2xl (≈7px)
    *   surfaces: cards, dialogs, alert dialogs = min(radius-4xl, 24px) (≈10px)
-   *   pills: avatars and status dots = rounded-full */
+   *   pills: avatars and status dots = rounded-full
+   *
+   * Control heights, set by the shared components (pages don't override them):
+   *   default = 40px (h-10) for buttons, inputs, selects and input groups
+   *   sm = 32px and xs = 28px, for compact rows such as table actions
+   *   lg = 44px; xl = at least 44px, wrapping, for full-width calls to action
+   * Text fields have a visible border-field-border at rest. */
   --radius-sm: calc(var(--radius) * 0.8);
   --radius-md: calc(var(--radius) * 1.1);
   --radius-lg: var(--radius);
@@ -134,6 +141,9 @@
   --input: oklch(0.872 0.012 259.8); /* #d0d5dd */
   --ring: oklch(0.548 0.155 40.6); /* #b8491a */
   --field: oklch(1 0 0); /* #ffffff */
+  /* Resting outline of text fields and selects: 3.9:1 on cards and 3.7:1 on
+     the page (WCAG 1.4.11 asks for 3:1). --input stays the lighter fill. */
+  --field-border: oklch(0.6 0.025 262); /* #788190 */
   /* Orange text and fills. Same hue as before, darker for WCAG AA: as text
      4.97:1 on the page background and 5.33:1 on cards; white on it 5.33:1,
      and 4.53:1 on its 90% hover fill. #c4501a was 4.34:1 on the page. */
@@ -208,6 +218,7 @@
   --input: oklch(0.311 0.048 264.2); /* #243049 */
   --ring: oklch(0.704 0.159 43.6); /* #ef7a45 */
   --field: oklch(0.219 0.038 263.3); /* #111a2c */
+  --field-border: oklch(0.56 0.04 264); /* #69758d, 3.7:1 on cards, 4.1:1 on the page */
   --brand: oklch(0.704 0.159 43.6); /* #ef7a45 */
 
   --navy: oklch(0.96 0.008 253.9); /* #eef2f7, inverted so it still contrasts */

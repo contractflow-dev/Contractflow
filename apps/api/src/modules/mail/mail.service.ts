@@ -28,6 +28,38 @@ export class MailService {
     await this.sendEmail(email, 'Verify your ContractFlow email', text);
   }
 
+  /**
+   * The password reset link. The token is only ever in this email's link:
+   * never logged, and the email has no images or tracking links.
+   */
+  async sendPasswordResetEmail(
+    email: string,
+    token: string,
+    expiresInMinutes: number,
+  ): Promise<void> {
+    const isProduction = this.config.get<string>('NODE_ENV') === 'production';
+    const webUrl =
+      this.config.get<string>('WEB_URL') ??
+      (isProduction ? undefined : 'http://localhost:3000');
+    if (!webUrl) {
+      throw new ServiceUnavailableException(
+        'Email delivery is not configured. Set WEB_URL.',
+      );
+    }
+
+    const resetUrl = new URL('/auth/reset-password', webUrl);
+    resetUrl.searchParams.set('token', token);
+    const text =
+      'ContractFlow password reset\n\n' +
+      'We received a request to reset the password for your ContractFlow account.\n\n' +
+      `Choose a new password here: ${resetUrl.toString()}\n\n` +
+      `This link expires in ${expiresInMinutes} minutes and can only be used once. ` +
+      'Resetting your password signs you out on every device.\n\n' +
+      "If you didn't ask to reset your password, you can ignore this email. " +
+      'Your password stays the same.';
+    await this.sendEmail(email, 'Reset your ContractFlow password', text);
+  }
+
   async sendCompanyInvitationEmail(
     email: string,
     companyName: string,

@@ -6,5 +6,5 @@ export default async function ContractDetailPage({
   params: Promise<{ contractId: string }>;
 }) {
   const { contractId } = await params;
-  return <ContractDetailsView contractId={contractId} />;
+  return <ContractDetailsView contractId={contractId} section="overview" />;
 }

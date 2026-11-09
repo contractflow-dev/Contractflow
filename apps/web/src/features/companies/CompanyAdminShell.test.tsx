@@ -338,6 +338,18 @@ describe("CompanyAdminShell", () => {
     expect(markup).toContain("Acme Works");
   });
 
+  it("renders through the shared shell: one navigation landmark and a mobile menu button", () => {
+    const markup = renderToStaticMarkup(
+      <CompanyAdminShell>{() => <p>Company content</p>}</CompanyAdminShell>,
+    );
+
+    // The old mobile tab strip duplicated the navigation; the drawer replaces it.
+    expect(markup.match(/<nav /g)).toHaveLength(1);
+    expect(markup).toContain('<nav aria-label="Company dashboard">');
+    expect(markup).toContain('aria-label="Open company dashboard menu"');
+    expect(markup).toMatch(/<main[^>]*>[\s\S]*Company content/);
+  });
+
   it("renders the overview for a company administrator", () => {
     mocks.pathname = "/dashboards";
 

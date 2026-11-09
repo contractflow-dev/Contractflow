@@ -59,6 +59,40 @@ describe('MailService', () => {
     );
   });
 
+  it('sends a password reset link with its expiry and an ignore note', async () => {
+    const service = createService({
+      NODE_ENV: 'development',
+      WEB_URL: 'http://localhost:3202',
+    });
+
+    await service.sendPasswordResetEmail('user@example.com', 'reset-token', 30);
+
+    const message = mocks.sendMail.mock.calls[0][0] as {
+      to: string;
+      subject: string;
+      text: string;
+    };
+    expect(message.to).toBe('user@example.com');
+    expect(message.subject).toBe('Reset your ContractFlow password');
+    expect(message.text).toContain(
+      'http://localhost:3202/auth/reset-password?token=reset-token',
+    );
+    expect(message.text).toContain('expires in 30 minutes');
+    expect(message.text).toContain("If you didn't ask to reset your password");
+    // Plain text only: no images or tracking links that could see the token.
+    expect(message).not.toHaveProperty('html');
+    expect(message.text.match(/https?:\/\//g)).toHaveLength(1);
+  });
+
+  it('refuses to build a reset link without a web URL in production', async () => {
+    const service = createService({ NODE_ENV: 'production' });
+
+    await expect(
+      service.sendPasswordResetEmail('user@example.com', 'reset-token', 30),
+    ).rejects.toThrow('Set WEB_URL');
+    expect(mocks.sendMail).not.toHaveBeenCalled();
+  });
+
   it('keeps Resend as the production default', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal('fetch', fetchMock);

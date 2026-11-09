@@ -7,11 +7,12 @@ import type {
   IUserSessionRepository,
 } from '../interface/user-session-repository.interface';
 import { UserSession } from '../entities/user-session.entity';
+import type { IPasswordResetSessionRepository } from '../interface/password-reset-persistence.interface';
 
 @Injectable()
 export class UserSessionRepository
   extends BaseRepository<UserSession>
-  implements IUserSessionRepository
+  implements IUserSessionRepository, IPasswordResetSessionRepository
 {
   constructor(
     @InjectRepository(UserSession) repository: Repository<UserSession>,
@@ -44,5 +45,9 @@ export class UserSessionRepository
       { refreshTokenHash, revokedAt: IsNull() },
       { revokedAt },
     );
+  }
+
+  async revokeAllActiveForUser(userId: string, revokedAt: Date): Promise<void> {
+    await this.repository.update({ userId, revokedAt: IsNull() }, { revokedAt });
   }
 }

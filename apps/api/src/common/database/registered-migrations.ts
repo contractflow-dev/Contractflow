@@ -11,6 +11,7 @@ import { CompanyInvitationExpiryIndex1792862700001 } from './migrations/17928627
 import { CompanyInvitationOptionalNames1793100000000 } from './migrations/1793100000000-company-invitation-optional-names';
 import { CompanyEmailVerification1793200000000 } from './migrations/1793200000000-company-email-verification';
 import { DocumentObjectStorage1793300000000 } from './migrations/1793300000000-document-object-storage';
+import { PasswordResetToken1793400000000 } from './migrations/1793400000000-password-reset-token';
 
 export const registeredMigrations = [
   IdentitySchemaBootstrap1749000000000,
@@ -26,4 +27,5 @@ export const registeredMigrations = [
   CompanyInvitationOptionalNames1793100000000,
   CompanyEmailVerification1793200000000,
   DocumentObjectStorage1793300000000,
+  PasswordResetToken1793400000000,
 ];

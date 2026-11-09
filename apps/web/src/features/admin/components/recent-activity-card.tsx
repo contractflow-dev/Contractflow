@@ -39,7 +39,7 @@ export function RecentActivityCard({ activity }: RecentActivityCardProps) {
           aria-level={2}
           className="flex items-center gap-2 text-base font-semibold tracking-tight"
         >
-          <RiHistoryLine className="size-4 text-blue-500" />
+          <RiHistoryLine className="size-4 text-info" />
           Platform Activity Audit
         </CardTitle>
         <CardDescription className="text-xs">

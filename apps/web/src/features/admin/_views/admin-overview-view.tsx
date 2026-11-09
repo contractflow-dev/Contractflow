@@ -37,8 +37,8 @@ export function AdminOverviewView() {
             <div className="flex items-center gap-2">
               <h1 className="type-page-title">Platform Overview</h1>
               <Badge
-                variant="outline"
-                className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs gap-1 font-medium"
+                variant="success"
+                className="gap-1 text-xs font-medium"
               >
                 <RiCheckboxCircleLine className="size-3" />
                 Live Telemetry

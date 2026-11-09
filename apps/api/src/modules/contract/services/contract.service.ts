@@ -7,7 +7,10 @@ import {
 import { ECompanyRole } from '@contractflow/contracts-schema';
 import type {
   Contract as ContractApiResponse,
+  ContractCounterparty,
   ContractDetail,
+  ContractListItem,
+  ContractListRole,
   ContractMembership,
   IPaginatedResponse,
 } from '@contractflow/contracts-schema';
@@ -24,6 +27,8 @@ import {
 import { ContractStatusHistory } from '../entities/contract-status-history.entity';
 import { CompanyUserRepository } from '../../identity/repositories/company-user.respository';
 import { ContractWorkspaceRepository } from '../repositories/contract-workspace.repository';
+import { ContractRoleAssignmentRepository } from '../repositories/contract-role-assignment.repository';
+import { workspaceForRole } from './contract-workspace';
 import type { AssignableContractWorkspace } from './contract-workspace';
 import type {
   ContractPartySummary,
@@ -62,14 +67,19 @@ export class ContractService {
     private readonly contracts: ContractRepository,
     private readonly companyUsers: CompanyUserRepository,
     private readonly workspaces: ContractWorkspaceRepository,
+    private readonly roleAssignments: ContractRoleAssignmentRepository,
   ) {}
 
   async list(
     userId: string,
     companyId: string,
     query: ListContractsQuery,
-  ): Promise<IPaginatedResponse<ContractApiResponse>> {
-    const scope = await this.companyScope.forUser(userId, companyId);
+  ): Promise<IPaginatedResponse<ContractListItem>> {
+    const context = await this.companyScope.contextForUser(userId, companyId);
+    const scope = { companyId: context.companyId };
+    // The user's own membership of the header company: the only assignments
+    // this list ever reads.
+    const companyUserId = context.membership.id;
     if (query.includeDeleted) {
       const companyRole = await this.companyUsers.findActiveRoleForUser(
         userId,
@@ -86,13 +96,49 @@ export class ContractService {
       status: query.status,
       includeDeleted: query.includeDeleted,
       creatorCompanyId: query.includeDeleted ? scope.companyId : undefined,
+      assignedToCompanyUserId: query.assignedToMe ? companyUserId : undefined,
       sortBy: query.sortBy,
       sortOrder: query.sortOrder,
       skip: pageOffset(query),
       take: query.limit,
     });
+    // Other parties' names, under the same rule as GET /contract/parties:
+    // any member of a party company may see them. Archived contracts can't be
+    // opened, so their parties aren't listed.
+    const counterparties = query.includeDeleted
+      ? []
+      : await this.parties.findCounterparties(
+          scope.companyId,
+          result.items.map((contract) => contract.id),
+        );
+    const roles = query.includeDeleted
+      ? []
+      : await this.roleAssignments.findActiveRolesForContracts(
+          scope,
+          companyUserId,
+          result.items.map((contract) => contract.id),
+        );
+    const rolesByContract = new Map<string, ContractListRole[]>();
+    for (const { contractId, role, isWorkspaceAdmin } of roles) {
+      const list = rolesByContract.get(contractId) ?? [];
+      list.push({ role, workspace: workspaceForRole(role), isWorkspaceAdmin });
+      rolesByContract.set(contractId, list);
+    }
+    const byContract = new Map<string, ContractCounterparty[]>();
+    for (const { contractId, companyName, partyType } of counterparties) {
+      const list = byContract.get(contractId) ?? [];
+      list.push({ companyName, partyType });
+      byContract.set(contractId, list);
+    }
     return toPaginatedResponse(
-      { ...result, items: result.items.map(toContractResponse) },
+      {
+        ...result,
+        items: result.items.map((contract) => ({
+          ...toContractResponse(contract),
+          counterparties: byContract.get(contract.id) ?? [],
+          myRoles: rolesByContract.get(contract.id) ?? [],
+        })),
+      },
       query,
     );
   }

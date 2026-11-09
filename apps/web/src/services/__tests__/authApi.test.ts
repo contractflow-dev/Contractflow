@@ -89,6 +89,50 @@ describe("RTK Query authentication and company API contracts", () => {
     await expect(request.clone().json()).resolves.toEqual(input);
   });
 
+  it("posts password reset requests with the token only in the body and no company context", async () => {
+    store.dispatch(setActiveWorkspaceId("01JCOMPANY00000000000000000"));
+    const token = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG";
+    for (let i = 0; i < 2; i++) {
+      fetchMock.mockResolvedValueOnce(
+        new Response(JSON.stringify({ message: "ok" }), {
+          status: 201,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    }
+
+    await store
+      .dispatch(
+        authApi.endpoints.forgotPassword.initiate({ email: "user@example.com" }),
+      )
+      .unwrap();
+    await store
+      .dispatch(
+        authApi.endpoints.resetPassword.initiate({
+          token,
+          password: "New-Password-123",
+        }),
+      )
+      .unwrap();
+
+    const [forgot, reset] = fetchMock.mock.calls.map((call) => call[0] as Request);
+    expect(forgot.url).toBe("http://localhost:3001/api/auth/forgot-password");
+    expect(forgot.method).toBe("POST");
+    await expect(forgot.clone().json()).resolves.toEqual({
+      email: "user@example.com",
+    });
+    expect(reset.url).toBe("http://localhost:3001/api/auth/reset-password");
+    expect(reset.url).not.toContain(token);
+    await expect(reset.clone().json()).resolves.toEqual({
+      token,
+      password: "New-Password-123",
+    });
+    for (const request of [forgot, reset]) {
+      expect(request.credentials).toBe("include");
+      expect(request.headers.get("X-Company-Id")).toBeNull();
+    }
+  });
+
   it("posts logout with cookies and clears authenticated client state and caches", async () => {
     fetchMock.mockResolvedValueOnce(
       new Response(JSON.stringify({ success: true }), {

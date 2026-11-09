@@ -51,7 +51,7 @@ export function AttentionItemsCard({ attention }: AttentionItemsCardProps) {
           aria-level={2}
           className="flex items-center gap-2 text-base font-semibold tracking-tight"
         >
-          <RiAlarmWarningLine className="size-4 text-amber-500" />
+          <RiAlarmWarningLine className="size-4 text-warning" />
           Operational Attention
         </CardTitle>
         <CardDescription className="text-xs">
@@ -72,7 +72,7 @@ export function AttentionItemsCard({ attention }: AttentionItemsCardProps) {
             <EmptyHeader>
               <EmptyMedia
                 variant="icon"
-                className="rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                className="rounded-full bg-success-soft text-success-soft-foreground"
               >
                 <RiCheckDoubleLine />
               </EmptyMedia>

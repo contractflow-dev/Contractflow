@@ -58,6 +58,47 @@ export class ContractPartyRepository extends ContractScopedRepository<ContractPa
     });
   }
 
+  /**
+   * The other parties to each of the given contracts, with company names, for
+   * the contract list. A row is returned only when `companyId` is itself a
+   * party to that contract and the contract is not archived, so passing a
+   * contract ID never reveals a contract the company cannot already open
+   * (the same rule as `GET /contract/parties`).
+   */
+  async findCounterparties(
+    companyId: string,
+    contractIds: string[],
+  ): Promise<
+    { contractId: string; companyName: string; partyType: ContractParty['partyType'] }[]
+  > {
+    if (!companyId.trim() || contractIds.length === 0) {
+      return [];
+    }
+    const rows = await this.repository
+      .createQueryBuilder('party')
+      .innerJoin('party.company', 'company')
+      .innerJoin('party.contract', 'contract')
+      .where('party.contractId IN (:...contractIds)', { contractIds })
+      .andWhere('party.companyId <> :companyId', { companyId })
+      .andWhere('contract.deletedAt IS NULL')
+      .andWhere(
+        `EXISTS (SELECT 1 FROM contract_party own
+          WHERE own.contract_id = party.contract_id
+            AND own.company_id = :companyId)`,
+      )
+      .select('party.contractId', 'contractId')
+      .addSelect('company.name', 'companyName')
+      .addSelect('party.partyType', 'partyType')
+      .orderBy('party.createdAt', 'ASC')
+      .addOrderBy('party.id', 'ASC')
+      .getRawMany<{
+        contractId: string;
+        companyName: string;
+        partyType: ContractParty['partyType'];
+      }>();
+    return rows;
+  }
+
   async countActiveContracts(companyId: string): Promise<number> {
     const result = await this.repository
       .createQueryBuilder('party')

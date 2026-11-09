@@ -85,7 +85,9 @@ export function ContractSiteManagement({
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4">
         <div>
-          <CardTitle>Contract sites</CardTitle>
+          <CardTitle>
+            <h2>Contract sites</h2>
+          </CardTitle>
           <CardDescription>
             Sites must exist before site logs, inspections, or incidents can
             reference them.

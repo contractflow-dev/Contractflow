@@ -32,6 +32,7 @@ describe('database migration configuration', () => {
       'CompanyInvitationOptionalNames1793100000000',
       'CompanyEmailVerification1793200000000',
       'DocumentObjectStorage1793300000000',
+      'PasswordResetToken1793400000000',
     ]);
   });
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   EMPTY_VALUE,
+  currencyDigits,
   daysUntilCalendarDate,
   formatBasisPoints,
   formatCalendarDate,
@@ -12,6 +13,8 @@ import {
   formatRelativeTime,
   formatTime,
   humanizeEnumValue,
+  parseDecimalToMinor,
+  parsePercentToBasisPoints,
   resolveTimeZone,
   todayAsCalendarDate,
 } from "./format";
@@ -207,5 +210,68 @@ describe("humanizeEnumValue", () => {
       "Company Administrator",
     );
     expect(humanizeEnumValue("")).toBe(EMPTY_VALUE);
+  });
+});
+
+describe("currencyDigits", () => {
+  it("reads each currency's minor-unit precision", () => {
+    expect(currencyDigits("NGN")).toBe(2);
+    expect(currencyDigits("JPY")).toBe(0);
+    expect(currencyDigits("BHD")).toBe(3);
+    expect(currencyDigits("NOT-A-CODE")).toBeNull();
+  });
+});
+
+describe("parseDecimalToMinor", () => {
+  it("converts a decimal amount to whole minor units exactly", () => {
+    expect(parseDecimalToMinor("1500000.50", "NGN")).toBe(150000050);
+    expect(parseDecimalToMinor("1500000", "NGN")).toBe(150000000);
+    expect(parseDecimalToMinor("0.1", "USD")).toBe(10);
+    expect(parseDecimalToMinor(" 12.34 ", "USD")).toBe(1234);
+    // 0.29 * 100 is 28.999999999999996 in floating point.
+    expect(parseDecimalToMinor("0.29", "USD")).toBe(29);
+  });
+
+  it("accepts grouping commas only in their usual places", () => {
+    expect(parseDecimalToMinor("1,500,000.50", "NGN")).toBe(150000050);
+    expect(parseDecimalToMinor("15,00", "NGN")).toBeNull();
+    expect(parseDecimalToMinor("1,5000", "NGN")).toBeNull();
+  });
+
+  it("follows the currency's precision", () => {
+    expect(parseDecimalToMinor("500", "JPY")).toBe(500);
+    expect(parseDecimalToMinor("500.5", "JPY")).toBeNull();
+    expect(parseDecimalToMinor("1.234", "BHD")).toBe(1234);
+    expect(parseDecimalToMinor("1.234", "USD")).toBeNull();
+  });
+
+  it("rejects anything that is not a non-negative amount", () => {
+    for (const text of ["", " ", "-5", "1e6", "12.", ".5", "abc", "1 000"]) {
+      expect(parseDecimalToMinor(text, "USD"), text).toBeNull();
+    }
+    expect(parseDecimalToMinor("10", "NOT-A-CODE")).toBeNull();
+  });
+
+  it("rejects amounts too large to send exactly", () => {
+    expect(parseDecimalToMinor("90071992547409.91", "USD")).toBe(
+      Number.MAX_SAFE_INTEGER,
+    );
+    expect(parseDecimalToMinor("90071992547409.92", "USD")).toBeNull();
+  });
+});
+
+describe("parsePercentToBasisPoints", () => {
+  it("converts a percentage to basis points", () => {
+    expect(parsePercentToBasisPoints("5")).toBe(500);
+    expect(parsePercentToBasisPoints("2.5")).toBe(250);
+    expect(parsePercentToBasisPoints("12.25")).toBe(1225);
+    expect(parsePercentToBasisPoints("0")).toBe(0);
+    expect(parsePercentToBasisPoints("100")).toBe(10_000);
+  });
+
+  it("rejects values outside 0-100 or finer than basis points", () => {
+    for (const text of ["", "100.01", "101", "-1", "2.555", "5%", "abc"]) {
+      expect(parsePercentToBasisPoints(text), text).toBeNull();
+    }
   });
 });

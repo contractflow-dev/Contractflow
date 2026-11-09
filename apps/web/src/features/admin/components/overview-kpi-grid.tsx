@@ -45,8 +45,8 @@ export function OverviewKpiGrid({ data }: OverviewKpiGridProps) {
             )}
           </div>
           <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-              <span className="size-1.5 rounded-full bg-emerald-500" />
+            <span className="flex items-center gap-1 text-success-soft-foreground">
+              <span className="size-1.5 rounded-full bg-success" />
               {companies.active} active
             </span>
             <span>•</span>
@@ -61,7 +61,7 @@ export function OverviewKpiGrid({ data }: OverviewKpiGridProps) {
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Registered Users
           </span>
-          <div className="grid size-9 place-items-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+          <div className="grid size-9 place-items-center rounded-lg bg-info-soft text-info-soft-foreground">
             <RiGroupLine className="size-5" />
           </div>
         </div>
@@ -76,12 +76,12 @@ export function OverviewKpiGrid({ data }: OverviewKpiGridProps) {
             </Badge>
           </div>
           <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-              <span className="size-1.5 rounded-full bg-emerald-500" />
+            <span className="flex items-center gap-1 text-success-soft-foreground">
+              <span className="size-1.5 rounded-full bg-success" />
               {users.active} active
             </span>
             <span>•</span>
-            <span className="text-amber-600 dark:text-amber-400">
+            <span className="text-warning-soft-foreground">
               {users.pendingVerification} unverified
             </span>
           </div>
@@ -94,7 +94,7 @@ export function OverviewKpiGrid({ data }: OverviewKpiGridProps) {
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Total Contracts
           </span>
-          <div className="grid size-9 place-items-center rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+          <div className="grid size-9 place-items-center rounded-lg bg-secondary text-secondary-foreground">
             <RiFileList3Line className="size-5" />
           </div>
         </div>
@@ -115,8 +115,8 @@ export function OverviewKpiGrid({ data }: OverviewKpiGridProps) {
             )}
           </div>
           <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-              <span className="size-1.5 rounded-full bg-emerald-500" />
+            <span className="flex items-center gap-1 text-success-soft-foreground">
+              <span className="size-1.5 rounded-full bg-success" />
               {contracts.active} active
             </span>
             <span>•</span>
@@ -133,7 +133,7 @@ export function OverviewKpiGrid({ data }: OverviewKpiGridProps) {
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Invitations
           </span>
-          <div className="grid size-9 place-items-center rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+          <div className="grid size-9 place-items-center rounded-lg bg-warning-soft text-warning-soft-foreground">
             <RiMailSendLine className="size-5" />
           </div>
         </div>
@@ -143,14 +143,14 @@ export function OverviewKpiGrid({ data }: OverviewKpiGridProps) {
               {formatNumber(invitations.total)}
             </span>
             {invitations.pending > 0 && (
-              <Badge variant="secondary" className="gap-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+              <Badge variant="warning" className="gap-1 text-xs font-medium">
                 <RiTimeLine className="size-3" />
                 {invitations.pending} pending
               </Badge>
             )}
           </div>
           <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+            <span className="flex items-center gap-1 text-success-soft-foreground">
               <RiCheckLine className="size-3" />
               {invitations.accepted} accepted
             </span>

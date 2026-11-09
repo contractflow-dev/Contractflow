@@ -36,8 +36,13 @@ describe('ContractService', () => {
     createdByCompanyId: 'co-1',
     deletedByCompanyUserId: null,
   };
-  const scopeFor = { forUser: vi.fn() };
-  const parties = { findByCompany: vi.fn(), findAllWithCompany: vi.fn() };
+  const scopeFor = { forUser: vi.fn(), contextForUser: vi.fn() };
+  const roleAssignments = { findActiveRolesForContracts: vi.fn() };
+  const parties = {
+    findByCompany: vi.fn(),
+    findAllWithCompany: vi.fn(),
+    findCounterparties: vi.fn(),
+  };
   const history = { searchPage: vi.fn() };
   const contracts = { findById: vi.fn(), searchPage: vi.fn() };
   const companyUsers = { findActiveRoleForUser: vi.fn() };
@@ -47,6 +52,11 @@ describe('ContractService', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     scopeFor.forUser.mockResolvedValue({ companyId: 'co-1' });
+    scopeFor.contextForUser.mockResolvedValue({
+      companyId: 'co-1',
+      membership: { id: 'cu-1', companyId: 'co-1' },
+    });
+    roleAssignments.findActiveRolesForContracts.mockResolvedValue([]);
     parties.findByCompany.mockResolvedValue({
       id: 'p-1',
       companyId: 'co-1',
@@ -56,6 +66,7 @@ describe('ContractService', () => {
       signatoryLastName: 'Signatory',
     });
     parties.findAllWithCompany.mockResolvedValue([]);
+    parties.findCounterparties.mockResolvedValue([]);
     history.searchPage.mockResolvedValue({ items: [], total: 0 });
     contracts.findById.mockResolvedValue(contractRecord);
     companyUsers.findActiveRoleForUser.mockResolvedValue(
@@ -69,11 +80,13 @@ describe('ContractService', () => {
       contracts as never,
       companyUsers as never,
       workspaces as never,
+      roleAssignments as never,
     );
   });
 
   it('rejects users who are not active members of the company', async () => {
     scopeFor.forUser.mockRejectedValue(new ForbiddenException());
+    scopeFor.contextForUser.mockRejectedValue(new ForbiddenException());
 
     await expect(service.get('u', 'co-1', 'c-1')).rejects.toBeInstanceOf(
       ForbiddenException,
@@ -304,5 +317,108 @@ describe('ContractService', () => {
     expect(Object.keys(result.data[0])).not.toContain(
       'deletedByCompanyUserId',
     );
+  });
+
+  it('adds the other parties to each listed contract with one scoped query', async () => {
+    contracts.searchPage.mockResolvedValue({
+      items: [contractRecord, { ...contractRecord, id: 'c-2' }],
+      total: 2,
+    });
+    parties.findCounterparties.mockResolvedValue([
+      { contractId: 'c-1', companyName: 'Bravo Energy', partyType: 'client' },
+      { contractId: 'c-1', companyName: 'Delta Supply', partyType: 'vendor' },
+    ]);
+
+    const result = await service.list('u', 'co-1', { page: 1, limit: 10 });
+
+    // Only the verified company and this page's (already scoped) contracts.
+    expect(parties.findCounterparties).toHaveBeenCalledTimes(1);
+    expect(parties.findCounterparties).toHaveBeenCalledWith('co-1', [
+      'c-1',
+      'c-2',
+    ]);
+    expect(result.data[0].counterparties).toEqual([
+      { companyName: 'Bravo Energy', partyType: 'client' },
+      { companyName: 'Delta Supply', partyType: 'vendor' },
+    ]);
+    expect(result.data[1].counterparties).toEqual([]);
+    // Only the name and party type: no IDs or signatory details.
+    expect(Object.keys(result.data[0].counterparties[0]).sort()).toEqual([
+      'companyName',
+      'partyType',
+    ]);
+  });
+
+  it('lists no parties for archived contracts', async () => {
+    contracts.searchPage.mockResolvedValue({
+      items: [{ ...contractRecord, deletedAt: new Date('2026-06-01') }],
+      total: 1,
+    });
+
+    const result = await service.list('u', 'co-1', {
+      page: 1,
+      limit: 10,
+      includeDeleted: true,
+    });
+
+    expect(parties.findCounterparties).not.toHaveBeenCalled();
+    expect(result.data[0].counterparties).toEqual([]);
+  });
+
+  it('narrows the list to the member\'s own assignments only when asked', async () => {
+    contracts.searchPage.mockResolvedValue({ items: [], total: 0 });
+
+    await service.list('u', 'co-1', { page: 1, limit: 10 });
+    expect(contracts.searchPage).toHaveBeenLastCalledWith(
+      { companyId: 'co-1' },
+      expect.objectContaining({ assignedToCompanyUserId: undefined }),
+    );
+
+    await service.list('u', 'co-1', { page: 1, limit: 10, assignedToMe: true });
+    // The membership comes from the verified header company, never the request.
+    expect(contracts.searchPage).toHaveBeenLastCalledWith(
+      { companyId: 'co-1' },
+      expect.objectContaining({ assignedToCompanyUserId: 'cu-1' }),
+    );
+  });
+
+  it("adds the member's own roles, with their workspace, to each row", async () => {
+    contracts.searchPage.mockResolvedValue({
+      items: [contractRecord, { ...contractRecord, id: 'c-2' }],
+      total: 2,
+    });
+    roleAssignments.findActiveRolesForContracts.mockResolvedValue([
+      { contractId: 'c-1', role: 'Finance Officer', isWorkspaceAdmin: true },
+      { contractId: 'c-1', role: 'HSE Officer', isWorkspaceAdmin: false },
+    ]);
+
+    const result = await service.list('u', 'co-1', { page: 1, limit: 10 });
+
+    expect(roleAssignments.findActiveRolesForContracts).toHaveBeenCalledWith(
+      { companyId: 'co-1' },
+      'cu-1',
+      ['c-1', 'c-2'],
+    );
+    expect(result.data[0].myRoles).toEqual([
+      { role: 'Finance Officer', workspace: 'finance', isWorkspaceAdmin: true },
+      { role: 'HSE Officer', workspace: 'hse', isWorkspaceAdmin: false },
+    ]);
+    expect(result.data[1].myRoles).toEqual([]);
+  });
+
+  it('reads no roles for archived contracts', async () => {
+    contracts.searchPage.mockResolvedValue({
+      items: [{ ...contractRecord, deletedAt: new Date('2026-06-01') }],
+      total: 1,
+    });
+
+    const result = await service.list('u', 'co-1', {
+      page: 1,
+      limit: 10,
+      includeDeleted: true,
+    });
+
+    expect(roleAssignments.findActiveRolesForContracts).not.toHaveBeenCalled();
+    expect(result.data[0].myRoles).toEqual([]);
   });
 });

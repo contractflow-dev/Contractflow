@@ -12,9 +12,6 @@ import { cn } from "@/lib/utils";
 import { useVerifyCompanyEmailMutation } from "@/services/companiesApi";
 
 const PAGE_PATH = "/auth/verify-company";
-const LINK_BUTTON_CLASS =
-  "h-auto min-h-11 w-full whitespace-normal py-2 text-center";
-
 type VerificationState = "verifying" | "verified" | "failed";
 
 function VerifyCompanyEmailContent() {
@@ -77,7 +74,7 @@ function VerifyCompanyEmailContent() {
               </p>
               <Link
                 href="/dashboards"
-                className={cn(buttonVariants(), LINK_BUTTON_CLASS)}
+                className={cn(buttonVariants({ size: "xl" }), "w-full")}
               >
                 Go to your workspace
               </Link>
@@ -102,10 +99,7 @@ function VerifyCompanyEmailContent() {
               </p>
               <Link
                 href="/dashboards"
-                className={cn(
-                  buttonVariants({ variant: "outline" }),
-                  LINK_BUTTON_CLASS,
-                )}
+                className={cn(buttonVariants({ variant: "outline", size: "xl" }), "w-full")}
               >
                 Go to your workspace
               </Link>

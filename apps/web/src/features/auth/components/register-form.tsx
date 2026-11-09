@@ -12,16 +12,9 @@ import {
   RiPhoneLine,
 } from "@remixicon/react";
 
-import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
-import { Checkbox } from "@workspace/ui/components/checkbox";
 import { Input } from "@workspace/ui/components/input";
-import {
-  Field,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from "@workspace/ui/components/field";
+import { FieldError, FieldGroup } from "@workspace/ui/components/field";
 import {
   FormField,
   FormSection,
@@ -40,7 +33,9 @@ import {
   SelectValue,
 } from "@workspace/ui/components/select";
 
+import { LegalConsent } from "@/components/auth/legal-consent";
 import { registerSchema, type RegisterValues } from "../registerSchema";
+import { rememberPendingVerificationEmail } from "../pendingVerificationEmail";
 import { PasswordInput } from "./password-input";
 import { getApiErrorMessage, getApiErrorStatus } from "@/lib/apiError";
 import { useRegisterMutation } from "@/services/authApi";
@@ -142,7 +137,10 @@ export function RegisterForm() {
     }
 
     form.setError("root.server", {
-      message: getApiErrorMessage(err, "Registration failed. Please try again."),
+      message: getApiErrorMessage(
+        err,
+        "Registration failed. Please try again.",
+      ),
     });
   }
 
@@ -159,6 +157,8 @@ export function RegisterForm() {
 
     try {
       await registerUser(payload).unwrap();
+      // "Check your inbox" names this address and can resend to it.
+      rememberPendingVerificationEmail(payload.email);
       router.push("/auth/verification-pending");
     } catch (err) {
       applyServerError(err);
@@ -172,12 +172,7 @@ export function RegisterForm() {
       className="flex flex-col gap-5"
     >
       <header className="flex flex-col gap-2">
-        <Badge variant="outline" className="w-fit">
-          STEP 1 OF 4
-        </Badge>
-        <h1 className="type-page-title">
-          Create your ContractFlow account
-        </h1>
+        <h1 className="type-page-title">Create your ContractFlow account</h1>
         <p className="text-xs text-muted-foreground">
           Set up your account and start managing contracts, teams, and workflows
           in one place.
@@ -188,7 +183,7 @@ export function RegisterForm() {
         <RequiredFieldsNote />
 
         <FormSection legend="Full name">
-          <div className="grid gap-3 sm:grid-cols-3 sm:gap-2">
+          <div className="grid gap-3 sm:grid-cols-2 sm:gap-2">
             {nameFields.map(({ name, label, required, autoComplete }) => (
               <Controller
                 key={name}
@@ -362,40 +357,14 @@ export function RegisterForm() {
           name="acceptTerms"
           control={form.control}
           render={({ field, fieldState }) => (
-            <Field orientation="horizontal" data-invalid={fieldState.invalid}>
-              <Checkbox
-                id="acceptTerms"
-                name={field.name}
-                checked={field.value}
-                onCheckedChange={(checked) => field.onChange(checked === true)}
-                aria-invalid={fieldState.invalid}
-                aria-required
-                aria-describedby={
-                  fieldState.invalid ? "acceptTerms-error" : undefined
-                }
-              />
-              <FieldLabel htmlFor="acceptTerms" className="text-xs font-normal">
-                <span>
-                  I agree to the{" "}
-                  <Link
-                    href="/terms-of-service"
-                    className="underline underline-offset-4"
-                  >
-                    Terms of Service
-                  </Link>{" "}
-                  and{" "}
-                  <Link
-                    href="/privacy-policy"
-                    className="underline underline-offset-4"
-                  >
-                    Privacy Policy
-                  </Link>
-                </span>
-              </FieldLabel>
-              {fieldState.invalid && (
-                <FieldError id="acceptTerms-error" errors={[fieldState.error]} />
-              )}
-            </Field>
+            // The terms open in a dialog, so reading them keeps the form.
+            <LegalConsent
+              checked={field.value}
+              onCheckedChange={(checked) => field.onChange(checked === true)}
+              onBlur={field.onBlur}
+              inputRef={field.ref}
+              error={fieldState.error?.message}
+            />
           )}
         />
       </FieldGroup>

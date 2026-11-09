@@ -22,7 +22,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
-import { FieldLabel } from "@workspace/ui/components/field";
 import { Input } from "@workspace/ui/components/input";
 import { FormField, FormGrid } from "@/components/forms/form-field";
 import {
@@ -56,6 +55,7 @@ import {
   StatusLegendDisclosure,
   type StatusLegendItem,
 } from "@/components/status-badge/status-legend";
+import { PageHeader } from "@/components/page-header/page-header";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useKeepPageInRange, usePagination } from "@/hooks/use-pagination";
 import { useUserTimeZone } from "@/hooks/use-user-time-zone";
@@ -281,19 +281,16 @@ function TeamContent({ companyId }: { companyId: string }) {
 
   return (
     <div className="space-y-8">
-      <header>
-        <p className="type-eyebrow">Company administration</p>
-        <h2 className="mt-1 type-page-title">Team & invitations</h2>
-        <p className="mt-1 type-lead">
-          Manage company memberships and invite colleagues. Removing a member
-          does not delete their account.
-        </p>
-      </header>
+      <PageHeader
+        eyebrow="Company administration"
+        title="Team & invitations"
+        description="Manage company memberships and invite colleagues. Removing a member does not delete their account."
+      />
 
       <Card>
         <CardHeader>
           <CardTitle>
-            <h3>Invite a team member</h3>
+            <h2>Invite a team member</h2>
           </CardTitle>
           <CardDescription>
             We&apos;ll email a single-use invitation link that expires after
@@ -305,7 +302,7 @@ function TeamContent({ companyId }: { companyId: string }) {
             onSubmit={(event) => void submitInvitation(event)}
             aria-label="Invite a team member"
           >
-            <FormGrid columns={3} className="items-end">
+            <FormGrid columns={2} className="items-end">
               <FormField id="invite-email" label="Email">
                 {(control) => (
                   <Input
@@ -355,145 +352,192 @@ function TeamContent({ companyId }: { companyId: string }) {
         </CardContent>
       </Card>
 
-      <section className="space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h3 className="type-section-title">Company members</h3>
-            <p className="text-sm text-muted-foreground">
-              {members?.meta.totalItems ?? 0} membership
-              {members?.meta.totalItems === 1 ? "" : "s"}
-            </p>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-[minmax(12rem,1fr)_auto]">
-            <FieldLabel className="sr-only" htmlFor="member-search">
-              Search members
-            </FieldLabel>
-            <Input
-              id="member-search"
-              type="search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search name or email"
-            />
-            <FieldLabel className="sr-only" htmlFor="member-status">
-              Membership status
-            </FieldLabel>
-            <NativeSelect
-              id="member-status"
-              value={status}
-              onChange={(event) => {
-                setStatus(event.target.value as ECompanyUserStatus | "");
-                memberPages.resetPage();
-              }}
-            >
-              <NativeSelectOption value="">All statuses</NativeSelectOption>
-              <NativeSelectOption value={ECompanyUserStatus.ACTIVE}>
-                Active
-              </NativeSelectOption>
-              <NativeSelectOption value={ECompanyUserStatus.INACTIVE}>
-                Inactive
-              </NativeSelectOption>
-            </NativeSelect>
-          </div>
-        </div>
-        {membersLoading ? (
-          <Alert role="status">
-            <AlertDescription>Loading company members…</AlertDescription>
-          </Alert>
-        ) : membersError ? (
-          <ErrorPanel
-            error={membersError}
-            message="Company members could not be loaded."
-          />
-        ) : !members?.data.length ? (
-          <Alert role="status">
-            <AlertDescription>No members match this search.</AlertDescription>
-          </Alert>
-        ) : (
-          <Card className="gap-0 py-0">
-            <div className="divide-y md:hidden">
-              {members.data.map((member) => (
-                <MemberCard
-                  key={member.id}
-                  member={member}
-                  busy={busyMemberId === member.id}
-                  onRoleChange={(value) => requestRoleChange(member, value)}
-                  timeZone={timeZone}
-                  onRemove={() => requestRemoval(member)}
+      <section>
+        <Card className="gap-0 py-0">
+          <CardHeader className="gap-4">
+            {/* Section heading and membership count */}
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle>
+                  <h2 className="type-section-title">Company members</h2>
+                </CardTitle>
+                <CardDescription>
+                  {members?.meta.totalItems ?? 0} membership
+                  {members?.meta.totalItems === 1 ? "" : "s"}
+                </CardDescription>
+              </div>
+            </div>
+
+            {/* Member filters */}
+            <div className="grid gap-3 border-t pt-4 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-end">
+              <div className="space-y-1.5">
+                <label htmlFor="member-search" className="text-sm font-medium">
+                  Search members
+                </label>
+                <Input
+                  id="member-search"
+                  type="search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search name or email"
+                  aria-label="Search members by name or email"
                 />
-              ))}
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="member-status" className="text-sm font-medium">
+                  Membership status
+                </label>
+                <NativeSelect
+                  id="member-status"
+                  className="w-full"
+                  value={status}
+                  onChange={(event) => {
+                    setStatus(event.target.value as ECompanyUserStatus | "");
+                    memberPages.resetPage();
+                  }}
+                >
+                  <NativeSelectOption value="">All statuses</NativeSelectOption>
+                  <NativeSelectOption value={ECompanyUserStatus.ACTIVE}>
+                    Active
+                  </NativeSelectOption>
+                  <NativeSelectOption value={ECompanyUserStatus.INACTIVE}>
+                    Inactive
+                  </NativeSelectOption>
+                </NativeSelect>
+              </div>
             </div>
-            <div className="hidden md:block">
-              <Table>
-                <TableHeader className="bg-muted/50 text-xs uppercase tracking-wide">
-                  <TableRow>
-                    <TableHead className="px-4">Member</TableHead>
-                    <TableHead className="px-4">Role</TableHead>
-                    <TableHead className="px-4">Status</TableHead>
-                    <TableHead className="px-4">Joined</TableHead>
-                    <TableHead className="px-4">
-                      <span className="sr-only">Actions</span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+          </CardHeader>
+
+          {/* Members content */}
+          <CardContent className="p-0">
+            {membersLoading ? (
+              <div className="p-4">
+                <Alert role="status">
+                  <AlertDescription>Loading company members…</AlertDescription>
+                </Alert>
+              </div>
+            ) : membersError ? (
+              <div className="p-4">
+                <ErrorPanel
+                  error={membersError}
+                  message="Company members could not be loaded."
+                />
+              </div>
+            ) : !members?.data.length ? (
+              <div className="p-4">
+                <Alert role="status">
+                  <AlertDescription>
+                    No members match this search.
+                  </AlertDescription>
+                </Alert>
+              </div>
+            ) : (
+              <>
+                {/* Mobile member cards */}
+                <div className="divide-y md:hidden">
                   {members.data.map((member) => (
-                    <TableRow key={member.id}>
-                      <TableCell className="px-4 py-3">
-                        <p className="font-medium">
-                          {member.firstName} {member.lastName}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {member.email}
-                        </p>
-                      </TableCell>
-                      <TableCell className="px-4 py-3">
-                        <MemberRoleSelect
-                          member={member}
-                          busy={busyMemberId === member.id}
-                          onChange={(value) => requestRoleChange(member, value)}
-                        />
-                      </TableCell>
-                      <TableCell className="px-4 py-3">
-                        <StatusBadge status={member.status} />
-                      </TableCell>
-                      <TableCell className="px-4 py-3">
-                        {formatDate(member.joinedAt, { timeZone })}
-                      </TableCell>
-                      <TableCell className="px-4 py-3 text-right">
-                        {member.status === ECompanyUserStatus.ACTIVE && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={busyMemberId === member.id}
-                            onClick={() => requestRemoval(member)}
-                          >
-                            {busyMemberId === member.id ? "Saving…" : "Remove"}
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
+                    <MemberCard
+                      key={member.id}
+                      member={member}
+                      busy={busyMemberId === member.id}
+                      onRoleChange={(value) => requestRoleChange(member, value)}
+                      timeZone={timeZone}
+                      onRemove={() => requestRemoval(member)}
+                    />
                   ))}
-                </TableBody>
-              </Table>
-            </div>
-            <CardFooter className="border-t py-3">
-              <DataPagination
-                className="w-full"
-                meta={members.meta}
-                itemLabel="members"
-                isFetching={membersFetching}
-                onPageChange={memberPages.setPage}
-                onPageSizeChange={memberPages.setLimit}
-              />
-            </CardFooter>
-          </Card>
-        )}
+                </div>
+
+                {/* Desktop members table */}
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader className="bg-muted/50 text-xs uppercase tracking-wide">
+                      <TableRow>
+                        <TableHead className="px-4">Member</TableHead>
+                        <TableHead className="px-4">Role</TableHead>
+                        <TableHead className="px-4">Status</TableHead>
+                        <TableHead className="px-4">Joined</TableHead>
+                        <TableHead className="px-4">
+                          <span className="sr-only">Actions</span>
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+
+                    <TableBody>
+                      {members.data.map((member) => (
+                        <TableRow key={member.id}>
+                          <TableCell className="px-4 py-3">
+                            <p className="font-medium">
+                              {member.firstName} {member.lastName}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {member.email}
+                            </p>
+                          </TableCell>
+
+                          <TableCell className="px-4 py-3">
+                            <MemberRoleSelect
+                              member={member}
+                              busy={busyMemberId === member.id}
+                              onChange={(value) =>
+                                requestRoleChange(member, value)
+                              }
+                            />
+                          </TableCell>
+
+                          <TableCell className="px-4 py-3">
+                            <StatusBadge status={member.status} />
+                          </TableCell>
+
+                          <TableCell className="px-4 py-3">
+                            {formatDate(member.joinedAt, { timeZone })}
+                          </TableCell>
+
+                          <TableCell className="px-4 py-3 text-right">
+                            {member.status === ECompanyUserStatus.ACTIVE && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={busyMemberId === member.id}
+                                onClick={() => requestRemoval(member)}
+                              >
+                                {busyMemberId === member.id
+                                  ? "Saving…"
+                                  : "Remove"}
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            )}
+          </CardContent>
+
+          {/* Pagination */}
+          {members &&
+            !membersLoading &&
+            !membersError &&
+            members.data.length > 0 && (
+              <CardFooter className="border-t py-3">
+                <DataPagination
+                  className="w-full"
+                  meta={members.meta}
+                  itemLabel="members"
+                  isFetching={membersFetching}
+                  onPageChange={memberPages.setPage}
+                  onPageSizeChange={memberPages.setLimit}
+                />
+              </CardFooter>
+            )}
+        </Card>
       </section>
 
       <section className="space-y-4">
         <div>
-          <h3 className="type-section-title">Invitations</h3>
+          <h2 className="type-section-title">Invitations</h2>
           <p className="type-lead">
             Invitations sent from this company and where each one stands.
           </p>

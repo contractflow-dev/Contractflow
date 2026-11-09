@@ -10,6 +10,7 @@ export interface ListContractsQuery extends IPageQuery {
   search?: string;
   status?: EContractStatus;
   includeDeleted?: boolean;
+  assignedToMe?: boolean;
   sortBy?: EContractSortField;
   sortOrder?: ESortOrder;
 }

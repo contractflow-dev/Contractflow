@@ -1,76 +1,59 @@
+import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { FormProvider, useForm, type FieldErrors } from "react-hook-form";
 import { describe, expect, it } from "vitest";
+import { ECurrencyCode } from "@contractflow/contracts-schema";
 import {
-  ContractSetupFields,
-  validateContractDates,
-  type ContractDateValues,
+  createContractDefaults,
+  type CreateContractFormValues,
+} from "../create-contract-schema";
+import {
+  ContractBasicsFields,
+  ContractCommercialFields,
+  ContractDatesFields,
+  ContractPartiesFields,
 } from "./contract-setup-fields";
 
-const validDates: ContractDateValues = {
-  awardDate: "2026-01-01",
-  startDate: "2026-02-01",
-  endDate: "2026-12-31",
-  revisedEndDate: "",
-  actualCompletionDate: "",
-};
-
-describe("validateContractDates", () => {
-  it("accepts dates in order and leaves optional dates empty", () => {
-    expect(validateContractDates(validDates)).toEqual({});
+function Harness({
+  values,
+  errors,
+  children,
+}: {
+  values?: CreateContractFormValues;
+  errors?: FieldErrors<CreateContractFormValues>;
+  children: ReactNode;
+}) {
+  const form = useForm<CreateContractFormValues>({
+    defaultValues: values ?? createContractDefaults("Africa/Lagos"),
+    errors,
   });
+  return (
+    <FormProvider {...form}>
+      <form>{children}</form>
+    </FormProvider>
+  );
+}
 
-  it("accepts a start date equal to the end date", () => {
-    expect(
-      validateContractDates({ ...validDates, startDate: "2026-12-31" }),
-    ).toEqual({});
-  });
-
-  it("flags a start date after the end date on the start date", () => {
-    expect(
-      validateContractDates({ ...validDates, startDate: "2027-01-01" }),
-    ).toEqual({
-      startDate: "The start date must not be after the end date.",
-    });
-  });
-
-  it("flags a revised end date before the end date", () => {
-    expect(
-      validateContractDates({ ...validDates, revisedEndDate: "2026-12-30" }),
-    ).toEqual({
-      revisedEndDate: "The revised end date must not be before the end date.",
-    });
-  });
-
-  it("flags an actual completion date before the start date", () => {
-    expect(
-      validateContractDates({
-        ...validDates,
-        actualCompletionDate: "2026-01-31",
-      }),
-    ).toEqual({
-      actualCompletionDate:
-        "The actual completion date must not be before the start date.",
-    });
-  });
-
-  it("leaves missing required dates to the browser's required check", () => {
-    expect(
-      validateContractDates({ ...validDates, startDate: "", endDate: "" }),
-    ).toEqual({});
-  });
-});
-
-function renderFields(
-  props: Partial<Parameters<typeof ContractSetupFields>[0]> = {},
+function renderAllSteps(
+  props: {
+    values?: CreateContractFormValues;
+    errors?: FieldErrors<CreateContractFormValues>;
+    parentContractsError?: unknown;
+  } = {},
 ) {
   return renderToStaticMarkup(
-    <ContractSetupFields
-      parentContracts={[
-        { id: "parent-1", referenceNumber: "CTR-001", title: "Main works" },
-      ]}
-      parentContractsLoading={false}
-      {...props}
-    />,
+    <Harness values={props.values} errors={props.errors}>
+      <ContractBasicsFields />
+      <ContractPartiesFields
+        parentContracts={[
+          { id: "parent-1", referenceNumber: "CTR-001", title: "Main works" },
+        ]}
+        parentContractsLoading={false}
+        parentContractsError={props.parentContractsError}
+      />
+      <ContractCommercialFields />
+      <ContractDatesFields />
+    </Harness>,
   );
 }
 
@@ -83,46 +66,45 @@ function controlTag(markup: string, id: string): string {
   return tag;
 }
 
-describe("ContractSetupFields", () => {
-  it("groups the fields into labelled fieldsets", () => {
-    const markup = renderFields();
+describe("contract setup step fields", () => {
+  it("groups each step's fields into labelled fieldsets", () => {
+    const markup = renderAllSteps();
     const legends = [...markup.matchAll(/<legend[^>]*>([^<]+)<\/legend>/g)].map(
       (match) => match[1],
     );
     expect(legends).toEqual([
-      "Contract overview",
+      "Contract basics",
       "Contract parties",
+      "Workspaces",
       "Commercial terms",
       "Contract dates and duration",
-      "Workspaces",
     ]);
-    expect(markup.match(/<fieldset/g)).toHaveLength(5);
   });
 
   it("gives every control a label", () => {
-    const markup = renderFields();
+    const markup = renderAllSteps();
+    // Visible fields, not the hidden inputs behind the shared checkboxes.
     const ids = [
-      ...markup.matchAll(/<(?:input|select|textarea)[^>]*id="([^"]+)"/g),
+      ...markup.matchAll(
+        /<(?:input|select|textarea)(?![^>]*aria-hidden)[^>]*id="([^"]+)"/g,
+      ),
     ].map((match) => match[1]);
     expect(ids.length).toBe(19);
     for (const id of ids) expect(markup).toContain(`for="${id}"`);
-    // Workspace checkboxes are labelled by their wrapping <label>.
-    expect(markup.match(/<label[^>]*><input type="checkbox"/g)).toHaveLength(
-      3,
-    );
+    expect(markup.match(/role="checkbox"/g)).toHaveLength(3);
   });
 
   it("marks exactly the fields the API requires", () => {
-    const markup = renderFields();
+    const markup = renderAllSteps();
     const required = [
       "referenceNumber",
       "title",
       "contractType",
       "partyType",
-      "originalValueMinor",
+      "originalValue",
       "currencyCode",
       "paymentTermsDays",
-      "retentionRateBps",
+      "retentionRate",
       "awardDate",
       "startDate",
       "endDate",
@@ -132,8 +114,8 @@ describe("ContractSetupFields", () => {
     const optional = [
       "description",
       "parentContractId",
-      "advancePaymentRateBps",
-      "liquidatedDamagesPerDayMinor",
+      "advancePaymentRate",
+      "liquidatedDamagesPerDay",
       "revisedEndDate",
       "actualCompletionDate",
     ];
@@ -147,39 +129,63 @@ describe("ContractSetupFields", () => {
         "aria-required",
       );
     }
-    expect(markup.match(/data-slot="required-indicator"/g)).toHaveLength(
-      required.length,
+  });
+
+  it("asks for amounts and percentages, not minor units or basis points", () => {
+    const markup = renderAllSteps();
+
+    expect(markup).not.toMatch(/minor units|smallest unit/i);
+    expect(markup).not.toMatch(/\(basis points\)/);
+    expect(markup).toContain(">Retention rate (%)");
+    expect(markup).toContain(">Advance payment rate (%)");
+    expect(controlTag(markup, "new-contract-originalValue")).toContain(
+      'inputMode="decimal"',
     );
-    expect(markup.match(/data-slot="optional-indicator"/g)).toHaveLength(
-      optional.length,
+    expect(controlTag(markup, "new-contract-originalValue")).not.toContain(
+      'type="number"',
     );
   });
 
-  it("keeps the names the form reads with FormData", () => {
-    const markup = renderFields();
-    expect(controlTag(markup, "new-contract-originalValueMinor")).toContain(
-      'name="originalValueMinor"',
-    );
-    expect(controlTag(markup, "new-contract-timezone")).toContain(
-      'name="timezone"',
+  it("echoes typed amounts and rates in their own format", () => {
+    const values = createContractDefaults("UTC");
+    values.commercial.currencyCode = ECurrencyCode.USD;
+    values.commercial.originalValue = "1500.5";
+    values.commercial.retentionRate = "5";
+    const markup = renderAllSteps({ values });
+
+    // Formatted in the runtime's locale: "$1,500.50" or "US$1,500.50".
+    expect(markup).toMatch(/(US)?\$1,500\.50\. Up to 2 decimal places\./);
+    expect(markup).toContain("5% (500 basis points).");
+    expect(controlTag(markup, "new-contract-originalValue")).toContain(
+      'aria-describedby="new-contract-originalValue-description"',
     );
   });
 
-  it("explains minor units and basis points with worked examples", () => {
-    const markup = renderFields();
-    expect(markup).toContain("the currency&#x27;s smallest unit");
-    // Formatted in the runtime's locale: "$1,500.00" or "US$1,500.00".
-    expect(markup).toMatch(/150000 is (US)?\$1,500\.00/);
-    expect(markup).toContain("100 basis points equal 1%. 0 is 0%.");
-    expect(controlTag(markup, "new-contract-originalValueMinor")).toContain(
-      'aria-describedby="new-contract-originalValueMinor-description"',
+  it("offers time zones from a list", () => {
+    const markup = renderAllSteps();
+    const select = markup.match(
+      /<select[^>]*id="new-contract-timezone"[\s\S]*?<\/select>/,
+    )?.[0];
+    expect(select).toBeDefined();
+    // React Hook Form selects the default through a ref in the browser.
+    expect(select).toMatch(/<option[^>]*value="UTC"[^>]*>UTC<\/option>/);
+    expect(select).toMatch(
+      /<option[^>]*value="Africa\/Lagos"[^>]*>Africa\/Lagos<\/option>/,
+    );
+    expect(select).toMatch(
+      /<option[^>]*value="America\/New_York"[^>]*>America\/New York<\/option>/,
     );
   });
 
-  it("shows date errors beside the date they concern", () => {
-    const markup = renderFields({
-      dateErrors: {
-        startDate: "The start date must not be after the end date.",
+  it("shows an error beside the field it concerns", () => {
+    const markup = renderAllSteps({
+      errors: {
+        dates: {
+          startDate: {
+            type: "custom",
+            message: "The start date must not be after the end date.",
+          },
+        },
       },
     });
     expect(controlTag(markup, "new-contract-startDate")).toContain(
@@ -196,8 +202,7 @@ describe("ContractSetupFields", () => {
   });
 
   it("shows a parent contract load failure on that field", () => {
-    const markup = renderFields({
-      parentContracts: [],
+    const markup = renderAllSteps({
       parentContractsError: { status: 500, data: {} },
     });
     expect(controlTag(markup, "new-contract-parentContractId")).toContain(
@@ -206,6 +211,12 @@ describe("ContractSetupFields", () => {
   });
 
   it("lists parent contracts by reference and title", () => {
-    expect(renderFields()).toContain("CTR-001 · Main works");
+    expect(renderAllSteps()).toContain("CTR-001 · Main works");
+  });
+
+  it("checks every workspace by default", () => {
+    expect(
+      renderAllSteps().match(/role="checkbox"[^>]*aria-checked="true"/g),
+    ).toHaveLength(3);
   });
 });

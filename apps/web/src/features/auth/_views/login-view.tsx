@@ -11,10 +11,16 @@ import { Button } from "@workspace/ui/components/button";
 import { FieldGroup } from "@workspace/ui/components/field";
 import { Input } from "@workspace/ui/components/input";
 import { FormField } from "@/components/forms/form-field";
-import { getApiErrorMessage } from "@/lib/apiError";
+import { getApiErrorMessage, getApiErrorStatus } from "@/lib/apiError";
 import { useLoginMutation } from "@/services/authApi";
-import { HeroMetrics } from "@/components/auth/HeroMetrics";
+import { AuthHero } from "@/components/auth/auth-hero";
 import { AuthTopBar } from "@/components/auth/authTopBar";
+import { PasswordInput } from "../components/password-input";
+import {
+  forgetPendingVerificationEmail,
+  rememberPendingVerificationEmail,
+} from "../pendingVerificationEmail";
+import { SESSION_EXPIRED_REASON, safeRedirectPath } from "../signInRedirect";
 
 const loginSchema = z.object({
   email: z
@@ -27,12 +33,26 @@ const loginSchema = z.object({
 });
 type LoginValues = z.infer<typeof loginSchema>;
 
+/**
+ * The API's answer to a correct password on an unverified account. It is
+ * given only after the password matches, so it reveals nothing to someone
+ * guessing addresses.
+ */
+export const UNVERIFIED_LOGIN_MESSAGE = "Verify your email before signing in.";
+
+type ServerError = { kind: "unverified" } | { kind: "other"; message: string };
+
 export function LoginView() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [login] = useLoginMutation();
-  const [serverError, setServerError] = useState<string | null>(null);
+  const [serverError, setServerError] = useState<ServerError | null>(null);
+  // Remounts the error on each failed attempt, so focus moves to it again.
+  const [attempt, setAttempt] = useState(0);
   const logoutWarning = searchParams.get("logout") === "failed";
+  const sessionExpired = searchParams.get("reason") === SESSION_EXPIRED_REASON;
+  const signInToContinue =
+    !sessionExpired && Boolean(searchParams.get("redirect"));
   const {
     register,
     handleSubmit,
@@ -46,20 +66,22 @@ export function LoginView() {
     setServerError(null);
     try {
       await login(values).unwrap();
-      const requestedRedirect = new URLSearchParams(window.location.search).get(
-        "redirect",
+      forgetPendingVerificationEmail();
+      router.replace(
+        safeRedirectPath(searchParams.get("redirect"), window.location.origin),
       );
-      const redirectUrl = requestedRedirect
-        ? new URL(requestedRedirect, window.location.origin)
-        : null;
-      const safeRedirect =
-        requestedRedirect?.startsWith("/") &&
-        redirectUrl?.origin === window.location.origin
-          ? `${redirectUrl.pathname}${redirectUrl.search}${redirectUrl.hash}`
-          : "/dashboards";
-      router.replace(safeRedirect);
     } catch (error) {
-      setServerError(getApiErrorMessage(error, "Sign in failed."));
+      const message = getApiErrorMessage(error, "Sign in failed.");
+      if (
+        getApiErrorStatus(error) === 401 &&
+        message === UNVERIFIED_LOGIN_MESSAGE
+      ) {
+        rememberPendingVerificationEmail(values.email);
+        setServerError({ kind: "unverified" });
+      } else {
+        setServerError({ kind: "other", message });
+      }
+      setAttempt((count) => count + 1);
     }
   }
 
@@ -72,20 +94,60 @@ export function LoginView() {
         <div className="flex flex-1 items-center justify-center p-4 sm:p-6 lg:p-10">
           <div className="w-full min-w-0 max-w-md space-y-6 py-4 sm:py-6">
             <header className="space-y-2">
-              <h1 className="type-page-title">
-                Welcome back
-              </h1>
-              <p className="text-sm text-muted-foreground">
+              <h1 className="type-page-title">Welcome back</h1>
+              {/* <p className="text-sm text-muted-foreground">
                 Sign in to continue to your company workspace.
-              </p>
+              </p> */}
             </header>
-            <form onSubmit={handleSubmit(onSubmit)} noValidate>
+            <form
+              onSubmit={handleSubmit(onSubmit)}
+              noValidate
+              aria-label="Sign in"
+            >
               <FieldGroup className="gap-4">
-                {serverError && (
-                  <Alert variant="destructive" className="break-words">
-                    <AlertDescription>{serverError}</AlertDescription>
+                {sessionExpired ? (
+                  <Alert role="status">
+                    <AlertDescription>
+                      Your session has expired. Sign in again to continue where
+                      you left off.
+                    </AlertDescription>
                   </Alert>
-                )}
+                ) : signInToContinue ? (
+                  <Alert role="status">
+                    <AlertDescription>
+                      Sign in to continue to your workspace.
+                    </AlertDescription>
+                  </Alert>
+                ) : null}
+                {serverError ? (
+                  <Alert
+                    key={attempt}
+                    variant="destructive"
+                    className="break-words focus-visible:outline-none"
+                    tabIndex={-1}
+                    // Moves focus to the message, so it is read out and the
+                    // next Tab continues from the form.
+                    ref={(element) => element?.focus()}
+                  >
+                    <AlertDescription>
+                      {serverError.kind === "unverified" ? (
+                        <>
+                          Verify your email address before signing in. Open the
+                          link we sent you, or{" "}
+                          <Link
+                            href="/auth/verification-pending"
+                            className="font-medium text-foreground underline underline-offset-4"
+                          >
+                            send a new verification email
+                          </Link>
+                          .
+                        </>
+                      ) : (
+                        serverError.message
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                ) : null}
                 {logoutWarning && (
                   <Alert variant="destructive" role="alert">
                     <AlertDescription>
@@ -105,6 +167,8 @@ export function LoginView() {
                       {...control}
                       type="email"
                       autoComplete="email"
+                      inputMode="email"
+                      spellCheck={false}
                       {...register("email")}
                     />
                   )}
@@ -115,17 +179,25 @@ export function LoginView() {
                   error={errors.password?.message}
                 >
                   {(control) => (
-                    <Input
+                    <PasswordInput
                       {...control}
-                      type="password"
                       autoComplete="current-password"
                       {...register("password")}
                     />
                   )}
                 </FormField>
+                <p className="-mt-1 text-end text-sm">
+                  <Link
+                    href="/auth/forgot-password"
+                    className="rounded-md font-medium text-foreground underline underline-offset-4"
+                  >
+                    Forgot your password?
+                  </Link>
+                </p>
                 <Button
                   type="submit"
                   disabled={isSubmitting}
+                  aria-busy={isSubmitting || undefined}
                   size="xl"
                   className="w-full"
                 >
@@ -146,29 +218,7 @@ export function LoginView() {
         </div>
       </section>
 
-      <aside className="relative hidden min-w-0 flex-col justify-between overflow-hidden bg-reg-hero bg-cover bg-center p-10 text-hero-foreground lg:sticky lg:top-0 lg:flex lg:min-h-svh lg:self-start">
-        <div className="absolute inset-0 bg-hero-overlay" aria-hidden="true" />
-
-        <span className="relative z-10 text-lg font-semibold tracking-tight">
-          {" "}
-        </span>
-
-        <div className="relative z-10 space-y-6">
-          <div className="space-y-3">
-            <h2 className="text-3xl font-semibold leading-tight">
-              Every contract, from tender to close-out, in one place.
-            </h2>
-            <p className="max-w-md text-sm text-hero-muted">
-              Track vendors, approvals, milestones and obligations across your
-              oil and gas operations.
-            </p>
-          </div>
-          <HeroMetrics className="mt-4 gap-8 xl:mt-2 xl:gap-1" />
-          <p className="text-xs text-hero-muted">
-            &copy; {new Date().getFullYear()} ContractFlow
-          </p>
-        </div>
-      </aside>
+      <AuthHero image="register" />
     </main>
   );
 }

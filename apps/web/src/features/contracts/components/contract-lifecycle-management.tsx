@@ -4,17 +4,13 @@ import { useId, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ECompanyRole,
-  EContractSortField,
   EContractStatus,
-  EContractType,
-  ECurrencyCode,
   EPartyType,
-  ESortOrder,
-  MAX_PAGE_LIMIT,
 } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
+import { Checkbox } from "@workspace/ui/components/checkbox";
+import { Field, FieldLabel } from "@workspace/ui/components/field";
 import {
   Card,
   CardContent,
@@ -32,7 +28,6 @@ import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
 import {
   FormField,
   FormSection,
-  RequiredFieldsNote,
 } from "@/components/forms/form-field";
 import {
   StatusBadge,
@@ -41,14 +36,11 @@ import {
 import { getApiErrorMessage } from "@/lib/apiError";
 import { humanizeEnumValue } from "@/lib/format";
 import { notifySuccess } from "@/lib/notify";
-import { useGetCompanyMembershipQuery } from "@/services/companiesApi";
 import {
   useArchiveContractMutation,
-  useCreateContractMutation,
   useCreateContractPartyInvitationMutation,
   useGetContractLifecyclePermissionsQuery,
   useGetContractPartyInvitationsQuery,
-  useGetContractsQuery,
   useGetContractWorkspacesQuery,
   useRevokeContractPartyInvitationMutation,
   useTransitionContractMutation,
@@ -57,14 +49,8 @@ import {
   type AssignableContractWorkspace,
   type Contract,
   type ContractTransition,
-  type CreateContractRequest,
 } from "@/services/contractApi";
-import {
-  ContractSetupFields,
-  contractWorkspaces as workspaces,
-  validateContractDates,
-  type ContractDateErrors,
-} from "./contract-setup-fields";
+import { contractWorkspaces as workspaces } from "../create-contract-schema";
 
 const transitionOptions: Record<
   EContractStatus,
@@ -106,183 +92,18 @@ const transitionEffects: Record<
   },
 };
 
-export function CreateContractForm({ companyId }: { companyId: string }) {
-  const [open, setOpen] = useState(false);
-  const [dateErrors, setDateErrors] = useState<ContractDateErrors>({});
-  const formId = useId();
-  const membershipQuery = useGetCompanyMembershipQuery({ companyId });
-  const parentContractsQuery = useGetContractsQuery(
-    {
-      companyId,
-      page: 1,
-      limit: MAX_PAGE_LIMIT,
-      sortBy: EContractSortField.REFERENCE_NUMBER,
-      sortOrder: ESortOrder.ASC,
-    },
-    { skip: !open },
-  );
-  const [createContract, createState] = useCreateContractMutation();
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formElement = event.currentTarget;
-    const form = new FormData(formElement);
-    const errors = validateContractDates({
-      awardDate: String(form.get("awardDate") ?? ""),
-      startDate: String(form.get("startDate") ?? ""),
-      endDate: String(form.get("endDate") ?? ""),
-      revisedEndDate: String(form.get("revisedEndDate") ?? ""),
-      actualCompletionDate: String(form.get("actualCompletionDate") ?? ""),
-    });
-    setDateErrors(errors);
-    const firstInvalid = Object.keys(errors)[0];
-    if (firstInvalid) {
-      formElement
-        .querySelector<HTMLElement>(`[name="${firstInvalid}"]`)
-        ?.focus();
-      return;
-    }
-    const selectedWorkspaces = workspaces.filter((workspace) =>
-      form.getAll("workspaces").includes(workspace),
-    );
-    const body: CreateContractRequest = {
-      referenceNumber: String(form.get("referenceNumber") ?? "").trim(),
-      title: String(form.get("title") ?? "").trim(),
-      description: String(form.get("description") ?? "").trim() || null,
-      contractType: String(form.get("contractType")) as EContractType,
-      partyType: String(form.get("partyType")) as EPartyType,
-      workspaces: selectedWorkspaces,
-      parentContractId: String(form.get("parentContractId") ?? "") || null,
-      originalValueMinor: Number(form.get("originalValueMinor")),
-      currencyCode: String(form.get("currencyCode")) as ECurrencyCode,
-      retentionRateBps: Number(form.get("retentionRateBps")),
-      advancePaymentRateBps: numberOrNull(form.get("advancePaymentRateBps")),
-      paymentTermsDays: Number(form.get("paymentTermsDays")),
-      liquidatedDamagesPerDayMinor: numberOrNull(
-        form.get("liquidatedDamagesPerDayMinor"),
-      ),
-      awardDate: String(form.get("awardDate")),
-      startDate: String(form.get("startDate")),
-      endDate: String(form.get("endDate")),
-      revisedEndDate: String(form.get("revisedEndDate")) || null,
-      actualCompletionDate: String(form.get("actualCompletionDate")) || null,
-      defectsLiabilityDays: Number(form.get("defectsLiabilityDays")),
-      timezone: String(form.get("timezone")).trim(),
-    };
-
-    const result = await createContract({ companyId, body });
-    if ("error" in result) return;
-    formElement.reset();
-    setOpen(false);
-    notifySuccess(
-      "Draft contract created",
-      `${body.referenceNumber} · ${body.title} is ready to set up.`,
-    );
-  }
-
-  if (membershipQuery.isLoading) return null;
-  if (membershipQuery.isError) {
-    return (
-      <Alert variant="destructive">
-        <AlertDescription>
-          {getApiErrorMessage(
-            membershipQuery.error,
-            "Unable to verify contract creation access.",
-          )}
-        </AlertDescription>
-      </Alert>
-    );
-  }
-  if (
-    membershipQuery.data?.membership.companyRole !== ECompanyRole.COMPANY_ADMIN
-  ) {
-    return null;
-  }
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
-        <div>
-          <CardTitle>Contract setup</CardTitle>
-          <CardDescription>
-            Create a draft contract for this company.
-          </CardDescription>
-        </div>
-        <Button
-          type="button"
-          aria-expanded={open}
-          aria-controls={open ? formId : undefined}
-          onClick={() => setOpen((value) => !value)}
-        >
-          {open ? "Close" : "New contract"}
-        </Button>
-      </CardHeader>
-      {open ? (
-        <CardContent>
-          <form
-            id={formId}
-            aria-label="New draft contract"
-            onSubmit={submit}
-            onChange={(event) => {
-              // Editing a date clears the error shown for it.
-              const target = event.target;
-              if (!(target instanceof HTMLInputElement)) return;
-              const name = target.name as keyof ContractDateErrors;
-              if (dateErrors[name]) {
-                setDateErrors((current) => {
-                  const next = { ...current };
-                  delete next[name];
-                  return next;
-                });
-              }
-            }}
-            className="space-y-6"
-          >
-            <RequiredFieldsNote />
-            <ContractSetupFields
-              parentContracts={parentContractsQuery.currentData?.data ?? []}
-              parentContractsLoading={parentContractsQuery.isFetching}
-              parentContractsError={parentContractsQuery.error}
-              dateErrors={dateErrors}
-            />
-            {createState.error ? (
-              <ErrorAlert
-                error={createState.error}
-                fallback="Unable to create the contract."
-              />
-            ) : null}
-            <div className="flex flex-col-reverse gap-2 border-t pt-5 sm:flex-row sm:justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setDateErrors({});
-                  setOpen(false);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={createState.isLoading}
-                aria-busy={createState.isLoading || undefined}
-              >
-                {createState.isLoading ? "Creating…" : "Create draft contract"}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      ) : null}
-    </Card>
-  );
-}
-
 export function ContractLifecycleManagement({
   companyId,
   contract,
+  part,
 }: {
   companyId: string;
   contract: Contract;
+  /**
+   * Which card to show: managing the contract itself (Overview tab), or
+   * inviting companies to it (Parties tab). Both share this state and dialogs.
+   */
+  part: "manage" | "invitations";
 }) {
   const query = { companyId, contractId: contract.id };
   const permissionsQuery = useGetContractLifecyclePermissionsQuery(query);
@@ -318,6 +139,7 @@ export function ContractLifecycleManagement({
   // The failure of the confirmation currently open, shown inside it.
   const [dialogError, setDialogError] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
+  const workspaceFieldId = useId();
   const [inviteType, setInviteType] = useState<EPartyType>(
     EPartyType.CONTRACTOR,
   );
@@ -449,195 +271,206 @@ export function ContractLifecycleManagement({
 
   return (
     <section className="space-y-5" aria-label="Contract lifecycle management">
-      <Card>
-        <CardHeader>
-          <CardTitle>Manage contract</CardTitle>
-          <CardDescription>
-            Draft details, workspace availability, and lifecycle actions.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {permissions.canManage ? (
-            <>
-              <form
-                onSubmit={saveDetails}
-                aria-label="Contract details"
-                className="grid items-start gap-4 sm:grid-cols-2"
-              >
-                <FormField id="contract-title" label="Contract title" required>
-                  {(control) => (
-                    <Input
-                      {...control}
-                      value={title}
-                      maxLength={255}
-                      onChange={(event) => setTitle(event.target.value)}
-                      required
+      {part === "manage" ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <h2>Manage contract</h2>
+            </CardTitle>
+            <CardDescription>
+              Draft details, workspace availability, and lifecycle actions.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {permissions.canManage ? (
+              <>
+                <form
+                  onSubmit={saveDetails}
+                  aria-label="Contract details"
+                  className="grid items-start gap-4 sm:grid-cols-2"
+                >
+                  <FormField id="contract-title" label="Contract title" required>
+                    {(control) => (
+                      <Input
+                        {...control}
+                        value={title}
+                        maxLength={255}
+                        onChange={(event) => setTitle(event.target.value)}
+                        required
+                      />
+                    )}
+                  </FormField>
+                  <FormField
+                    id="contract-description"
+                    label="Description"
+                    optional
+                  >
+                    {(control) => (
+                      <Textarea
+                        {...control}
+                        value={description}
+                        onChange={(event) => setDescription(event.target.value)}
+                      />
+                    )}
+                  </FormField>
+                  <div className="sm:col-span-2">
+                    <Button
+                      type="submit"
+                      disabled={updateState.isLoading}
+                      aria-busy={updateState.isLoading || undefined}
+                    >
+                      {updateState.isLoading ? "Saving…" : "Save details"}
+                    </Button>
+                  </div>
+                </form>
+                {updateState.error ? (
+                  <ErrorAlert
+                    error={updateState.error}
+                    fallback="Unable to update contract details."
+                  />
+                ) : null}
+
+                <FormSection
+                  legend="Available workspaces"
+                  description="Removing a workspace revokes its active assignments and pending invitations."
+                  className="border-t pt-5"
+                >
+                  {workspacesQuery.error ? (
+                    <ErrorAlert
+                      error={workspacesQuery.error}
+                      fallback="Unable to load contract workspaces."
                     />
+                  ) : (
+                    <>
+                      <div className="flex flex-wrap gap-x-6 gap-y-3">
+                        {workspaces.map((workspace) => (
+                          <Field
+                            orientation="horizontal"
+                            className="w-fit"
+                            key={workspace}
+                          >
+                            <Checkbox
+                              id={`${workspaceFieldId}-${workspace}`}
+                              checked={activeWorkspaces.includes(workspace)}
+                              onCheckedChange={(checked) => {
+                                setSelectedWorkspaces((current) => {
+                                  const next =
+                                    current ?? workspacesQuery.currentData ?? [];
+                                  return checked
+                                    ? [...next, workspace]
+                                    : next.filter((value) => value !== workspace);
+                                });
+                              }}
+                            />
+                            <FieldLabel
+                              htmlFor={`${workspaceFieldId}-${workspace}`}
+                              className="font-normal"
+                            >
+                              {formatLabel(workspace)}
+                            </FieldLabel>
+                          </Field>
+                        ))}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-fit"
+                        disabled={
+                          workspaceState.isLoading || selectedWorkspaces === null
+                        }
+                        onClick={() => void saveWorkspaces()}
+                      >
+                        Save workspaces
+                      </Button>
+                    </>
                   )}
-                </FormField>
+                  {workspaceState.error ? (
+                    <ErrorAlert
+                      error={workspaceState.error}
+                      fallback="Unable to update workspaces."
+                    />
+                  ) : null}
+                </FormSection>
+              </>
+            ) : null}
+
+            {permissions.canTransition &&
+            transitionOptions[contract.status].length ? (
+              <div className="space-y-3 border-t pt-5">
+                <div>
+                  <h3 className="type-subsection-title">Change status</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Every status change requires a reason and is recorded in
+                    history.
+                  </p>
+                </div>
                 <FormField
-                  id="contract-description"
-                  label="Description"
-                  optional
+                  id="contract-transition-reason"
+                  label="Reason for the change"
+                  required
+                  description="Up to 2,000 characters. The status buttons are available once a reason is entered."
                 >
                   {(control) => (
                     <Textarea
                       {...control}
-                      value={description}
-                      onChange={(event) => setDescription(event.target.value)}
+                      value={reason}
+                      maxLength={2000}
+                      onChange={(event) => setReason(event.target.value)}
+                      required
                     />
                   )}
                 </FormField>
-                <div className="sm:col-span-2">
-                  <Button
-                    type="submit"
-                    disabled={updateState.isLoading}
-                    aria-busy={updateState.isLoading || undefined}
-                  >
-                    {updateState.isLoading ? "Saving…" : "Save details"}
-                  </Button>
+                <div className="flex flex-wrap gap-2">
+                  {transitionOptions[contract.status].map((option) => (
+                    <form
+                      key={option.transition}
+                      onSubmit={(event) => requestTransition(event, option)}
+                    >
+                      <input type="hidden" name="reason" value={reason} />
+                      <Button
+                        type="submit"
+                        disabled={transitionState.isLoading || !reason.trim()}
+                      >
+                        {option.label}
+                      </Button>
+                    </form>
+                  ))}
                 </div>
-              </form>
-              {updateState.error ? (
-                <ErrorAlert
-                  error={updateState.error}
-                  fallback="Unable to update contract details."
-                />
-              ) : null}
-
-              <FormSection
-                legend="Available workspaces"
-                description="Removing a workspace revokes its active assignments and pending invitations."
-                className="border-t pt-5"
-              >
-                {workspacesQuery.error ? (
-                  <ErrorAlert
-                    error={workspacesQuery.error}
-                    fallback="Unable to load contract workspaces."
-                  />
-                ) : (
-                  <>
-                    <div className="flex flex-wrap gap-x-6 gap-y-3">
-                      {workspaces.map((workspace) => (
-                        <label
-                          className="flex min-h-6 items-center gap-2 text-sm"
-                          key={workspace}
-                        >
-                          <input
-                            type="checkbox"
-                            className="size-4 accent-primary"
-                            checked={activeWorkspaces.includes(workspace)}
-                            onChange={(event) => {
-                              setSelectedWorkspaces((current) => {
-                                const next =
-                                  current ?? workspacesQuery.currentData ?? [];
-                                return event.target.checked
-                                  ? [...next, workspace]
-                                  : next.filter((value) => value !== workspace);
-                              });
-                            }}
-                          />
-                          {formatLabel(workspace)}
-                        </label>
-                      ))}
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-fit"
-                      disabled={
-                        workspaceState.isLoading || selectedWorkspaces === null
-                      }
-                      onClick={() => void saveWorkspaces()}
-                    >
-                      Save workspaces
-                    </Button>
-                  </>
-                )}
-                {workspaceState.error ? (
-                  <ErrorAlert
-                    error={workspaceState.error}
-                    fallback="Unable to update workspaces."
-                  />
-                ) : null}
-              </FormSection>
-            </>
-          ) : null}
-
-          {permissions.canTransition &&
-          transitionOptions[contract.status].length ? (
-            <div className="space-y-3 border-t pt-5">
-              <div>
-                <h3 className="type-subsection-title">Change status</h3>
-                <p className="text-sm text-muted-foreground">
-                  Every status change requires a reason and is recorded in
-                  history.
-                </p>
               </div>
-              <FormField
-                id="contract-transition-reason"
-                label="Reason for the change"
-                required
-                description="Up to 2,000 characters. The status buttons are available once a reason is entered."
-              >
-                {(control) => (
-                  <Textarea
-                    {...control}
-                    value={reason}
-                    maxLength={2000}
-                    onChange={(event) => setReason(event.target.value)}
-                    required
-                  />
-                )}
-              </FormField>
-              <div className="flex flex-wrap gap-2">
-                {transitionOptions[contract.status].map((option) => (
-                  <form
-                    key={option.transition}
-                    onSubmit={(event) => requestTransition(event, option)}
-                  >
-                    <input type="hidden" name="reason" value={reason} />
-                    <Button
-                      type="submit"
-                      disabled={transitionState.isLoading || !reason.trim()}
-                    >
-                      {option.label}
-                    </Button>
-                  </form>
-                ))}
-              </div>
-            </div>
-          ) : null}
+            ) : null}
 
-          {permissions.canManage ? (
-            <div className="space-y-3 border-t pt-5">
-              <div>
-                <h3 className="type-subsection-title">Archive contract</h3>
-                <p className="text-sm text-muted-foreground">
-                  Archiving removes the contract from the register and revokes
-                  access and pending invitations.
-                </p>
+            {permissions.canManage ? (
+              <div className="space-y-3 border-t pt-5">
+                <div>
+                  <h3 className="type-subsection-title">Archive contract</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Archiving removes the contract from the register and revokes
+                    access and pending invitations.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={archiveState.isLoading}
+                  onClick={() => {
+                    setDialogError("");
+                    setArchiveRequested(true);
+                  }}
+                >
+                  Archive contract
+                </Button>
               </div>
-              <Button
-                type="button"
-                variant="destructive"
-                disabled={archiveState.isLoading}
-                onClick={() => {
-                  setDialogError("");
-                  setArchiveRequested(true);
-                }}
-              >
-                Archive contract
-              </Button>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
 
-      {permissions.canManage ? (
+      {part === "invitations" && permissions.canManage ? (
         <Card>
           <CardHeader>
-            <CardTitle>Invite a company</CardTitle>
+            <CardTitle>
+              <h2>Invite a company</h2>
+            </CardTitle>
             <CardDescription>
               Invite an active, verified company to join this contract, using
               the email address on its company profile.
@@ -819,10 +652,5 @@ function ErrorAlert({ error, fallback }: { error: unknown; fallback: string }) {
   );
 }
 
-function numberOrNull(value: FormDataEntryValue | null): number | null {
-  if (value === null || value === "") return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
 
 const formatLabel = humanizeEnumValue;
