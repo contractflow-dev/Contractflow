@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { ECountryCode, ECurrencyCode } from "@contractflow/contracts-schema";
 import { countryCodes, countryOptions } from "@/lib/countries";
+import { websiteSchema } from "@/lib/website";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent } from "@workspace/ui/components/card";
@@ -49,7 +50,7 @@ const profileSchema = z.object({
     .max(254)
     .pipe(z.email("Enter a valid email")),
   phoneNumber: z.string().trim().min(1, "Phone number is required").max(20),
-  website: z.union([z.literal(""), z.string().trim().url("Enter a valid URL")]),
+  website: websiteSchema,
   addressLine1: z.string().trim().min(1, "Address is required").max(255),
   addressLine2: z.string().trim().max(255),
   city: z.string().trim().min(1, "City is required").max(100),

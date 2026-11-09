@@ -38,6 +38,15 @@ describe("RTK Query document API contracts", () => {
     const [input, init] = fetchMock.mock.calls.at(-1)!;
     return new Request(input, init);
   };
+  const requestWith = (method: string) => {
+    // Read the method without copying the request, which would use up its body.
+    const call = fetchMock.mock.calls.findLast(
+      ([input, init]) =>
+        (init?.method ?? (input instanceof Request ? input.method : "GET")) ===
+        method,
+    )!;
+    return new Request(call[0], call[1]);
+  };
 
   it("lists documents with scope only in headers", async () => {
     await store.dispatch(
@@ -115,5 +124,53 @@ describe("RTK Query document API contracts", () => {
       new RegExp(`/contract/documents/${DOCUMENT}/download-url$`),
     );
     expect(new URL(download.url).search).toBe("");
+  });
+
+  it("uses company routes, with no contract header, for company documents", async () => {
+    await store.dispatch(
+      documentsApi.endpoints.getContractDocuments.initiate({
+        companyId: COMPANY,
+        page: 1,
+        limit: 10,
+      }),
+    );
+    let request = lastRequest();
+    expect(new URL(request.url).pathname).toMatch(/\/company\/documents$/);
+    expect(request.headers.get("X-Company-Id")).toBe(COMPANY);
+    expect(request.headers.get("X-Contract-Id")).toBeNull();
+
+    await store.dispatch(
+      documentsApi.endpoints.createDocumentUpload.initiate({
+        companyId: COMPANY,
+        body: {
+          title: "Insurance master policy",
+          category: EDocumentCategory.CERTIFICATE,
+          fileName: "policy.pdf",
+          mimeType: "application/pdf",
+          sizeBytes: 2048,
+          checksumSha256: "a".repeat(64),
+        },
+      }),
+    );
+    // The list refetches after the upload, so pick the upload itself.
+    request = requestWith("POST");
+    expect(new URL(request.url).pathname).toMatch(
+      /\/company\/documents\/upload-url$/,
+    );
+    expect(request.headers.get("X-Contract-Id")).toBeNull();
+    const body = await request.json();
+    expect(body).not.toHaveProperty("visibility");
+    expect(JSON.stringify(body)).not.toContain(COMPANY);
+
+    await store.dispatch(
+      documentsApi.endpoints.deleteContractDocument.initiate({
+        companyId: COMPANY,
+        documentId: DOCUMENT,
+      }),
+    );
+    request = requestWith("DELETE");
+    expect(new URL(request.url).pathname).toMatch(
+      new RegExp(`/company/documents/${DOCUMENT}$`),
+    );
   });
 });

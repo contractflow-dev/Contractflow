@@ -8,10 +8,6 @@ import {
 } from '@contractflow/contracts-schema';
 import { In, type DataSource } from 'typeorm';
 import { TypeOrmUnitOfWork } from '../../../src/common/database/typeorm-unit-of-work';
-import type {
-  IObjectStorage,
-  IStoredObjectMetadata,
-} from '../../../src/common/storage/object-storage.interface';
 import type { ContractAccessService } from '../../../src/modules/contract/services/contract-access.service';
 import { ActivityLog } from '../../../src/modules/cross-cutting/entities/activity-log.entity';
 import { Document } from '../../../src/modules/cross-cutting/entities/document.entity';
@@ -26,62 +22,13 @@ import {
   type LifecycleFixture,
 } from '../../fixtures/contract-test.factory';
 import { integrationEntities } from '../database/integration-entities';
+import { InMemoryObjectStorage } from './in-memory-object-storage';
 import {
   destroyPostgresTestDatabase,
   initializePostgresTestDatabase,
 } from '../database/postgres-test-database';
 
 const PDF = Buffer.from('%PDF-1.7\n1 0 obj << >> endobj\n%%EOF\n');
-
-/** In-memory S3 stand-in that records "uploads" made through the test. */
-class InMemoryObjectStorage implements IObjectStorage {
-  readonly provider = 'amazon-s3';
-  readonly bucket = 'integration-bucket';
-  readonly objects = new Map<string, { body: Buffer; contentType: string }>();
-
-  put(key: string, body: Buffer, contentType: string) {
-    this.objects.set(key, { body, contentType });
-  }
-
-  async createUploadUrl(request: { key: string; expiresInSeconds: number }) {
-    return {
-      url: `memory://${request.key}`,
-      method: 'PUT' as const,
-      headers: {},
-      expiresAt: new Date(Date.now() + request.expiresInSeconds * 1000),
-    };
-  }
-
-  async createDownloadUrl(request: { key: string }) {
-    return {
-      url: `memory://${request.key}?download`,
-      expiresAt: new Date(Date.now() + 60_000),
-    };
-  }
-
-  async headObject(key: string): Promise<IStoredObjectMetadata | null> {
-    const object = this.objects.get(key);
-    if (!object) return null;
-    return {
-      sizeBytes: object.body.length,
-      contentType: object.contentType,
-      checksumSha256Base64: createHash('sha256')
-        .update(object.body)
-        .digest('base64'),
-      versionId: 'memory-version-1',
-    };
-  }
-
-  async readObjectPrefix(key: string, length: number) {
-    return new Uint8Array(
-      this.objects.get(key)?.body.subarray(0, length) ?? [],
-    );
-  }
-
-  async deleteObject(key: string) {
-    this.objects.delete(key);
-  }
-}
 
 describe('Document storage PostgreSQL integration', () => {
   let dataSource: DataSource | undefined;
@@ -106,8 +53,14 @@ describe('Document storage PostgreSQL integration', () => {
     storage = new InMemoryObjectStorage();
     // Authorization is unit-tested; here the gate returns the caller's scope.
     const access = {
-      authorize: async (_user: string, companyId: string, contractId: string) =>
-        Object.freeze({ companyId, contractId }),
+      authorizeIncludingArchived: async (
+        _user: string,
+        companyId: string,
+        contractId: string,
+      ) => ({
+        scope: Object.freeze({ companyId, contractId }),
+        archived: false,
+      }),
     } as unknown as ContractAccessService;
     const settings: Record<string, number> = {
       DOCUMENT_MAX_UPLOAD_BYTES: 1024 * 1024,
@@ -127,12 +80,10 @@ describe('Document storage PostgreSQL integration', () => {
 
   afterEach(async () => {
     // document_version -> document is NO ACTION, so remove versions first.
-    const documents = await dataSource!
-      .getRepository(Document)
-      .find({
-        where: { contractId: fixture.contract.id },
-        select: { id: true },
-      });
+    const documents = await dataSource!.getRepository(Document).find({
+      where: { contractId: fixture.contract.id },
+      select: { id: true },
+    });
     const ids = documents.map(({ id }) => id);
     if (ids.length) {
       await dataSource!

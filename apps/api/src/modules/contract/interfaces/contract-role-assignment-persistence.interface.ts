@@ -2,6 +2,7 @@ import type {
   ECompanyRole,
   ECompanyUserStatus,
   EContractRole,
+  EContractStatus,
   EPartyType,
 } from '@contractflow/contracts-schema';
 import type { IUnitOfWork } from '../../../common/application/unit-of-work.interface';
@@ -65,6 +66,22 @@ export interface IRoleInvitationRecord {
   expiresAt: Date;
   respondedAt: Date | null;
   revokedAt: Date | null;
+}
+
+/** An active role held by a member of the company, with its contract. */
+export interface ICompanyRoleAssignmentRow {
+  id: string;
+  contractId: string;
+  contractReference: string;
+  contractTitle: string;
+  contractStatus: EContractStatus;
+  companyUserId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: EContractRole;
+  isWorkspaceAdmin: boolean;
+  assignedAt: Date;
 }
 
 export interface ICreateRoleAssignment {
@@ -151,6 +168,15 @@ export interface IContractRoleAssignmentRepositories {
     ): Promise<boolean>;
   };
   assignments: {
+    /**
+     * Active roles held through the company's own party on contracts that
+     * are not archived. Never another company's assignments.
+     */
+    listActiveForCompany(
+      companyId: string,
+      filters: { companyUserId?: string; roles?: EContractRole[] },
+      page: { skip: number; take: number },
+    ): Promise<{ items: ICompanyRoleAssignmentRow[]; total: number }>;
     findActiveForParty(
       companyId: string,
       partyId: string,

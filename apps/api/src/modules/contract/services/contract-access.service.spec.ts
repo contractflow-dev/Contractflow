@@ -8,7 +8,7 @@ describe('ContractAccessService', () => {
   const users = { findActiveMember: vi.fn() };
   const parties = { findByCompany: vi.fn() };
   const roleAssignments = { findActiveByCompanyUser: vi.fn() };
-  const contracts = { findById: vi.fn() };
+  const contracts = { findById: vi.fn(), findByIdIncludingArchived: vi.fn() };
   const workspaces = { exists: vi.fn() };
   let service: ContractAccessService;
 
@@ -124,6 +124,51 @@ describe('ContractAccessService', () => {
     ]);
     await expect(
       service.authorize('u1', 'co1', 'c1', 'finance'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('keeps archived contracts out of the default check', async () => {
+    // findById excludes archived contracts, so authorize reports not found.
+    contracts.findById.mockResolvedValue(null);
+    contracts.findByIdIncludingArchived.mockResolvedValue({
+      id: 'c1',
+      deletedAt: new Date(),
+    });
+    await expect(
+      service.authorize('u1', 'co1', 'c1', 'finance'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(contracts.findByIdIncludingArchived).not.toHaveBeenCalled();
+  });
+
+  it('reports an archived contract to callers that keep it read-only', async () => {
+    contracts.findByIdIncludingArchived.mockResolvedValue({
+      id: 'c1',
+      deletedAt: new Date(),
+    });
+    await expect(
+      service.authorizeIncludingArchived('u1', 'co1', 'c1', 'finance'),
+    ).resolves.toEqual({
+      scope: { contractId: 'c1', companyId: 'co1' },
+      archived: true,
+    });
+
+    contracts.findByIdIncludingArchived.mockResolvedValue({
+      id: 'c1',
+      deletedAt: null,
+    });
+    await expect(
+      service.authorizeIncludingArchived('u1', 'co1', 'c1', 'finance'),
+    ).resolves.toMatchObject({ archived: false });
+  });
+
+  it('applies the same role checks to archived contracts', async () => {
+    contracts.findByIdIncludingArchived.mockResolvedValue({
+      id: 'c1',
+      deletedAt: new Date(),
+    });
+    roleAssignments.findActiveByCompanyUser.mockResolvedValue([]);
+    await expect(
+      service.authorizeIncludingArchived('u1', 'co1', 'c1', 'finance'),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 

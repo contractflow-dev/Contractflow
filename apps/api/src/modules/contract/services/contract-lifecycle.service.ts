@@ -15,7 +15,10 @@ import {
   EPartyType,
   EToStatus,
 } from '@contractflow/contracts-schema';
-import type { ContractSite as ContractSiteResponse } from '@contractflow/contracts-schema';
+import type {
+  ContractSite as ContractSiteResponse,
+  IncomingContractInvitation,
+} from '@contractflow/contracts-schema';
 import type {
   ContractPartyInvitationPreviewResponse,
   ContractPartyInvitationResponse,
@@ -918,9 +921,81 @@ export class ContractLifecycleService {
     decision: 'accept' | 'reject',
   ): Promise<{ status: 'accepted' | 'rejected' | 'expired' }> {
     const tokenHash = hashToken(token);
+    return this.respondToPartyInvitation(userId, companyId, decision, {
+      find: (context) => context.partyInvitations.findByTokenHash(tokenHash),
+      findForUpdate: (context) =>
+        context.partyInvitations.findByTokenHashForUpdate(tokenHash),
+    });
+  }
+
+  /**
+   * Invitations for the header company to join other companies' contracts,
+   * for its Company Administrators to answer in the app.
+   */
+  async listIncomingInvitations(
+    userId: string,
+    companyId: string,
+  ): Promise<IncomingContractInvitation[]> {
+    return this.unitOfWork.execute(async (context) => {
+      await this.requireCompanyAdmin(context, userId, companyId);
+      const rows = await context.partyInvitations.listPendingForTarget(
+        companyId,
+        new Date(),
+      );
+      return rows.map((row) => ({
+        id: row.id,
+        contractTitle: row.contractTitle,
+        contractReference: row.contractReference,
+        invitingCompanyName: row.invitingCompanyName,
+        partyType: row.partyType,
+        email: row.email,
+        createdAt: row.createdAt.toISOString(),
+        expiresAt: row.expiresAt.toISOString(),
+      }));
+    });
+  }
+
+  /**
+   * Answers an invitation by its id, from the app. Only an invitation
+   * addressed to the header company is found; the checks are the same as for
+   * the email link.
+   */
+  async respondToIncomingInvitation(
+    userId: string,
+    companyId: string,
+    invitationId: string,
+    decision: 'accept' | 'reject',
+  ): Promise<{ status: 'accepted' | 'rejected' | 'expired' }> {
+    return this.respondToPartyInvitation(userId, companyId, decision, {
+      find: (context) =>
+        context.partyInvitations.findByIdForTarget(invitationId, companyId),
+      findForUpdate: (context) =>
+        context.partyInvitations.findByIdForTargetForUpdate(
+          invitationId,
+          companyId,
+        ),
+    });
+  }
+
+  /**
+   * Shared by the email link and the in-app answer. The contract is locked
+   * before the invitation, the order every contract change uses.
+   */
+  private async respondToPartyInvitation(
+    userId: string,
+    companyId: string,
+    decision: 'accept' | 'reject',
+    locate: {
+      find: (
+        context: IContractLifecycleContext,
+      ) => Promise<ContractPartyInvitation | null>;
+      findForUpdate: (
+        context: IContractLifecycleContext,
+      ) => Promise<ContractPartyInvitation | null>;
+    },
+  ): Promise<{ status: 'accepted' | 'rejected' | 'expired' }> {
     const sourceContractId = await this.unitOfWork.execute(async (context) => {
-      const preflight =
-        await context.partyInvitations.findByTokenHash(tokenHash);
+      const preflight = await locate.find(context);
       if (!preflight) {
         throw new NotFoundException('Contract invitation was not found.');
       }
@@ -935,8 +1010,7 @@ export class ContractLifecycleService {
 
     const result = await this.unitOfWork.execute(async (context) => {
       const contract = await this.lockActiveContract(context, sourceContractId);
-      const invitation =
-        await context.partyInvitations.findByTokenHashForUpdate(tokenHash);
+      const invitation = await locate.findForUpdate(context);
       if (!invitation) {
         throw new NotFoundException('Contract invitation was not found.');
       }

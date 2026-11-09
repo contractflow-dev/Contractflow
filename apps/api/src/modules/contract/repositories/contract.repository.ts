@@ -82,6 +82,16 @@ export class ContractRepository extends BaseRepository<
       .getOne();
   }
 
+  /** Like findById, but an archived (soft-deleted) contract is returned too. */
+  findByIdIncludingArchived(
+    scope: ICompanyScope,
+    id: string,
+  ): Promise<Contract | null> {
+    return this.scopedQuery(scope, 'contract')
+      .andWhere('contract.id = :id', { id })
+      .getOne();
+  }
+
   async searchPage(
     scope: ICompanyScope,
     options: ContractSearch = {},

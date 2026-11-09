@@ -8,6 +8,7 @@ import {
   ECompanyRole,
   ECompanyUserStatus,
   EContractRole,
+  EContractStatus,
   EPartyType,
 } from '@contractflow/contracts-schema';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -189,6 +190,68 @@ describe('ContractRoleAssignmentService', () => {
       companyUserId: target.id,
       role: EContractRole.FINANCE_OFFICER,
       email: 'casey@example.test',
+    });
+  });
+
+  describe('listForCompany', () => {
+    const row = {
+      id: assignment.id,
+      contractId: 'contract-1',
+      contractReference: 'CTR-001',
+      contractTitle: 'Pipeline integrity',
+      contractStatus: EContractStatus.ACTIVE,
+      companyUserId: target.id,
+      firstName: 'Casey',
+      lastName: 'Member',
+      email: 'casey@example.test',
+      role: EContractRole.HSE_OFFICER,
+      isWorkspaceAdmin: true,
+      assignedAt: new Date('2026-01-01T00:00:00.000Z'),
+    };
+
+    beforeEach(() => {
+      persistence.assignments.listActiveForCompany = vi
+        .fn()
+        .mockResolvedValue({ items: [row], total: 1 });
+    });
+
+    it('lists the header company only, narrowed to the workspace roles', async () => {
+      const result = await service.listForCompany('actor-user', 'company-1', {
+        page: 1,
+        limit: 20,
+        workspace: 'hse',
+        companyUserId: target.id,
+      });
+
+      expect(persistence.assignments.listActiveForCompany).toHaveBeenCalledWith(
+        'company-1',
+        {
+          companyUserId: target.id,
+          roles: [EContractRole.HSE_OFFICER, EContractRole.HSE_MANAGER],
+        },
+        { skip: 0, take: 20 },
+      );
+      expect(result.data[0]).toMatchObject({
+        id: assignment.id,
+        workspace: 'hse',
+        assignedAt: '2026-01-01T00:00:00.000Z',
+      });
+      expect(result.meta.totalItems).toBe(1);
+    });
+
+    it('is refused to members who are not Company Administrators', async () => {
+      await expect(
+        service.listForCompany('target-user', 'company-1', {
+          page: 1,
+          limit: 20,
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(
+        service.listForCompany('stranger', 'company-1', { page: 1, limit: 20 }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(
+        persistence.assignments.listActiveForCompany,
+      ).not.toHaveBeenCalled();
     });
   });
 

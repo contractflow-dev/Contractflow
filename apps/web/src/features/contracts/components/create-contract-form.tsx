@@ -50,6 +50,9 @@ import {
   ContractPartiesFields,
 } from "./contract-setup-fields";
 
+/** Link here to open the form directly: `/dashboards/contracts#new-contract`. */
+export const NEW_CONTRACT_ANCHOR = "new-contract";
+
 /**
  * "New contract" for company administrators: a card that opens a four-step
  * form. `canCreate` is the shell's `membership.canManageCompany`; the API
@@ -63,11 +66,25 @@ export function CreateContractForm({
   canCreate: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  // The Overview's "Create a contract" links here with #new-contract. On a
+  // client-side navigation the page renders before the URL changes, so the
+  // hash is read just after mounting, and again if it changes later.
+  useEffect(() => {
+    const openFromHash = () => {
+      if (window.location.hash === `#${NEW_CONTRACT_ANCHOR}`) setOpen(true);
+    };
+    const pending = window.setTimeout(openFromHash, 0);
+    window.addEventListener("hashchange", openFromHash);
+    return () => {
+      window.clearTimeout(pending);
+      window.removeEventListener("hashchange", openFromHash);
+    };
+  }, []);
   const formId = useId();
   if (!canCreate) return null;
 
   return (
-    <Card>
+    <Card id={NEW_CONTRACT_ANCHOR} className="scroll-mt-24">
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
         <div>
           <CardTitle>

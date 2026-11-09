@@ -33,6 +33,8 @@ describe('database migration configuration', () => {
       'CompanyEmailVerification1793200000000',
       'DocumentObjectStorage1793300000000',
       'PasswordResetToken1793400000000',
+      'CompanyLevelDocuments1793500000000',
+      'CompanyRoleAssignmentIndex1793500000001',
     ]);
   });
 

@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import {
+  ECompanyRole,
   EDocumentCategory,
   EDocumentStatus,
   EDocumentUploadStatus,
@@ -22,7 +23,11 @@ import type {
   IDocumentContext,
   IDocumentUnitOfWork,
 } from '../interfaces/document-persistence.interface';
-import { DocumentService, type IDocumentActor } from './document.service';
+import {
+  DocumentService,
+  type ICompanyDocumentActor,
+  type IDocumentActor,
+} from './document.service';
 
 const COMPANY = '01J00000000000000000000CMP';
 const OTHER_COMPANY = '01J00000000000000000000OTH';
@@ -95,6 +100,11 @@ function makeContext() {
       findOwnedForUpdate: vi.fn(),
       create: vi.fn(),
       softDelete: vi.fn(),
+      findCompanyLevel: vi.fn(),
+      findCompanyLevelForUpdate: vi.fn(),
+      listCompanyLevel: vi.fn(),
+      createCompanyLevel: vi.fn(),
+      softDeleteCompanyLevel: vi.fn(),
     },
     versions: {
       listForDocuments: vi.fn().mockResolvedValue([]),
@@ -107,7 +117,10 @@ function makeContext() {
       markFailed: vi.fn(),
     },
     memberships: {
-      findActive: vi.fn().mockResolvedValue({ id: 'member-1' }),
+      findActive: vi.fn().mockResolvedValue({
+        id: 'member-1',
+        companyRole: ECompanyRole.COMPANY_ADMIN,
+      }),
     },
     activity: { record: vi.fn() },
   } satisfies IDocumentContext;
@@ -115,6 +128,8 @@ function makeContext() {
 
 describe('DocumentService', () => {
   let authorize: Mock;
+  /** Whether the contract the access check resolves to is archived. */
+  let archived: boolean;
   let persistence: ReturnType<typeof makeContext>;
   let transaction: ReturnType<typeof makeContext>;
   let storage: { [K in keyof IObjectStorage]: IObjectStorage[K] } & {
@@ -128,6 +143,7 @@ describe('DocumentService', () => {
 
   beforeEach(() => {
     authorize = vi.fn().mockResolvedValue(scope);
+    archived = false;
     persistence = makeContext();
     transaction = makeContext();
     storage = {
@@ -164,7 +180,13 @@ describe('DocumentService', () => {
       DOCUMENT_DOWNLOAD_URL_TTL_SECONDS: 60,
     };
     service = new DocumentService(
-      { authorize } as unknown as ContractAccessService,
+      {
+        // The service checks access including archived contracts; `authorize`
+        // stands in for the shared checks, `archived` for the contract state.
+        authorizeIncludingArchived: async (
+          ...args: [string, string, string, string]
+        ) => ({ scope: await authorize(...args), archived }),
+      } as unknown as ContractAccessService,
       persistence,
       unitOfWork,
       storage,
@@ -659,6 +681,191 @@ describe('DocumentService', () => {
       );
 
       await expect(service.delete(actor, DOCUMENT)).resolves.toBeUndefined();
+    });
+  });
+
+  describe('archived contracts', () => {
+    beforeEach(() => {
+      archived = true;
+    });
+
+    it('keeps documents readable and downloadable', async () => {
+      persistence.documents.listVisible.mockResolvedValue({
+        items: [makeDocument()],
+        total: 1,
+      });
+      persistence.documents.findVisible.mockResolvedValue(makeDocument());
+      persistence.versions.listForDocuments.mockResolvedValue([
+        makeVersion({ uploadStatus: EDocumentUploadStatus.AVAILABLE }),
+      ]);
+
+      await expect(
+        service.list(actor, { page: 1, limit: 20 }),
+      ).resolves.toMatchObject({ data: [{ id: DOCUMENT }] });
+      await expect(
+        service.createDownloadUrl(actor, DOCUMENT),
+      ).resolves.toMatchObject({ url: 'https://signed-download' });
+    });
+
+    it('refuses every change, before touching storage', async () => {
+      persistence.documents.findOwned.mockResolvedValue(makeDocument());
+
+      for (const attempt of [
+        () => service.createUpload(actor, uploadRequest),
+        () => service.createVersionUpload(actor, DOCUMENT, uploadRequest),
+        () => service.completeUpload(actor, DOCUMENT, VERSION),
+        () => service.delete(actor, DOCUMENT),
+      ]) {
+        await expect(attempt()).rejects.toThrow(
+          'This contract is archived, so its documents are read-only.',
+        );
+      }
+      expect(storage.createUploadUrl).not.toHaveBeenCalled();
+      expect(storage.headObject).not.toHaveBeenCalled();
+      expect(storage.deleteObject).not.toHaveBeenCalled();
+      expect(transaction.documents.create).not.toHaveBeenCalled();
+      expect(transaction.documents.softDelete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('company-wide documents', () => {
+    const companyActor: ICompanyDocumentActor = {
+      userId: 'user-1',
+      companyId: COMPANY,
+    };
+    const companyPlace = { companyId: COMPANY, contractId: null };
+    const companyRequest = {
+      title: 'Insurance master policy',
+      category: EDocumentCategory.CERTIFICATE,
+      fileName: 'policy.pdf',
+      mimeType: 'application/pdf',
+      sizeBytes: 2048,
+      checksumSha256: CHECKSUM,
+    };
+    const asMember = (context: ReturnType<typeof makeContext>) =>
+      context.memberships.findActive.mockResolvedValue({
+        id: 'member-2',
+        companyRole: ECompanyRole.FINANCE_OFFICER,
+      });
+
+    it('never consults contract access, and reads only the header company', async () => {
+      persistence.documents.listCompanyLevel.mockResolvedValue({
+        items: [makeDocument({ contractId: null })],
+        total: 1,
+      });
+
+      const page = await service.listCompany(companyActor, {
+        page: 1,
+        limit: 20,
+      });
+
+      expect(page.data[0]).toMatchObject({ id: DOCUMENT, contractId: null });
+      expect(persistence.documents.listCompanyLevel).toHaveBeenCalledWith(
+        companyPlace,
+        { skip: 0, take: 20 },
+      );
+      expect(authorize).not.toHaveBeenCalled();
+    });
+
+    it('lets any active member read, but refuses people outside the company', async () => {
+      asMember(persistence);
+      persistence.documents.findCompanyLevel.mockResolvedValue(
+        makeDocument({ contractId: null }),
+      );
+      await expect(
+        service.getCompany(companyActor, DOCUMENT),
+      ).resolves.toMatchObject({ id: DOCUMENT });
+
+      persistence.memberships.findActive.mockResolvedValue(null);
+      await expect(
+        service.getCompany(companyActor, DOCUMENT),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it("treats another company's document, or a contract document, as not found", async () => {
+      // The repository only returns company-wide rows owned by the scope.
+      persistence.documents.findCompanyLevel.mockResolvedValue(null);
+
+      await expect(
+        service.createCompanyDownloadUrl(companyActor, DOCUMENT),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(storage.createDownloadUrl).not.toHaveBeenCalled();
+    });
+
+    it('lets only a Company Administrator add, replace or delete', async () => {
+      asMember(persistence);
+
+      for (const attempt of [
+        () => service.createCompanyUpload(companyActor, companyRequest),
+        () =>
+          service.createCompanyVersionUpload(
+            companyActor,
+            DOCUMENT,
+            companyRequest,
+          ),
+        () => service.completeCompanyUpload(companyActor, DOCUMENT, VERSION),
+        () => service.deleteCompany(companyActor, DOCUMENT),
+      ]) {
+        await expect(attempt()).rejects.toThrow(
+          'Only a Company Administrator can change company documents',
+        );
+      }
+      expect(storage.createUploadUrl).not.toHaveBeenCalled();
+      expect(transaction.documents.createCompanyLevel).not.toHaveBeenCalled();
+      expect(
+        transaction.documents.softDeleteCompanyLevel,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('re-checks administrator rights inside the upload transaction', async () => {
+      asMember(transaction);
+
+      await expect(
+        service.createCompanyUpload(companyActor, companyRequest),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(transaction.documents.createCompanyLevel).not.toHaveBeenCalled();
+    });
+
+    it('stores uploads under the company, outside any contract, without contract activity', async () => {
+      transaction.documents.createCompanyLevel.mockResolvedValue(
+        makeDocument({ contractId: null }),
+      );
+
+      const session = await service.createCompanyUpload(
+        companyActor,
+        companyRequest,
+      );
+
+      expect(transaction.documents.createCompanyLevel).toHaveBeenCalledWith(
+        companyPlace,
+        expect.not.objectContaining({ visibility: expect.anything() }),
+      );
+      const key = storage.createUploadUrl.mock.calls[0][0].key as string;
+      expect(key).toMatch(
+        new RegExp(`^companies/${COMPANY}/documents/${DOCUMENT}/[0-9A-Z]{26}\\.pdf$`),
+      );
+      expect(key).not.toContain('/contracts/');
+      expect(session.document.contractId).toBeNull();
+      expect(transaction.activity.record).not.toHaveBeenCalled();
+    });
+
+    it('soft-deletes and then removes the stored objects', async () => {
+      persistence.documents.findCompanyLevel.mockResolvedValue(
+        makeDocument({ contractId: null }),
+      );
+      transaction.documents.softDeleteCompanyLevel.mockResolvedValue(true);
+      persistence.versions.listForDocuments.mockResolvedValue([makeVersion()]);
+
+      await service.deleteCompany(companyActor, DOCUMENT);
+
+      expect(transaction.documents.softDeleteCompanyLevel).toHaveBeenCalledWith(
+        companyPlace,
+        DOCUMENT,
+        'member-1',
+        expect.any(Date),
+      );
+      expect(storage.deleteObject).toHaveBeenCalledTimes(1);
+      expect(transaction.activity.record).not.toHaveBeenCalled();
     });
   });
 });

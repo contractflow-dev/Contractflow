@@ -29,6 +29,12 @@ export class RespondContractPartyInvitationRequestDto extends ContractPartyInvit
   decision!: 'accept' | 'reject';
 }
 
+/** The in-app answer to an invitation for the header company. */
+export class RespondIncomingContractInvitationRequestDto {
+  @IsIn(['accept', 'reject'])
+  decision!: 'accept' | 'reject';
+}
+
 export interface ContractPartyInvitationResponse {
   id: string;
   email: string;

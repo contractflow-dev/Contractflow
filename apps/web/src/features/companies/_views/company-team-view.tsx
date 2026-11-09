@@ -56,6 +56,7 @@ import {
   type StatusLegendItem,
 } from "@/components/status-badge/status-legend";
 import { PageHeader } from "@/components/page-header/page-header";
+import { CompanyContractRoles } from "../components/company-contract-roles";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useKeepPageInRange, usePagination } from "@/hooks/use-pagination";
 import { useUserTimeZone } from "@/hooks/use-user-time-zone";
@@ -534,6 +535,8 @@ function TeamContent({ companyId }: { companyId: string }) {
             )}
         </Card>
       </section>
+
+      <CompanyContractRoles companyId={companyId} />
 
       <section className="space-y-4">
         <div>

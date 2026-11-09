@@ -97,6 +97,15 @@ describe('CompanyService', () => {
       countExpiringCompanyContracts: vi.fn().mockResolvedValue(1),
       findExpiringCompanyContracts: vi.fn().mockResolvedValue([]),
       findRecentlyUpdatedCompanyContracts: vi.fn().mockResolvedValue([]),
+      getCompanyPortfolioCounts: vi.fn().mockResolvedValue({
+        stalledContractCount: 2,
+        nonCompliantContractorCount: 1,
+        complianceAttentionCount: 3,
+        overduePaymentCount: 4,
+        invoicesDueSoonCount: 5,
+        openIncidentCount: 6,
+        contractsNeedingAttentionCount: 7,
+      }),
     };
     configService = {
       get: vi.fn().mockReturnValue(30),
@@ -325,6 +334,19 @@ describe('CompanyService', () => {
         expiringContractCount: 1,
       },
       expiryWindowDays: 30,
+      portfolioHealth: {
+        stalledAfterDays: 14,
+        stalledContractCount: 2,
+        nonCompliantContractorCount: 1,
+        overduePaymentCount: 4,
+      },
+      departments: {
+        complianceAttentionCount: 3,
+        contractsNeedingAttentionCount: 7,
+        openIncidentCount: 6,
+        invoicesDueSoonCount: 5,
+        dueWindowDays: 30,
+      },
       expiringContracts: [
         {
           id: 'contract-expiring',
@@ -344,6 +366,18 @@ describe('CompanyService', () => {
     expect(membershipRepository.countActiveMembers).toHaveBeenCalledWith(
       companyData.id,
     );
+    // Portfolio figures are asked for the header company only, with dated
+    // windows: stalled after 14 days, due within 30.
+    const [portfolioCompany, window] =
+      contractPartyRepository.getCompanyPortfolioCounts.mock.calls[0];
+    expect(portfolioCompany).toBe(companyData.id);
+    expect(Date.now() - window.stalledBefore.getTime()).toBeGreaterThanOrEqual(
+      14 * 86400000 - 1000,
+    );
+    expect(window.today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(
+      (Date.parse(window.dueLimit) - Date.parse(window.today)) / 86400000,
+    ).toBe(30);
     expect(invitationRepository.countPending).toHaveBeenCalledWith({
       companyId: companyData.id,
     });

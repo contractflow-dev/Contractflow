@@ -27,6 +27,37 @@ export class ContractAccessService {
     contractId: string,
     workspace: ContractWorkspace,
   ): Promise<IContractCompanyScope> {
+    const { scope } = await this.check(
+      userId,
+      companyId,
+      contractId,
+      workspace,
+      false,
+    );
+    return scope;
+  }
+
+  /**
+   * The same checks as `authorize`, but an archived contract is allowed and
+   * reported, so a caller can keep its records readable while refusing
+   * changes. Only callers that enforce that read-only rule may use this.
+   */
+  async authorizeIncludingArchived(
+    userId: string,
+    companyId: string,
+    contractId: string,
+    workspace: ContractWorkspace,
+  ): Promise<{ scope: IContractCompanyScope; archived: boolean }> {
+    return this.check(userId, companyId, contractId, workspace, true);
+  }
+
+  private async check(
+    userId: string,
+    companyId: string,
+    contractId: string,
+    workspace: ContractWorkspace,
+    includeArchived: boolean,
+  ): Promise<{ scope: IContractCompanyScope; archived: boolean }> {
     const user = userId?.trim();
     const company = companyId?.trim();
     const contract = contractId?.trim();
@@ -49,10 +80,12 @@ export class ContractAccessService {
     if (!party) {
       throw new NotFoundException('Contract was not found');
     }
-    const contractRecord = await this.contracts.findById(
-      { companyId: company },
-      contract,
-    );
+    const contractRecord = includeArchived
+      ? await this.contracts.findByIdIncludingArchived(
+          { companyId: company },
+          contract,
+        )
+      : await this.contracts.findById({ companyId: company }, contract);
     if (!contractRecord) {
       throw new NotFoundException('Contract was not found');
     }
@@ -80,6 +113,9 @@ export class ContractAccessService {
         'Your role does not have access to this contract workspace',
       );
     }
-    return Object.freeze({ contractId: contract, companyId: company });
+    return {
+      scope: Object.freeze({ contractId: contract, companyId: company }),
+      archived: contractRecord.deletedAt !== null,
+    };
   }
 }

@@ -15,6 +15,19 @@ import {
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
 
+/** Trims and prefixes `https://` when no scheme is given (e.g. `www.example.com`). */
+export const normalizeWebsite = (value: unknown): unknown => {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  if (!trimmed || /^[a-z][a-z\d+.-]*:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+};
+
+export const WEBSITE_URL_OPTIONS = {
+  require_protocol: true,
+  protocols: ['http', 'https'],
+};
+
 export class CreateCompanyRequestDto {
   @Transform(trim)
   @IsString()
@@ -30,12 +43,14 @@ export class CreateCompanyRequestDto {
 
   @Transform(trim)
   @IsString()
+  @IsOptional()
   @MinLength(1)
   @MaxLength(64)
   registrationNumber!: string;
 
   @Transform(trim)
   @IsString()
+  @IsOptional()
   @MinLength(1)
   @MaxLength(64)
   taxIdentificationNumber!: string;
@@ -53,11 +68,9 @@ export class CreateCompanyRequestDto {
   @MaxLength(20)
   phoneNumber!: string;
 
-  @Transform(({ value }) =>
-    typeof value === 'string' ? value.trim() || undefined : value,
-  )
+  @Transform(({ value }) => normalizeWebsite(value) || undefined)
   @IsOptional()
-  @IsUrl({ require_protocol: true })
+  @IsUrl(WEBSITE_URL_OPTIONS)
   @MaxLength(255)
   website?: string;
 

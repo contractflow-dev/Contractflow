@@ -7,6 +7,7 @@ import {
   formatCalendarDate,
   formatDate,
   formatDateTime,
+  formatFileSize,
   formatMoneyMinor,
   formatNumber,
   formatPercent,
@@ -191,6 +192,16 @@ describe("number and percentage formatting", () => {
     expect(formatBasisPoints(125, { locale })).toBe("1.25%");
     expect(formatPercent(undefined)).toBe(EMPTY_VALUE);
     expect(formatBasisPoints(null)).toBe(EMPTY_VALUE);
+  });
+});
+
+describe("formatFileSize", () => {
+  it("uses bytes, KB or MB, whichever reads best", () => {
+    expect(formatFileSize(12, { locale })).toBe("12 bytes");
+    expect(formatFileSize(655_360, { locale })).toBe("640 KB");
+    expect(formatFileSize(2_516_582, { locale })).toBe("2.4 MB");
+    expect(formatFileSize(26_214_400, { locale })).toBe("25 MB");
+    expect(formatFileSize(null)).toBe(EMPTY_VALUE);
   });
 });
 

@@ -22,13 +22,26 @@ import type {
   CreateContractSiteRequest,
   EContractRole,
   EPartyType,
+  CompanyRoleAssignment,
+  CompanyRoleAssignmentFilters,
+  IncomingContractInvitation,
   IPaginatedResponse,
   RecordContractSignatoryRequest,
+  RespondIncomingContractInvitationRequest,
+  RespondIncomingContractInvitationResponse,
   UpdateContractSiteRequest,
 } from "@contractflow/contracts-schema";
-import { api, companyCollectionRoute, contractRoute } from "./api";
+import {
+  api,
+  companyCollectionRoute,
+  companyRoute,
+  contractRoute,
+} from "./api";
 
 export type {
+  CompanyRoleAssignment,
+  CompanyRoleAssignmentFilters,
+  IncomingContractInvitation,
   AssignableContractWorkspace,
   CompanyContractDetailQuery,
   CompanyContractHistoryQuery,
@@ -570,6 +583,53 @@ export const contractApi = api.injectEndpoints({
         { type: "ContractLifecyclePermission", id: "LIST" },
       ],
     }),
+
+    /** Contract roles held across the header company. Administrators only. */
+    getCompanyRoleAssignments: builder.query<
+      IPaginatedResponse<CompanyRoleAssignment>,
+      { companyId: string; page: number; limit: number } &
+        CompanyRoleAssignmentFilters
+    >({
+      query: ({ companyId, ...params }) => ({
+        ...companyRoute(companyId, "/role-assignments"),
+        params,
+      }),
+      providesTags: (_result, _error, { companyId }) => [
+        { type: "ContractRoleAssignment", id: `company:${companyId}` },
+      ],
+    }),
+
+    /** Invitations for the header company to join other companies' contracts. */
+    getIncomingContractInvitations: builder.query<
+      IncomingContractInvitation[],
+      { companyId: string }
+    >({
+      query: ({ companyId }) =>
+        companyRoute(companyId, "/contract-invitations"),
+      providesTags: (_result, _error, { companyId }) => [
+        { type: "ContractPartyInvitation", id: `incoming:${companyId}` },
+      ],
+    }),
+
+    respondToIncomingContractInvitation: builder.mutation<
+      RespondIncomingContractInvitationResponse,
+      { companyId: string; invitationId: string } &
+        RespondIncomingContractInvitationRequest
+    >({
+      query: ({ companyId, invitationId, decision }) => ({
+        ...companyRoute(
+          companyId,
+          `/contract-invitations/${encodeURIComponent(invitationId)}/respond`,
+        ),
+        method: "POST",
+        body: { decision },
+      }),
+      invalidatesTags: (_result, _error, { companyId }) => [
+        { type: "ContractPartyInvitation", id: `incoming:${companyId}` },
+        { type: "Contract", id: "LIST" },
+        "Dashboard",
+      ],
+    }),
   }),
   overrideExisting: false,
 });
@@ -608,4 +668,7 @@ export const {
   useRevokeContractRoleInvitationMutation,
   useGetPublicContractRoleInvitationQuery,
   useRespondToContractRoleInvitationMutation,
+  useGetCompanyRoleAssignmentsQuery,
+  useGetIncomingContractInvitationsQuery,
+  useRespondToIncomingContractInvitationMutation,
 } = contractApi;

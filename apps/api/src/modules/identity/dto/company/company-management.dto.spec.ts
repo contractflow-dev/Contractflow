@@ -2,11 +2,41 @@ import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 import { describe, expect, it } from 'vitest';
 import { UpdateCompanyRequestDto } from './update-company-request.dto';
+import {
+  CreateCompanyRequestDto,
+  normalizeWebsite,
+} from './requests/create-company-request.dto';
 import { CreateCompanyInvitationRequestDto } from './create-company-invitation-request.dto';
 import { InviteCompanyMemberRequestDto } from './requests/invite-company-member-request.dto';
 import { EInvitationRole } from '@contractflow/contracts-schema';
 
 describe('Company management DTO validation', () => {
+  it('normalizes a website without a protocol for company creation', () => {
+    const input = plainToInstance(CreateCompanyRequestDto, {
+      name: 'Example Company',
+      legalName: 'Example Company Ltd',
+      registrationNumber: 'REG-1',
+      taxIdentificationNumber: 'TAX-1',
+      email: 'company@example.com',
+      phoneNumber: '+10000000000',
+      website: 'www.greatbuilder.com',
+      addressLine1: '1 Test Street',
+      city: 'Test City',
+      stateRegion: 'Test Region',
+      postalCode: '10000',
+      countryCode: 'NG',
+      defaultCurrencyCode: 'NGN',
+    });
+
+    expect(validateSync(input).map(({ property }) => property)).not.toContain(
+      'website',
+    );
+    expect(input.website).toBe('https://www.greatbuilder.com');
+    expect(normalizeWebsite('www.greatbuilder.com')).toBe(
+      'https://www.greatbuilder.com',
+    );
+  });
+
   it('trims allowed company profile fields and strips protected fields', () => {
     const input = plainToInstance(UpdateCompanyRequestDto, {
       name: '  Updated Company  ',

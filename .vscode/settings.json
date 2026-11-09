@@ -3,5 +3,6 @@
         "contractflow"
     ],
     "css.lint.unknownAtRules": "ignore",
-    "liveServer.settings.multiRootWorkspaceName": "Contractflow"
+    "liveServer.settings.multiRootWorkspaceName": "Contractflow",
+    "chat.mcp.apps.enabled": false
 }

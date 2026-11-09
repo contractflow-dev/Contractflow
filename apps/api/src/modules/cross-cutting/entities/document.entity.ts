@@ -10,11 +10,13 @@ import { EDocumentCategory, EDocumentStatus, EDocumentVisibility } from "@contra
 @Entity("document")
 export class Document extends BaseCustomEntity implements IDocumentEntity {
 
-    @Column({name: "contract_id", type: "varchar", length: 26})
-    contractId!: string
-    @ManyToOne(() => Contract, {onDelete:"CASCADE"})
+    // Null for a company-wide document, which only its owner company sees
+    // (enforced by ck_document_company_level_private).
+    @Column({name: "contract_id", type: "varchar", length: 26, nullable: true})
+    contractId!: string | null
+    @ManyToOne(() => Contract, {onDelete:"CASCADE", nullable: true})
     @JoinColumn({name:"contract_id", referencedColumnName:"id"})
-    contract!: Contract
+    contract!: Contract | null
 
     @Column({name: "owner_company_id", type: "varchar", length: 26})
     ownerCompanyId!: string

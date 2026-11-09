@@ -161,6 +161,29 @@ export interface ContractPartyInvitationPreview {
   expiresAt: string;
 }
 
+/**
+ * A pending invitation for the header company to join another company's
+ * contract, listed in the app for its Company Administrators.
+ */
+export interface IncomingContractInvitation {
+  id: string;
+  contractTitle: string;
+  contractReference: string;
+  invitingCompanyName: string;
+  partyType: EPartyType;
+  email: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface RespondIncomingContractInvitationRequest {
+  decision: "accept" | "reject";
+}
+
+export interface RespondIncomingContractInvitationResponse {
+  status: "accepted" | "rejected";
+}
+
 export interface CreateContractRequest {
   referenceNumber: string;
   title: string;
@@ -198,6 +221,32 @@ export interface ContractRoleAssignment {
   assignedById: string;
   revokedAt: string | null;
   revokedById: string | null;
+}
+
+/**
+ * An active contract role held by a member of the header company, listed
+ * across all of the company's contracts that are not archived.
+ */
+export interface CompanyRoleAssignment {
+  id: string;
+  contractId: string;
+  contractReference: string;
+  contractTitle: string;
+  contractStatus: EContractStatus;
+  companyUserId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: EContractRole;
+  workspace: AssignableContractWorkspace;
+  isWorkspaceAdmin: boolean;
+  assignedAt: string;
+}
+
+/** Filters that narrow the header company's role assignments. */
+export interface CompanyRoleAssignmentFilters {
+  companyUserId?: string;
+  workspace?: AssignableContractWorkspace;
 }
 
 export interface ContractRoleInvitation {

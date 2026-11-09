@@ -56,6 +56,7 @@ import {
 } from "@/services/contractApi";
 import { ContractRoleAssignmentManagement } from "./contract-role-assignment-management";
 import { ContractSignatoryManagement } from "./contract-signatory-management";
+import { ContractDocuments } from "./contract-documents";
 import { ContractSiteManagement } from "./contract-site-management";
 import { useContractDetails } from "../_hooks/use-contract-details";
 import { useContractSectionAccess } from "../_hooks/use-contract-section-access";
@@ -779,6 +780,10 @@ export function ContractDetail({
             />
           )}
         </RestrictedSection>
+      ) : null}
+
+      {section === "documents" ? (
+        <ContractDocuments companyId={companyId} contract={contract} />
       ) : null}
 
       {section === "history" ? (

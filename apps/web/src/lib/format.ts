@@ -300,6 +300,21 @@ export function formatNumber(
   return new Intl.NumberFormat(locale, { maximumFractionDigits }).format(value);
 }
 
+/** Formats a file size in bytes: "12 bytes", "640 KB", "2.4 MB". */
+export function formatFileSize(
+  bytes: number | null | undefined,
+  { locale, fallback = EMPTY_VALUE }: FormatOptions = {},
+): string {
+  if (bytes === null || bytes === undefined || !Number.isFinite(bytes)) {
+    return fallback;
+  }
+  if (bytes < 1024) return `${formatNumber(bytes, { locale })} bytes`;
+  if (bytes < 1024 * 1024) {
+    return `${formatNumber(Math.round(bytes / 1024), { locale })} KB`;
+  }
+  return `${formatNumber(bytes / (1024 * 1024), { locale, maximumFractionDigits: 1 })} MB`;
+}
+
 /** Formats a ratio as a percentage: 0.25 becomes "25%". */
 export function formatPercent(
   ratio: number | null | undefined,

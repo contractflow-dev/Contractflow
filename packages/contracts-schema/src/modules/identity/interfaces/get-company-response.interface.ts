@@ -76,6 +76,35 @@ export interface ICompanyAccessSummaryResponse {
   hasInactiveCompanyMembership: boolean;
 }
 
+/**
+ * What is holding progress up across the company's own contracts that are
+ * not archived. Counts only: every figure comes from recorded data, so it is
+ * 0 until the related records exist.
+ */
+export interface ICompanyPortfolioHealth {
+  /** A contract counts as stalled after this many days without a change. */
+  stalledAfterDays: number;
+  /** Active contracts with no status change, update or milestone update. */
+  stalledContractCount: number;
+  /** Contractor companies with an expired, rejected or non-compliant record. */
+  nonCompliantContractorCount: number;
+  /** Unpaid invoices past their due date that the company issued or owes. */
+  overduePaymentCount: number;
+}
+
+/** One figure per department workspace, each through its own lens. */
+export interface ICompanyDepartmentSummary {
+  /** Contractor: compliance records that are expired, due or rejected. */
+  complianceAttentionCount: number;
+  /** Client project management: suspended, stalled or ending soon. */
+  contractsNeedingAttentionCount: number;
+  /** HSE: incidents not yet closed. */
+  openIncidentCount: number;
+  /** Finance: unpaid invoices due within `dueWindowDays`. */
+  invoicesDueSoonCount: number;
+  dueWindowDays: number;
+}
+
 export interface ICompanyDashboardResponse extends ICompanyAccessResponse {
   expiryWindowDays: number;
   summary: {
@@ -85,6 +114,8 @@ export interface ICompanyDashboardResponse extends ICompanyAccessResponse {
     activeContractCount: number;
     expiringContractCount: number;
   };
+  portfolioHealth: ICompanyPortfolioHealth;
+  departments: ICompanyDepartmentSummary;
   expiringContracts: ICompanyDashboardContractResponse[];
   recentlyUpdatedContracts: ICompanyDashboardContractResponse[];
 }
@@ -115,6 +146,8 @@ export interface ICompanyDashboard extends ICompanyAccessResponse {
     activeContractCount: number;
     expiringContractCount: number;
   };
+  portfolioHealth: ICompanyPortfolioHealth;
+  departments: ICompanyDepartmentSummary;
   expiringContracts: ICompanyDashboardContract[];
   recentlyUpdatedContracts: ICompanyDashboardContract[];
 }
