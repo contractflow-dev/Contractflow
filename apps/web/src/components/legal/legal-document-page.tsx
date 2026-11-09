@@ -17,7 +17,7 @@ export function LegalDocumentPage({
       <article className="mx-auto w-full max-w-3xl space-y-7">
         <Link
           href="/auth/register"
-          className={cn(buttonVariants({ variant: "link" }), "h-11 px-0")}
+          className={cn(buttonVariants({ variant: "link" }), "px-0")}
         >
           Back to registration
         </Link>

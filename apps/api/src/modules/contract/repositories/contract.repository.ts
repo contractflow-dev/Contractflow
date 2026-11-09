@@ -10,12 +10,18 @@ import { BaseRepository } from '../../../common/database/repositories/base.repos
 import type { ICompanyScope } from '../../../common/database/repositories/company-scope.interface';
 import { Contract } from '../entities/contract.entity';
 import { ContractParty } from '../entities/contract-party.entity';
+import { ContractRoleAssignment } from '../entities/contract-role-assignment.entity';
 
 export interface ContractSearch {
   search?: string;
   status?: EContractStatus;
   includeDeleted?: boolean;
   creatorCompanyId?: string;
+  /**
+   * Only contracts this member of the scoped company holds an active role
+   * assignment on. Narrows the company's contracts; never widens them.
+   */
+  assignedToCompanyUserId?: string;
   sortBy?: EContractSortField;
   sortOrder?: ESortOrder;
   skip?: number;
@@ -98,6 +104,22 @@ export class ContractRepository extends BaseRepository<
 
     if (options.status) {
       qb.andWhere('contract.status = :status', { status: options.status });
+    }
+    if (options.assignedToCompanyUserId) {
+      const assignment = qb
+        .subQuery()
+        .select('1')
+        .from(ContractRoleAssignment, 'mine')
+        .innerJoin(ContractParty, 'mine_party', 'mine_party.id = mine.contractPartyId')
+        .where('mine_party.contractId = contract.id')
+        .andWhere('mine.companyUserId = :assignedCompanyUserId')
+        .andWhere('mine.companyId = :assignedCompanyId')
+        .andWhere('mine.revokedAt IS NULL')
+        .getQuery();
+      qb.andWhere(`EXISTS ${assignment}`, {
+        assignedCompanyUserId: options.assignedToCompanyUserId,
+        assignedCompanyId: scope.companyId,
+      });
     }
     if (options.search) {
       const escaped = options.search.replace(/[\\%_]/g, '\\$&');

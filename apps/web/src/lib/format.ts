@@ -168,7 +168,11 @@ export function todayAsCalendarDate(now: Date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
-function currencyDigits(currencyCode: string): number | null {
+/**
+ * The number of decimal places a currency uses for its minor unit (2 for NGN
+ * and USD, 0 for JPY, 3 for KWD), or null for an unknown currency code.
+ */
+export function currencyDigits(currencyCode: string): number | null {
   try {
     return (
       new Intl.NumberFormat("en", {
@@ -235,6 +239,50 @@ export function formatMoneyMinor(
     maximumFractionDigits: digits,
     // Intl formats numeric strings exactly; the cast covers older TS libs.
   }).format(decimal as unknown as number);
+}
+
+/** A plain decimal number as typed: digits, then optionally "." and digits. */
+const DECIMAL_TEXT = /^(\d+)(?:\.(\d+))?$/;
+
+/**
+ * Converts a typed decimal amount ("1500000.50", "1,500,000.50") to whole
+ * minor units of the currency (150000050 for NGN). Exact: it works on the
+ * digits, never through floating point. Returns null when the text is not a
+ * non-negative amount, has more decimals than the currency allows, or is too
+ * large to send as a safe integer.
+ */
+export function parseDecimalToMinor(
+  text: string,
+  currencyCode: string,
+): number | null {
+  const digits = currencyDigits(currencyCode);
+  if (digits === null) return null;
+  // Grouping commas are allowed only in their usual places.
+  const trimmed = text.trim();
+  const compact = /^\d{1,3}(,\d{3})+(\.\d+)?$/.test(trimmed)
+    ? trimmed.replaceAll(",", "")
+    : trimmed;
+  const match = DECIMAL_TEXT.exec(compact);
+  if (!match) return null;
+  const [, whole, fraction = ""] = match;
+  if (fraction.length > digits) return null;
+  const minor = BigInt(whole + fraction.padEnd(digits, "0"));
+  if (minor > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+  return Number(minor);
+}
+
+/**
+ * Converts a typed percentage ("5", "2.5", "12.25") to basis points (500,
+ * 250, 1225). Returns null unless it is between 0 and 100 with at most two
+ * decimal places, the precision basis points can hold.
+ */
+export function parsePercentToBasisPoints(text: string): number | null {
+  const match = DECIMAL_TEXT.exec(text.trim());
+  if (!match) return null;
+  const [, whole, fraction = ""] = match;
+  if (fraction.length > 2 || whole.length > 3) return null;
+  const basisPoints = Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
+  return basisPoints <= 10_000 ? basisPoints : null;
 }
 
 /** Formats a count or quantity with locale grouping. */

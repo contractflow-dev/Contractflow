@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm, useWatch, type FieldPath } from "react-hook-form";
+import { RiMailLine } from "@remixicon/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
@@ -13,7 +15,8 @@ import { useGetCurrentUserQuery } from "@/services/authApi";
 import { setActiveWorkspaceId } from "@/features/workspace/workspaceSlice";
 import { useAppDispatch } from "@/store/hooks";
 import { AuthTopBar } from "@/components/auth/authTopBar";
-import { HeroMetrics } from "@/components/auth/HeroMetrics";
+import { AuthHero } from "@/components/auth/auth-hero";
+import { SignOutAction } from "@/components/auth/sign-out-action";
 import {
   ECountryCode,
   ECurrencyCode,
@@ -36,9 +39,6 @@ import {
 import { Separator } from "@workspace/ui/components/separator";
 
 const currencyCodes = Object.values(ECurrencyCode);
-
-// One column in the narrow half-width panel (lg), two columns when there's room.
-const FIELD_GRID_CLASS = "lg:grid-cols-1 xl:grid-cols-2";
 
 const companySchema = z.object({
   name: z.string().trim().min(1, "Company name is required").max(255),
@@ -84,6 +84,55 @@ const companySchema = z.object({
 
 type CompanyFormValues = z.infer<typeof companySchema>;
 
+/**
+ * Company creation in three short steps. Every field is still required by
+ * the API; the steps only spread them out.
+ */
+export const companySetupSteps: Array<{
+  id: "company" | "contact" | "address";
+  title: string;
+  fields: Array<FieldPath<CompanyFormValues>>;
+}> = [
+  {
+    id: "company",
+    title: "Company and legal details",
+    fields: ["name", "legalName", "registrationNumber", "taxIdentificationNumber"],
+  },
+  {
+    id: "contact",
+    title: "Contact",
+    fields: ["email", "phoneNumber", "website"],
+  },
+  {
+    id: "address",
+    title: "Address and currency",
+    fields: [
+      "addressLine1",
+      "addressLine2",
+      "city",
+      "stateRegion",
+      "postalCode",
+      "countryCode",
+      "defaultCurrencyCode",
+    ],
+  },
+];
+const lastStep = companySetupSteps.length - 1;
+
+/** The form gets the whole width; beside the hero panel it was cramped. */
+function WideOnboardingShell({ children }: { children: React.ReactNode }) {
+  return (
+    <main className="flex min-h-svh min-w-0 flex-col p-4 sm:p-6 lg:p-10">
+      <div className="mx-auto w-full min-w-0 max-w-3xl">
+        <AuthTopBar />
+      </div>
+      <div className="mx-auto w-full min-w-0 max-w-3xl flex-1 space-y-8 py-6 sm:py-10">
+        {children}
+      </div>
+    </main>
+  );
+}
+
 function OnboardingShell({
   children,
   className,
@@ -110,29 +159,7 @@ function OnboardingShell({
         </div>
       </section>
 
-      <aside className="relative hidden min-w-0 flex-col justify-between overflow-hidden bg-auth-hero bg-cover bg-center p-10 text-hero-foreground lg:sticky lg:top-0 lg:flex lg:min-h-svh lg:self-start">
-        <div className="absolute inset-0 bg-hero-overlay" aria-hidden="true" />
-
-        <span className="relative z-10 text-lg font-semibold tracking-tight">
-          ContractFlow
-        </span>
-
-        <div className="relative z-10 space-y-6">
-          <div className="space-y-3">
-            <h2 className="text-3xl font-semibold leading-tight">
-              Every contract, from tender to close-out, in one place.
-            </h2>
-            <p className="max-w-md text-sm text-hero-muted">
-              Track vendors, approvals, milestones and obligations across your
-              oil and gas operations.
-            </p>
-          </div>
-          <HeroMetrics className="mt-4 gap-8 xl:mt-2 xl:gap-1" />
-          <p className="text-xs text-hero-muted">
-            &copy; {new Date().getFullYear()} ContractFlow
-          </p>
-        </div>
-      </aside>
+      <AuthHero />
     </main>
   );
 }
@@ -153,13 +180,7 @@ export function OnboardingView() {
     name: string;
     isAdmin: boolean;
   } | null>(null);
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    control,
-    formState: { errors, isSubmitting },
-  } = useForm<CompanyFormValues>({
+  const form = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
     defaultValues: {
       name: "",
@@ -177,7 +198,65 @@ export function OnboardingView() {
       countryCode: "",
       defaultCurrencyCode: "",
     },
+    // Each step is checked on Next, not as fields lose focus: an error
+    // appearing on blur would move the Next button under the pointer.
+    mode: "onSubmit",
+    reValidateMode: "onChange",
   });
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    control,
+    formState: { errors, isSubmitting },
+  } = form;
+  const [stepIndex, setStepIndex] = useState(0);
+  const step = companySetupSteps[stepIndex];
+  const formRef = useRef<HTMLFormElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  // Focus moves once the new step has rendered; the counter re-runs it.
+  const focusTarget = useRef<"heading" | "error" | null>(null);
+  const [focusRequest, setFocusRequest] = useState(0);
+  const requestFocus = (target: "heading" | "error") => {
+    focusTarget.current = target;
+    setFocusRequest((count) => count + 1);
+  };
+
+  /** Focuses the first invalid control on screen, in reading order. */
+  const focusFirstInvalid = useCallback(() => {
+    const controls =
+      formRef.current?.querySelectorAll<HTMLElement>("[name]") ?? [];
+    for (const element of controls) {
+      const name = element.getAttribute("name") as FieldPath<CompanyFormValues>;
+      if (form.getFieldState(name).invalid) {
+        element.focus();
+        return;
+      }
+    }
+  }, [form]);
+
+  useEffect(() => {
+    const target = focusTarget.current;
+    focusTarget.current = null;
+    if (target === "heading") headingRef.current?.focus();
+    else if (target === "error") focusFirstInvalid();
+  }, [focusRequest, focusFirstInvalid, stepIndex]);
+
+  // Once a field shows an error, re-check it as it changes, so the error
+  // clears as soon as it is fixed.
+  useEffect(
+    () =>
+      form.subscribe({
+        formState: { values: true },
+        callback: ({ name }) => {
+          const field = name as FieldPath<CompanyFormValues> | undefined;
+          if (field && form.getFieldState(field).invalid) {
+            void form.trigger(field);
+          }
+        },
+      }),
+    [form],
+  );
 
   const countryCode = useWatch({ control, name: "countryCode" });
   const defaultCurrencyCode = useWatch({
@@ -212,6 +291,37 @@ export function OnboardingView() {
       router.replace("/auth/verification-pending");
     }
   }, [currentUser, router, userError]);
+
+  async function next() {
+    const valid = await form.trigger(step.fields);
+    if (!valid) {
+      focusFirstInvalid();
+      return;
+    }
+    setStepIndex((index) => Math.min(index + 1, lastStep));
+    requestFocus("heading");
+  }
+
+  function back() {
+    setStepIndex((index) => Math.max(index - 1, 0));
+    requestFocus("heading");
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    // Enter in a field moves to the next step; only the last step creates.
+    if (stepIndex < lastStep) {
+      event.preventDefault();
+      void next();
+      return;
+    }
+    void handleSubmit(onSubmit, (formErrors) => {
+      const firstWithErrors = companySetupSteps.findIndex((candidate) =>
+        candidate.fields.some((field) => formErrors[field]),
+      );
+      setStepIndex(firstWithErrors === -1 ? lastStep : firstWithErrors);
+      requestFocus("error");
+    })(event);
+  }
 
   async function onSubmit(values: CompanyFormValues) {
     setServerError(null);
@@ -317,281 +427,342 @@ export function OnboardingView() {
   }
 
   return (
-    <OnboardingShell className="max-w-2xl space-y-8">
+    <WideOnboardingShell>
       <header className="space-y-2">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Company setup
         </p>
-        <h1 className="type-page-title">
-          Create your company
-        </h1>
+        <h1 className="type-page-title">Create your company</h1>
         <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-          Add your organization details to set up its ContractFlow workspace.
-          You&apos;ll be the administrator of the company you create. If you were
-          invited to join an existing company, open the invitation link in your
-          email instead.
+          Set up your organization&apos;s ContractFlow workspace. You&apos;ll be
+          the administrator of the company you create.
         </p>
       </header>
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-8">
-        {serverError && (
-          <Alert
-            variant="destructive"
-            className="border-destructive/30 bg-destructive/10"
+      <Alert>
+        <RiMailLine aria-hidden="true" />
+        <AlertDescription>
+          <span className="font-medium text-foreground">
+            Were you invited to join a company?
+          </span>{" "}
+          You don&apos;t need to create one. Open the invitation link in your
+          email and accept it while signed in as {currentUser.email}.
+        </AlertDescription>
+      </Alert>
+
+      <form
+        ref={formRef}
+        onSubmit={submit}
+        noValidate
+        aria-label="Create your company"
+        className="space-y-8"
+      >
+        <ol aria-label="Steps" className="hidden flex-wrap gap-2 text-sm sm:flex">
+          {companySetupSteps.map((candidate, index) => (
+            <li
+              key={candidate.id}
+              aria-current={index === stepIndex ? "step" : undefined}
+              className={cn(
+                "flex items-center gap-2 rounded-full border px-3 py-1",
+                index === stepIndex
+                  ? "border-primary bg-primary/10 font-medium text-foreground"
+                  : "text-muted-foreground",
+              )}
+            >
+              <span className="tabular-nums" aria-hidden="true">
+                {index + 1}
+              </span>
+              <span>
+                {candidate.title}
+                {index < stepIndex ? (
+                  <span className="sr-only"> (done)</span>
+                ) : null}
+              </span>
+            </li>
+          ))}
+        </ol>
+
+        <div className="space-y-1">
+          <h2
+            ref={headingRef}
+            tabIndex={-1}
+            className="text-base font-semibold focus-visible:outline-none"
           >
-            <AlertDescription className="text-destructive-soft-foreground">
-              {serverError}
-            </AlertDescription>
+            Step {stepIndex + 1} of {companySetupSteps.length}: {step.title}
+          </h2>
+          <RequiredFieldsNote />
+        </div>
+
+        {serverError && (
+          <Alert variant="destructive" className="break-words">
+            <AlertDescription>{serverError}</AlertDescription>
           </Alert>
         )}
 
-        <RequiredFieldsNote />
+        {step.id === "company" ? (
+          <FormSection legend="Company and legal details">
+            <FormGrid>
+              <FormField
+                id="name"
+                label="Company name"
+                required
+                description="The name people know you by."
+                error={errors.name?.message}
+              >
+                {(control) => (
+                  <Input
+                    {...control}
+                    autoComplete="organization"
+                    {...register("name")}
+                  />
+                )}
+              </FormField>
+              <FormField
+                id="legalName"
+                label="Legal name"
+                required
+                description="The name the company is registered under."
+                error={errors.legalName?.message}
+              >
+                {(control) => <Input {...control} {...register("legalName")} />}
+              </FormField>
+              <FormField
+                id="registrationNumber"
+                label="Registration number"
+                required
+                error={errors.registrationNumber?.message}
+              >
+                {(control) => (
+                  <Input {...control} {...register("registrationNumber")} />
+                )}
+              </FormField>
+              <FormField
+                id="taxIdentificationNumber"
+                label="Tax identification number"
+                required
+                error={errors.taxIdentificationNumber?.message}
+              >
+                {(control) => (
+                  <Input {...control} {...register("taxIdentificationNumber")} />
+                )}
+              </FormField>
+            </FormGrid>
+          </FormSection>
+        ) : null}
 
-        <FormSection legend="Organization information">
-          <FormGrid className={FIELD_GRID_CLASS}>
-            <FormField
-              id="name"
-              label="Company name"
-              required
-              error={errors.name?.message}
-            >
-              {(control) => (
-                <Input
-                  {...control}
-                  autoComplete="organization"
-                  {...register("name")}
-                />
-              )}
-            </FormField>
-            <FormField
-              id="legalName"
-              label="Legal name"
-              required
-              description="The name the company is registered under."
-              error={errors.legalName?.message}
-            >
-              {(control) => <Input {...control} {...register("legalName")} />}
-            </FormField>
-            <FormField
-              id="registrationNumber"
-              label="Registration number"
-              required
-              error={errors.registrationNumber?.message}
-            >
-              {(control) => (
-                <Input {...control} {...register("registrationNumber")} />
-              )}
-            </FormField>
-            <FormField
-              id="taxIdentificationNumber"
-              label="Tax identification number"
-              required
-              error={errors.taxIdentificationNumber?.message}
-            >
-              {(control) => (
-                <Input {...control} {...register("taxIdentificationNumber")} />
-              )}
-            </FormField>
-          </FormGrid>
-        </FormSection>
+        {step.id === "contact" ? (
+          <FormSection legend="Contact">
+            <FormGrid>
+              <FormField
+                id="email"
+                label="Company email"
+                required
+                description="Other companies invite you to contracts at this address. You'll verify it after creating the company."
+                error={errors.email?.message}
+                className="sm:col-span-2"
+              >
+                {(control) => (
+                  <Input
+                    {...control}
+                    type="email"
+                    autoComplete="email"
+                    {...register("email")}
+                  />
+                )}
+              </FormField>
+              <FormField
+                id="phoneNumber"
+                label="Phone number"
+                required
+                error={errors.phoneNumber?.message}
+              >
+                {(control) => (
+                  <Input
+                    {...control}
+                    type="tel"
+                    autoComplete="tel"
+                    {...register("phoneNumber")}
+                  />
+                )}
+              </FormField>
+              <FormField
+                id="website"
+                label="Website"
+                optional
+                description="Include https://, for example https://example.com."
+                error={errors.website?.message}
+              >
+                {(control) => (
+                  <Input
+                    {...control}
+                    type="url"
+                    autoComplete="url"
+                    {...register("website")}
+                  />
+                )}
+              </FormField>
+            </FormGrid>
+          </FormSection>
+        ) : null}
 
-        <FormSection legend="Contact information">
-          <FormGrid className={FIELD_GRID_CLASS}>
-            <FormField
-              id="email"
-              label="Company email"
-              required
-              description="Other companies invite you to contracts at this address. You'll verify it after creating the company."
-              error={errors.email?.message}
-            >
-              {(control) => (
-                <Input
-                  {...control}
-                  type="email"
-                  autoComplete="email"
-                  {...register("email")}
-                />
-              )}
-            </FormField>
-            <FormField
-              id="phoneNumber"
-              label="Phone number"
-              required
-              error={errors.phoneNumber?.message}
-            >
-              {(control) => (
-                <Input
-                  {...control}
-                  type="tel"
-                  autoComplete="tel"
-                  {...register("phoneNumber")}
-                />
-              )}
-            </FormField>
-            <FormField
-              id="website"
-              label="Website"
-              optional
-              description="Include https://, for example https://example.com."
-              error={errors.website?.message}
-            >
-              {(control) => (
-                <Input
-                  {...control}
-                  type="url"
-                  autoComplete="url"
-                  {...register("website")}
-                />
-              )}
-            </FormField>
-          </FormGrid>
-        </FormSection>
-
-        <FormSection legend="Business address and currency">
-          <FormGrid className={FIELD_GRID_CLASS}>
-            <FormField
-              id="addressLine1"
-              label="Address line 1"
-              required
-              error={errors.addressLine1?.message}
-            >
-              {(control) => (
-                <Input
-                  {...control}
-                  autoComplete="address-line1"
-                  {...register("addressLine1")}
-                />
-              )}
-            </FormField>
-            <FormField
-              id="addressLine2"
-              label="Address line 2"
-              optional
-              error={errors.addressLine2?.message}
-            >
-              {(control) => (
-                <Input
-                  {...control}
-                  autoComplete="address-line2"
-                  {...register("addressLine2")}
-                />
-              )}
-            </FormField>
-            <FormField
-              id="city"
-              label="City"
-              required
-              error={errors.city?.message}
-            >
-              {(control) => (
-                <Input
-                  {...control}
-                  autoComplete="address-level2"
-                  {...register("city")}
-                />
-              )}
-            </FormField>
-            <FormField
-              id="stateRegion"
-              label="State or region"
-              required
-              error={errors.stateRegion?.message}
-            >
-              {(control) => (
-                <Input
-                  {...control}
-                  autoComplete="address-level1"
-                  {...register("stateRegion")}
-                />
-              )}
-            </FormField>
-            <FormField
-              id="postalCode"
-              label="Postal code"
-              required
-              error={errors.postalCode?.message}
-            >
-              {(control) => (
-                <Input
-                  {...control}
-                  autoComplete="postal-code"
-                  {...register("postalCode")}
-                />
-              )}
-            </FormField>
-            <FormField
-              id="countryCode"
-              label="Country"
-              required
-              error={errors.countryCode?.message}
-            >
-              {(control) => (
-                <NativeSelect
-                  {...control}
-                  autoComplete="country"
-                  className="w-full"
-                  {...register("countryCode")}
-                >
-                  <NativeSelectOption value="">
-                    Select a country
-                  </NativeSelectOption>
-                  {countryOptions.map(({ code, name }) => (
-                    <NativeSelectOption key={code} value={code}>
-                      {name}
+        {step.id === "address" ? (
+          <FormSection legend="Business address and currency">
+            <FormGrid>
+              <FormField
+                id="addressLine1"
+                label="Address line 1"
+                required
+                error={errors.addressLine1?.message}
+              >
+                {(control) => (
+                  <Input
+                    {...control}
+                    autoComplete="address-line1"
+                    {...register("addressLine1")}
+                  />
+                )}
+              </FormField>
+              <FormField
+                id="addressLine2"
+                label="Address line 2"
+                optional
+                error={errors.addressLine2?.message}
+              >
+                {(control) => (
+                  <Input
+                    {...control}
+                    autoComplete="address-line2"
+                    {...register("addressLine2")}
+                  />
+                )}
+              </FormField>
+              <FormField
+                id="city"
+                label="City"
+                required
+                error={errors.city?.message}
+              >
+                {(control) => (
+                  <Input
+                    {...control}
+                    autoComplete="address-level2"
+                    {...register("city")}
+                  />
+                )}
+              </FormField>
+              <FormField
+                id="stateRegion"
+                label="State or region"
+                required
+                error={errors.stateRegion?.message}
+              >
+                {(control) => (
+                  <Input
+                    {...control}
+                    autoComplete="address-level1"
+                    {...register("stateRegion")}
+                  />
+                )}
+              </FormField>
+              <FormField
+                id="postalCode"
+                label="Postal code"
+                required
+                error={errors.postalCode?.message}
+              >
+                {(control) => (
+                  <Input
+                    {...control}
+                    autoComplete="postal-code"
+                    {...register("postalCode")}
+                  />
+                )}
+              </FormField>
+              <FormField
+                id="countryCode"
+                label="Country"
+                required
+                error={errors.countryCode?.message}
+              >
+                {(control) => (
+                  <NativeSelect
+                    {...control}
+                    autoComplete="country"
+                    className="w-full"
+                    {...register("countryCode")}
+                  >
+                    <NativeSelectOption value="">
+                      Select a country
                     </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              )}
-            </FormField>
-            <FormField
-              id="defaultCurrencyCode"
-              label="Default currency"
-              required
-              description="Filled in from the country you select. You can change it."
-              error={errors.defaultCurrencyCode?.message}
-            >
-              {(control) => (
-                <NativeSelect
-                  {...control}
-                  className="w-full"
-                  value={defaultCurrencyCode}
-                  onChange={(event) =>
-                    setValue("defaultCurrencyCode", event.target.value, {
-                      shouldValidate: true,
-                    })
-                  }
-                >
-                  <NativeSelectOption value="">
-                    Select a currency
-                  </NativeSelectOption>
-                  {currencyCodes.map((currency) => (
-                    <NativeSelectOption key={currency} value={currency}>
-                      {currency}
+                    {countryOptions.map(({ code, name }) => (
+                      <NativeSelectOption key={code} value={code}>
+                        {name}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                )}
+              </FormField>
+              <FormField
+                id="defaultCurrencyCode"
+                label="Default currency"
+                required
+                description="Filled in from the country you select. You can change it."
+                error={errors.defaultCurrencyCode?.message}
+              >
+                {(control) => (
+                  <NativeSelect
+                    {...control}
+                    name="defaultCurrencyCode"
+                    className="w-full"
+                    value={defaultCurrencyCode}
+                    onChange={(event) =>
+                      setValue("defaultCurrencyCode", event.target.value, {
+                        shouldValidate: true,
+                      })
+                    }
+                  >
+                    <NativeSelectOption value="">
+                      Select a currency
                     </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              )}
-            </FormField>
-          </FormGrid>
-        </FormSection>
+                    {currencyCodes.map((currency) => (
+                      <NativeSelectOption key={currency} value={currency}>
+                        {currency}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                )}
+              </FormField>
+            </FormGrid>
+          </FormSection>
+        ) : null}
 
         <Separator />
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Link
-            href="/login"
-            className="text-center text-sm text-muted-foreground underline underline-offset-4 sm:text-left"
-          >
-            Sign out and return to sign in
-          </Link>
-          <Button
-            type="submit"
-            size="xl"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? "Creating company…" : "Create company"}
-          </Button>
+          <SignOutAction className="self-center sm:self-auto" />
+          <div className="flex flex-col-reverse gap-2 sm:flex-row">
+            {stepIndex > 0 ? (
+              <Button type="button" variant="outline" size="xl" onClick={back}>
+                Back
+              </Button>
+            ) : null}
+            {stepIndex < lastStep ? (
+              // A submit button, so Enter in any field moves on.
+              <Button type="submit" size="xl">
+                Next: {companySetupSteps[stepIndex + 1].title}
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                size="xl"
+                disabled={isSubmitting}
+                aria-busy={isSubmitting || undefined}
+              >
+                {isSubmitting ? "Creating company…" : "Create company"}
+              </Button>
+            )}
+          </div>
         </div>
       </form>
-    </OnboardingShell>
+    </WideOnboardingShell>
   );
 }

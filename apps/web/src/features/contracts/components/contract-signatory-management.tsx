@@ -53,7 +53,9 @@ export function ContractSignatoryManagement({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Your company&apos;s signatory</CardTitle>
+        <CardTitle>
+          <h2>Your company&apos;s signatory</h2>
+        </CardTitle>
         <CardDescription>
           Record who signed this contract on behalf of your company, and when.
           Other parties record their own signatories.

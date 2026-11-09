@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { headingProblems } from "@/components/page-header/heading-outline";
 import { CompanyTeamView } from "./company-team-view";
 
 const mocks = vi.hoisted(() => ({
@@ -156,5 +157,12 @@ describe("CompanyTeamView", () => {
     // An expired invitation can't be revoked.
     expect(markup).not.toContain(">Revoke</button>");
     expect(markup).toMatch(/Jan 15, 2026|15 Jan 2026/);
+  });
+  it("gives the page one <h1> and its sections <h2> headings", () => {
+    const markup = renderToStaticMarkup(<CompanyTeamView />);
+
+    expect(markup).toMatch(/<h1[^>]*>Team &amp; invitations<\/h1>/);
+    expect(markup).toMatch(/<h2[^>]*>Company members<\/h2>/);
+    expect(headingProblems(markup)).toEqual([]);
   });
 });

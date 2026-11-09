@@ -58,4 +58,24 @@ describe("RegisterForm", () => {
     );
     expect(markup).toContain('id="password-description"');
   });
+
+  it("opens the terms in a dialog instead of leaving the form", () => {
+    const markup = renderToStaticMarkup(<RegisterForm />);
+
+    expect(markup).not.toContain('href="/terms-of-service"');
+    expect(markup).not.toContain('href="/privacy-policy"');
+    expect(markup).toMatch(/<button[^>]*type="button"[^>]*>Terms of Service<\/button>/);
+    expect(markup).toMatch(/<button[^>]*type="button"[^>]*>Privacy Policy<\/button>/);
+    expect(markup).toMatch(/role="checkbox"[^>]*aria-label="I agree to the Terms of Service/);
+  });
+
+  it("doesn't claim steps that don't exist", () => {
+    expect(renderToStaticMarkup(<RegisterForm />)).not.toMatch(/STEP 1 OF 4/i);
+  });
+
+  it("offers password visibility on both password fields", () => {
+    const markup = renderToStaticMarkup(<RegisterForm />);
+    expect(markup.match(/aria-label="Show password"/g)).toHaveLength(2);
+    expect(markup.match(/autoComplete="new-password"/g)).toHaveLength(2);
+  });
 });

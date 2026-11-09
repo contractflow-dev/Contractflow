@@ -72,7 +72,7 @@ export function LegalDocumentDialog({
           <Link
             href={pageHref}
             onClick={() => onOpenChange(false)}
-            className={cn(buttonVariants({ variant: "link" }), "h-10 px-0")}
+            className={cn(buttonVariants({ variant: "link" }), "px-0")}
           >
             Open full policy page
           </Link>

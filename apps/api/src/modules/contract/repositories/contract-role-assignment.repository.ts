@@ -20,6 +20,39 @@ export class ContractRoleAssignmentRepository extends CompanyScopedRepository<Co
     super(repository);
   }
 
+  /**
+   * A member's active roles on each of the given contracts of the scoped
+   * company, for the contract list. Only the member's own assignments.
+   */
+  async findActiveRolesForContracts(
+    scope: ICompanyScope,
+    companyUserId: string,
+    contractIds: string[],
+  ): Promise<
+    Array<{ contractId: string; role: EContractRole; isWorkspaceAdmin: boolean }>
+  > {
+    if (!companyUserId || contractIds.length === 0) return [];
+    const rows = await this.scopedQuery(scope)
+      .innerJoin('e.contractParty', 'party')
+      .andWhere('e.companyUserId = :companyUserId AND e.revokedAt IS NULL', {
+        companyUserId,
+      })
+      .andWhere('party.contractId IN (:...contractIds)', { contractIds })
+      .select('party.contractId', 'contractId')
+      .addSelect('e.role', 'role')
+      .addSelect('e.isWorkspaceAdmin', 'isWorkspaceAdmin')
+      .orderBy('e.role', 'ASC')
+      .getRawMany<{
+        contractId: string;
+        role: EContractRole;
+        isWorkspaceAdmin: boolean;
+      }>();
+    return rows.map((row) => ({
+      ...row,
+      isWorkspaceAdmin: Boolean(row.isWorkspaceAdmin),
+    }));
+  }
+
   findActiveByCompanyUser(companyUserId: string, scope: ICompanyScope) {
     return this.scopedQuery(scope)
       .andWhere('e.companyUserId = :companyUserId AND e.revokedAt IS NULL', {

@@ -17,11 +17,12 @@ import type {
   IAppUserRepository,
   ICreateAuthUser,
 } from '../interface/auth-persistence.interface';
+import type { IPasswordResetUserRepository } from '../interface/password-reset-persistence.interface';
 
 @Injectable()
 export class AppUserRepository
   extends BaseRepository<AppUser>
-  implements IAppUserRepository
+  implements IAppUserRepository, IPasswordResetUserRepository
 {
   constructor(@InjectRepository(AppUser) repository: Repository<AppUser>) {
     super(repository);

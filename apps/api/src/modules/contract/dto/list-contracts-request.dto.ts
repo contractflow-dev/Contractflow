@@ -27,6 +27,14 @@ export class ListContractsRequestDto extends PaginationQueryDto {
   @IsBoolean()
   includeDeleted = false;
 
+  /** Narrows the list to contracts the user has an active role on. */
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean()
+  assignedToMe = false;
+
   @IsOptional()
   @IsEnum(EContractStatus)
   status?: EContractStatus;

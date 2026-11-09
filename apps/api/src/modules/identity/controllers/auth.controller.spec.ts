@@ -4,6 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LoginAppUserDto } from '../dto/app-user/requests/login-app-user-request.dto';
 import { AppUserResponseDto } from '../dto/app-user/responses/app-user-response.dto';
 import type { AuthService } from '../services/auth/auth.service';
+import type { PasswordResetService } from '../services/auth/password-reset.service';
+import { ForgotPasswordRequestDto } from '../dto/auth/forgot-password-request.dto';
+import { ResetPasswordRequestDto } from '../dto/auth/reset-password-request.dto';
 import { AuthController } from './auth.controller';
 
 describe('AuthController', () => {
@@ -11,6 +14,7 @@ describe('AuthController', () => {
   let authService: Record<string, ReturnType<typeof vi.fn>>;
   let config: { get: ReturnType<typeof vi.fn> };
   let setHeader: ReturnType<typeof vi.fn>;
+  let passwordReset: Record<string, ReturnType<typeof vi.fn>>;
 
   beforeEach(() => {
     authService = {
@@ -23,9 +27,14 @@ describe('AuthController', () => {
       sessionCookieName: vi.fn().mockReturnValue('contractflow_session'),
     };
     config = { get: vi.fn(() => 'production') };
+    passwordReset = {
+      requestReset: vi.fn().mockResolvedValue({ message: 'generic' }),
+      resetPassword: vi.fn().mockResolvedValue({ message: 'reset' }),
+    };
     controller = new AuthController(
       authService as unknown as AuthService,
       config as unknown as ConfigService,
+      passwordReset as unknown as PasswordResetService,
     );
     setHeader = vi.fn();
   });
@@ -56,6 +65,50 @@ describe('AuthController', () => {
       key === 'NODE_ENV' ? nodeEnv : undefined,
     );
   }
+
+  it('passes a forgot-password request through and sets no cookie', async () => {
+    const body = Object.assign(new ForgotPasswordRequestDto(), {
+      email: 'user@example.com',
+    });
+
+    await expect(controller.forgotPassword(body)).resolves.toEqual({
+      message: 'generic',
+    });
+    expect(passwordReset.requestReset).toHaveBeenCalledWith('user@example.com');
+    expect(setHeader).not.toHaveBeenCalled();
+  });
+
+  it('resets the password, then clears the session cookie in this browser', async () => {
+    const body = Object.assign(new ResetPasswordRequestDto(), {
+      token: 'reset-token',
+      password: 'New-Password-123',
+    });
+
+    await expect(
+      controller.resetPassword(body, { setHeader } as unknown as Response),
+    ).resolves.toEqual({ message: 'reset' });
+    expect(passwordReset.resetPassword).toHaveBeenCalledWith(
+      'reset-token',
+      'New-Password-123',
+    );
+    expect(setHeader).toHaveBeenCalledWith(
+      'Set-Cookie',
+      expect.stringMatching(/^contractflow_session=; HttpOnly; Path=\/; .*Max-Age=0/),
+    );
+  });
+
+  it('sets no cookie when the reset fails', async () => {
+    passwordReset.resetPassword.mockRejectedValue(new Error('invalid'));
+    const body = Object.assign(new ResetPasswordRequestDto(), {
+      token: 'reset-token',
+      password: 'New-Password-123',
+    });
+
+    await expect(
+      controller.resetPassword(body, { setHeader } as unknown as Response),
+    ).rejects.toThrow('invalid');
+    expect(setHeader).not.toHaveBeenCalled();
+  });
 
   it('sets the session cookie while returning only the user body', async () => {
     const result = await login();

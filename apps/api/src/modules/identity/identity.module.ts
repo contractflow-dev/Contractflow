@@ -9,6 +9,13 @@ import { CompanyInvitation } from './entities/company-invitation.entity';
 import { CompanyUser } from './entities/company-user.entity';
 import { UserSession } from './entities/user-session.entity';
 import { EmailVerificationToken } from './entities/email-verification-token.entity';
+import { PasswordResetToken } from './entities/password-reset-token.entity';
+import { PasswordResetService } from './services/auth/password-reset.service';
+import { PasswordResetTransactionContextFactory } from './repositories/password-reset-transaction-context.factory';
+import {
+  PASSWORD_RESET_UNIT_OF_WORK,
+  type IPasswordResetTransactionContext,
+} from './interface/password-reset-persistence.interface';
 import { AppUserController } from './controllers/app-user.controller';
 import { AuthController } from './controllers/auth.controller';
 import { CompanyController } from './controllers/company.controller';
@@ -74,6 +81,7 @@ import {
       UserSession,
       EmailVerificationToken,
       CompanyVerificationToken,
+      PasswordResetToken,
     ]),
   ],
   controllers: [
@@ -131,6 +139,16 @@ import {
     AuthService,
     PasswordService,
     SessionService,
+    PasswordResetService,
+    {
+      provide: PASSWORD_RESET_UNIT_OF_WORK,
+      useFactory: (dataSource: DataSource) =>
+        new TypeOrmUnitOfWork<IPasswordResetTransactionContext>(
+          dataSource,
+          new PasswordResetTransactionContextFactory(),
+        ),
+      inject: [DataSource],
+    },
     CompanyService,
     CompanyAdminService,
     CompanyVerificationService,

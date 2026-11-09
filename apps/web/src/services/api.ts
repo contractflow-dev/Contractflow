@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { clearUser } from "@/features/auth/authSlice";
+import { signInUrl } from "@/features/auth/signInRedirect";
 import type { RootState } from "@/store";
 import { getApiBaseUrl } from "@/lib/apiBaseUrl";
 
@@ -9,6 +10,8 @@ const COMPANY_CONTEXT_EXEMPT_ENDPOINTS = new Set([
   "register",
   "verifyEmail",
   "resendVerificationEmail",
+  "forgotPassword",
+  "resetPassword",
   "logout",
   "getCompanies",
   "getCurrentCompany",
@@ -83,6 +86,22 @@ function isProtectedRoute(pathname: string): boolean {
   );
 }
 
+/** True once the current user has loaded on this page. */
+function hadSignedInUser(state: RootState): boolean {
+  return Object.values(state.api.queries).some(
+    (query) => query?.endpointName === "getCurrentUser" && query.data,
+  );
+}
+
+// Several requests can fail at once when a session ends; send the user to
+// sign in only once.
+let redirectingToSignIn = false;
+
+/** For tests: forget that a sign-in redirect has started. */
+export function resetSignInRedirectForTests(): void {
+  redirectingToSignIn = false;
+}
+
 /**
  * Base RTK Query API service for ContractFlow.
  * Extended with injectEndpoints() in domain-specific service files.
@@ -93,14 +112,24 @@ export const api = createApi({
     const result = await baseQuery(args, baseQueryApi, extraOptions);
 
     if (result.error?.status === 401) {
+      // Read before clearing: a user who was signed in on this page has had
+      // their session expire or be revoked.
+      const expired = hadSignedInUser(baseQueryApi.getState() as RootState);
       baseQueryApi.dispatch(clearUser());
 
       if (
         typeof window !== "undefined" &&
         baseQueryApi.endpoint !== "logout" &&
-        isProtectedRoute(window.location.pathname)
+        isProtectedRoute(window.location.pathname) &&
+        !redirectingToSignIn
       ) {
-        window.location.replace("/login");
+        redirectingToSignIn = true;
+        // A full page load, so nothing from the old session stays in memory.
+        window.location.replace(
+          signInUrl(`${window.location.pathname}${window.location.search}`, {
+            expired,
+          }),
+        );
       }
     }
 

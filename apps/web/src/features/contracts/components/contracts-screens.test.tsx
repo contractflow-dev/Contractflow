@@ -7,11 +7,35 @@ import {
   EPartyType,
 } from "@contractflow/contracts-schema";
 import type { ContractDetail as ContractDetailResponse } from "@/services/contractApi";
+import { headingProblems } from "@/components/page-header/heading-outline";
 import { useContractDetails } from "../_hooks/use-contract-details";
-import { ContractDetail } from "./contracts-screens";
+import { useContractsList } from "../_hooks/use-contracts-list";
+import { ContractDetail, ContractsList } from "./contracts-screens";
+import type { ContractSection } from "../contract-sections";
+
+function renderSection(section: ContractSection) {
+  return renderToStaticMarkup(
+    <ContractDetail
+      companyId="company-1"
+      contractId="contract-1"
+      section={section}
+    />,
+  );
+}
 
 vi.mock("../_hooks/use-contract-details", () => ({
   useContractDetails: vi.fn(),
+}));
+
+const sectionAccess = vi.hoisted(() => ({
+  value: { roles: true, sites: true, signatories: true } as Record<
+    "roles" | "sites" | "signatories",
+    boolean | undefined
+  >,
+}));
+
+vi.mock("../_hooks/use-contract-section-access", () => ({
+  useContractSectionAccess: () => sectionAccess.value,
 }));
 
 vi.mock("./contract-role-assignment-management", () => ({
@@ -20,6 +44,15 @@ vi.mock("./contract-role-assignment-management", () => ({
 
 vi.mock("./contract-lifecycle-management", () => ({
   ContractLifecycleManagement: () => <div>Contract lifecycle management</div>,
+}));
+
+vi.mock("./create-contract-form", () => ({
+  CreateContractForm: () => <div>Create contract</div>,
+}));
+
+vi.mock("../_hooks/use-contracts-list", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../_hooks/use-contracts-list")>()),
+  useContractsList: vi.fn(),
 }));
 
 vi.mock("./contract-signatory-management", () => ({
@@ -90,14 +123,16 @@ describe("ContractDetail query states", () => {
   });
 
   it("shows independent errors for failed parties and history requests", () => {
-    const markup = renderToStaticMarkup(
-      <ContractDetail companyId="company-1" contractId="contract-1" />,
-    );
+    const parties = renderSection("parties");
+    const history = renderSection("history");
 
-    expect(markup).toContain("Unable to load contract parties.");
-    expect(markup).toContain("Unable to load status history.");
-    expect(markup).not.toContain("No party details are available.");
-    expect(markup).not.toContain("No status changes have been recorded.");
+    expect(parties).toContain("Unable to load contract parties.");
+    expect(parties).not.toContain("No party details are available.");
+    expect(history).toContain("Unable to load status history.");
+    expect(history).not.toContain("No status changes have been recorded.");
+    // Each section shows only its own content.
+    expect(parties).not.toContain("Unable to load status history.");
+    expect(history).not.toContain("Unable to load contract parties.");
   });
 
   it("shows loading states for parties and history independently", () => {
@@ -117,14 +152,13 @@ describe("ContractDetail query states", () => {
       setHistoryPageSize: vi.fn(),
     });
 
-    const markup = renderToStaticMarkup(
-      <ContractDetail companyId="company-1" contractId="contract-1" />,
-    );
+    const parties = renderSection("parties");
+    const history = renderSection("history");
 
-    expect(markup).toContain("Loading parties…");
-    expect(markup).toContain("Loading status history…");
-    expect(markup).not.toContain("No party details are available.");
-    expect(markup).not.toContain("No status changes have been recorded.");
+    expect(parties).toContain("Loading parties…");
+    expect(parties).not.toContain("No party details are available.");
+    expect(history).toContain("Loading status history…");
+    expect(history).not.toContain("No status changes have been recorded.");
   });
 
   it("formats the contract value in its currency and dates as calendar days", () => {
@@ -171,19 +205,124 @@ describe("ContractDetail query states", () => {
       setHistoryPageSize: vi.fn(),
     } as unknown as ReturnType<typeof useContractDetails>);
 
-    const markup = renderToStaticMarkup(
-      <ContractDetail companyId="company-1" contractId="contract-1" />,
-    );
+    const markup = renderSection("overview");
+    const history = renderSection("history");
 
     // 250,000,000 euro cents, never shown in NGN or as raw minor units.
     expect(markup).toMatch(/2[,.\s\u00a0]500[,.\s\u00a0]000/);
     expect(markup).not.toContain("250000000");
     expect(markup).toContain("€");
     expect(markup).toMatch(/Dec 31, 2026|31 Dec 2026/);
+    // The header's status shows on every section.
     expect(markup).toContain('data-status="suspended"');
     expect(markup).toContain(">Suspended</span>");
-    expect(markup).toContain(">Draft</span>");
-    expect(markup).toContain(">Active</span>");
-    expect(markup).not.toContain(">draft<");
+    expect(history).toContain(">Draft</span>");
+    expect(history).toContain(">Active</span>");
+    expect(history).not.toContain(">draft<");
+  });
+});
+
+describe("contract screen headings", () => {
+  it("gives the contract detail one <h1>, the contract title, with nested sections", () => {
+    vi.mocked(useContractDetails).mockReturnValue({
+      detail: contractDetail,
+      error: undefined,
+      isLoading: false,
+      refetch: vi.fn(),
+      parties: {
+        data: [],
+        meta: {
+          totalItems: 0,
+          itemCount: 0,
+          itemsPerPage: 20,
+          totalPages: 0,
+          currentPage: 1,
+        },
+      },
+      partiesError: undefined,
+      partiesLoading: false,
+      history: {
+        data: [],
+        meta: {
+          totalItems: 0,
+          itemCount: 0,
+          itemsPerPage: 20,
+          totalPages: 0,
+          currentPage: 1,
+        },
+      },
+      historyError: undefined,
+      historyLoading: false,
+      historyFetching: false,
+      setHistoryPage: vi.fn(),
+      setHistoryPageSize: vi.fn(),
+    } as unknown as ReturnType<typeof useContractDetails>);
+
+    for (const section of [
+      "overview",
+      "parties",
+      "roles",
+      "sites",
+      "signatories",
+      "history",
+    ] as const) {
+      const markup = renderSection(section);
+      expect(markup, section).toMatch(
+        new RegExp(
+          String.raw`<h1[^>]*>\s*${contractDetail.contract.title}\s*</h1>`,
+        ),
+      );
+      expect(headingProblems(markup), section).toEqual([]);
+    }
+  });
+
+  it("gives the contract list one <h1>, Contracts, before its sections", () => {
+    vi.mocked(useContractsList).mockReturnValue({
+      searchInput: "",
+      setSearchInput: vi.fn(),
+      status: "",
+      setStatus: vi.fn(),
+      includeDeleted: false,
+      setIncludeDeleted: vi.fn(),
+      sort: "newest",
+      setSort: vi.fn(),
+      page: 1,
+      setPage: vi.fn(),
+      limit: 20,
+      setLimit: vi.fn(),
+      submitSearch: vi.fn(),
+      hasFilters: false,
+      clearFilters: vi.fn(),
+      currentData: {
+        data: [],
+        meta: {
+          totalItems: 0,
+          itemCount: 0,
+          itemsPerPage: 20,
+          totalPages: 0,
+          currentPage: 1,
+        },
+      },
+      error: undefined,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useContractsList>);
+
+    const markup = renderToStaticMarkup(
+      <ContractsList companyId="company-1" canViewArchived canCreateContracts />,
+    );
+
+    expect(markup).toMatch(/<h1[^>]*>Contracts<\/h1>/);
+    expect(headingProblems(markup)).toEqual([]);
+
+    // "Show archived contracts only" is the shared Checkbox, labelled by a
+    // <label for> on its input, and unchecked by default.
+    expect(markup).toMatch(/role="checkbox"[^>]*aria-checked="false"/);
+    const inputId = /<input id="([^"]+)"[^>]*type="checkbox"/.exec(markup)?.[1];
+    expect(markup).toContain(
+      `for="${inputId}">Show archived contracts only</label>`,
+    );
+    expect(markup).not.toContain("accent-primary");
   });
 });

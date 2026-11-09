@@ -126,6 +126,21 @@ describe.each([":root", ".dark"] as const)("%s colour tokens", (selector) => {
       expect(contrast(t.foreground!, fill)).toBeGreaterThanOrEqual(AA);
     }
   });
+
+  // WCAG 1.4.11: the outline that identifies a text field or select needs 3:1
+  // against what surrounds it, and against the field's own fill inside it.
+  it("keeps the resting field border visible on cards, the page and the fill", () => {
+    const NON_TEXT = 3;
+    for (const backdrop of [t.card!, t.background!]) {
+      expect(contrast(t["field-border"]!, backdrop)).toBeGreaterThanOrEqual(
+        NON_TEXT,
+      );
+      const fill = over(t.input!, backdrop, 0.5);
+      expect(contrast(t["field-border"]!, fill)).toBeGreaterThanOrEqual(
+        NON_TEXT,
+      );
+    }
+  });
 });
 
 /** Reads a token that may carry an alpha channel (`oklch(l c h / a)`). */

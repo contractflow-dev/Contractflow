@@ -27,6 +27,7 @@ import { getApiErrorMessage } from "@/lib/apiError";
 import { notifySuccess } from "@/lib/notify";
 import { CompanyAdminShell } from "@/features/companies/CompanyAdminShell";
 import { CompanyVerificationNotice } from "@/features/companies/company-verification-notice";
+import { PageHeader } from "@/components/page-header/page-header";
 
 const profileSchema = z.object({
   name: z.string().trim().min(1, "Company name is required").max(255),
@@ -148,13 +149,11 @@ export function CompanyProfileView() {
 function ProfileContent({ company }: { company: ICompanyProfileResponse }) {
   return (
     <section className="mx-auto max-w-4xl space-y-6">
-      <header>
-        <p className="type-eyebrow">Company administration</p>
-        <h2 className="mt-1 type-page-title">Company profile</h2>
-        <p className="mt-1 type-lead">
-          Update the registered company and contact details.
-        </p>
-      </header>
+      <PageHeader
+        eyebrow="Company administration"
+        title="Company profile"
+        description="Update the registered company and contact details."
+      />
       <ProfileForm key={company.id} company={company} />
     </section>
   );

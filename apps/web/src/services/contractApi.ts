@@ -6,6 +6,7 @@ import type {
   Contract,
   ContractDetail,
   ContractLifecyclePermissions,
+  ContractListItem,
   ContractPartyInvitation,
   ContractPartyInvitationPreview,
   ContractPartySignatory,
@@ -33,6 +34,8 @@ export type {
   CompanyContractHistoryQuery,
   CompanyContractQuery,
   Contract,
+  ContractCounterparty,
+  ContractListItem,
   ContractDetail,
   ContractFilterParams,
   ContractLifecyclePermissions,
@@ -85,7 +88,7 @@ const roleInvitationTag = (
 export const contractApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getContracts: builder.query<
-      IPaginatedResponse<Contract>,
+      IPaginatedResponse<ContractListItem>,
       CompanyContractQuery
     >({
       query: ({ companyId, ...params }) => ({

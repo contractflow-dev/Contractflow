@@ -4,6 +4,8 @@ import { useId, useState, type FormEvent } from "react";
 import { EContractRole } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
+import { Checkbox } from "@workspace/ui/components/checkbox";
+import { Field, FieldLabel } from "@workspace/ui/components/field";
 import {
   Card,
   CardContent,
@@ -265,7 +267,9 @@ export function ContractRoleAssignmentManagement({
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Contract role assignments</CardTitle>
+          <CardTitle>
+            <h2>Contract role assignments</h2>
+          </CardTitle>
           <CardDescription>
             Manage active roles for members of your company. Contract access
             ends when an assignment is revoked.
@@ -519,17 +523,19 @@ export function ContractRoleAssignmentManagement({
                 </Button>
               </div>
               {permissions.canGrantWorkspaceAdmin ? (
-                <label className="flex min-h-6 w-fit items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="size-4 accent-primary"
+                <Field orientation="horizontal" className="w-fit">
+                  <Checkbox
+                    id={`${formId}-workspace-admin`}
                     checked={inviteAsWorkspaceAdmin}
-                    onChange={(event) =>
-                      setInviteAsWorkspaceAdmin(event.target.checked)
-                    }
+                    onCheckedChange={setInviteAsWorkspaceAdmin}
                   />
-                  Invite as a workspace administrator
-                </label>
+                  <FieldLabel
+                    htmlFor={`${formId}-workspace-admin`}
+                    className="font-normal"
+                  >
+                    Invite as a workspace administrator
+                  </FieldLabel>
+                </Field>
               ) : null}
             </form>
             {invitationsQuery.error ? (

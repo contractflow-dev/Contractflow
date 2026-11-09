@@ -7,6 +7,9 @@ import { CreateAppUserRequestDto } from '../dto/app-user/requests/create-app-use
 import { LoginAppUserDto } from '../dto/app-user/requests/login-app-user-request.dto';
 import { VerifyEmailRequestDto } from '../dto/auth/verify-email-request.dto';
 import { ResendVerificationRequestDto } from '../dto/auth/resend-verification-request.dto';
+import { ForgotPasswordRequestDto } from '../dto/auth/forgot-password-request.dto';
+import { ResetPasswordRequestDto } from '../dto/auth/reset-password-request.dto';
+import { PasswordResetService } from '../services/auth/password-reset.service';
 import { Public } from '../../../common/decorators/public.decorator';
 import type {
   AuthMessageResponse,
@@ -39,6 +42,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly config: ConfigService,
+    private readonly passwordReset: PasswordResetService,
   ) {}
 
   @Post('register')
@@ -74,6 +78,34 @@ export class AuthController {
     @Body() body: ResendVerificationRequestDto,
   ): Promise<AuthMessageResponse> {
     return this.authService.resendVerification(body.email);
+  }
+
+  /** Always the same answer, so it never reveals whether an account exists. */
+  @Post('forgot-password')
+  forgotPassword(
+    @Body() body: ForgotPasswordRequestDto,
+  ): Promise<AuthMessageResponse> {
+    return this.passwordReset.requestReset(body.email);
+  }
+
+  /**
+   * Sets the new password and revokes every session of the account, then
+   * clears this browser's session cookie: the user signs in again.
+   */
+  @Post('reset-password')
+  async resetPassword(
+    @Body() body: ResetPasswordRequestDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<AuthMessageResponse> {
+    const result = await this.passwordReset.resetPassword(
+      body.token,
+      body.password,
+    );
+    response.setHeader(
+      'Set-Cookie',
+      this.sessionCookieHeader(this.authService.sessionCookieName(), '', 0),
+    );
+    return result;
   }
 
   @Post('logout')

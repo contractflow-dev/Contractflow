@@ -1,17 +1,21 @@
 import type {
   AuthMessageResponse,
   AuthResponse,
+  ForgotPasswordRequest,
   LoginRequest,
   LogoutResponse,
   RegisterRequest,
+  ResetPasswordRequest,
 } from "@contractflow/contracts-schema";
 import { api } from "./api";
 export type {
   AuthMessageResponse,
   AuthResponse,
+  ForgotPasswordRequest,
   LoginRequest,
   LogoutResponse,
   RegisterRequest,
+  ResetPasswordRequest,
 } from "@contractflow/contracts-schema";
 
 export type UserProfile = AuthResponse["user"];
@@ -62,6 +66,27 @@ export const authApi = api.injectEndpoints({
       }),
     }),
 
+    forgotPassword: builder.mutation<AuthMessageResponse, ForgotPasswordRequest>(
+      {
+        query: (data) => ({
+          url: "/auth/forgot-password",
+          method: "POST",
+          body: data,
+        }),
+      },
+    ),
+
+    // The token travels only in the request body, never in a URL.
+    resetPassword: builder.mutation<AuthMessageResponse, ResetPasswordRequest>({
+      query: (data) => ({
+        url: "/auth/reset-password",
+        method: "POST",
+        body: data,
+      }),
+      // The API ends every session of the account.
+      invalidatesTags: ["Auth", "User"],
+    }),
+
     logout: builder.mutation<LogoutResponse, void>({
       query: () => ({
         url: "/auth/logout",
@@ -78,6 +103,8 @@ export const {
   useLoginMutation,
   useRegisterMutation,
   useVerifyEmailMutation,
+  useForgotPasswordMutation,
+  useResetPasswordMutation,
   useResendVerificationEmailMutation,
   useLogoutMutation,
 } = authApi;

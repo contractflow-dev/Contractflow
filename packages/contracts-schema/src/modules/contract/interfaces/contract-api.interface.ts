@@ -40,12 +40,35 @@ export interface Contract {
   deletedAt?: string | null;
 }
 
+/** Another company that is party to a contract, as shown in the contract list. */
+export interface ContractCounterparty {
+  companyName: string;
+  partyType: EPartyType;
+}
+
+/** One of the signed-in user's own active roles on a listed contract. */
+export interface ContractListRole {
+  role: EContractRole;
+  workspace: AssignableContractWorkspace;
+  isWorkspaceAdmin: boolean;
+}
+
+/** A contract-list row: the contract and the other parties to it. */
+export interface ContractListItem extends Contract {
+  /** Every party except the requesting company; empty for archived contracts. */
+  counterparties: ContractCounterparty[];
+  /** The signed-in user's active roles on it; empty when none or archived. */
+  myRoles: ContractListRole[];
+}
+
 export interface ContractFilterParams
   extends IPaginationQuery,
     ISortQuery<EContractSortField> {
   status?: EContractStatus;
   search?: string;
   includeDeleted?: boolean;
+  /** Only contracts the signed-in user holds an active role on. */
+  assignedToMe?: boolean;
 }
 
 export interface ContractPartySummary {
