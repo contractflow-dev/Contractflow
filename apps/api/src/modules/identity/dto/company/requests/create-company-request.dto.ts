@@ -15,6 +15,14 @@ import {
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
 
+/**
+ * Trims an optional text field. `null` is treated as "not sent", so it never
+ * reaches a NOT NULL column; an empty string is kept so a profile update can
+ * clear the field.
+ */
+const trimOptional = ({ value }: { value: unknown }) =>
+  value === null ? undefined : trim({ value });
+
 /** Trims and prefixes `https://` when no scheme is given (e.g. `www.example.com`). */
 export const normalizeWebsite = (value: unknown): unknown => {
   if (typeof value !== 'string') return value;
@@ -41,19 +49,19 @@ export class CreateCompanyRequestDto {
   @MaxLength(255)
   legalName!: string;
 
-  @Transform(trim)
-  @IsString()
+  /** Optional; a blank value is stored as an empty string ("not provided"). */
+  @Transform(trimOptional)
   @IsOptional()
-  @MinLength(1)
+  @IsString()
   @MaxLength(64)
-  registrationNumber!: string;
+  registrationNumber?: string;
 
-  @Transform(trim)
-  @IsString()
+  /** Optional; a blank value is stored as an empty string ("not provided"). */
+  @Transform(trimOptional)
   @IsOptional()
-  @MinLength(1)
+  @IsString()
   @MaxLength(64)
-  taxIdentificationNumber!: string;
+  taxIdentificationNumber?: string;
 
   @Transform(({ value }) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value,

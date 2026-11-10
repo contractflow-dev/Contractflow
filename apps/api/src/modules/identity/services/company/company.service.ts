@@ -72,6 +72,8 @@ export class CompanyService {
 
       const savedCompany = await context.createCompany({
         ...dto,
+        registrationNumber: dto.registrationNumber ?? '',
+        taxIdentificationNumber: dto.taxIdentificationNumber ?? '',
         website: dto.website ?? '',
         addressLine2: dto.addressLine2 ?? '',
         status: ECompanyStatus.ACTIVE,
