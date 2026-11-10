@@ -11,7 +11,6 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
-import { CONTRACT_INVITATIONS_ANCHOR } from "@/features/companies/components/company-notification-bell";
 import { useUserTimeZone } from "@/hooks/use-user-time-zone";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { formatDate, humanizeEnumValue } from "@/lib/format";
@@ -73,8 +72,7 @@ export function IncomingContractInvitations({
   };
 
   return (
-    // The notification bell links here.
-    <Card id={CONTRACT_INVITATIONS_ANCHOR} className="scroll-mt-20">
+    <Card>
       <CardHeader>
         <CardTitle>
           <h2>Invitations to contracts</h2>

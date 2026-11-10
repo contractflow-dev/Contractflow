@@ -22,7 +22,6 @@ import { AppShell } from "@/components/app-shell/app-shell";
 import { isNavItemActive } from "@/components/app-shell/navigation";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { AccountMenu } from "@/components/account-menu/account-menu";
-import { CompanyNotificationBell } from "./components/company-notification-bell";
 import { api } from "@/services/api";
 import { useGetCurrentUserQuery } from "@/services/authApi";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -396,7 +395,6 @@ export function CompanyAdminShell({
             )}
           </div>
           <div className="flex items-center gap-2">
-            <CompanyNotificationBell access={access} />
             <ThemeToggle />
             <AccountMenu area="company" />
           </div>

@@ -26,7 +26,7 @@ vi.mock("@/components/auth/sign-out-action", () => ({
 }));
 
 describe("OnboardingView", () => {
-  it("starts on the first of three steps, beside the hero panel", () => {
+  it("starts on the first of three steps, at full width", () => {
     const markup = renderToStaticMarkup(<OnboardingView />);
 
     expect(markup).toMatch(/<h1[^>]*>Create your company<\/h1>/);
@@ -36,24 +36,16 @@ describe("OnboardingView", () => {
     const steps = markup.match(/<li[^>]*>[\s\S]*?<\/li>/g) ?? [];
     expect(steps).toHaveLength(3);
     expect(steps[0]).toContain('aria-current="step"');
-    // Like sign-in and sign-up, the form sits in a section beside the hero.
-    expect(markup).toMatch(/<section[^>]*>[\s\S]*Create your company/);
-    expect(markup).toContain("HERO");
+    // The form no longer shares the screen with the hero panel.
+    expect(markup).not.toContain("HERO");
   });
 
   it("shows only the first step's fields, all labelled", () => {
     const markup = renderToStaticMarkup(<OnboardingView />);
 
-    for (const id of ["name", "legalName"]) {
+    for (const id of ["name", "legalName", "registrationNumber", "taxIdentificationNumber"]) {
       expect(markup).toMatch(new RegExp(`<label[^>]*for="${id}"`));
       expect(markup).toMatch(new RegExp(`id="${id}"[^>]*aria-required="true"`));
-    }
-    // Registration and tax numbers are optional, here and in the API.
-    for (const id of ["registrationNumber", "taxIdentificationNumber"]) {
-      expect(markup).toMatch(
-        new RegExp(`<label[^>]*for="${id}"[^>]*>[^<]*<span data-slot="optional-indicator"`),
-      );
-      expect(markup).not.toMatch(new RegExp(`id="${id}"[^>]*aria-required`));
     }
     expect(markup).not.toContain('id="email"');
     expect(markup).not.toContain('id="countryCode"');

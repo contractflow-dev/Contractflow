@@ -154,21 +154,6 @@ describe('CompanyService', () => {
     );
   });
 
-  it('stores omitted registration and tax numbers as empty strings', async () => {
-    const {
-      registrationNumber: _registrationNumber,
-      taxIdentificationNumber: _taxIdentificationNumber,
-      ...withoutNumbers
-    } = companyInput;
-
-    await service.create('user-from-session', withoutNumbers);
-
-    expect(companyRepository.save.mock.calls[0][0]).toMatchObject({
-      registrationNumber: '',
-      taxIdentificationNumber: '',
-    });
-  });
-
   it('rejects unauthenticated identity and unverified accounts before writes', async () => {
     users.findOne.mockResolvedValueOnce(null);
     await expect(
