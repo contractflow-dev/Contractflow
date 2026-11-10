@@ -50,11 +50,6 @@ vi.mock("@/components/theme/theme-toggle", () => ({
   ThemeToggle: () => <button type="button">Theme</button>,
 }));
 
-// The bell has its own tests; here it only needs to render in the header.
-vi.mock("./components/company-notification-bell", () => ({
-  CompanyNotificationBell: () => <button type="button">Notifications</button>,
-}));
-
 vi.mock("@workspace/ui/components/dropdown-menu", () => ({
   DropdownMenu: ({ children }: { children: ReactNode }) => (
     <div>{children}</div>

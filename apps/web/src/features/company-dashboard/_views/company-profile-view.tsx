@@ -33,8 +33,16 @@ import { PageHeader } from "@/components/page-header/page-header";
 const profileSchema = z.object({
   name: z.string().trim().min(1, "Company name is required").max(255),
   legalName: z.string().trim().min(1, "Legal name is required").max(255),
-  registrationNumber: z.string().trim().max(64),
-  taxIdentificationNumber: z.string().trim().max(64),
+  registrationNumber: z
+    .string()
+    .trim()
+    .min(1, "Registration number is required")
+    .max(64),
+  taxIdentificationNumber: z
+    .string()
+    .trim()
+    .min(1, "Tax identification number is required")
+    .max(64),
   email: z
     .string()
     .trim()
@@ -81,12 +89,8 @@ const organizationFields: ProfileTextField[] = [
     autoComplete: "organization",
     description: "The name the company is registered under.",
   },
-  { key: "registrationNumber", label: "Registration number", optional: true },
-  {
-    key: "taxIdentificationNumber",
-    label: "Tax identification number",
-    optional: true,
-  },
+  { key: "registrationNumber", label: "Registration number" },
+  { key: "taxIdentificationNumber", label: "Tax identification number" },
 ];
 
 const contactFields: ProfileTextField[] = [

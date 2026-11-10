@@ -44,8 +44,16 @@ const currencyCodes = Object.values(ECurrencyCode);
 const companySchema = z.object({
   name: z.string().trim().min(1, "Company name is required").max(255),
   legalName: z.string().trim().min(1, "Legal name is required").max(255),
-  registrationNumber: z.string().trim().max(64),
-  taxIdentificationNumber: z.string().trim().max(64),
+  registrationNumber: z
+    .string()
+    .trim()
+    .min(1, "Registration number is required")
+    .max(64),
+  taxIdentificationNumber: z
+    .string()
+    .trim()
+    .min(1, "Tax identification number is required")
+    .max(64),
   email: z
     .string()
     .trim()
@@ -78,8 +86,8 @@ const companySchema = z.object({
 type CompanyFormValues = z.infer<typeof companySchema>;
 
 /**
- * Company creation in three short steps. The steps only spread the fields
- * out; the API applies the same required and optional rules.
+ * Company creation in three short steps. Every field is still required by
+ * the API; the steps only spread them out.
  */
 export const companySetupSteps: Array<{
   id: "company" | "contact" | "address";
@@ -112,18 +120,16 @@ export const companySetupSteps: Array<{
 ];
 const lastStep = companySetupSteps.length - 1;
 
-/** The company setup form beside the hero panel, like sign-in and sign-up. */
+/** The form gets the whole width; beside the hero panel it was cramped. */
 function WideOnboardingShell({ children }: { children: React.ReactNode }) {
   return (
-    <main className="grid min-h-svh min-w-0 grid-cols-1 lg:grid-cols-2">
-      <section className="flex min-w-0 flex-col p-4 sm:p-6 lg:p-10">
+    <main className="flex min-h-svh min-w-0 flex-col p-4 sm:p-6 lg:p-10">
+      <div className="mx-auto w-full min-w-0 max-w-3xl">
         <AuthTopBar />
-        <div className="mx-auto w-full min-w-0 max-w-2xl flex-1 space-y-8 py-6 sm:py-10">
-          {children}
-        </div>
-      </section>
-
-      <AuthHero image="register" />
+      </div>
+      <div className="mx-auto w-full min-w-0 max-w-3xl flex-1 space-y-8 py-6 sm:py-10">
+        {children}
+      </div>
     </main>
   );
 }
@@ -154,7 +160,7 @@ function OnboardingShell({
         </div>
       </section>
 
-      <AuthHero image="register" />
+      <AuthHero />
     </main>
   );
 }
@@ -524,7 +530,7 @@ export function OnboardingView() {
               <FormField
                 id="registrationNumber"
                 label="Registration number"
-                optional
+                required
                 error={errors.registrationNumber?.message}
               >
                 {(control) => (
@@ -534,7 +540,7 @@ export function OnboardingView() {
               <FormField
                 id="taxIdentificationNumber"
                 label="Tax identification number"
-                optional
+                required
                 error={errors.taxIdentificationNumber?.message}
               >
                 {(control) => (
