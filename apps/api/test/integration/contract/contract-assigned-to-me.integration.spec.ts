@@ -1,4 +1,8 @@
-import { EContractRole } from '@contractflow/contracts-schema';
+import {
+  ECompanyRole,
+  EContractorContractRole,
+  type ContractRole,
+} from '@contractflow/contracts-schema';
 import type { DataSource } from 'typeorm';
 import { ContractRoleAssignment } from '../../../src/modules/contract/entities/contract-role-assignment.entity';
 import { Contract } from '../../../src/modules/contract/entities/contract.entity';
@@ -47,7 +51,7 @@ describe('Contracts assigned to me (PostgreSQL)', () => {
   async function assign(
     party: ContractParty,
     member: CompanyUser,
-    role: EContractRole,
+    role: ContractRole,
     revoked = false,
   ) {
     const repository = dataSource!.getRepository(ContractRoleAssignment);
@@ -77,24 +81,45 @@ describe('Contracts assigned to me (PostgreSQL)', () => {
 
     const revoked = await factory!.createAdditionalContract(company);
     const revokedParty = await factory!.createAdditionalParty(revoked, company);
-    await assign(revokedParty, actor, EContractRole.FINANCE_OFFICER, true);
+    await assign(revokedParty, actor, EContractorContractRole.FINANCE_OFFICER, true);
 
     const colleagues = await factory!.createAdditionalContract(company);
     const colleaguesParty = await factory!.createAdditionalParty(colleagues, company);
-    await assign(colleaguesParty, colleague, EContractRole.FINANCE_OFFICER);
+    await assign(colleaguesParty, colleague, EContractorContractRole.FINANCE_OFFICER);
 
-    const scope = { companyId: company.id };
+    // An ordinary member's whole list is already only their own contracts.
+    const scope = {
+      companyId: company.id,
+      companyUserId: actor.id,
+      includeCompanyAdminOversight: true,
+    };
     const everything = await contracts.searchPage(scope, { take: 50 });
     const mine = await contracts.searchPage(scope, {
       take: 50,
       assignedToCompanyUserId: actor.id,
     });
-
-    expect(everything.items.map((c) => c.id).sort()).toEqual(
-      [assigned.id, unassigned.id, revoked.id, colleagues.id].sort(),
-    );
+    expect(everything.items.map((c) => c.id)).toEqual([assigned.id]);
+    expect(everything.total).toBe(1);
     expect(mine.items.map((c) => c.id)).toEqual([assigned.id]);
     expect(mine.total).toBe(1);
+
+    // A Company Administrator sees every party contract through oversight;
+    // the filter still narrows to their own (none here).
+    const admin = await factory!.createAdditionalMember(
+      company,
+      ECompanyRole.COMPANY_ADMIN,
+    );
+    const adminScope = { ...scope, companyUserId: admin.id };
+    const overseen = await contracts.searchPage(adminScope, { take: 50 });
+    expect(overseen.items.map((c) => c.id).sort()).toEqual(
+      [assigned.id, unassigned.id, revoked.id, colleagues.id].sort(),
+    );
+    await expect(
+      contracts.searchPage(adminScope, {
+        take: 50,
+        assignedToCompanyUserId: admin.id,
+      }),
+    ).resolves.toEqual({ items: [], total: 0 });
   });
 
   it("returns only the member's own active roles, inside the scoped company", async () => {
@@ -106,13 +131,13 @@ describe('Contracts assigned to me (PostgreSQL)', () => {
     await assign(
       { id: party } as ContractParty,
       colleague,
-      EContractRole.FINANCE_OFFICER,
+      EContractorContractRole.FINANCE_OFFICER,
     );
     // Another company on the same contract, with its own member and role.
     const { company: other, member: outsider } =
       await factory!.createCompanyMember();
     const otherParty = await factory!.createAdditionalParty(contract, other);
-    await assign(otherParty, outsider, EContractRole.HSE_OFFICER);
+    await assign(otherParty, outsider, EContractorContractRole.HSE_OFFICER);
 
     const roles = await assignments.findActiveRolesForContracts(
       { companyId: company.id },
@@ -122,7 +147,7 @@ describe('Contracts assigned to me (PostgreSQL)', () => {
     expect(roles).toEqual([
       {
         contractId: contract.id,
-        role: EContractRole.CONTRACTOR_PROJECT_LEAD,
+        role: EContractorContractRole.CONTRACTOR_PROJECT_LEAD,
         isWorkspaceAdmin: false,
       },
     ]);
@@ -137,7 +162,11 @@ describe('Contracts assigned to me (PostgreSQL)', () => {
     ).resolves.toEqual([]);
     await expect(
       contracts.searchPage(
-        { companyId: other.id },
+        {
+          companyId: other.id,
+          companyUserId: actor.id,
+          includeCompanyAdminOversight: true,
+        },
         { take: 50, assignedToCompanyUserId: actor.id },
       ),
     ).resolves.toEqual({ items: [], total: 0 });

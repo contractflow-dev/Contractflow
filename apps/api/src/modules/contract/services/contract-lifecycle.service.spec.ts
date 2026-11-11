@@ -55,6 +55,7 @@ function createContext() {
     },
     roleAssignments: {
       hasActiveAssignment: vi.fn(),
+      hasAnyActiveAssignment: vi.fn(),
       hasActiveAssignmentForShare: vi.fn(),
       revokeForWorkspaceRoles: vi.fn(),
       revokeAllForContract: vi.fn(),
@@ -99,7 +100,7 @@ describe('ContractLifecycleService', () => {
     id: 'membership-1',
     userId: 'user-1',
     companyId: 'company-1',
-    companyRole: ECompanyRole.FINANCE_OFFICER,
+    companyRole: ECompanyRole.MEMBER,
     status: ECompanyUserStatus.ACTIVE,
   };
   const party = {
@@ -129,6 +130,7 @@ describe('ContractLifecycleService', () => {
     context.parties.find.mockResolvedValue(party);
     context.parties.findForShare.mockResolvedValue(party);
     context.roleAssignments.hasActiveAssignment.mockResolvedValue(true);
+    context.roleAssignments.hasAnyActiveAssignment.mockResolvedValue(true);
     context.roleAssignments.hasActiveAssignmentForShare.mockResolvedValue(true);
 
     outcomes = { committed: 0, rolledBack: 0 };
@@ -310,6 +312,22 @@ describe('ContractLifecycleService', () => {
       canTransition: false,
       canRestore: false,
     });
+  });
+
+  it('hides lifecycle permissions (404) from a member with no role on the contract', async () => {
+    context.roleAssignments.hasAnyActiveAssignment.mockResolvedValue(false);
+    await expect(
+      service.managementPermissions(actor.userId, actor.companyId, contract.id),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    // A Company Administrator still sees them through oversight.
+    context.memberships.findActive.mockResolvedValue({
+      ...actor,
+      companyRole: ECompanyRole.COMPANY_ADMIN,
+    });
+    await expect(
+      service.managementPermissions(actor.userId, actor.companyId, contract.id),
+    ).resolves.toMatchObject({ canTransition: true });
   });
 
   it('does not allow a non-admin party member to modify contract workspaces', async () => {

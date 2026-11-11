@@ -2,7 +2,6 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
 import { ECompanyRole } from '@contractflow/contracts-schema';
 import type {
@@ -14,9 +13,8 @@ import type {
   ContractMembership,
   IPaginatedResponse,
 } from '@contractflow/contracts-schema';
-import type { IContractScope } from '../../../common/database/repositories/contract-scope.interface';
 import { CompanyScopeService } from '../../identity/services/company/company-scope.service';
-import { Contract } from '../entities/contract.entity';
+import type { Contract } from '../entities/contract.entity';
 import { ContractParty } from '../entities/contract-party.entity';
 import { ContractPartyRepository } from '../repositories/contract-party.repository';
 import { ContractRepository } from '../repositories/contract.repository';
@@ -28,6 +26,7 @@ import { ContractStatusHistory } from '../entities/contract-status-history.entit
 import { CompanyUserRepository } from '../../identity/repositories/company-user.respository';
 import { ContractWorkspaceRepository } from '../repositories/contract-workspace.repository';
 import { ContractRoleAssignmentRepository } from '../repositories/contract-role-assignment.repository';
+import { ContractAccessService } from './contract-access.service';
 import { workspaceForRole } from './contract-workspace';
 import type { AssignableContractWorkspace } from './contract-workspace';
 import type {
@@ -40,24 +39,6 @@ import {
   toPaginatedResponse,
 } from '../../../common/application/pagination';
 
-/** Everything a contract-level read needs once membership is proven. */
-interface ContractAccess {
-  /** For contract-scoped repositories (e.g. status history). */
-  contractScope: IContractScope;
-  /** The acting company's party row on this contract. */
-  membership: ContractParty;
-  /** The visible, non-archived contract. */
-  contract: Contract;
-}
-
-/**
- * Read access to contracts for the members of a party company.
- *
- * Membership of an active company is verified first, and every query is then
- * bound to that company's `ContractParty` rows. Being a Company Admin or
- * Platform Admin grants no extra contract visibility. Workspace data
- * (finance, HSE, ...) needs its own role-assignment checks in its own module.
- */
 @Injectable()
 export class ContractService {
   constructor(
@@ -68,6 +49,7 @@ export class ContractService {
     private readonly companyUsers: CompanyUserRepository,
     private readonly workspaces: ContractWorkspaceRepository,
     private readonly roleAssignments: ContractRoleAssignmentRepository,
+    private readonly access: ContractAccessService,
   ) {}
 
   async list(
@@ -76,10 +58,17 @@ export class ContractService {
     query: ListContractsQuery,
   ): Promise<IPaginatedResponse<ContractListItem>> {
     const context = await this.companyScope.contextForUser(userId, companyId);
-    const scope = { companyId: context.companyId };
     // The user's own membership of the header company: the only assignments
-    // this list ever reads.
+    // this list ever reads, and the reader the visibility rule is checked for.
     const companyUserId = context.membership.id;
+    const scope = {
+      companyId: context.companyId,
+      companyUserId,
+      // Ordinary members see contracts they hold a role on; a Company
+      // Administrator also sees, read-only, every contract their company is
+      // party to. Re-checked in SQL from the stored membership row.
+      includeCompanyAdminOversight: true,
+    };
     if (query.includeDeleted) {
       const companyRole = await this.companyUsers.findActiveRoleForUser(
         userId,
@@ -103,7 +92,7 @@ export class ContractService {
       take: query.limit,
     });
     // Other parties' names, under the same rule as GET /contract/parties:
-    // any member of a party company may see them. Archived contracts can't be
+    // anyone who may see the contract may see them. Archived contracts can't be
     // opened, so their parties aren't listed.
     const counterparties = query.includeDeleted
       ? []
@@ -114,7 +103,7 @@ export class ContractService {
     const roles = query.includeDeleted
       ? []
       : await this.roleAssignments.findActiveRolesForContracts(
-          scope,
+          { companyId: scope.companyId },
           companyUserId,
           result.items.map((contract) => contract.id),
         );
@@ -148,14 +137,14 @@ export class ContractService {
     companyId: string,
     contractId: string,
   ): Promise<ContractDetail> {
-    const { contract, membership } = await this.requireMembership(
+    const { contract, party } = await this.access.authorizeContractOversight(
       userId,
       companyId,
       contractId,
     );
     return {
       contract: toContractResponse(contract),
-      membership: toMembershipResponse(membership),
+      membership: toMembershipResponse(party),
     };
   }
 
@@ -164,14 +153,14 @@ export class ContractService {
     companyId: string,
     contractId: string,
   ): Promise<ContractPartySummary[]> {
-    // Membership must be proven first: the query below is NOT company-scoped.
-    const { contractScope } = await this.requireMembership(
+    // Visibility must be proven first: the query below is NOT company-scoped.
+    const { scope } = await this.access.authorizeContractOversight(
       userId,
       companyId,
       contractId,
     );
 
-    const parties = await this.parties.findAllWithCompany(contractScope);
+    const parties = await this.parties.findAllWithCompany(scope);
     return parties.map(toPartySummary);
   }
 
@@ -181,11 +170,12 @@ export class ContractService {
     contractId: string,
     query: ListContractStatusHistoryQuery,
   ) {
-    const { contractScope } = await this.requireMembership(
-      userId,
-      companyId,
-      contractId,
-    );
+    const { scope: contractScope } =
+      await this.access.authorizeContractOversight(
+        userId,
+        companyId,
+        contractId,
+      );
 
     if (
       query.fromDate &&
@@ -216,60 +206,20 @@ export class ContractService {
     companyId: string,
     contractId: string,
   ): Promise<AssignableContractWorkspace[]> {
-    const { contractScope, membership } = await this.requireMembership(
+    // Which workspaces the contract has enabled is general contract setup
+    // information, not access to any of them.
+    const { scope } = await this.access.authorizeContractOversight(
       userId,
       companyId,
       contractId,
     );
-    return this.workspaces.findWorkspaces({
-      contractId: contractScope.contractId,
-      companyId: membership.companyId,
-    });
-  }
-
-  // ---------------------------------------------------------------------
-  // Access check (the one place membership is decided)
-  // ---------------------------------------------------------------------
-
-  /**
-   * Verifies the user is an active member of `companyId`, and that company is
-   * a party to `contractId`. The contract-level scope is only built after both
-   * checks pass. Not-found covers both "no such contract" and "not your
-   * contract", so existence is never leaked.
-   */
-  private async requireMembership(
-    userId: string,
-    companyId: string,
-    contractId: string,
-  ): Promise<ContractAccess> {
-    const companyScope = await this.companyScope.forUser(userId, companyId);
-    const contractScope: IContractScope = {
-      contractId,
-      companyId: companyScope.companyId,
-    };
-    // The query is the proof: it matches only if THIS company is a party to THIS contract.
-    const membership = await this.parties.findByCompany(
-      contractScope,
-      companyScope.companyId,
-    );
-    if (!membership) {
-      throw contractNotFound();
-    }
-    const contract = await this.contracts.findById(companyScope, contractId);
-    if (!contract) {
-      throw contractNotFound();
-    }
-    return { membership, contractScope, contract };
+    return this.workspaces.findWorkspaces(scope);
   }
 }
 
 // -----------------------------------------------------------------------
 // Helpers
 // -----------------------------------------------------------------------
-
-function contractNotFound(): NotFoundException {
-  return new NotFoundException('Contract was not found');
-}
 
 function toPartySummary(party: ContractParty): ContractPartySummary {
   return {

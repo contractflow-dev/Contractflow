@@ -1,37 +1,38 @@
-import { EContractRole, EPartyType } from '@contractflow/contracts-schema';
+import {
+  CONTRACT_ROLES,
+  EClientContractRole,
+  EContractorContractRole,
+  isContractRoleForParty,
+  type ContractRole,
+  type EPartyType,
+} from '@contractflow/contracts-schema';
 import type { AssignableContractWorkspace } from '@contractflow/contracts-schema';
 
 export type { AssignableContractWorkspace } from '@contractflow/contracts-schema';
 
 export type ContractWorkspace = AssignableContractWorkspace | 'general';
 
-export const WORKSPACE_ROLES: Record<ContractWorkspace, EContractRole[]> = {
+/**
+ * The stored role values of each workspace. HSE and Finance values are the
+ * same on both sides; which side a holder is on comes from their party.
+ */
+export const WORKSPACE_ROLES: Record<ContractWorkspace, ContractRole[]> = {
   project: [
-    EContractRole.CONTRACTOR_PROJECT_LEAD,
-    EContractRole.CONTRACTOR_SITE_SUPERVISOR,
-    EContractRole.CLIENT_PROJECT_MANAGER,
-    EContractRole.CLIENT_SITE_ENGINEER,
+    EContractorContractRole.CONTRACTOR_PROJECT_LEAD,
+    EContractorContractRole.CONTRACTOR_SITE_SUPERVISOR,
+    EClientContractRole.CLIENT_PROJECT_MANAGER,
+    EClientContractRole.CLIENT_SITE_ENGINEER,
   ],
-  finance: [EContractRole.FINANCE_OFFICER, EContractRole.FINANCE_DIRECTOR],
-  hse: [EContractRole.HSE_OFFICER, EContractRole.HSE_MANAGER],
-  general: Object.values(EContractRole),
-};
-
-const ROLE_PARTY_TYPES: Partial<Record<EContractRole, EPartyType[]>> = {
-  [EContractRole.CONTRACTOR_PROJECT_LEAD]: [
-    EPartyType.CONTRACTOR,
-    EPartyType.SUBCONTRACTOR,
+  finance: [
+    EClientContractRole.FINANCE_OFFICER,
+    EClientContractRole.FINANCE_DIRECTOR,
   ],
-  [EContractRole.CONTRACTOR_SITE_SUPERVISOR]: [
-    EPartyType.CONTRACTOR,
-    EPartyType.SUBCONTRACTOR,
-  ],
-  [EContractRole.CLIENT_PROJECT_MANAGER]: [EPartyType.CLIENT],
-  [EContractRole.CLIENT_SITE_ENGINEER]: [EPartyType.CLIENT],
+  hse: [EClientContractRole.HSE_OFFICER, EClientContractRole.HSE_MANAGER],
+  general: [...CONTRACT_ROLES],
 };
 
 export function workspaceForRole(
-  role: EContractRole,
+  role: ContractRole,
 ): AssignableContractWorkspace {
   if (WORKSPACE_ROLES.project.includes(role)) return 'project';
   if (WORKSPACE_ROLES.finance.includes(role)) return 'finance';
@@ -39,10 +40,13 @@ export function workspaceForRole(
   throw new Error(`Contract role "${role}" has no workspace mapping.`);
 }
 
+/**
+ * Whether the role belongs to the party's side: client roles for a CLIENT
+ * party, contractor roles for CONTRACTOR, SUBCONTRACTOR, VENDOR and OTHER.
+ */
 export function roleAllowedForParty(
-  role: EContractRole,
+  role: ContractRole,
   partyType: EPartyType,
 ): boolean {
-  const partyTypes = ROLE_PARTY_TYPES[role];
-  return !partyTypes || partyTypes.includes(partyType);
+  return isContractRoleForParty(role, partyType);
 }

@@ -288,7 +288,8 @@ export class CompanyService {
       },
       departments: {
         complianceAttentionCount: portfolio.complianceAttentionCount,
-        contractsNeedingAttentionCount: portfolio.contractsNeedingAttentionCount,
+        contractsNeedingAttentionCount:
+          portfolio.contractsNeedingAttentionCount,
         openIncidentCount: portfolio.openIncidentCount,
         invoicesDueSoonCount: portfolio.invoicesDueSoonCount,
         dueWindowDays: COMPANY_DASHBOARD_DUE_WINDOW_DAYS,

@@ -10,7 +10,6 @@ import { createHash, randomBytes } from 'node:crypto';
 import {
   ECompanyRole,
   ECompanyUserStatus,
-  EInvitationRole,
   EInvitationStatus,
   type IPaginatedResponse,
 } from '@contractflow/contracts-schema';
@@ -47,23 +46,6 @@ const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
-}
-
-function roleForMembership(role: EInvitationRole): ECompanyRole {
-  const roleMap: Record<EInvitationRole, ECompanyRole> = {
-    [EInvitationRole.CONTRACTOR_PROJECT_LEAD]:
-      ECompanyRole.CONTRACTOR_PROJECT_LEAD,
-    [EInvitationRole.CONTRACTOR_SITE_SUPERVISOR]:
-      ECompanyRole.CONTRACTOR_SITE_SUPERVISOR,
-    [EInvitationRole.CLIENT_PROJECT_MANAGER]:
-      ECompanyRole.CLIENT_PROJECT_MANAGER,
-    [EInvitationRole.CLIENT_SITE_ENGINEER]: ECompanyRole.CLIENT_SITE_ENGINEER,
-    [EInvitationRole.HSE_OFFICER]: ECompanyRole.HSE_OFFICER,
-    [EInvitationRole.HSE_MANAGER]: ECompanyRole.HSE_MANAGER,
-    [EInvitationRole.FINANCE_OFFICER]: ECompanyRole.FINANCE_OFFICER,
-    [EInvitationRole.FINANCE_DIRECTOR]: ECompanyRole.FINANCE_DIRECTOR,
-  };
-  return roleMap[role];
 }
 
 @Injectable()
@@ -223,8 +205,8 @@ export class CompanyAdminService {
         companyId: scope.companyId,
         invitedByCompanyUserId: membership.id,
         email: dto.email,
-        firstName: null,
-        lastName: null,
+        firstName: dto.firstName ?? null,
+        lastName: dto.lastName ?? null,
         companyRole: dto.companyRole,
         tokenHash: hashToken(token),
         status: EInvitationStatus.PENDING,
@@ -383,10 +365,13 @@ export class CompanyAdminService {
         );
       }
 
-      const membershipRole = roleForMembership(invitation.companyRole);
+      // The invited company role becomes the membership role. Nothing
+      // here grants contract or workspace access: that needs a contract role.
+      const membershipRole = invitation.companyRole;
       if (existingMembership) {
         existingMembership.companyRole = membershipRole;
-        existingMembership.jobTitle = invitation.companyRole;
+        // A returning member keeps the job title they had.
+        existingMembership.jobTitle ||= invitation.companyRole;
         existingMembership.status = ECompanyUserStatus.ACTIVE;
         existingMembership.joinedAt = new Date();
         existingMembership.leftAt = null;

@@ -116,7 +116,11 @@ last so callers cannot override them. Scoped subclasses live beside it:
 
 Choose the base from the entity's actual ownership columns and relationships.
 `ContractRepository` extends `BaseRepository` directly and overrides its scope
-hooks to restrict contracts to those where the company is a party. Unscoped
+hooks with `IContractVisibilityScope`: a contract is visible only where the
+company is a party and the reader holds an active role assignment on that
+party, or, when the caller allows oversight, is an active Company
+Administrator of that company. Company membership alone never makes a
+contract visible. Unscoped
 repositories (for example users, sessions, and companies) must be used only
 after explicit authorization checks.
 
@@ -160,6 +164,17 @@ and do not add repository layers that merely duplicate existing abstractions.
 - Contract access goes through `ContractAccessService.authorize`, which checks
   company membership, contract party status, the contract workspace, and the
   user's contract role assignment, then returns the contract scope to use.
+  General contract information (detail, parties, status history) uses
+  `ContractAccessService.authorizeContractOversight`, which also admits a
+  Company Administrator of a party company without a role (read-only
+  oversight). Never use oversight to open a workspace or a protected contract
+  resource; those always need `authorize`. Both answer 404 when the reader
+  cannot see the contract, and `authorize` answers 403 when the contract is
+  visible but the workspace is not. Contract-scoped management operations (lifecycle,
+  sites, signatory, party invitations, role management) decide visibility
+  before their own permission checks, so a caller who cannot see the contract
+  always gets the same 404 as for a missing contract, never a 403 or a
+  differently worded 404 that confirms it exists.
 - Every company- or contract-scoped read and write must enforce the relevant
   scope. Use the existing repository scope hooks or explicit scoped methods.
 - A contract may be visible through its company-party relationship rather than

@@ -18,6 +18,10 @@ export function ContractDetailsView({
           companyId={access.company.id}
           contractId={contractId}
           section={section}
+          viewer={{
+            membershipId: access.membership.id,
+            companyName: access.company.name,
+          }}
         />
       )}
     </CompanyAdminShell>

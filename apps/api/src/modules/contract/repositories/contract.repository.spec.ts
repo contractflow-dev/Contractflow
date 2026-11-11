@@ -8,6 +8,7 @@ function createQb() {
   const sub = {
     select: vi.fn().mockReturnThis(),
     from: vi.fn().mockReturnThis(),
+    innerJoin: vi.fn().mockReturnThis(),
     where: vi.fn().mockReturnThis(),
     andWhere: vi.fn().mockReturnThis(),
     getQuery: vi.fn().mockReturnValue('(SELECT 1)'),
@@ -26,6 +27,18 @@ function createQb() {
   return { qb, sub };
 }
 
+const MEMBER = {
+  companyId: 'co-1',
+  companyUserId: 'cu-1',
+  includeCompanyAdminOversight: false,
+};
+const OVERSIGHT = { ...MEMBER, includeCompanyAdminOversight: true };
+const MEMBER_PARAMS = {
+  __scopeCompanyId: 'co-1',
+  __scopeCompanyUserId: 'cu-1',
+  __scopeMemberStatus: 'active',
+};
+
 describe('ContractRepository', () => {
   const orm = { createQueryBuilder: vi.fn() };
   let repository: ContractRepository;
@@ -39,23 +52,44 @@ describe('ContractRepository', () => {
     repository = new ContractRepository(orm as never);
   });
 
-  it('limits every read to contracts the company is party to', async () => {
-    await repository.searchPage({ companyId: 'co-1' });
+  it('limits an ordinary member to contracts they hold an active role on', async () => {
+    await repository.searchPage(MEMBER);
 
     expect(sub.andWhere).toHaveBeenCalledWith(
       'scope_party.companyId = :__scopeCompanyId',
     );
+    expect(sub.andWhere).toHaveBeenCalledWith(
+      'scope_member.id = :__scopeCompanyUserId',
+    );
+    expect(sub.andWhere).toHaveBeenCalledWith(
+      'scope_member.status = :__scopeMemberStatus',
+    );
+    expect(sub.andWhere).toHaveBeenCalledWith('scope_member.leftAt IS NULL');
+    expect(sub.andWhere).toHaveBeenCalledWith('scope_assignment.revokedAt IS NULL');
+    expect(sub.where).toHaveBeenCalledWith(
+      'scope_assignment.contractPartyId = scope_party.id',
+    );
+    // The assignment alone decides visibility: no administrator branch.
+    expect(sub.andWhere).toHaveBeenCalledWith('EXISTS (SELECT 1)');
+    expect(qb.andWhere).toHaveBeenCalledWith('EXISTS (SELECT 1)', MEMBER_PARAMS);
+  });
+
+  it('adds Company Administrator oversight only when asked, checked against the stored role', async () => {
+    await repository.searchPage(OVERSIGHT);
+
+    expect(sub.andWhere).toHaveBeenCalledWith(
+      '(EXISTS (SELECT 1) OR scope_member.companyRole = :__scopeAdminRole)',
+    );
     expect(qb.andWhere).toHaveBeenCalledWith('EXISTS (SELECT 1)', {
-      __scopeCompanyId: 'co-1',
+      ...MEMBER_PARAMS,
+      __scopeAdminRole: 'Company Administrator',
     });
   });
 
-  it('applies the party restriction when loading one contract', async () => {
-    await repository.findById({ companyId: 'co-1' }, 'c-1');
+  it('applies the visibility restriction when loading one contract', async () => {
+    await repository.findById(MEMBER, 'c-1');
 
-    expect(qb.andWhere).toHaveBeenCalledWith('EXISTS (SELECT 1)', {
-      __scopeCompanyId: 'co-1',
-    });
+    expect(qb.andWhere).toHaveBeenCalledWith('EXISTS (SELECT 1)', MEMBER_PARAMS);
     expect(qb.andWhere).toHaveBeenCalledWith('contract.id = :id', {
       id: 'c-1',
     });
@@ -63,7 +97,7 @@ describe('ContractRepository', () => {
 
   it('escapes search wildcards and pages the result', async () => {
     await repository.searchPage(
-      { companyId: 'co-1' },
+      MEMBER,
       { search: '50%_', skip: 5, take: 5 },
     );
 
@@ -76,7 +110,7 @@ describe('ContractRepository', () => {
 
   it('maps archived-contract creator filtering to the declared creator column', async () => {
     await repository.searchPage(
-      { companyId: 'co-1' },
+      MEMBER,
       { includeDeleted: true, creatorCompanyId: 'co-1' },
     );
 
@@ -102,9 +136,12 @@ describe('ContractRepository', () => {
     );
   });
 
-  it('refuses a blank company scope', async () => {
+  it('refuses a blank company or member scope', async () => {
     await expect(
-      repository.searchPage({ companyId: ' ' }),
+      repository.searchPage({ ...MEMBER, companyId: ' ' }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      repository.findById({ ...MEMBER, companyUserId: '' }, 'c-1'),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 

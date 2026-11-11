@@ -14,9 +14,9 @@ import {
  * RTK Query hook so they form part of its cache key, and call `resetPage`
  * whenever a search or filter changes.
  */
-export function usePagination(initialLimit?: number) {
+export function usePagination(initialLimit?: number, initialPage?: number) {
   const [state, setState] = useState(() =>
-    initialPaginationState(initialLimit),
+    initialPaginationState(initialLimit, initialPage),
   );
 
   const setPage = useCallback((page: number) => {

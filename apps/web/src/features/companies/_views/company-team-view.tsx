@@ -5,7 +5,6 @@ import type { FormEvent } from "react";
 import {
   ECompanyRole,
   ECompanyUserStatus,
-  EInvitationRole,
   EInvitationStatus,
 } from "@contractflow/contracts-schema";
 import {
@@ -65,8 +64,16 @@ import { formatDate } from "@/lib/format";
 import { notifySuccess } from "@/lib/notify";
 import { CompanyAdminShell } from "../CompanyAdminShell";
 
-const invitationRoles = Object.values(EInvitationRole);
 const memberRoles = Object.values(ECompanyRole);
+
+/**
+ * A company invitation grants company membership only. Contract roles are
+ * assigned per contract, from the contract's role management, after joining.
+ */
+const invitationRoles: ReadonlyArray<{ value: ECompanyRole; label: string }> = [
+  { value: ECompanyRole.MEMBER, label: "Member" },
+  { value: ECompanyRole.COMPANY_ADMIN, label: "Company Administrator" },
+];
 
 /** What each company invitation status means for the person invited. */
 const invitationStatusLegend: StatusLegendItem[] = [
@@ -132,9 +139,9 @@ function TeamContent({ companyId }: { companyId: string }) {
   const [busyMemberId, setBusyMemberId] = useState("");
   const [busyInvitationId, setBusyInvitationId] = useState("");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<EInvitationRole>(
-    EInvitationRole.CONTRACTOR_PROJECT_LEAD,
-  );
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [role, setRole] = useState<ECompanyRole>(ECompanyRole.MEMBER);
   const {
     currentData: members,
     error: membersError,
@@ -176,6 +183,8 @@ function TeamContent({ companyId }: { companyId: string }) {
         companyId,
         data: {
           email: email.trim().toLowerCase(),
+          ...(firstName.trim() ? { firstName: firstName.trim() } : {}),
+          ...(lastName.trim() ? { lastName: lastName.trim() } : {}),
           companyRole: role,
         },
       }).unwrap();
@@ -184,6 +193,8 @@ function TeamContent({ companyId }: { companyId: string }) {
         `${email.trim()} can now join the team.`,
       );
       setEmail("");
+      setFirstName("");
+      setLastName("");
     } catch (error) {
       setInviteError(
         getApiErrorMessage(error, "The invitation could not be sent."),
@@ -295,7 +306,8 @@ function TeamContent({ companyId }: { companyId: string }) {
           </CardTitle>
           <CardDescription>
             We&apos;ll email a single-use invitation link that expires after
-            seven days.
+            seven days. This adds them to the company only: contract roles are
+            assigned on each contract after they join.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -317,19 +329,44 @@ function TeamContent({ companyId }: { companyId: string }) {
                   />
                 )}
               </FormField>
+              <FormField id="invite-first-name" label="First name (optional)">
+                {(control) => (
+                  <Input
+                    {...control}
+                    maxLength={100}
+                    value={firstName}
+                    onChange={(event) => setFirstName(event.target.value)}
+                    autoComplete="off"
+                  />
+                )}
+              </FormField>
+              <FormField id="invite-last-name" label="Last name (optional)">
+                {(control) => (
+                  <Input
+                    {...control}
+                    maxLength={100}
+                    value={lastName}
+                    onChange={(event) => setLastName(event.target.value)}
+                    autoComplete="off"
+                  />
+                )}
+              </FormField>
               <FormField id="invite-role" label="Company role">
                 {(control) => (
                   <NativeSelect
                     {...control}
                     className="w-full"
                     value={role}
-                    onChange={(event) =>
-                      setRole(event.target.value as EInvitationRole)
-                    }
+                    onChange={(event) => {
+                      const next = invitationRoles.find(
+                        (option) => option.value === event.target.value,
+                      );
+                      if (next) setRole(next.value);
+                    }}
                   >
                     {invitationRoles.map((option) => (
-                      <NativeSelectOption key={option} value={option}>
-                        {option}
+                      <NativeSelectOption key={option.value} value={option.value}>
+                        {option.label}
                       </NativeSelectOption>
                     ))}
                   </NativeSelect>

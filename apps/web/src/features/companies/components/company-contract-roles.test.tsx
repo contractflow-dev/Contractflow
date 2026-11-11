@@ -1,6 +1,9 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { EContractRole, EContractStatus } from "@contractflow/contracts-schema";
+import {
+  EContractStatus,
+  EContractorContractRole,
+} from "@contractflow/contracts-schema";
 import type { CompanyRoleAssignment } from "@/services/contractApi";
 import { CompanyContractRoles } from "./company-contract-roles";
 
@@ -39,7 +42,7 @@ const row: CompanyRoleAssignment = {
   firstName: "Casey",
   lastName: "Okafor",
   email: "casey@acme.test",
-  role: EContractRole.HSE_OFFICER,
+  role: EContractorContractRole.HSE_OFFICER,
   workspace: "hse",
   isWorkspaceAdmin: true,
   assignedAt: "2026-11-01T10:00:00.000Z",

@@ -166,10 +166,16 @@ export const companiesApi = api.injectEndpoints({
         method: "PATCH",
         body: { companyRole },
       }),
+      // A Company Administrator sees every party contract (oversight); a
+      // Member only those they hold a role on. Changing the role, including
+      // one's own, changes which contracts are visible, so refresh them all.
       invalidatesTags: (_result, _error, { companyId }) => [
         { type: "CompanyMember", id: companyId },
         { type: "Company", id: "LIST" },
         { type: "Dashboard", id: companyId },
+        "Contract",
+        "ContractLifecyclePermission",
+        "ContractRoleAssignment",
       ],
     }),
 
@@ -181,10 +187,13 @@ export const companiesApi = api.injectEndpoints({
         ...companyRoute(companyId, `/members/${encodeURIComponent(membershipId)}`),
         method: "DELETE",
       }),
+      // The departed member's contract roles stop counting; refresh the role
+      // views that list them.
       invalidatesTags: (_result, _error, { companyId }) => [
         { type: "CompanyMember", id: companyId },
         { type: "Company", id: "LIST" },
         { type: "Dashboard", id: companyId },
+        "ContractRoleAssignment",
       ],
     }),
 
@@ -241,6 +250,9 @@ export const companiesApi = api.injectEndpoints({
                 { type: "Company" as const, id: "LIST" },
                 { type: "Company" as const, id: "ACCESS_SUMMARY" },
                 { type: "Company" as const, id: "CURRENT" },
+                // A returning member must not see contracts cached from an
+                // earlier membership; the API decides again.
+                { type: "Contract" as const, id: "LIST" },
               ]
             : []),
         ];

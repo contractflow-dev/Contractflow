@@ -1,5 +1,5 @@
 import {
-  EInvitationRole,
+  ECompanyRole,
   EInvitationStatus,
 } from '@contractflow/contracts-schema';
 import { CompanyInvitation } from '../../../entities/company-invitation.entity';
@@ -12,7 +12,7 @@ export interface ICompanyInvitationResponseDto {
   email: string;
   firstName: string | null;
   lastName: string | null;
-  companyRole: EInvitationRole;
+  companyRole: ECompanyRole;
   status: CompanyInvitationDisplayStatus;
   expiresAt: Date;
   acceptedAt: Date | null;
@@ -24,7 +24,7 @@ export class CompanyInvitationResponseDto implements ICompanyInvitationResponseD
   email: string;
   firstName: string | null;
   lastName: string | null;
-  companyRole: EInvitationRole;
+  companyRole: ECompanyRole;
   status: CompanyInvitationDisplayStatus;
   expiresAt: Date;
   acceptedAt: Date | null;

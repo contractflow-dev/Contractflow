@@ -3,7 +3,8 @@ import type {
   ISortQuery,
 } from "../../../common/interfaces/pagination.interface.js";
 import type {
-  EContractRole,
+  ContractRole,
+  ContractRoleSide,
   EContractSortField,
   EContractStatus,
   EContractType,
@@ -48,7 +49,7 @@ export interface ContractCounterparty {
 
 /** One of the signed-in user's own active roles on a listed contract. */
 export interface ContractListRole {
-  role: EContractRole;
+  role: ContractRole;
   workspace: AssignableContractWorkspace;
   isWorkspaceAdmin: boolean;
 }
@@ -214,7 +215,7 @@ export interface ContractRoleAssignment {
   firstName: string;
   lastName: string;
   email: string;
-  role: EContractRole;
+  role: ContractRole;
   workspace: AssignableContractWorkspace;
   isWorkspaceAdmin: boolean;
   assignedAt: string;
@@ -237,7 +238,7 @@ export interface CompanyRoleAssignment {
   firstName: string;
   lastName: string;
   email: string;
-  role: EContractRole;
+  role: ContractRole;
   workspace: AssignableContractWorkspace;
   isWorkspaceAdmin: boolean;
   assignedAt: string;
@@ -252,7 +253,7 @@ export interface CompanyRoleAssignmentFilters {
 export interface ContractRoleInvitation {
   id: string;
   email: string;
-  role: EContractRole;
+  role: ContractRole;
   workspace: AssignableContractWorkspace;
   isWorkspaceAdmin: boolean;
   status: "pending" | "accepted" | "rejected" | "expired" | "revoked";
@@ -266,7 +267,7 @@ export interface ContractRoleInvitationPreview {
   contractTitle: string;
   companyName: string;
   email: string;
-  role: EContractRole;
+  role: ContractRole;
   workspace: AssignableContractWorkspace;
   isWorkspaceAdmin: boolean;
   expiresAt: string;
@@ -280,4 +281,41 @@ export interface ContractLifecyclePermissions {
   canManage: boolean;
   canTransition: boolean;
   canRestore: boolean;
+}
+
+/**
+ * The signed-in member's standing in one of a contract's workspaces. Only
+ * the caller's own active roles are ever included; never anyone else's.
+ */
+/**
+ * Whether the caller may manage one workspace's team for their company, and
+ * which roles their company's party may hold there: client roles for a
+ * CLIENT party, contractor roles for any other party type.
+ */
+export interface ContractRoleManagementPermissions {
+  canManage: boolean;
+  canGrantWorkspaceAdmin: boolean;
+  roleSide: ContractRoleSide;
+  roles: ContractRole[];
+}
+
+export interface ContractWorkspaceAccess {
+  workspace: AssignableContractWorkspace;
+  /** True when the member holds an active role in this workspace. */
+  hasAccess: boolean;
+  /** The member's active roles in this workspace (none without access). */
+  roles: ContractRole[];
+  /** Workspace Admin rights on one of those roles. */
+  isWorkspaceAdmin: boolean;
+  /**
+   * May manage this workspace's team for the member's company: holds a role
+   * here and is a Workspace Admin or a Company Administrator. The role routes
+   * check this again on every change.
+   */
+  canManageTeam: boolean;
+}
+
+/** `GET /contract/workspace-access`: every workspace enabled on the contract. */
+export interface ContractWorkspaceAccessResponse {
+  workspaces: ContractWorkspaceAccess[];
 }

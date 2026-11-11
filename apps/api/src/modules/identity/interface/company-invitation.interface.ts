@@ -1,5 +1,5 @@
 import {
-  EInvitationRole,
+  ECompanyRole,
   EInvitationStatus,
 } from '@contractflow/contracts-schema';
 
@@ -9,7 +9,7 @@ export interface ICompanyInvitationEntity {
   email: string;
   firstName: string | null;
   lastName: string | null;
-  companyRole: EInvitationRole;
+  companyRole: ECompanyRole;
   tokenHash: string;
   status: EInvitationStatus;
   expiresAt: Date;

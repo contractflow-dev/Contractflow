@@ -8,7 +8,7 @@ import {
 } from './requests/create-company-request.dto';
 import { CreateCompanyInvitationRequestDto } from './create-company-invitation-request.dto';
 import { InviteCompanyMemberRequestDto } from './requests/invite-company-member-request.dto';
-import { EInvitationRole } from '@contractflow/contracts-schema';
+import { ECompanyRole } from '@contractflow/contracts-schema';
 
 describe('Company management DTO validation', () => {
   it('normalizes a website without a protocol for company creation', () => {
@@ -70,38 +70,82 @@ describe('Company management DTO validation', () => {
     expect(invalidFields).toContain('defaultCurrencyCode');
   });
 
-  it('normalizes invitation email and rejects a company-admin invite role', () => {
-    const input = plainToInstance(CreateCompanyInvitationRequestDto, {
-      email: ' Invitee@Example.com ',
-      companyRole: 'Company Administrator',
-    });
+  it.each([ECompanyRole.COMPANY_ADMIN, ECompanyRole.MEMBER])(
+    'accepts %s as a company invitation role and normalizes the email',
+    (companyRole) => {
+      const input = plainToInstance(CreateCompanyInvitationRequestDto, {
+        email: ' Invitee@Example.com ',
+        companyRole,
+      });
 
-    const invalidFields = validateSync(input).map(({ property }) => property);
-
-    expect(input.email).toBe('invitee@example.com');
-    expect(invalidFields).toContain('companyRole');
-  });
+      expect(validateSync(input, { whitelist: true })).toHaveLength(0);
+      expect(input.email).toBe('invitee@example.com');
+      expect(input.companyRole).toBe(companyRole);
+    },
+  );
 
   it('accepts a company invitation with only email and an allowed role', () => {
     const input = plainToInstance(InviteCompanyMemberRequestDto, {
       email: ' Invitee@Example.com ',
-      companyRole: EInvitationRole.FINANCE_OFFICER,
+      companyRole: ECompanyRole.MEMBER,
     });
 
     expect(validateSync(input, { whitelist: true })).toHaveLength(0);
     expect(input.email).toBe('invitee@example.com');
   });
 
+  it('accepts optional trimmed names on a company invitation', () => {
+    const input = plainToInstance(InviteCompanyMemberRequestDto, {
+      email: 'invitee@example.com',
+      firstName: '  Ada ',
+      lastName: ' Obi  ',
+      companyRole: ECompanyRole.MEMBER,
+    });
+
+    expect(validateSync(input, { whitelist: true })).toHaveLength(0);
+    expect(input.firstName).toBe('Ada');
+    expect(input.lastName).toBe('Obi');
+  });
+
+  it('strips contract-role and workspace fields from a company invitation', () => {
+    const input = plainToInstance(InviteCompanyMemberRequestDto, {
+      email: 'invitee@example.com',
+      companyRole: ECompanyRole.MEMBER,
+      contractRole: 'Contractor Project Lead',
+      role: 'HSE Officer',
+      workspace: 'project',
+      isWorkspaceAdmin: true,
+      contractId: '01HZZZZZZZZZZZZZZZZZZZZZZZ',
+    });
+
+    expect(validateSync(input, { whitelist: true })).toHaveLength(0);
+    const kept = Object.entries(input)
+      .filter(([, value]) => value !== undefined)
+      .map(([key]) => key)
+      .sort();
+    expect(kept).toEqual(['companyRole', 'email']);
+  });
+
   it.each([
-    [{ companyRole: EInvitationRole.FINANCE_OFFICER }, 'email'],
+    [{ companyRole: ECompanyRole.MEMBER }, 'email'],
     [{ email: 'invitee@example.com' }, 'companyRole'],
+    [{ email: 'not-an-email', companyRole: ECompanyRole.MEMBER }, 'email'],
+    // Contract roles are not company roles any more.
     [
-      { email: 'not-an-email', companyRole: EInvitationRole.FINANCE_OFFICER },
-      'email',
+      { email: 'invitee@example.com', companyRole: 'Finance Officer' },
+      'companyRole',
     ],
     [
-      { email: 'invitee@example.com', companyRole: 'Company Administrator' },
+      { email: 'invitee@example.com', companyRole: 'Contractor Project Lead' },
       'companyRole',
+    ],
+    [
+      {
+        email: 'invitee@example.com',
+        companyRole: ECompanyRole.MEMBER,
+        firstName: '',
+      },
+      'firstName',
     ],
   ])('rejects invalid company invitation payload %#', (payload, field) => {
     const input = plainToInstance(InviteCompanyMemberRequestDto, payload);

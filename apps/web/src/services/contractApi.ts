@@ -18,14 +18,21 @@ import type {
   ContractSite,
   ContractStatusHistory,
   ContractTransition,
+  ContractRoleManagementPermissions,
+  ContractWorkspaceAccess,
+  ContractWorkspaceAccessResponse,
   CreateContractRequest,
   CreateContractSiteRequest,
-  EContractRole,
+  ContractRole,
   EPartyType,
   CompanyRoleAssignment,
   CompanyRoleAssignmentFilters,
   IncomingContractInvitation,
+  ContractActivityActor,
+  ContractActivityFilters,
+  ContractActivityItem,
   IPaginatedResponse,
+  IPaginationQuery,
   RecordContractSignatoryRequest,
   RespondIncomingContractInvitationRequest,
   RespondIncomingContractInvitationResponse,
@@ -41,6 +48,9 @@ import {
 export type {
   CompanyRoleAssignment,
   CompanyRoleAssignmentFilters,
+  ContractActivityActor,
+  ContractActivityFilters,
+  ContractActivityItem,
   IncomingContractInvitation,
   AssignableContractWorkspace,
   CompanyContractDetailQuery,
@@ -64,13 +74,19 @@ export type {
   ContractSite,
   ContractStatusHistory,
   ContractTransition,
+  ContractRoleManagementPermissions,
+  ContractWorkspaceAccess,
+  ContractWorkspaceAccessResponse,
   CreateContractRequest,
   CreateContractSiteRequest,
-  EContractRole,
+  ContractRole,
   EPartyType,
   RecordContractSignatoryRequest,
   UpdateContractSiteRequest,
 } from "@contractflow/contracts-schema";
+
+/** Every workspace a contract can enable, in display order. */
+const WORKSPACES: AssignableContractWorkspace[] = ["project", "hse", "finance"];
 
 const roleAssignmentTag = (
   contractId: string,
@@ -227,6 +243,84 @@ export const contractApi = api.injectEndpoints({
         params: { page, limit, fromDate, toDate, status, userId },
       }),
       providesTags: (_result, _error, { contractId }) => [
+        { type: "Contract", id: contractId },
+      ],
+    }),
+
+    /**
+     * Actions members of the header company took on the contract, newest
+     * first. The API needs an active contract role and returns only this
+     * company's entries.
+     */
+    getContractActivity: builder.query<
+      IPaginatedResponse<ContractActivityItem>,
+      CompanyContractDetailQuery & IPaginationQuery & ContractActivityFilters
+    >({
+      // The filters are applied by the API, before paging; unset ones are
+      // left out of the query string.
+      query: ({
+        companyId,
+        contractId,
+        page,
+        limit,
+        fromDate,
+        toDate,
+        actorUserId,
+        action,
+      }) => ({
+        ...contractRoute(companyId, contractId, `/activity`),
+        params: { page, limit, fromDate, toDate, actorUserId, action },
+      }),
+      // Contract changes refresh it with the status history.
+      providesTags: (_result, _error, { contractId }) => [
+        { type: "Contract", id: contractId },
+      ],
+    }),
+
+    /** Members of the header company with activity here: the actor filter. */
+    getContractActivityActors: builder.query<
+      ContractActivityActor[],
+      CompanyContractDetailQuery
+    >({
+      query: ({ companyId, contractId }) => ({
+        ...contractRoute(companyId, contractId, `/activity/actors`),
+      }),
+      providesTags: (_result, _error, { contractId }) => [
+        { type: "Contract", id: contractId },
+      ],
+    }),
+
+    /** The signed-in member's access to each enabled workspace. */
+    getContractWorkspaceAccess: builder.query<
+      ContractWorkspaceAccessResponse,
+      CompanyContractDetailQuery
+    >({
+      query: ({ companyId, contractId }) => ({
+        ...contractRoute(companyId, contractId, `/workspace-access`),
+      }),
+      // Role changes in any workspace refresh it.
+      providesTags: (_result, _error, { contractId }) => [
+        ...WORKSPACES.map((workspace) => roleAssignmentTag(contractId, workspace)),
+        { type: "ContractRoleAssignment", id: "LIST" },
+        { type: "Contract", id: contractId },
+      ],
+    }),
+
+    /** One workspace; the API refuses it (403) without a role there. */
+    getContractWorkspace: builder.query<
+      ContractWorkspaceAccess,
+      CompanyContractDetailQuery & { workspace: AssignableContractWorkspace }
+    >({
+      query: ({ companyId, contractId, workspace }) => ({
+        ...contractRoute(
+          companyId,
+          contractId,
+          `/workspaces/${encodeURIComponent(workspace)}`,
+        ),
+      }),
+      providesTags: (_result, _error, { contractId, workspace }) => [
+        roleAssignmentTag(contractId, workspace),
+        { type: "ContractRoleAssignment", id: "LIST" },
         { type: "Contract", id: contractId },
       ],
     }),
@@ -424,7 +518,7 @@ export const contractApi = api.injectEndpoints({
     }),
 
     getContractRoleManagementPermissions: builder.query<
-      { canManage: boolean; canGrantWorkspaceAdmin: boolean },
+      ContractRoleManagementPermissions,
       ContractRoleAssignmentQuery
     >({
       query: ({ companyId, contractId, workspace }) => ({
@@ -447,7 +541,7 @@ export const contractApi = api.injectEndpoints({
       ContractRoleAssignment,
       ContractRoleAssignmentQuery & {
         companyUserId: string;
-        role: EContractRole;
+        role: ContractRole;
         isWorkspaceAdmin?: boolean;
       }
     >({
@@ -464,10 +558,14 @@ export const contractApi = api.injectEndpoints({
         params: { workspace },
         body: { companyUserId, role, isWorkspaceAdmin },
       }),
+      // A role is what makes a contract visible to an ordinary member, so the
+      // contract list and detail are refreshed too (the API re-decides).
       invalidatesTags: (_result, _error, { contractId, workspace }) => [
         roleAssignmentTag(contractId, workspace),
         { type: "ContractRoleAssignment", id: "LIST" },
         { type: "ContractLifecyclePermission", id: contractId },
+        { type: "Contract", id: "LIST" },
+        { type: "Contract", id: contractId },
       ],
     }),
 
@@ -479,9 +577,13 @@ export const contractApi = api.injectEndpoints({
         ...contractRoute(companyId, contractId, `/role-assignments/${encodeURIComponent(assignmentId)}`),
         method: "DELETE",
       }),
+      // Revoking the last role hides the contract from an ordinary member.
       invalidatesTags: (_result, _error, { contractId, workspace }) => [
         roleAssignmentTag(contractId, workspace),
+        { type: "ContractRoleAssignment", id: "LIST" },
         { type: "ContractLifecyclePermission", id: contractId },
+        { type: "Contract", id: "LIST" },
+        { type: "Contract", id: contractId },
       ],
     }),
 
@@ -499,6 +601,8 @@ export const contractApi = api.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, { contractId, workspace }) => [
         roleAssignmentTag(contractId, workspace),
+        // The list shows the viewer's own Workspace Admin flag.
+        { type: "Contract", id: "LIST" },
       ],
     }),
 
@@ -520,7 +624,7 @@ export const contractApi = api.injectEndpoints({
       ContractRoleInvitation,
       ContractRoleAssignmentQuery & {
         email: string;
-        role: EContractRole;
+        role: ContractRole;
         isWorkspaceAdmin: boolean;
       }
     >({
@@ -577,10 +681,12 @@ export const contractApi = api.injectEndpoints({
         method: "POST",
         body: { token, decision },
       }),
+      // Accepting creates the role that makes the contract visible.
       invalidatesTags: [
         { type: "CompanyMember", id: "LIST" },
         { type: "ContractRoleAssignment", id: "LIST" },
         { type: "ContractLifecyclePermission", id: "LIST" },
+        { type: "Contract", id: "LIST" },
       ],
     }),
 
@@ -639,12 +745,16 @@ export const {
   useGetContractByIdQuery,
   useGetContractPartiesQuery,
   useGetContractStatusHistoryQuery,
+  useGetContractActivityQuery,
+  useGetContractActivityActorsQuery,
   useGetContractSignatoryQuery,
   useGetManagedContractSitesQuery,
   useCreateContractSiteMutation,
   useUpdateContractSiteMutation,
   useRecordContractSignatoryMutation,
   useGetContractWorkspacesQuery,
+  useGetContractWorkspaceAccessQuery,
+  useGetContractWorkspaceQuery,
   useGetContractLifecyclePermissionsQuery,
   useCreateContractMutation,
   useUpdateContractMutation,

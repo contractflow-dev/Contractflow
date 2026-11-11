@@ -1,7 +1,7 @@
 import type {
   ECompanyRole,
   ECompanyUserStatus,
-  EContractRole,
+  ContractRole,
   EContractStatus,
   EPartyType,
 } from '@contractflow/contracts-schema';
@@ -40,7 +40,7 @@ export interface IRoleAssignmentRecord {
   contractPartyId: string;
   companyUserId: string;
   companyId: string;
-  role: EContractRole;
+  role: ContractRole;
   isWorkspaceAdmin: boolean;
   assignedAt: Date;
   assignedById: string;
@@ -57,7 +57,7 @@ export interface IRoleInvitationRecord {
   companyId: string;
   invitedById: string;
   email: string;
-  role: EContractRole;
+  role: ContractRole;
   workspace: AssignableContractWorkspace;
   isWorkspaceAdmin: boolean;
   tokenHash: string;
@@ -79,7 +79,7 @@ export interface ICompanyRoleAssignmentRow {
   firstName: string;
   lastName: string;
   email: string;
-  role: EContractRole;
+  role: ContractRole;
   isWorkspaceAdmin: boolean;
   assignedAt: Date;
 }
@@ -87,7 +87,7 @@ export interface ICompanyRoleAssignmentRow {
 export interface ICreateRoleAssignment {
   contractPartyId: string;
   companyUserId: string;
-  role: EContractRole;
+  role: ContractRole;
   isWorkspaceAdmin: boolean;
   assignedAt: Date;
   assignedById: string;
@@ -100,7 +100,7 @@ export interface ICreateRoleInvitation {
   companyId: string;
   invitedById: string;
   email: string;
-  role: EContractRole;
+  role: ContractRole;
   workspace: AssignableContractWorkspace;
   isWorkspaceAdmin: boolean;
   tokenHash: string;
@@ -166,6 +166,8 @@ export interface IContractRoleAssignmentRepositories {
       contractId: string,
       workspace: AssignableContractWorkspace,
     ): Promise<boolean>;
+    /** The workspaces enabled on the contract. */
+    listEnabled(contractId: string): Promise<AssignableContractWorkspace[]>;
   };
   assignments: {
     /**
@@ -174,31 +176,40 @@ export interface IContractRoleAssignmentRepositories {
      */
     listActiveForCompany(
       companyId: string,
-      filters: { companyUserId?: string; roles?: EContractRole[] },
+      filters: { companyUserId?: string; roles?: ContractRole[] },
       page: { skip: number; take: number },
     ): Promise<{ items: ICompanyRoleAssignmentRow[]; total: number }>;
     findActiveForParty(
       companyId: string,
       partyId: string,
       contractId: string,
-      roles: EContractRole[],
+      roles: ContractRole[],
     ): Promise<IRoleAssignmentRecord[]>;
     hasWorkspaceAdmin(
       companyId: string,
       memberId: string,
       partyId: string,
-      roles: EContractRole[],
+      roles: ContractRole[],
     ): Promise<boolean>;
+    /**
+     * One member's active roles through the company's own party: the role
+     * and Workspace Admin flag only, nothing about the person.
+     */
+    listActiveForMember(
+      companyId: string,
+      partyId: string,
+      memberId: string,
+    ): Promise<Array<{ role: ContractRole; isWorkspaceAdmin: boolean }>>;
     countActiveWorkspaceAdmins(
       companyId: string,
       partyId: string,
-      roles: EContractRole[],
+      roles: ContractRole[],
     ): Promise<number>;
     findActiveDuplicate(
       companyId: string,
       partyId: string,
       memberId: string,
-      role: EContractRole,
+      role: ContractRole,
     ): Promise<IRoleAssignmentRecord | null>;
     create(
       companyId: string,
@@ -236,13 +247,13 @@ export interface IContractRoleAssignmentRepositories {
     expirePending(
       partyId: string,
       email: string,
-      role: EContractRole,
+      role: ContractRole,
       at: Date,
     ): Promise<void>;
     findPending(
       partyId: string,
       email: string,
-      role: EContractRole,
+      role: ContractRole,
     ): Promise<IRoleInvitationRecord | null>;
     create(data: ICreateRoleInvitation): Promise<IRoleInvitationRecord>;
     findByIdForUpdate(

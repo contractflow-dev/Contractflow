@@ -117,7 +117,7 @@ function accessFor(
       companyId: "company-1",
       companyRole: canManageCompany
         ? ECompanyRole.COMPANY_ADMIN
-        : ECompanyRole.HSE_OFFICER,
+        : ECompanyRole.MEMBER,
       status: ECompanyUserStatus.ACTIVE,
       canManageCompany,
     },

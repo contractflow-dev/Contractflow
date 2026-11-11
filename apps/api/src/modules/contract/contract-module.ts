@@ -39,6 +39,8 @@ import {
   ContractRoleAssignmentTransactionContextFactory,
   TypeOrmContractRoleAssignmentContext,
 } from './repositories/contract-role-assignment-transaction-context.factory';
+import { ContractWorkspaceController } from './controllers/contract-workspace.controller';
+import { ContractWorkspaceAccessService } from './services/contract-workspace-access.service';
 
 @Module({
   imports: [
@@ -60,12 +62,14 @@ import {
     ContractController,
     ContractRoleInvitationController,
     ContractPartyInvitationController,
+    ContractWorkspaceController,
   ],
   providers: [
     ContractService,
     ContractLifecycleService,
     ContractAccessService,
     ContractRoleAssignmentService,
+    ContractWorkspaceAccessService,
     ContractRepository,
     ContractPartyRepository,
     ContractRoleAssignmentRepository,

@@ -5,6 +5,7 @@ import type { FormEvent, InputHTMLAttributes } from "react";
 import {
   EContractSiteStatus,
   ECountryCode,
+  type ContractActivityTarget,
 } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
@@ -67,9 +68,11 @@ export function fromMicroDegrees(value: number): string {
 export function ContractSiteManagement({
   companyId,
   contract,
+  target,
 }: {
   companyId: string;
   contract: Contract;
+  target?: ContractActivityTarget | null;
 }) {
   const query = { companyId, contractId: contract.id };
   const permissionsQuery = useGetContractLifecyclePermissionsQuery(query);
@@ -148,7 +151,15 @@ export function ContractSiteManagement({
               </TableHeader>
               <TableBody>
                 {sitesQuery.currentData.map((site) => (
-                  <TableRow key={site.id}>
+                  <TableRow
+                    key={site.id}
+                    id={`activity-target-${site.id}`}
+                    className={
+                      target?.type === "contract_site" && target.id === site.id
+                        ? "bg-primary/10"
+                        : undefined
+                    }
+                  >
                     <TableCell>
                       <span className="block font-medium">{site.name}</span>
                       <span className="text-xs text-muted-foreground">

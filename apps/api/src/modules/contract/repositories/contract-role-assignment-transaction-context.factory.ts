@@ -144,6 +144,13 @@ export class TypeOrmContractRoleAssignmentContext implements IContractRoleAssign
           select: { contractId: true },
         }),
       ),
+    listEnabled: async (contractId: string) =>
+      (
+        await this.manager.getRepository(ContractWorkspaceEntity).find({
+          where: { contractId },
+          select: { workspace: true },
+        })
+      ).map(({ workspace }) => workspace),
   };
 
   assignments = {
@@ -256,6 +263,27 @@ export class TypeOrmContractRoleAssignmentContext implements IContractRoleAssign
         .andWhere('assignment.revokedAt IS NULL')
         .andWhere('assignment.isWorkspaceAdmin = true')
         .getCount()) > 0,
+    listActiveForMember: (
+      companyId: string,
+      partyId: string,
+      memberId: string,
+    ) =>
+      this.manager
+        .getRepository(ContractRoleAssignment)
+        .createQueryBuilder('assignment')
+        .select(['assignment.role', 'assignment.isWorkspaceAdmin'])
+        .where('assignment.companyId = :companyId', { companyId })
+        .andWhere('assignment.contractPartyId = :partyId', { partyId })
+        .andWhere('assignment.companyUserId = :memberId', { memberId })
+        .andWhere('assignment.revokedAt IS NULL')
+        .orderBy('assignment.assignedAt', 'ASC')
+        .getMany()
+        .then((rows) =>
+          rows.map(({ role, isWorkspaceAdmin }) => ({
+            role,
+            isWorkspaceAdmin,
+          })),
+        ),
     countActiveWorkspaceAdmins: (
       companyId: string,
       partyId: string,

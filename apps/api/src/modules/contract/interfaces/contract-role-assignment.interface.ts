@@ -1,10 +1,10 @@
-import { EContractRole } from '@contractflow/contracts-schema';
+import type { ContractRole } from '@contractflow/contracts-schema';
 
 export interface IContractRoleAssignmentEntity {
   contractPartyId: string;
   companyUserId: string;
   companyId: string;
-  role: EContractRole;
+  role: ContractRole;
   isWorkspaceAdmin: boolean;
   assignedAt: Date;
   assignedById: string;

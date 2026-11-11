@@ -13,6 +13,7 @@ import {
   EDocumentCategory,
   EDocumentUploadStatus,
   EDocumentVisibility,
+  type ContractActivityTarget,
 } from "@contractflow/contracts-schema";
 import { RiArrowDownSLine, RiArrowUpSLine } from "@remixicon/react";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
@@ -128,14 +129,17 @@ type Scope = { companyId: string; contractId?: string };
 export function ContractDocuments({
   companyId,
   contract,
+  target,
 }: {
   companyId: string;
   contract: Contract;
+  target?: ContractActivityTarget | null;
 }) {
   const archived = Boolean(contract.deletedAt);
   return (
     <DocumentLibrary
       scope={{ companyId, contractId: contract.id }}
+      target={target}
       shared
       canAdd={!archived}
       canChange={!archived}
@@ -194,6 +198,7 @@ function DocumentLibrary({
   description,
   emptyText,
   noAccess: noAccessCopy,
+  target,
 }: {
   scope: Scope;
   /** Contract documents choose who they're shared with; company ones don't. */
@@ -205,6 +210,7 @@ function DocumentLibrary({
   description: string;
   emptyText: string;
   noAccess: { title: string; text: string };
+  target?: ContractActivityTarget | null;
 }) {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
@@ -214,6 +220,10 @@ function DocumentLibrary({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<DocumentSummary | null>(null);
   const documents = useGetContractDocumentsQuery({ ...scope, page, limit });
+  const targetDocument = useGetContractDocumentQuery(
+    { ...scope, documentId: target?.id ?? "" },
+    { skip: target?.type !== "document" },
+  );
   const noAccess = getApiErrorStatus(documents.error) === 403;
   const data = documents.currentData;
   const canUpload = canAdd && !noAccess && !documents.isLoading;
@@ -285,15 +295,34 @@ function DocumentLibrary({
               </Button>
             </AlertDescription>
           </Alert>
-        ) : data?.data.length ? (
+        ) : data?.data.length || targetDocument.currentData ? (
           <>
+            {target?.type === "document" &&
+            targetDocument.currentData &&
+            !data?.data.some((document) => document.id === target.id) ? (
+              <DocumentList
+                scope={scope}
+                documents={[targetDocument.currentData]}
+                ownerCompanyId={scope.companyId}
+                canChange={canChange}
+                shared={shared}
+                expanded={target.id}
+                target={target}
+                onToggle={() => undefined}
+                onNewVersion={(document) =>
+                  setForm({ kind: "version", document })
+                }
+                onDelete={setDeleting}
+              />
+            ) : null}
             <DocumentList
               scope={scope}
-              documents={data.data}
+              documents={data?.data ?? []}
               ownerCompanyId={scope.companyId}
               canChange={canChange}
               shared={shared}
               expanded={expanded}
+              target={target}
               onToggle={(id) =>
                 setExpanded((open) => (open === id ? null : id))
               }
@@ -302,17 +331,19 @@ function DocumentLibrary({
               }
               onDelete={setDeleting}
             />
-            <DataPagination
-              className="border-t pt-4"
-              meta={data.meta}
-              itemLabel="documents"
-              isFetching={documents.isFetching}
-              onPageChange={setPage}
-              onPageSizeChange={(size) => {
-                setLimit(size);
-                setPage(1);
-              }}
-            />
+            {data ? (
+              <DataPagination
+                className="border-t pt-4"
+                meta={data.meta}
+                itemLabel="documents"
+                isFetching={documents.isFetching}
+                onPageChange={setPage}
+                onPageSizeChange={(size) => {
+                  setLimit(size);
+                  setPage(1);
+                }}
+              />
+            ) : null}
           </>
         ) : (
           <div className="space-y-2 rounded-2xl border border-dashed p-6 text-center">
@@ -344,6 +375,7 @@ function DocumentList({
   onToggle,
   onNewVersion,
   onDelete,
+  target,
 }: {
   scope: Scope;
   documents: DocumentSummary[];
@@ -354,6 +386,7 @@ function DocumentList({
   onToggle: (id: string) => void;
   onNewVersion: (document: DocumentSummary) => void;
   onDelete: (document: DocumentSummary) => void;
+  target?: ContractActivityTarget | null;
 }) {
   const timeZone = useUserTimeZone();
   const actions = (document: DocumentSummary) => (
@@ -374,7 +407,15 @@ function DocumentList({
       {/* Phones: one card per document. */}
       <ul className="divide-y rounded-2xl border md:hidden">
         {documents.map((document) => (
-          <li key={document.id} className="space-y-3 p-4">
+          <li
+            key={document.id}
+            id={`activity-target-${document.id}`}
+            className={`space-y-3 p-4 ${
+              target?.type === "document" && target.id === document.id
+                ? "bg-primary/10"
+                : ""
+            }`}
+          >
             <DocumentTitle document={document} />
             <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
               <dt className="text-muted-foreground">Category</dt>
@@ -418,7 +459,14 @@ function DocumentList({
           <TableBody>
             {documents.map((document) => (
               <Fragment key={document.id}>
-                <TableRow>
+                <TableRow
+                  id={`activity-target-${document.id}`}
+                  className={
+                    target?.type === "document" && target.id === document.id
+                      ? "bg-primary/10"
+                      : undefined
+                  }
+                >
                   <TableCell className="max-w-72 whitespace-normal">
                     <DocumentTitle document={document} />
                   </TableCell>

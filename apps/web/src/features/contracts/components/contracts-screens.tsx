@@ -2,8 +2,12 @@
 
 import Link from "next/link";
 import { useId, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 import { ContractLifecycleManagement } from "./contract-lifecycle-management";
-import { EContractStatus } from "@contractflow/contracts-schema";
+import {
+  EContractStatus,
+  type ContractActivityTarget,
+} from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
 import { Checkbox } from "@workspace/ui/components/checkbox";
@@ -39,7 +43,7 @@ import {
 } from "@/components/status-badge/status-legend";
 import { PageHeader } from "@/components/page-header/page-header";
 import { useUserTimeZone } from "@/hooks/use-user-time-zone";
-import { getApiErrorMessage } from "@/lib/apiError";
+import { getApiErrorMessage, getApiErrorStatus } from "@/lib/apiError";
 import {
   EMPTY_VALUE,
   formatCalendarDate,
@@ -61,11 +65,14 @@ import { ContractSiteManagement } from "./contract-site-management";
 import { useContractDetails } from "../_hooks/use-contract-details";
 import { useContractSectionAccess } from "../_hooks/use-contract-section-access";
 import {
+  CONTRACT_UNAVAILABLE_TEXT,
   contractSectionHref,
   isRestrictedContractSection,
   type ContractSection,
 } from "../contract-sections";
 import { ContractSectionNav } from "./contract-section-nav";
+import { ContractActivity } from "./contract-activity";
+import { ContractWorkspacesCard } from "./contract-workspace-screens";
 import {
   contractSortOptions,
   useContractsList,
@@ -98,6 +105,52 @@ const archivedStatusLegend: StatusLegendItem = {
   description:
     "Removed from the register. A Company Administrator can restore it.",
 };
+
+function parseActivityTarget(
+  params: ReturnType<typeof useSearchParams>,
+): ContractActivityTarget | null {
+  const type = params.get("targetType");
+  const id = params.get("targetId");
+  const section = params.get("targetSection");
+  const validTypes = [
+    "contract_site",
+    "contract_party",
+    "contract_party_invitation",
+    "contract_role_assignment",
+    "contract_role_invitation",
+    "document",
+  ] as const;
+  const validSections = [
+    "parties",
+    "roles",
+    "sites",
+    "signatories",
+    "documents",
+  ] as const;
+  if (
+    !id ||
+    !validTypes.includes(type as (typeof validTypes)[number]) ||
+    !validSections.includes(section as (typeof validSections)[number])
+  ) {
+    return null;
+  }
+  const target: ContractActivityTarget = {
+    type: type as ContractActivityTarget["type"],
+    id,
+    section: section as ContractActivityTarget["section"],
+  };
+  const versionId = params.get("targetVersionId");
+  const workspace = params.get("targetWorkspace");
+  if (versionId) target.versionId = versionId;
+  if (
+    workspace === "project" ||
+    workspace === "hse" ||
+    workspace === "finance"
+  ) {
+    target.workspace = workspace;
+  }
+  return target;
+}
 
 export function ContractsList({
   companyId,
@@ -137,9 +190,15 @@ export function ContractsList({
 
   return (
     <div className="space-y-6">
+      {/* Company Administrators oversee every contract the company is a
+          party to; other members see only those they hold a role on. */}
       <PageHeader
         title="Contracts"
-        description="Contracts your company is a party to. Open one to see its parties, roles, sites and history."
+        description={
+          canCreateContracts
+            ? "Contracts your company is a party to. Open one to see its parties, roles, sites and history."
+            : "Contracts you hold a role on. Open one to see its parties and history, and your workspaces."
+        }
       />
       <CreateContractForm
         companyId={companyId}
@@ -410,8 +469,9 @@ export function ContractsList({
                 </>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  No contracts yet. Contracts your company creates, or joins
-                  when invited, will appear here.
+                  {canCreateContracts
+                    ? "No contracts yet. Contracts your company creates, or joins when invited, will appear here."
+                    : "No contracts yet. Contracts appear here once a Company Administrator or workspace administrator gives you a role on them."}
                 </p>
               )}
             </div>
@@ -525,11 +585,16 @@ export function ContractDetail({
   companyId,
   contractId,
   section,
+  viewer,
 }: {
   companyId: string;
   contractId: string;
   section: ContractSection;
+  /** The signed-in member, so the activity timeline can say "You". */
+  viewer?: { membershipId: string; companyName: string };
 }) {
+  const searchParams = useSearchParams();
+  const target = parseActivityTarget(searchParams);
   const query = { companyId, contractId };
   const timeZone = useUserTimeZone();
   const {
@@ -565,6 +630,8 @@ export function ContractDetail({
   }
 
   if (contractError || !detail) {
+    // Not found also covers "not visible to you"; retrying can't change that.
+    const notFound = getApiErrorStatus(contractError) === 404;
     return (
       <div className="space-y-4">
         <Link
@@ -576,12 +643,14 @@ export function ContractDetail({
         <Alert variant="destructive">
           <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
             <span>
-              {getApiErrorMessage(
-                contractError,
-                "Unable to load this contract.",
-              )}
+              {notFound
+                ? `Contract was not found. ${CONTRACT_UNAVAILABLE_TEXT}`
+                : getApiErrorMessage(
+                    contractError,
+                    "Unable to load this contract.",
+                  )}
             </span>
-            {contractError ? (
+            {contractError && !notFound ? (
               <Button
                 type="button"
                 variant="outline"
@@ -687,6 +756,11 @@ export function ContractDetail({
               />
             </CardContent>
           </Card>
+          <ContractWorkspacesCard
+            companyId={companyId}
+            contractId={contractId}
+            canAssignRoles={access.roles === true}
+          />
           <ContractLifecycleManagement
             companyId={companyId}
             contract={contract}
@@ -757,6 +831,7 @@ export function ContractDetail({
             companyId={companyId}
             contract={contract}
             part="invitations"
+            target={target}
           />
         </>
       ) : null}
@@ -770,20 +845,30 @@ export function ContractDetail({
             <ContractRoleAssignmentManagement
               companyId={companyId}
               contractId={contractId}
+              target={target}
             />
           ) : section === "sites" ? (
-            <ContractSiteManagement companyId={companyId} contract={contract} />
+            <ContractSiteManagement
+              companyId={companyId}
+              contract={contract}
+              target={target}
+            />
           ) : (
             <ContractSignatoryManagement
               companyId={companyId}
               contract={contract}
+              target={target}
             />
           )}
         </RestrictedSection>
       ) : null}
 
       {section === "documents" ? (
-        <ContractDocuments companyId={companyId} contract={contract} />
+        <ContractDocuments
+          companyId={companyId}
+          contract={contract}
+          target={target}
+        />
       ) : null}
 
       {section === "history" ? (
@@ -859,6 +944,16 @@ export function ContractDetail({
             )}
           </CardContent>
         </Card>
+      ) : null}
+
+      {/* A separate request: each section still works if the other fails. */}
+      {section === "history" ? (
+        <ContractActivity
+          companyId={companyId}
+          contractId={contractId}
+          viewer={viewer}
+          sectionAccess={access}
+        />
       ) : null}
     </div>
   );

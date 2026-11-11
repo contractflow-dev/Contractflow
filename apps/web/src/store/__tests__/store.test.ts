@@ -50,9 +50,9 @@ describe('ContractFlow Redux Store', () => {
       let state = store.getState();
       expect(selectCurrentStep(state)).toBe('role');
 
-      store.dispatch(setSelectedRole(ECompanyRole.CLIENT_PROJECT_MANAGER));
+      store.dispatch(setSelectedRole(ECompanyRole.MEMBER));
       state = store.getState();
-      expect(selectSelectedRole(state)).toBe(ECompanyRole.CLIENT_PROJECT_MANAGER);
+      expect(selectSelectedRole(state)).toBe(ECompanyRole.MEMBER);
     });
   });
 

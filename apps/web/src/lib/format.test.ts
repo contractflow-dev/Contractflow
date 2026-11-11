@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   EMPTY_VALUE,
   currencyDigits,
+  dayBoundsInTimeZone,
   daysUntilCalendarDate,
   formatBasisPoints,
   formatCalendarDate,
@@ -283,6 +284,44 @@ describe("parsePercentToBasisPoints", () => {
   it("rejects values outside 0-100 or finer than basis points", () => {
     for (const text of ["", "100.01", "101", "-1", "2.555", "5%", "abc"]) {
       expect(parsePercentToBasisPoints(text), text).toBeNull();
+    }
+  });
+});
+
+describe("dayBoundsInTimeZone", () => {
+  it("covers the whole day as the viewer's time zone lives it", () => {
+    expect(dayBoundsInTimeZone("2026-03-16", "Africa/Lagos")).toEqual({
+      start: "2026-03-15T23:00:00.000Z",
+      end: "2026-03-16T22:59:59.999Z",
+    });
+    expect(dayBoundsInTimeZone("2026-03-16", "UTC")).toEqual({
+      start: "2026-03-16T00:00:00.000Z",
+      end: "2026-03-16T23:59:59.999Z",
+    });
+  });
+
+  it("handles days on which the clocks change", () => {
+    // London springs forward: a 23-hour day.
+    expect(dayBoundsInTimeZone("2026-03-29", "Europe/London")).toEqual({
+      start: "2026-03-29T00:00:00.000Z",
+      end: "2026-03-29T22:59:59.999Z",
+    });
+    // New York falls back: a 25-hour day.
+    expect(dayBoundsInTimeZone("2026-11-01", "America/New_York")).toEqual({
+      start: "2026-11-01T04:00:00.000Z",
+      end: "2026-11-02T04:59:59.999Z",
+    });
+  });
+
+  it("rejects anything that isn't a real calendar day", () => {
+    for (const value of [
+      "2026-02-30",
+      "2026-13-01",
+      "10/11/2026",
+      "",
+      "2026-11-10T00:00",
+    ]) {
+      expect(dayBoundsInTimeZone(value, "UTC")).toBeNull();
     }
   });
 });

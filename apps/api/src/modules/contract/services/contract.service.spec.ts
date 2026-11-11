@@ -47,6 +47,15 @@ describe('ContractService', () => {
   const contracts = { findById: vi.fn(), searchPage: vi.fn() };
   const companyUsers = { findActiveRoleForUser: vi.fn() };
   const workspaces = { findWorkspaces: vi.fn() };
+  const access = { authorizeContractOversight: vi.fn() };
+  const party = {
+    id: 'p-1',
+    companyId: 'co-1',
+    partyType: 'contractor',
+    signedAt: null,
+    signatoryFirstName: 'Private',
+    signatoryLastName: 'Signatory',
+  };
   let service: ContractService;
 
   beforeEach(() => {
@@ -73,6 +82,12 @@ describe('ContractService', () => {
       ECompanyRole.COMPANY_ADMIN,
     );
     workspaces.findWorkspaces.mockResolvedValue(['general', 'finance']);
+    access.authorizeContractOversight.mockResolvedValue({
+      scope: { contractId: 'c-1', companyId: 'co-1' },
+      basis: 'assignment',
+      party,
+      contract: contractRecord,
+    });
     service = new ContractService(
       scopeFor as never,
       parties as never,
@@ -81,12 +96,16 @@ describe('ContractService', () => {
       companyUsers as never,
       workspaces as never,
       roleAssignments as never,
+      access as never,
     );
   });
 
   it('rejects users who are not active members of the company', async () => {
     scopeFor.forUser.mockRejectedValue(new ForbiddenException());
     scopeFor.contextForUser.mockRejectedValue(new ForbiddenException());
+    access.authorizeContractOversight.mockRejectedValue(
+      new ForbiddenException(),
+    );
 
     await expect(service.get('u', 'co-1', 'c-1')).rejects.toBeInstanceOf(
       ForbiddenException,
@@ -98,8 +117,10 @@ describe('ContractService', () => {
     expect(contracts.searchPage).not.toHaveBeenCalled();
   });
 
-  it('hides contracts the company is not a party to', async () => {
-    parties.findByCompany.mockResolvedValue(null);
+  it('hides contracts the caller may not see (no role, not a party, archived)', async () => {
+    access.authorizeContractOversight.mockRejectedValue(
+      new NotFoundException(),
+    );
 
     await expect(service.get('u', 'co-1', 'c-9')).rejects.toBeInstanceOf(
       NotFoundException,
@@ -110,23 +131,35 @@ describe('ContractService', () => {
     await expect(
       service.listParties('u', 'co-1', 'c-9'),
     ).rejects.toBeInstanceOf(NotFoundException);
-    expect(contracts.findById).not.toHaveBeenCalled();
+    await expect(
+      service.listWorkspaces('u', 'co-1', 'c-9'),
+    ).rejects.toBeInstanceOf(NotFoundException);
     expect(history.searchPage).not.toHaveBeenCalled();
     expect(parties.findAllWithCompany).not.toHaveBeenCalled();
+    expect(workspaces.findWorkspaces).not.toHaveBeenCalled();
   });
 
-  it('returns a contract for a party company', async () => {
-    const party = {
-      id: 'p-1',
-      companyId: 'co-1',
-      partyType: 'contractor',
-      signedAt: null,
-      signatoryFirstName: 'Private',
-      signatoryLastName: 'Signatory',
-    };
-    parties.findByCompany.mockResolvedValue(party);
-    contracts.findById.mockResolvedValue(contractRecord);
+  it('serves detail, parties, history and workspaces under Company Administrator oversight', async () => {
+    access.authorizeContractOversight.mockResolvedValue({
+      scope: { contractId: 'c-1', companyId: 'co-1' },
+      basis: 'company_admin_oversight',
+      party,
+      contract: contractRecord,
+    });
 
+    await expect(service.get('u', 'co-1', 'c-1')).resolves.toMatchObject({
+      contract: { id: 'c-1' },
+    });
+    await service.listParties('u', 'co-1', 'c-1');
+    await service.listStatusHistory('u', 'co-1', 'c-1', { page: 1, limit: 10 });
+    await service.listWorkspaces('u', 'co-1', 'c-1');
+    expect(access.authorizeContractOversight).toHaveBeenCalledTimes(4);
+    for (const call of access.authorizeContractOversight.mock.calls) {
+      expect(call).toEqual(['u', 'co-1', 'c-1']);
+    }
+  });
+
+  it('returns a contract the caller may see', async () => {
     const result = await service.get('u', 'co-1', 'c-1');
     expect(result.contract).toMatchObject({
       id: 'c-1',
@@ -145,18 +178,18 @@ describe('ContractService', () => {
       partyType: 'contractor',
       signedAt: null,
     });
-    expect(contracts.findById).toHaveBeenCalledWith(
-      { companyId: 'co-1' },
-      'c-1',
-    );
-    expect(parties.findByCompany).toHaveBeenCalledWith(
-      { contractId: 'c-1', companyId: 'co-1' },
+    expect(access.authorizeContractOversight).toHaveBeenCalledWith(
+      'u',
       'co-1',
+      'c-1',
     );
   });
 
   it('hides archived contracts from party, history, and detail reads', async () => {
-    contracts.findById.mockResolvedValue(null);
+    // The oversight check loads only non-archived contracts.
+    access.authorizeContractOversight.mockRejectedValue(
+      new NotFoundException(),
+    );
 
     await expect(service.get('u', 'co-1', 'c-1')).rejects.toBeInstanceOf(
       NotFoundException,
@@ -219,7 +252,11 @@ describe('ContractService', () => {
     });
 
     expect(contracts.searchPage).toHaveBeenCalledWith(
-      { companyId: 'co-1' },
+      {
+        companyId: 'co-1',
+        companyUserId: 'cu-1',
+        includeCompanyAdminOversight: true,
+      },
       { search: 'bridge', status: undefined, skip: 5, take: 5 },
     );
     expect(result).toEqual({
@@ -245,7 +282,11 @@ describe('ContractService', () => {
     });
 
     expect(contracts.searchPage).toHaveBeenCalledWith(
-      { companyId: 'co-1' },
+      {
+        companyId: 'co-1',
+        companyUserId: 'cu-1',
+        includeCompanyAdminOversight: true,
+      },
       expect.objectContaining({
         sortBy: EContractSortField.TITLE,
         sortOrder: ESortOrder.ASC,
@@ -274,7 +315,11 @@ describe('ContractService', () => {
       includeDeleted: true,
     });
     expect(contracts.searchPage).toHaveBeenCalledWith(
-      { companyId: 'co-1' },
+      {
+        companyId: 'co-1',
+        companyUserId: 'cu-1',
+        includeCompanyAdminOversight: true,
+      },
       {
         search: undefined,
         status: undefined,
@@ -286,7 +331,7 @@ describe('ContractService', () => {
     );
   });
 
-  it('lists workspaces only through the verified contract party scope', async () => {
+  it('lists workspaces only through the authorized contract scope', async () => {
     await expect(service.listWorkspaces('u', 'co-1', 'c-1')).resolves.toEqual([
       'general',
       'finance',
@@ -370,14 +415,22 @@ describe('ContractService', () => {
 
     await service.list('u', 'co-1', { page: 1, limit: 10 });
     expect(contracts.searchPage).toHaveBeenLastCalledWith(
-      { companyId: 'co-1' },
+      {
+        companyId: 'co-1',
+        companyUserId: 'cu-1',
+        includeCompanyAdminOversight: true,
+      },
       expect.objectContaining({ assignedToCompanyUserId: undefined }),
     );
 
     await service.list('u', 'co-1', { page: 1, limit: 10, assignedToMe: true });
     // The membership comes from the verified header company, never the request.
     expect(contracts.searchPage).toHaveBeenLastCalledWith(
-      { companyId: 'co-1' },
+      {
+        companyId: 'co-1',
+        companyUserId: 'cu-1',
+        includeCompanyAdminOversight: true,
+      },
       expect.objectContaining({ assignedToCompanyUserId: 'cu-1' }),
     );
   });

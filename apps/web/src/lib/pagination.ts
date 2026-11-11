@@ -18,8 +18,9 @@ export type PageRangeItem = number | "ellipsis-start" | "ellipsis-end";
 
 export function initialPaginationState(
   limit: number = DEFAULT_PAGE_LIMIT,
+  page: number = DEFAULT_PAGE,
 ): PaginationState {
-  return { page: DEFAULT_PAGE, limit };
+  return { page, limit };
 }
 
 /** A new page size starts again from page 1. */

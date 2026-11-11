@@ -44,9 +44,13 @@ describe('Pagination PostgreSQL integration', () => {
     await destroyPostgresTestDatabase();
   }, 60_000);
 
-  /** Five contracts for one company, all created at the same instant. */
+  /**
+   * Five contracts for one company, all created at the same instant. The
+   * reader is the company's administrator, who sees them all through
+   * read-only oversight without holding a role on any of them.
+   */
   async function companyWithTiedContracts() {
-    const { company } = await factory.createCompanyMember();
+    const { company, member } = await factory.createCompanyMember();
     const created: Contract[] = [];
     for (let index = 0; index < 5; index += 1) {
       const contract = await factory.createAdditionalContract(company);
@@ -59,13 +63,20 @@ describe('Pagination PostgreSQL integration', () => {
         createdAt: tiedTimestamp,
       },
     );
-    return { company, ids: created.map(({ id }) => id) };
+    return {
+      company,
+      ids: created.map(({ id }) => id),
+      scope: oversightScope(company.id, member.id),
+    };
+  }
+
+  function oversightScope(companyId: string, companyUserId: string) {
+    return { companyId, companyUserId, includeCompanyAdminOversight: true };
   }
 
   it('pages a company scope without overlap, gaps, or other companies', async () => {
-    const { company, ids } = await companyWithTiedContracts();
+    const { ids, scope } = await companyWithTiedContracts();
     const other = await companyWithTiedContracts();
-    const scope = { companyId: company.id };
 
     const seen: string[] = [];
     for (let page = 1; page <= 3; page += 1) {
@@ -91,8 +102,7 @@ describe('Pagination PostgreSQL integration', () => {
   });
 
   it('keeps tied rows in the same order on repeated requests', async () => {
-    const { company } = await companyWithTiedContracts();
-    const scope = { companyId: company.id };
+    const { scope } = await companyWithTiedContracts();
 
     const first = await contracts.searchPage(scope, { skip: 0, take: 5 });
     const second = await contracts.searchPage(scope, { skip: 0, take: 5 });
@@ -106,13 +116,12 @@ describe('Pagination PostgreSQL integration', () => {
   });
 
   it('applies allowlisted sorting and filters before counting', async () => {
-    const { company, ids } = await companyWithTiedContracts();
+    const { ids, scope } = await companyWithTiedContracts();
     const repository = dataSource.getRepository(Contract);
     for (const [index, id] of ids.entries()) {
       await repository.update({ id }, { title: `Pipeline ${5 - index}` });
     }
     await repository.update({ id: ids[0] }, { title: 'Unrelated works' });
-    const scope = { companyId: company.id };
 
     const result = await contracts.searchPage(scope, {
       search: 'pipeline',
@@ -131,10 +140,11 @@ describe('Pagination PostgreSQL integration', () => {
 
   it('reveals no rows or counts to a company that is not a party', async () => {
     await companyWithTiedContracts();
-    const { company: outsider } = await factory.createCompanyMember();
+    const { company: outsider, member: outsiderAdmin } =
+      await factory.createCompanyMember();
 
     const result = await contracts.searchPage(
-      { companyId: outsider.id },
+      oversightScope(outsider.id, outsiderAdmin.id),
       { skip: 0, take: 100 },
     );
 
@@ -142,10 +152,10 @@ describe('Pagination PostgreSQL integration', () => {
   });
 
   it('returns an empty page past the end with the true total', async () => {
-    const { company } = await companyWithTiedContracts();
+    const { scope } = await companyWithTiedContracts();
 
     const result = await contracts.searchPage(
-      { companyId: company.id },
+      scope,
       { skip: 20, take: 20 },
     );
 

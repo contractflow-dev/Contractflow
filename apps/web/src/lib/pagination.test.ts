@@ -20,6 +20,8 @@ describe("pagination state", () => {
   it("starts on the first page with the default page size", () => {
     expect(initialPaginationState()).toEqual({ page: 1, limit: 20 });
     expect(initialPaginationState(10)).toEqual({ page: 1, limit: 10 });
+    // A restored view can start on a later page.
+    expect(initialPaginationState(20, 3)).toEqual({ page: 3, limit: 20 });
   });
 
   it("returns to page 1 when the page size changes", () => {

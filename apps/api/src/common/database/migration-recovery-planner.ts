@@ -326,17 +326,18 @@ export const probeSql: Record<string, string> = {
       (SELECT COUNT(DISTINCT tc.table_name) FROM information_schema.table_constraints tc JOIN information_schema.key_column_usage kcu ON kcu.constraint_name = tc.constraint_name AND kcu.table_schema = tc.table_schema WHERE tc.table_schema = current_schema() AND tc.constraint_type = 'PRIMARY KEY' AND tc.table_name IN ('app_user', 'company', 'company_user', 'company_invitation', 'user_session') AND kcu.column_name = 'id') = 5
     ) AS present
   `,
+  // Company role labels: before or after CompanyMembershipRoles1793600000000.
   'identity-enums-and-labels': `
     SELECT (
       (SELECT array_agg(enumlabel::text ORDER BY enumsortorder) FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = current_schema() AND t.typname = 'app_user_status_enum') = ARRAY['active', 'inactive']::text[]
       AND
       (SELECT array_agg(enumlabel::text ORDER BY enumsortorder) FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = current_schema() AND t.typname = 'company_status_enum') = ARRAY['active', 'inactive']::text[]
       AND
-      (SELECT array_agg(enumlabel::text ORDER BY enumsortorder) FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = current_schema() AND t.typname = 'company_user_company_role_enum') = ARRAY['Contractor Project Lead', 'Contractor Site Supervisor', 'Client Project Manager', 'Client Site Engineer', 'HSE Officer', 'HSE Manager', 'Finance Officer', 'Finance Director', 'Company Administrator']::text[]
+      (SELECT array_agg(enumlabel::text ORDER BY enumsortorder) FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = current_schema() AND t.typname = 'company_user_company_role_enum') IN (ARRAY['Contractor Project Lead', 'Contractor Site Supervisor', 'Client Project Manager', 'Client Site Engineer', 'HSE Officer', 'HSE Manager', 'Finance Officer', 'Finance Director', 'Company Administrator']::text[], ARRAY['Company Administrator', 'Member']::text[])
       AND
       (SELECT array_agg(enumlabel::text ORDER BY enumsortorder) FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = current_schema() AND t.typname = 'company_user_status_enum') = ARRAY['active', 'inactive']::text[]
       AND
-      (SELECT array_agg(enumlabel::text ORDER BY enumsortorder) FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = current_schema() AND t.typname = 'company_invitation_company_role_enum') = ARRAY['Contractor Project Lead', 'Contractor Site Supervisor', 'Client Project Manager', 'Client Site Engineer', 'HSE Officer', 'HSE Manager', 'Finance Officer', 'Finance Director']::text[]
+      (SELECT array_agg(enumlabel::text ORDER BY enumsortorder) FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = current_schema() AND t.typname = 'company_invitation_company_role_enum') IN (ARRAY['Contractor Project Lead', 'Contractor Site Supervisor', 'Client Project Manager', 'Client Site Engineer', 'HSE Officer', 'HSE Manager', 'Finance Officer', 'Finance Director']::text[], ARRAY['Company Administrator', 'Member']::text[])
       AND
       (SELECT array_agg(enumlabel::text ORDER BY enumsortorder) FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = current_schema() AND t.typname = 'company_invitation_status_enum') = ARRAY['pending', 'accepted', 'declined', 'expired', 'revoked']::text[]
     ) AS present

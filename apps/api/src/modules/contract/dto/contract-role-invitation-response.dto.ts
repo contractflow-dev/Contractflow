@@ -1,11 +1,11 @@
-import type { EContractRole } from '@contractflow/contracts-schema';
+import type { ContractRole } from '@contractflow/contracts-schema';
 import type { ContractRoleInvitationStatus } from '../interfaces/contract-role-assignment-persistence.interface';
 import type { AssignableContractWorkspace } from '../services/contract-workspace';
 
 export class ContractRoleInvitationResponseDto {
   id!: string;
   email!: string;
-  role!: EContractRole;
+  role!: ContractRole;
   workspace!: AssignableContractWorkspace;
   isWorkspaceAdmin!: boolean;
   status!: ContractRoleInvitationStatus;
@@ -17,7 +17,7 @@ export class ContractRoleInvitationResponseDto {
   static fromEntity(invitation: {
     id: string;
     email: string;
-    role: EContractRole;
+    role: ContractRole;
     workspace: AssignableContractWorkspace;
     isWorkspaceAdmin: boolean;
     status: ContractRoleInvitationStatus;
@@ -45,7 +45,7 @@ export interface ContractRoleInvitationPreviewDto {
   contractTitle: string;
   companyName: string;
   email: string;
-  role: EContractRole;
+  role: ContractRole;
   workspace: AssignableContractWorkspace;
   isWorkspaceAdmin: boolean;
   expiresAt: string;

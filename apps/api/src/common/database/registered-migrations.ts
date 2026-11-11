@@ -14,6 +14,7 @@ import { DocumentObjectStorage1793300000000 } from './migrations/1793300000000-d
 import { PasswordResetToken1793400000000 } from './migrations/1793400000000-password-reset-token';
 import { CompanyLevelDocuments1793500000000 } from './migrations/1793500000000-company-level-documents';
 import { CompanyRoleAssignmentIndex1793500000001 } from './migrations/1793500000001-company-role-assignment-index';
+import { CompanyMembershipRoles1793600000000 } from './migrations/1793600000000-company-membership-roles';
 
 export const registeredMigrations = [
   IdentitySchemaBootstrap1749000000000,
@@ -32,4 +33,5 @@ export const registeredMigrations = [
   PasswordResetToken1793400000000,
   CompanyLevelDocuments1793500000000,
   CompanyRoleAssignmentIndex1793500000001,
+  CompanyMembershipRoles1793600000000,
 ];

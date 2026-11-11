@@ -1,5 +1,5 @@
 ﻿import type {
-  EContractRole,
+  ContractRole,
   EFromStatus,
   EPartyType,
   EToStatus,
@@ -99,17 +99,21 @@ export interface IActiveAssignmentCriteria {
   companyId: string;
   contractPartyId: string;
   companyUserId: string;
-  role: EContractRole;
+  role: ContractRole;
 }
 
 export interface ILifecycleRoleAssignmentRepository {
   hasActiveAssignment(criteria: IActiveAssignmentCriteria): Promise<boolean>;
+  /** Whether the member holds any active role on the party (visibility). */
+  hasAnyActiveAssignment(
+    criteria: Omit<IActiveAssignmentCriteria, 'role'>,
+  ): Promise<boolean>;
   hasActiveAssignmentForShare(
     criteria: IActiveAssignmentCriteria,
   ): Promise<boolean>;
   revokeForWorkspaceRoles(
     contractId: string,
-    roles: EContractRole[],
+    roles: ContractRole[],
     revokedById: string,
     now: Date,
   ): Promise<void>;

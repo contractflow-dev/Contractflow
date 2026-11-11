@@ -274,7 +274,7 @@ describe('CompanyService', () => {
     membershipRepository.findActiveMembershipWithCompany.mockResolvedValue({
       id: 'membership-id',
       companyId: companyData.id,
-      companyRole: ECompanyRole.CONTRACTOR_PROJECT_LEAD,
+      companyRole: ECompanyRole.MEMBER,
       status: ECompanyUserStatus.ACTIVE,
       company: companyData,
     });

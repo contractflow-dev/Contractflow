@@ -43,6 +43,21 @@ export class ContractLifecycleContextFactory implements ITransactionContextFacto
       status: ECompanyUserStatus.ACTIVE,
       leftAt: IsNull(),
     };
+    const memberAssignmentQuery = (
+      criteria: Omit<IActiveAssignmentCriteria, 'role'>,
+    ) =>
+      assignments
+        .createQueryBuilder('assignment')
+        .where('assignment.companyId = :companyId', {
+          companyId: criteria.companyId,
+        })
+        .andWhere('assignment.contractPartyId = :partyId', {
+          partyId: criteria.contractPartyId,
+        })
+        .andWhere('assignment.companyUserId = :companyUserId', {
+          companyUserId: criteria.companyUserId,
+        })
+        .andWhere('assignment.revokedAt IS NULL');
     const assignmentQuery = (criteria: IActiveAssignmentCriteria) =>
       assignments
         .createQueryBuilder('assignment')
@@ -183,6 +198,8 @@ export class ContractLifecycleContextFactory implements ITransactionContextFacto
       roleAssignments: {
         hasActiveAssignment: async (criteria) =>
           Boolean(await assignmentQuery(criteria).getOne()),
+        hasAnyActiveAssignment: async (criteria) =>
+          Boolean(await memberAssignmentQuery(criteria).getOne()),
         hasActiveAssignmentForShare: async (criteria) =>
           Boolean(
             await assignmentQuery(criteria)

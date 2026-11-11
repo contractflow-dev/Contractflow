@@ -5,7 +5,6 @@ import {
   ECompanyUserStatus,
   ECurrencyCode,
   ECountryCode,
-  EInvitationRole,
   EInvitationStatus,
 } from "@contractflow/contracts-schema";
 
@@ -182,16 +181,22 @@ export interface ICompanyInvitation {
   email: string;
   firstName: string | null;
   lastName: string | null;
-  companyRole: EInvitationRole;
+  companyRole: ECompanyRole;
   status: EInvitationStatus;
   expiresAt: string;
   acceptedAt: string | null;
   createdAt: string;
 }
 
+/**
+ * A company team invitation: company membership only. It never carries a
+ * contract role; those are assigned per contract after the person joins.
+ */
 export interface IInviteCompanyMemberRequest {
   email: string;
-  companyRole: EInvitationRole;
+  firstName?: string;
+  lastName?: string;
+  companyRole: ECompanyRole;
 }
 
 export type ICreateCompanyRequest = Omit<
@@ -204,7 +209,7 @@ export type IUpdateCompanyProfileRequest = Partial<ICreateCompanyRequest>;
 export interface IPublicCompanyInvitation {
   companyName: string;
   email: string;
-  companyRole: EInvitationRole;
+  companyRole: ECompanyRole;
   expiresAt: string;
 }
 
