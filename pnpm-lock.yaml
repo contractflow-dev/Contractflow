@@ -235,6 +235,10 @@ importers:
         version: 4.1.11(@types/node@20.19.43)(@vitest/coverage-v8@4.1.11)(vite@8.3.3(@types/node@20.19.43)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
   packages/contracts-schema:
+    dependencies:
+      country-phone-codes:
+        specifier: ^1.0.1
+        version: 1.0.1
     devDependencies:
       '@types/node':
         specifier: ^26.6.4
@@ -2526,6 +2530,10 @@ packages:
   cors@2.8.6:
     resolution: {integrity: sha512-tJtZBBHA6vjIAaF6EnIaq6laBBP9aq/Y3ouVJjEfoHbRBcHBAHYcMh/w8LDrk2PvIMMq8gmopa5D4V8RmbrxGw==}
     engines: {node: '>= 0.10'}
+
+  country-phone-codes@1.0.1:
+    resolution: {integrity: sha512-OkHd89yIc6QAKH5//VANKyUypTNdaXP5N1tr55dcV7jwQoSZHgAXWDuR9dPynJ0rOSRwrRNJc0MyUTFLR4uIrg==}
+    engines: {node: '>=16.0.0'}
 
   cross-env@10.1.0:
     resolution: {integrity: sha512-GsYosgnACZTADcmEyJctkJIoqAhHjttw7RsFrVoJNXbsWWqaq6Ym+7kZjq6mS45O0jij6vtiReppKQEtqWy6Dw==}
@@ -7311,6 +7319,8 @@ snapshots:
     dependencies:
       object-assign: 4.1.1
       vary: 1.1.2
+
+  country-phone-codes@1.0.1: {}
 
   cross-env@10.1.0:
     dependencies:

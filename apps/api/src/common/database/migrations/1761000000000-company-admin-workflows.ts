@@ -60,14 +60,42 @@ export class CompanyAdminWorkflows1761000000000 implements MigrationInterface {
       'DROP INDEX IF EXISTS "uq_company_user_company_user"',
     );
     await queryRunner.query(`
-      CREATE UNIQUE INDEX "uq_company_user_active_company_user"
+      CREATE UNIQUE INDEX IF NOT EXISTS "uq_company_user_active_company_user"
       ON "company_user" ("company_id", "user_id")
       WHERE "status" = 'active' AND "left_at" IS NULL
     `);
     await queryRunner.query(`
-      CREATE UNIQUE INDEX "uq_company_invitation_pending_company_email"
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_index ix
+          WHERE ix.indexrelid = to_regclass('"uq_company_user_active_company_user"')
+            AND ix.indrelid = '"company_user"'::regclass
+            AND ix.indisvalid
+            AND pg_get_indexdef(ix.indexrelid, 0, true) = 'CREATE UNIQUE INDEX uq_company_user_active_company_user ON company_user USING btree (company_id, user_id) WHERE status = ''active''::company_user_status_enum AND left_at IS NULL'
+        ) THEN
+          RAISE EXCEPTION 'Existing index "uq_company_user_active_company_user" on "company_user" does not match the migration definition.';
+        END IF;
+      END $$;
+    `);
+    await queryRunner.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS "uq_company_invitation_pending_company_email"
       ON "company_invitation" ("company_id", "email")
       WHERE "status" = 'pending'
+    `);
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_index ix
+          WHERE ix.indexrelid = to_regclass('"uq_company_invitation_pending_company_email"')
+            AND ix.indrelid = '"company_invitation"'::regclass
+            AND ix.indisvalid
+            AND pg_get_indexdef(ix.indexrelid, 0, true) = 'CREATE UNIQUE INDEX uq_company_invitation_pending_company_email ON company_invitation USING btree (company_id, email) WHERE status::text = ''pending''::text'
+        ) THEN
+          RAISE EXCEPTION 'Existing index "uq_company_invitation_pending_company_email" on "company_invitation" does not match the migration definition.';
+        END IF;
+      END $$;
     `);
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "company_audit_log" (
@@ -267,7 +295,7 @@ export class CompanyAdminWorkflows1761000000000 implements MigrationInterface {
       'ALTER TABLE "company_invitation" ALTER COLUMN "accepted_at" SET NOT NULL',
     );
     await queryRunner.query(`
-      CREATE UNIQUE INDEX "uq_company_user_company_user"
+      CREATE UNIQUE INDEX IF NOT EXISTS "uq_company_user_company_user"
       ON "company_user" ("company_id", "user_id")
     `);
   }

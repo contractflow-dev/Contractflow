@@ -25,23 +25,33 @@ export class WorkspaceAdminRole1791882600003 implements MigrationInterface {
       ['contract_party', 'uq_contract_party_id_company'],
       ['company_user', 'uq_company_user_id_company'],
     ] as const) {
-      const table = await queryRunner.getTable(tableName);
-      const existing = table?.indices.find(
-        (index) => index.name === indexName,
-      );
-      if (
-        existing &&
-        (!existing.isUnique || existing.columnNames.join(',') !== 'id,company_id')
-      ) {
+      // Read key columns in index order from the catalog: TypeORM's getTable()
+      // reports index columns sorted by name, which loses the order.
+      const indexes = (await queryRunner.query(
+        `
+          SELECT index_class.relname AS "name",
+            ix.indisunique
+              AND ix.indpred IS NULL
+              AND ix.indexprs IS NULL
+              AND ARRAY(
+                SELECT attribute_row.attname::text
+                FROM unnest(ix.indkey) WITH ORDINALITY AS key_row(attnum, ordinality)
+                JOIN pg_attribute attribute_row
+                  ON attribute_row.attrelid = ix.indrelid
+                 AND attribute_row.attnum = key_row.attnum
+                ORDER BY key_row.ordinality
+              ) = ARRAY['id', 'company_id'] AS "matches"
+          FROM pg_index ix
+          JOIN pg_class index_class ON index_class.oid = ix.indexrelid
+          WHERE ix.indrelid = $1::regclass
+        `,
+        [`"${tableName}"`],
+      )) as Array<{ name: string; matches: boolean }>;
+      const existing = indexes.find((index) => index.name === indexName);
+      if (existing && !existing.matches) {
         throw new Error(`Existing index "${indexName}" is incompatible.`);
       }
-      if (
-        !existing &&
-        !table?.indices.some(
-          (index) =>
-            index.isUnique && index.columnNames.join(',') === 'id,company_id',
-        )
-      ) {
+      if (!existing && !indexes.some((index) => index.matches)) {
         await queryRunner.query(`
           CREATE UNIQUE INDEX "${indexName}"
           ON "${tableName}" ("id", "company_id")
