@@ -18,11 +18,15 @@ import type {
   ICreateAuthUser,
 } from '../interface/auth-persistence.interface';
 import type { IPasswordResetUserRepository } from '../interface/password-reset-persistence.interface';
+import type { IAppUserAccountUserRepository } from '../interface/app-user-account-persistence.interface';
 
 @Injectable()
 export class AppUserRepository
   extends BaseRepository<AppUser>
-  implements IAppUserRepository, IPasswordResetUserRepository
+  implements
+    IAppUserRepository,
+    IPasswordResetUserRepository,
+    IAppUserAccountUserRepository
 {
   constructor(@InjectRepository(AppUser) repository: Repository<AppUser>) {
     super(repository);
@@ -139,6 +143,28 @@ export class AppUserRepository
       .addSelect('u.passwordHash')
       .where('u.id = :id', { id })
       .getOne();
+  }
+
+  /** The user's profile row (no password hash), or null. */
+  findProfileById(id: string): Promise<AppUser | null> {
+    return this.repository.findOne({ where: { id } });
+  }
+
+  /** Only the stored password hash, or null when the user doesn't exist. */
+  async findPasswordHash(id: string): Promise<string | null> {
+    const user = await this.findByIdWithPassword(id);
+    return user?.passwordHash ?? null;
+  }
+
+  /** The stored password hash, row-locked for the rest of the transaction. */
+  async findPasswordHashForUpdate(id: string): Promise<string | null> {
+    const user = await this.repository
+      .createQueryBuilder('u')
+      .addSelect('u.passwordHash')
+      .where('u.id = :id', { id })
+      .setLock('pessimistic_write')
+      .getOne();
+    return user?.passwordHash ?? null;
   }
 
   // ---------------------------------------------------------------------

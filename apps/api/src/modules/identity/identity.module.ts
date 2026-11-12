@@ -23,6 +23,11 @@ import { CompanyInvitationController } from './controllers/company-invitation.co
 import { AppUserRepository } from './repositories/app-user.repository';
 import { EmailVerificationTokenRepository } from './repositories/email-verification-token.repository';
 import { AppUserService } from './services/app-user/app-user.service';
+import { AppUserAccountTransactionContextFactory } from './repositories/app-user-account-transaction-context.factory';
+import {
+  APP_USER_ACCOUNT_UNIT_OF_WORK,
+  type IAppUserAccountTransactionContext,
+} from './interface/app-user-account-persistence.interface';
 import { AuthService } from './services/auth/auth.service';
 import { PasswordService } from './services/auth/password.service';
 import { SessionService } from './services/auth/session.service';
@@ -136,6 +141,15 @@ import {
       inject: [DataSource],
     },
     AppUserService,
+    {
+      provide: APP_USER_ACCOUNT_UNIT_OF_WORK,
+      useFactory: (dataSource: DataSource) =>
+        new TypeOrmUnitOfWork<IAppUserAccountTransactionContext>(
+          dataSource,
+          new AppUserAccountTransactionContextFactory(),
+        ),
+      inject: [DataSource],
+    },
     AuthService,
     PasswordService,
     SessionService,
