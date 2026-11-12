@@ -34,6 +34,28 @@ export interface ResetPasswordRequest {
   password: string;
 }
 
+/**
+ * The signed-in user's own profile fields, all optional; only the fields
+ * sent are changed. Email is not editable here: a new address would need
+ * verifying first.
+ */
+export interface UpdateMyProfileRequest {
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  phoneNumber?: string;
+  timezone?: string;
+}
+
+/**
+ * Changes the signed-in user's password. The current password is required;
+ * every other session of the user is signed out, the current one stays.
+ */
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
 export interface LogoutResponse {
   success: boolean;
   message: string;
