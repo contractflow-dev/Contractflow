@@ -49,16 +49,16 @@ const nameFields = [
     autoComplete: "given-name",
   },
   {
-    name: "middleName",
-    label: "Middle name",
-    required: false,
-    autoComplete: "additional-name",
-  },
-  {
     name: "lastName",
     label: "Last name",
     required: true,
     autoComplete: "family-name",
+  },
+  {
+    name: "middleName",
+    label: "Middle name",
+    required: false,
+    autoComplete: "additional-name",
   },
 ] as const;
 
@@ -100,8 +100,8 @@ export function RegisterForm() {
     mode: "onTouched",
     defaultValues: {
       firstName: "",
-      middleName: "",
       lastName: "",
+      middleName: "",
       email: "",
       phone: "",
       timezone: "",
@@ -182,7 +182,7 @@ export function RegisterForm() {
       <FieldGroup className="gap-5">
         <RequiredFieldsNote />
 
-        <FormSection legend="Full name">
+        <FormSection legend="">
           <div className="grid gap-3 sm:grid-cols-2 sm:gap-2">
             {nameFields.map(({ name, label, required, autoComplete }) => (
               <Controller

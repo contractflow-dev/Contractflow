@@ -12,12 +12,38 @@ describe('ContractLifecycle1792862700000', () => {
 
     await new ContractLifecycle1792862700000().up({ query } as never);
 
-    expect(statements[0]).toContain(
-      'ADD COLUMN "created_by_company_id" character varying(26),',
+    expect(statements).toContainEqual(
+      expect.stringContaining(
+        'ADD COLUMN IF NOT EXISTS "created_by_company_id" character varying(26),',
+      ),
     );
-    expect(statements[0]).toContain(
-      'FOREIGN KEY ("created_by_company_id") REFERENCES "company"("id") ON DELETE RESTRICT',
+    expect(statements).toContainEqual(
+      expect.stringContaining(
+        'FOREIGN KEY ("created_by_company_id") REFERENCES "company"("id") ON DELETE RESTRICT;',
+      ),
     );
+  });
+
+  it('refuses a pre-existing column whose definition differs', async () => {
+    const query = vi.fn(async (sql: string) =>
+      sql.includes('FROM pg_attribute')
+        ? [
+            {
+              name: 'created_by_company_id',
+              type: 'text',
+              notNull: false,
+              defaultExpression: null,
+            },
+          ]
+        : [],
+    );
+
+    await expect(
+      new ContractLifecycle1792862700000().up({ query } as never),
+    ).rejects.toThrow(
+      'Existing column "contract"."created_by_company_id" does not match the migration schema.',
+    );
+    expect(query).toHaveBeenCalledOnce();
   });
 });
 

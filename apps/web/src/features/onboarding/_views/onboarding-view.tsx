@@ -89,7 +89,12 @@ export const companySetupSteps: Array<{
   {
     id: "company",
     title: "Company and legal details",
-    fields: ["name", "legalName", "registrationNumber", "taxIdentificationNumber"],
+    fields: [
+      "name",
+      "legalName",
+      "registrationNumber",
+      "taxIdentificationNumber",
+    ],
   },
   {
     id: "contact",
@@ -187,10 +192,10 @@ export function OnboardingView() {
       website: "",
       addressLine1: "",
       addressLine2: "",
-      city: "",
-      stateRegion: "",
-      postalCode: "",
       countryCode: "",
+      stateRegion: "",
+      city: "",
+      postalCode: "",
       defaultCurrencyCode: "",
     },
     // Each step is checked on Next, not as fields lose focus: an error
@@ -343,9 +348,7 @@ export function OnboardingView() {
     return (
       <OnboardingShell>
         <div className="space-y-5">
-          <h1 className="type-page-title">
-            {createdCompany.name} is ready
-          </h1>
+          <h1 className="type-page-title">{createdCompany.name} is ready</h1>
           <p role="status" className="text-sm leading-6 text-muted-foreground">
             Your company has been created.
             {createdCompany.isAdmin
@@ -452,7 +455,10 @@ export function OnboardingView() {
         aria-label="Create your company"
         className="space-y-8"
       >
-        <ol aria-label="Steps" className="hidden flex-wrap gap-2 text-sm sm:flex">
+        <ol
+          aria-label="Steps"
+          className="hidden flex-wrap gap-2 text-sm sm:flex"
+        >
           {companySetupSteps.map((candidate, index) => (
             <li
               key={candidate.id}
@@ -478,13 +484,13 @@ export function OnboardingView() {
         </ol>
 
         <div className="space-y-1">
-          <h2
+          {/* <h2
             ref={headingRef}
             tabIndex={-1}
             className="text-base font-semibold focus-visible:outline-none"
           >
             Step {stepIndex + 1} of {companySetupSteps.length}: {step.title}
-          </h2>
+          </h2> */}
           <RequiredFieldsNote />
         </div>
 
@@ -495,7 +501,7 @@ export function OnboardingView() {
         )}
 
         {step.id === "company" ? (
-          <FormSection legend="Company and legal details">
+          <FormSection legend="">
             <FormGrid>
               <FormField
                 id="name"
@@ -538,7 +544,10 @@ export function OnboardingView() {
                 error={errors.taxIdentificationNumber?.message}
               >
                 {(control) => (
-                  <Input {...control} {...register("taxIdentificationNumber")} />
+                  <Input
+                    {...control}
+                    {...register("taxIdentificationNumber")}
+                  />
                 )}
               </FormField>
             </FormGrid>
@@ -546,7 +555,7 @@ export function OnboardingView() {
         ) : null}
 
         {step.id === "contact" ? (
-          <FormSection legend="Contact">
+          <FormSection legend="">
             <FormGrid>
               <FormField
                 id="email"
@@ -601,7 +610,7 @@ export function OnboardingView() {
         ) : null}
 
         {step.id === "address" ? (
-          <FormSection legend="Business address and currency">
+          <FormSection legend="">
             <FormGrid>
               <FormField
                 id="addressLine1"
@@ -632,48 +641,6 @@ export function OnboardingView() {
                 )}
               </FormField>
               <FormField
-                id="city"
-                label="City"
-                required
-                error={errors.city?.message}
-              >
-                {(control) => (
-                  <Input
-                    {...control}
-                    autoComplete="address-level2"
-                    {...register("city")}
-                  />
-                )}
-              </FormField>
-              <FormField
-                id="stateRegion"
-                label="State or region"
-                required
-                error={errors.stateRegion?.message}
-              >
-                {(control) => (
-                  <Input
-                    {...control}
-                    autoComplete="address-level1"
-                    {...register("stateRegion")}
-                  />
-                )}
-              </FormField>
-              <FormField
-                id="postalCode"
-                label="Postal code"
-                required
-                error={errors.postalCode?.message}
-              >
-                {(control) => (
-                  <Input
-                    {...control}
-                    autoComplete="postal-code"
-                    {...register("postalCode")}
-                  />
-                )}
-              </FormField>
-              <FormField
                 id="countryCode"
                 label="Country"
                 required
@@ -697,6 +664,49 @@ export function OnboardingView() {
                   </NativeSelect>
                 )}
               </FormField>
+              <FormField
+                id="stateRegion"
+                label="State or region"
+                required
+                error={errors.stateRegion?.message}
+              >
+                {(control) => (
+                  <Input
+                    {...control}
+                    autoComplete="address-level1"
+                    {...register("stateRegion")}
+                  />
+                )}
+              </FormField>
+              <FormField
+                id="city"
+                label="City"
+                required
+                error={errors.city?.message}
+              >
+                {(control) => (
+                  <Input
+                    {...control}
+                    autoComplete="address-level2"
+                    {...register("city")}
+                  />
+                )}
+              </FormField>
+              <FormField
+                id="postalCode"
+                label="Postal code"
+                required
+                error={errors.postalCode?.message}
+              >
+                {(control) => (
+                  <Input
+                    {...control}
+                    autoComplete="postal-code"
+                    {...register("postalCode")}
+                  />
+                )}
+              </FormField>
+
               <FormField
                 id="defaultCurrencyCode"
                 label="Default currency"

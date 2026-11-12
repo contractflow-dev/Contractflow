@@ -174,52 +174,124 @@ export class IdentitySchemaBootstrap1749000000000 implements MigrationInterface 
     }
 
     await queryRunner.query('CREATE EXTENSION IF NOT EXISTS citext');
-    await queryRunner.query(
-      `CREATE TYPE "public"."app_user_status_enum" AS ENUM('active', 'inactive')`,
-    );
-    await queryRunner.query(
-      `CREATE TYPE "public"."company_status_enum" AS ENUM('active', 'inactive')`,
-    );
     await queryRunner.query(`
-      CREATE TYPE "public"."company_user_company_role_enum" AS ENUM(
-        'Contractor Project Lead',
-        'Contractor Site Supervisor',
-        'Client Project Manager',
-        'Client Site Engineer',
-        'HSE Officer',
-        'HSE Manager',
-        'Finance Officer',
-        'Finance Director',
-        'Company Administrator'
-      )
-    `);
-    await queryRunner.query(
-      `CREATE TYPE "public"."company_user_status_enum" AS ENUM('active', 'inactive')`,
-    );
-    await queryRunner.query(`
-      CREATE TYPE "public"."company_invitation_company_role_enum" AS ENUM(
-        'Contractor Project Lead',
-        'Contractor Site Supervisor',
-        'Client Project Manager',
-        'Client Site Engineer',
-        'HSE Officer',
-        'HSE Manager',
-        'Finance Officer',
-        'Finance Director'
-      )
+      DO $$
+      BEGIN
+        CREATE TYPE "public"."app_user_status_enum" AS ENUM('active', 'inactive');
+      EXCEPTION
+        WHEN duplicate_object THEN
+          IF ARRAY(
+            SELECT enumlabel::text FROM pg_enum
+            WHERE enumtypid = '"public"."app_user_status_enum"'::regtype
+            ORDER BY enumsortorder
+          ) IS DISTINCT FROM ARRAY['active', 'inactive']::text[] THEN
+            RAISE EXCEPTION 'Existing type "public"."app_user_status_enum" does not match the migration definition.';
+          END IF;
+      END $$;
     `);
     await queryRunner.query(`
-      CREATE TYPE "public"."company_invitation_status_enum" AS ENUM(
-        'pending',
-        'accepted',
-        'declined',
-        'expired',
-        'revoked'
-      )
+      DO $$
+      BEGIN
+        CREATE TYPE "public"."company_status_enum" AS ENUM('active', 'inactive');
+      EXCEPTION
+        WHEN duplicate_object THEN
+          IF ARRAY(
+            SELECT enumlabel::text FROM pg_enum
+            WHERE enumtypid = '"public"."company_status_enum"'::regtype
+            ORDER BY enumsortorder
+          ) IS DISTINCT FROM ARRAY['active', 'inactive']::text[] THEN
+            RAISE EXCEPTION 'Existing type "public"."company_status_enum" does not match the migration definition.';
+          END IF;
+      END $$;
+    `);
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        CREATE TYPE "public"."company_user_company_role_enum" AS ENUM(
+          'Contractor Project Lead',
+          'Contractor Site Supervisor',
+          'Client Project Manager',
+          'Client Site Engineer',
+          'HSE Officer',
+          'HSE Manager',
+          'Finance Officer',
+          'Finance Director',
+          'Company Administrator'
+        );
+      EXCEPTION
+        WHEN duplicate_object THEN
+          IF ARRAY(
+            SELECT enumlabel::text FROM pg_enum
+            WHERE enumtypid = '"public"."company_user_company_role_enum"'::regtype
+            ORDER BY enumsortorder
+          ) IS DISTINCT FROM ARRAY['Contractor Project Lead', 'Contractor Site Supervisor', 'Client Project Manager', 'Client Site Engineer', 'HSE Officer', 'HSE Manager', 'Finance Officer', 'Finance Director', 'Company Administrator']::text[] THEN
+            RAISE EXCEPTION 'Existing type "public"."company_user_company_role_enum" does not match the migration definition.';
+          END IF;
+      END $$;
+    `);
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        CREATE TYPE "public"."company_user_status_enum" AS ENUM('active', 'inactive');
+      EXCEPTION
+        WHEN duplicate_object THEN
+          IF ARRAY(
+            SELECT enumlabel::text FROM pg_enum
+            WHERE enumtypid = '"public"."company_user_status_enum"'::regtype
+            ORDER BY enumsortorder
+          ) IS DISTINCT FROM ARRAY['active', 'inactive']::text[] THEN
+            RAISE EXCEPTION 'Existing type "public"."company_user_status_enum" does not match the migration definition.';
+          END IF;
+      END $$;
+    `);
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        CREATE TYPE "public"."company_invitation_company_role_enum" AS ENUM(
+          'Contractor Project Lead',
+          'Contractor Site Supervisor',
+          'Client Project Manager',
+          'Client Site Engineer',
+          'HSE Officer',
+          'HSE Manager',
+          'Finance Officer',
+          'Finance Director'
+        );
+      EXCEPTION
+        WHEN duplicate_object THEN
+          IF ARRAY(
+            SELECT enumlabel::text FROM pg_enum
+            WHERE enumtypid = '"public"."company_invitation_company_role_enum"'::regtype
+            ORDER BY enumsortorder
+          ) IS DISTINCT FROM ARRAY['Contractor Project Lead', 'Contractor Site Supervisor', 'Client Project Manager', 'Client Site Engineer', 'HSE Officer', 'HSE Manager', 'Finance Officer', 'Finance Director']::text[] THEN
+            RAISE EXCEPTION 'Existing type "public"."company_invitation_company_role_enum" does not match the migration definition.';
+          END IF;
+      END $$;
+    `);
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        CREATE TYPE "public"."company_invitation_status_enum" AS ENUM(
+          'pending',
+          'accepted',
+          'declined',
+          'expired',
+          'revoked'
+        );
+      EXCEPTION
+        WHEN duplicate_object THEN
+          IF ARRAY(
+            SELECT enumlabel::text FROM pg_enum
+            WHERE enumtypid = '"public"."company_invitation_status_enum"'::regtype
+            ORDER BY enumsortorder
+          ) IS DISTINCT FROM ARRAY['pending', 'accepted', 'declined', 'expired', 'revoked']::text[] THEN
+            RAISE EXCEPTION 'Existing type "public"."company_invitation_status_enum" does not match the migration definition.';
+          END IF;
+      END $$;
     `);
 
     await queryRunner.query(`
-      CREATE TABLE "company" (
+      CREATE TABLE IF NOT EXISTS "company" (
         "id" character varying(26) NOT NULL,
         "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
         "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
@@ -243,7 +315,7 @@ export class IdentitySchemaBootstrap1749000000000 implements MigrationInterface 
       )
     `);
     await queryRunner.query(`
-      CREATE TABLE "app_user" (
+      CREATE TABLE IF NOT EXISTS "app_user" (
         "id" character varying(26) NOT NULL,
         "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
         "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
@@ -264,7 +336,7 @@ export class IdentitySchemaBootstrap1749000000000 implements MigrationInterface 
       )
     `);
     await queryRunner.query(`
-      CREATE TABLE "company_user" (
+      CREATE TABLE IF NOT EXISTS "company_user" (
         "id" character varying(26) NOT NULL,
         "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
         "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
@@ -285,7 +357,7 @@ export class IdentitySchemaBootstrap1749000000000 implements MigrationInterface 
       )
     `);
     await queryRunner.query(`
-      CREATE TABLE "company_invitation" (
+      CREATE TABLE IF NOT EXISTS "company_invitation" (
         "id" character varying(26) NOT NULL,
         "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
         "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
@@ -311,7 +383,7 @@ export class IdentitySchemaBootstrap1749000000000 implements MigrationInterface 
       )
     `);
     await queryRunner.query(`
-      CREATE TABLE "user_session" (
+      CREATE TABLE IF NOT EXISTS "user_session" (
         "id" character varying(26) NOT NULL,
         "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
         "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
