@@ -7,10 +7,10 @@ import {
 import type { ConfigService } from '@nestjs/config';
 import {
   ECompanyRole,
-  EContractRole,
   EDocumentCategory,
   EDocumentStatus,
   EDocumentVisibility,
+  EContractorContractRole,
 } from '@contractflow/contracts-schema';
 import { In, type DataSource } from 'typeorm';
 import { TypeOrmUnitOfWork } from '../../../src/common/database/typeorm-unit-of-work';
@@ -118,7 +118,7 @@ describe('Document access across companies (PostgreSQL)', () => {
         contractPartyId: partyB.id,
         companyUserId: memberB.id,
         companyId: companyB.id,
-        role: EContractRole.CONTRACTOR_PROJECT_LEAD,
+        role: EContractorContractRole.CONTRACTOR_PROJECT_LEAD,
         isWorkspaceAdmin: false,
         assignedAt: new Date(),
         assignedById: memberB.id,

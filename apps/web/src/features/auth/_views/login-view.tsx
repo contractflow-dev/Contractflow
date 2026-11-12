@@ -115,7 +115,7 @@ export function LoginView() {
                 ) : signInToContinue ? (
                   <Alert role="status">
                     <AlertDescription>
-                      Sign in to continue to your workspace.
+                      Sign in to continue to that page.
                     </AlertDescription>
                   </Alert>
                 ) : null}

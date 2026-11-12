@@ -8,7 +8,9 @@ import {
 } from '@nestjs/common';
 import {
   ECompanyRole,
-  EContractRole,
+  contractRoleSide,
+  type ContractRole,
+  type ContractRoleManagementPermissions,
   type CompanyRoleAssignment,
   type IPaginatedResponse,
 } from '@contractflow/contracts-schema';
@@ -63,7 +65,7 @@ export class ContractRoleAssignmentService {
     companyId: string,
     contractId: string,
     workspace: AssignableContractWorkspace,
-  ): Promise<{ canManage: boolean; canGrantWorkspaceAdmin: boolean }> {
+  ): Promise<ContractRoleManagementPermissions> {
     const membership = await this.persistence.memberships.findActiveMember(
       companyId,
       userId,
@@ -80,6 +82,20 @@ export class ContractRoleAssignmentService {
     }
     const canGrantWorkspaceAdmin =
       membership.companyRole === ECompanyRole.COMPANY_ADMIN;
+    // The contract must be visible to the caller: a role on it, or Company
+    // Administrator oversight. Otherwise it is not found, not "no rights".
+    if (
+      !canGrantWorkspaceAdmin &&
+      (
+        await this.persistence.assignments.listActiveForMember(
+          companyId,
+          party.id,
+          membership.id,
+        )
+      ).length === 0
+    ) {
+      throw new NotFoundException('Contract was not found.');
+    }
     const canManage =
       canGrantWorkspaceAdmin ||
       (await this.persistence.assignments.hasWorkspaceAdmin(
@@ -88,7 +104,15 @@ export class ContractRoleAssignmentService {
         party.id,
         WORKSPACE_ROLES[workspace],
       ));
-    return { canManage, canGrantWorkspaceAdmin };
+    return {
+      canManage,
+      canGrantWorkspaceAdmin,
+      roleSide: contractRoleSide(party.partyType),
+      // The workspace's roles for this party's side only.
+      roles: WORKSPACE_ROLES[workspace].filter((role) =>
+        roleAllowedForParty(role, party.partyType),
+      ),
+    };
   }
 
   async listEligibleMembers(
@@ -188,10 +212,11 @@ export class ContractRoleAssignmentService {
     contractId: string,
     workspace: AssignableContractWorkspace,
     companyUserId: string,
-    role: EContractRole,
+    role: ContractRole,
     isWorkspaceAdmin = false,
   ): Promise<ContractRoleAssignmentResponseDto> {
-    if (workspaceForRole(role) !== workspace) {
+    // Unknown values fail here too, before any transaction opens.
+    if (!WORKSPACE_ROLES[workspace].includes(role)) {
       throw new BadRequestException(
         'The selected contract role does not belong to this workspace.',
       );
@@ -203,6 +228,7 @@ export class ContractRoleAssignmentService {
         contractId,
         companyId,
       );
+      await this.assertVisibleTo(context, userId, companyId, party.id);
       await this.assertWorkspaceEnabled(context, contractId, workspace);
       if (!roleAllowedForParty(role, party.partyType)) {
         throw new BadRequestException(
@@ -275,6 +301,7 @@ export class ContractRoleAssignmentService {
         contractId,
         companyId,
       );
+      await this.assertVisibleTo(context, userId, companyId, party.id);
       const assignment = await context.assignments.findByIdInPartyForUpdate(
         companyId,
         assignmentId,
@@ -346,6 +373,7 @@ export class ContractRoleAssignmentService {
         contractId,
         companyId,
       );
+      await this.assertVisibleTo(context, userId, companyId, party.id);
       const { actor, isCompanyAdmin } = await this.requireManagementActor(
         context,
         userId,
@@ -446,10 +474,11 @@ export class ContractRoleAssignmentService {
     contractId: string,
     workspace: AssignableContractWorkspace,
     email: string,
-    role: EContractRole,
+    role: ContractRole,
     isWorkspaceAdmin = false,
   ): Promise<ContractRoleInvitationResponseDto> {
-    if (workspaceForRole(role) !== workspace) {
+    // Unknown values fail here too, before any transaction opens.
+    if (!WORKSPACE_ROLES[workspace].includes(role)) {
       throw new BadRequestException(
         'The selected contract role does not belong to this workspace.',
       );
@@ -460,6 +489,7 @@ export class ContractRoleAssignmentService {
         contractId,
         companyId,
       );
+      await this.assertVisibleTo(context, userId, companyId, party.id);
       await this.assertWorkspaceEnabled(context, contractId, workspace);
       if (!roleAllowedForParty(role, party.partyType)) {
         throw new BadRequestException(
@@ -566,6 +596,7 @@ export class ContractRoleAssignmentService {
         contractId,
         companyId,
       );
+      await this.assertVisibleTo(context, userId, companyId, party.id);
       const invitation = await context.invitations.findByIdForUpdate(
         invitationId,
         party.id,
@@ -818,11 +849,9 @@ export class ContractRoleAssignmentService {
     contractId: string,
     workspace: AssignableContractWorkspace,
   ): Promise<{ party: IRoleAssignmentParty }> {
-    const contract = await repositories.contracts.findActive(contractId);
-    if (!contract) {
-      throw new NotFoundException('Contract was not found.');
-    }
-    await this.assertWorkspaceEnabled(repositories, contractId, workspace);
+    // Membership and visibility first: nothing about a contract the caller
+    // can't see (whether it exists, its workspaces) is revealed by the order
+    // of the checks below.
     const membership = await repositories.memberships.findActiveMember(
       companyId,
       userId,
@@ -837,6 +866,12 @@ export class ContractRoleAssignmentService {
     if (!party) {
       throw new NotFoundException('Contract was not found.');
     }
+    await this.assertVisible(repositories, companyId, party.id, membership);
+    const contract = await repositories.contracts.findActive(contractId);
+    if (!contract) {
+      throw new NotFoundException('Contract was not found.');
+    }
+    await this.assertWorkspaceEnabled(repositories, contractId, workspace);
     if (
       membership.companyRole !== ECompanyRole.COMPANY_ADMIN &&
       !(await repositories.assignments.hasWorkspaceAdmin(
@@ -851,6 +886,46 @@ export class ContractRoleAssignmentService {
       );
     }
     return { party };
+  }
+
+  /**
+   * The contract visibility rule (see ContractAccessService): a Company
+   * Administrator of the party company, or a member holding an active role
+   * on this party. Anyone else gets the same 404 as for a missing contract,
+   * so a later 403 or 404 never confirms what the contract holds.
+   */
+  private async assertVisible(
+    repositories: IContractRoleAssignmentRepositories,
+    companyId: string,
+    partyId: string,
+    member: IRoleAssignmentMember,
+  ): Promise<void> {
+    if (member.companyRole === ECompanyRole.COMPANY_ADMIN) return;
+    const roles = await repositories.assignments.listActiveForMember(
+      companyId,
+      partyId,
+      member.id,
+    );
+    if (roles.length === 0) {
+      throw new NotFoundException('Contract was not found.');
+    }
+  }
+
+  /** `assertVisible` for the signed-in user, inside a write's transaction. */
+  private async assertVisibleTo(
+    context: IContractRoleAssignmentTransactionContext,
+    userId: string,
+    companyId: string,
+    partyId: string,
+  ): Promise<void> {
+    const member = await context.memberships.findActiveMember(
+      companyId,
+      userId,
+    );
+    if (!member) {
+      throw new ForbiddenException('Active company membership is required.');
+    }
+    await this.assertVisible(context, companyId, partyId, member);
   }
 
   private async findPartyForUpdate(

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { EntityManager, Repository } from 'typeorm';
 import { IsNull } from 'typeorm';
-import { EContractRole } from '@contractflow/contracts-schema';
+import type { ContractRole } from '@contractflow/contracts-schema';
 import type { ICompanyScope } from '../../../common/database/repositories/company-scope.interface';
 import { CompanyScopedRepository } from '../../../common/database/repositories/company-scoped.repository';
 import { ContractRoleAssignment } from '../entities/contract-role-assignment.entity';
@@ -29,7 +29,7 @@ export class ContractRoleAssignmentRepository extends CompanyScopedRepository<Co
     companyUserId: string,
     contractIds: string[],
   ): Promise<
-    Array<{ contractId: string; role: EContractRole; isWorkspaceAdmin: boolean }>
+    Array<{ contractId: string; role: ContractRole; isWorkspaceAdmin: boolean }>
   > {
     if (!companyUserId || contractIds.length === 0) return [];
     const rows = await this.scopedQuery(scope)
@@ -44,7 +44,7 @@ export class ContractRoleAssignmentRepository extends CompanyScopedRepository<Co
       .orderBy('e.role', 'ASC')
       .getRawMany<{
         contractId: string;
-        role: EContractRole;
+        role: ContractRole;
         isWorkspaceAdmin: boolean;
       }>();
     return rows.map((row) => ({
@@ -65,7 +65,7 @@ export class ContractRoleAssignmentRepository extends CompanyScopedRepository<Co
     scope: ICompanyScope,
     contractPartyId: string,
     contractId: string,
-    roles: EContractRole[],
+    roles: ContractRole[],
     manager: EntityManager = this.repository.manager,
   ) {
     return manager
@@ -95,7 +95,7 @@ export class ContractRoleAssignmentRepository extends CompanyScopedRepository<Co
     scope: ICompanyScope,
     contractPartyId: string,
     companyUserId: string,
-    role: EContractRole,
+    role: ContractRole,
     manager: EntityManager,
   ) {
     return manager.getRepository(ContractRoleAssignment).findOne({
@@ -113,7 +113,7 @@ export class ContractRoleAssignmentRepository extends CompanyScopedRepository<Co
     scope: ICompanyScope,
     companyUserId: string,
     contractPartyId: string,
-    roles: EContractRole[],
+    roles: ContractRole[],
     manager: EntityManager = this.repository.manager,
   ): Promise<boolean> {
     return (
@@ -139,7 +139,7 @@ export class ContractRoleAssignmentRepository extends CompanyScopedRepository<Co
   countActiveWorkspaceAdmins(
     scope: ICompanyScope,
     contractPartyId: string,
-    roles: EContractRole[],
+    roles: ContractRole[],
     manager: EntityManager,
   ): Promise<number> {
     return manager

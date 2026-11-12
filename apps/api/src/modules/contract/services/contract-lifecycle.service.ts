@@ -9,7 +9,9 @@
 import { createHash, randomBytes } from 'node:crypto';
 import {
   ECompanyRole,
-  EContractRole,
+  EClientContractRole,
+  EContractorContractRole,
+  type ContractRole,
   EContractStatus,
   EFromStatus,
   EPartyType,
@@ -93,12 +95,12 @@ function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
-function projectLeadRole(partyType: EPartyType): EContractRole | null {
+function projectLeadRole(partyType: EPartyType): ContractRole | null {
   if (partyType === EPartyType.CLIENT) {
-    return EContractRole.CLIENT_PROJECT_MANAGER;
+    return EClientContractRole.CLIENT_PROJECT_MANAGER;
   }
   return [EPartyType.CONTRACTOR, EPartyType.SUBCONTRACTOR].includes(partyType)
-    ? EContractRole.CONTRACTOR_PROJECT_LEAD
+    ? EContractorContractRole.CONTRACTOR_PROJECT_LEAD
     : null;
 }
 
@@ -135,6 +137,18 @@ export class ContractLifecycleService {
       const contract =
         await context.contracts.findPermissionSnapshot(contractId);
       if (!contract) {
+        throw new NotFoundException('Contract was not found.');
+      }
+      // Visibility first: a role on this party, or Company Administrator
+      // oversight. A member who can't see the contract learns nothing more.
+      if (
+        membership.companyRole !== ECompanyRole.COMPANY_ADMIN &&
+        !(await context.roleAssignments.hasAnyActiveAssignment({
+          companyId,
+          contractPartyId: party.id,
+          companyUserId: membership.id,
+        }))
+      ) {
         throw new NotFoundException('Contract was not found.');
       }
 
@@ -658,7 +672,12 @@ export class ContractLifecycleService {
   ): Promise<RecordedContractSignatory> {
     return this.unitOfWork.execute(async (context) => {
       await this.lockActiveContract(context, contractId);
-      await this.requireCompanyAdmin(context, userId, companyId);
+      await this.requireContractCompanyAdmin(
+        context,
+        userId,
+        companyId,
+        contractId,
+      );
       const party = await context.parties.find(contractId, companyId);
       if (!party) {
         throw new NotFoundException('Contract was not found.');
@@ -686,7 +705,12 @@ export class ContractLifecycleService {
     }
     return this.unitOfWork.execute(async (context) => {
       const contract = await this.lockActiveContract(context, contractId);
-      const actor = await this.requireCompanyAdmin(context, userId, companyId);
+      const actor = await this.requireContractCompanyAdmin(
+        context,
+        userId,
+        companyId,
+        contractId,
+      );
       const party = await context.parties.findForUpdate(contractId, companyId);
       if (!party) {
         throw new NotFoundException('Contract was not found.');
@@ -1105,6 +1129,54 @@ export class ContractLifecycleService {
     return actor;
   }
 
+  /**
+   * `requireCompanyAdmin` for one contract. A caller who isn't allowed to
+   * manage it and can't even see it (no role on it, not a Company
+   * Administrator of a party company) gets the same 404 as for a contract
+   * that doesn't exist, so a 403 never confirms that the contract exists.
+   */
+  private async requireContractCompanyAdmin(
+    context: IContractLifecycleContext,
+    userId: string,
+    companyId: string,
+    contractId: string,
+  ): Promise<CompanyUser> {
+    try {
+      return await this.requireCompanyAdmin(context, userId, companyId);
+    } catch (error) {
+      if (
+        error instanceof ForbiddenException &&
+        !(await this.canSeeContract(context, userId, companyId, contractId))
+      ) {
+        throw new NotFoundException('Contract was not found.');
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * The contract visibility rule (see ContractAccessService): an active
+   * member of a party company who holds an active role on that party, or is
+   * its Company Administrator.
+   */
+  private async canSeeContract(
+    context: IContractLifecycleContext,
+    userId: string,
+    companyId: string,
+    contractId: string,
+  ): Promise<boolean> {
+    const member = await context.memberships.findActive(userId, companyId);
+    if (!member) return false;
+    const party = await context.parties.find(contractId, companyId);
+    if (!party) return false;
+    if (member.companyRole === ECompanyRole.COMPANY_ADMIN) return true;
+    return context.roleAssignments.hasAnyActiveAssignment({
+      companyId,
+      contractPartyId: party.id,
+      companyUserId: member.id,
+    });
+  }
+
   private async requireOwnedContract(
     context: IContractLifecycleContext,
     userId: string,
@@ -1120,7 +1192,12 @@ export class ContractLifecycleService {
     ) {
       throw new NotFoundException('Contract was not found.');
     }
-    const actor = await this.requireCompanyAdmin(context, userId, companyId);
+    const actor = await this.requireContractCompanyAdmin(
+      context,
+      userId,
+      companyId,
+      contractId,
+    );
     const party = await context.parties.findForShare(contractId, companyId);
     if (!party) {
       throw new NotFoundException('Contract was not found.');
@@ -1199,6 +1276,9 @@ export class ContractLifecycleService {
         role: authorizedRole,
       });
     if (!hasAssignment) {
+      if (!(await this.canSeeContract(context, userId, companyId, contractId))) {
+        throw new NotFoundException('Contract was not found.');
+      }
       throw new ForbiddenException(
         'An active project lead assignment is required to change contract status.',
       );

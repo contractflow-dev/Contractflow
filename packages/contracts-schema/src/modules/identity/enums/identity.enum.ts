@@ -3,17 +3,6 @@ export enum EUserStatus {
   INACTIVE = "inactive",
 }
 
-export enum EInvitationRole {
-  CONTRACTOR_PROJECT_LEAD = "Contractor Project Lead",
-  CONTRACTOR_SITE_SUPERVISOR = "Contractor Site Supervisor",
-  CLIENT_PROJECT_MANAGER = "Client Project Manager",
-  CLIENT_SITE_ENGINEER = "Client Site Engineer",
-  HSE_OFFICER = "HSE Officer",
-  HSE_MANAGER = "HSE Manager",
-  FINANCE_OFFICER = "Finance Officer",
-  FINANCE_DIRECTOR = "Finance Director",
-}
-
 export enum EInvitationStatus {
   PENDING = "pending",
   ACCEPTED = "accepted",
@@ -22,16 +11,13 @@ export enum EInvitationStatus {
   REVOKED = "revoked",
 }
 
+/**
+ * A member's authority in their company. Contract and workspace access never
+ * comes from this: it needs a contract role assignment on each contract.
+ */
 export enum ECompanyRole {
   COMPANY_ADMIN = "Company Administrator",
-  CONTRACTOR_PROJECT_LEAD = "Contractor Project Lead",
-  CONTRACTOR_SITE_SUPERVISOR = "Contractor Site Supervisor",
-  CLIENT_PROJECT_MANAGER = "Client Project Manager",
-  CLIENT_SITE_ENGINEER = "Client Site Engineer",
-  HSE_OFFICER = "HSE Officer",
-  HSE_MANAGER = "HSE Manager",
-  FINANCE_OFFICER = "Finance Officer",
-  FINANCE_DIRECTOR = "Finance Director",
+  MEMBER = "Member",
 }
 
 export enum ECurrencyCode {

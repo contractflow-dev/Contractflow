@@ -168,6 +168,71 @@ export function todayAsCalendarDate(now: Date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
+/** How far ahead of UTC a time zone's wall clock is at an instant, in ms. */
+function zoneOffsetMs(instant: number, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(new Date(instant));
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((candidate) => candidate.type === type)?.value);
+  const wallClock = Date.UTC(
+    part("year"),
+    part("month") - 1,
+    part("day"),
+    part("hour"),
+    part("minute"),
+    part("second"),
+  );
+  return wallClock - Math.floor(instant / 1000) * 1000;
+}
+
+/** The instant a calendar day begins in a time zone (DST-aware). */
+function zonedMidnight(
+  year: number,
+  month: number,
+  day: number,
+  timeZone: string | undefined,
+): number {
+  if (!timeZone) return new Date(year, month - 1, day).getTime();
+  const wallClock = Date.UTC(year, month - 1, day);
+  // A second pass corrects days on which the offset changes.
+  const first = wallClock - zoneOffsetMs(wallClock, timeZone);
+  return wallClock - zoneOffsetMs(first, timeZone);
+}
+
+/**
+ * The first and last instants (ISO 8601, UTC) of a `YYYY-MM-DD` day in the
+ * viewer's time zone, or the browser's when none is given. A filter "from
+ * 10 Nov to 12 Nov" then covers those whole days as the viewer lives them.
+ * Returns null for anything that isn't a real calendar day.
+ */
+export function dayBoundsInTimeZone(
+  value: string,
+  timeZone?: string,
+): { start: string; end: string } | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const [year, month, day] = match.slice(1).map(Number);
+  const check = new Date(Date.UTC(year, month - 1, day));
+  if (check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) {
+    return null;
+  }
+  const zone = resolveTimeZone(timeZone);
+  const start = zonedMidnight(year, month, day, zone);
+  const next = zonedMidnight(year, month, day + 1, zone);
+  return {
+    start: new Date(start).toISOString(),
+    end: new Date(next - 1).toISOString(),
+  };
+}
+
 /**
  * The number of decimal places a currency uses for its minor unit (2 for NGN
  * and USD, 0 for JPY, 3 for KWD), or null for an unknown currency code.

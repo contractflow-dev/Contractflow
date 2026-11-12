@@ -2,12 +2,12 @@ import {
   ECompanyRole,
   ECompanyStatus,
   ECompanyUserStatus,
-  EContractRole,
   EContractStatus,
   EContractType,
   ECurrencyCode,
   EPartyType,
   EUserStatus,
+  EContractorContractRole,
 } from '@contractflow/contracts-schema';
 import type { DataSource } from 'typeorm';
 import { ActivityLog } from '../../src/modules/cross-cutting/entities/activity-log.entity';
@@ -45,10 +45,7 @@ export class ContractTestFactory {
 
   async createLifecycleFixture(): Promise<LifecycleFixture> {
     const company = await this.createCompany();
-    const actor = await this.createMember(
-      company,
-      ECompanyRole.FINANCE_OFFICER,
-    );
+    const actor = await this.createMember(company, ECompanyRole.MEMBER);
     const contract = await this.createContract(company);
     const party = await this.createParty(contract, company);
     await this.createWorkspace(contract, actor, 'project');
@@ -60,7 +57,7 @@ export class ContractTestFactory {
         contractPartyId: party.id,
         companyUserId: actor.id,
         companyId: company.id,
-        role: EContractRole.CONTRACTOR_PROJECT_LEAD,
+        role: EContractorContractRole.CONTRACTOR_PROJECT_LEAD,
         isWorkspaceAdmin: false,
         assignedAt: new Date(),
         assignedById: actor.id,
@@ -74,10 +71,7 @@ export class ContractTestFactory {
   async createRoleAssignmentFixture(): Promise<RoleAssignmentFixture> {
     const company = await this.createCompany();
     const actor = await this.createMember(company, ECompanyRole.COMPANY_ADMIN);
-    const target = await this.createMember(
-      company,
-      ECompanyRole.FINANCE_OFFICER,
-    );
+    const target = await this.createMember(company, ECompanyRole.MEMBER);
     const contract = await this.createContract(company);
     const party = await this.createParty(contract, company);
     await this.createWorkspace(contract, actor, 'finance');
@@ -101,7 +95,7 @@ export class ContractTestFactory {
 
   async createAdditionalMember(
     company: Company,
-    companyRole: ECompanyRole = ECompanyRole.FINANCE_OFFICER,
+    companyRole: ECompanyRole = ECompanyRole.MEMBER,
   ): Promise<CompanyUser> {
     return this.createMember(company, companyRole);
   }

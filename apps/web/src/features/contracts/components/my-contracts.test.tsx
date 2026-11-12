@@ -1,11 +1,11 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  EContractRole,
   EContractStatus,
   EContractType,
   ECurrencyCode,
   EPartyType,
+  EContractorContractRole,
 } from "@contractflow/contracts-schema";
 import type { ContractListItem } from "@/services/contractApi";
 import { useContractsList } from "../_hooks/use-contracts-list";
@@ -45,7 +45,7 @@ function contract(overrides: Partial<ContractListItem> = {}): ContractListItem {
     counterparties: [{ companyName: "Bravo Energy", partyType: EPartyType.CLIENT }],
     myRoles: [
       {
-        role: EContractRole.FINANCE_OFFICER,
+        role: EContractorContractRole.FINANCE_OFFICER,
         workspace: "finance",
         isWorkspaceAdmin: true,
       },

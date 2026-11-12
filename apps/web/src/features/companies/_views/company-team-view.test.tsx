@@ -85,13 +85,33 @@ describe("CompanyTeamView", () => {
     });
   });
 
-  it("collects only the email and role required by the invitation API", () => {
+  it("collects company membership only: email, optional names and a company role", () => {
     const markup = renderToStaticMarkup(<CompanyTeamView />);
 
     expect(markup).toContain('id="invite-email"');
-    expect(markup).not.toContain('id="invite-first-name"');
-    expect(markup).not.toContain('id="invite-last-name"');
+    expect(markup).toContain("First name (optional)");
+    expect(markup).toContain("Last name (optional)");
     expect(markup).toContain("No invitations have been sent.");
+    // Company roles only, Member first; no contract role or workspace field.
+    const select = markup.slice(
+      markup.indexOf('id="invite-role"'),
+      markup.indexOf("</select>", markup.indexOf('id="invite-role"')),
+    );
+    const options = [...select.matchAll(/value="([^"]*)"/g)].map(
+      ([, value]) => value,
+    );
+    expect(options).toEqual(["Member", "Company Administrator"]);
+    expect(select).toMatch(/value="Member" selected=""/);
+    for (const contractRole of [
+      "Contractor Project Lead",
+      "Client Project Manager",
+      "HSE Officer",
+      "Finance Officer",
+    ]) {
+      expect(select).not.toContain(contractRole);
+    }
+    expect(markup).not.toMatch(/id="invite-(contract-role|workspace)"/);
+    expect(markup).toContain("contract roles are");
   });
 
   it("explains invitation expiry where invitations are sent", () => {
@@ -122,7 +142,7 @@ describe("CompanyTeamView", () => {
             firstName: "Ada",
             lastName: "Obi",
             email: "ada@example.com",
-            companyRole: "HSE Officer",
+            companyRole: "Member",
             status: "active",
             joinedAt: "2026-01-15T10:00:00.000Z",
           },
@@ -141,7 +161,7 @@ describe("CompanyTeamView", () => {
             email: "late@example.com",
             firstName: null,
             lastName: null,
-            companyRole: "HSE Officer",
+            companyRole: "Member",
             status: "pending",
             expiresAt: "2020-01-01T00:00:00.000Z",
           },

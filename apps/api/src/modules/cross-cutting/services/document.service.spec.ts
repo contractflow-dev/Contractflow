@@ -745,7 +745,7 @@ describe('DocumentService', () => {
     const asMember = (context: ReturnType<typeof makeContext>) =>
       context.memberships.findActive.mockResolvedValue({
         id: 'member-2',
-        companyRole: ECompanyRole.FINANCE_OFFICER,
+        companyRole: ECompanyRole.MEMBER,
       });
 
     it('never consults contract access, and reads only the header company', async () => {

@@ -72,6 +72,8 @@ export class CompanyService {
 
       const savedCompany = await context.createCompany({
         ...dto,
+        registrationNumber: dto.registrationNumber ?? '',
+        taxIdentificationNumber: dto.taxIdentificationNumber ?? '',
         website: dto.website ?? '',
         addressLine2: dto.addressLine2 ?? '',
         status: ECompanyStatus.ACTIVE,
@@ -286,7 +288,8 @@ export class CompanyService {
       },
       departments: {
         complianceAttentionCount: portfolio.complianceAttentionCount,
-        contractsNeedingAttentionCount: portfolio.contractsNeedingAttentionCount,
+        contractsNeedingAttentionCount:
+          portfolio.contractsNeedingAttentionCount,
         openIncidentCount: portfolio.openIncidentCount,
         invoicesDueSoonCount: portfolio.invoicesDueSoonCount,
         dueWindowDays: COMPANY_DASHBOARD_DUE_WINDOW_DAYS,

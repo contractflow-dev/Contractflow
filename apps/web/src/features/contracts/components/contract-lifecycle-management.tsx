@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   EContractStatus,
   EPartyType,
+  type ContractActivityTarget,
 } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
@@ -25,10 +26,7 @@ import {
 } from "@workspace/ui/components/native-select";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
-import {
-  FormField,
-  FormSection,
-} from "@/components/forms/form-field";
+import { FormField, FormSection } from "@/components/forms/form-field";
 import {
   StatusBadge,
   effectiveInvitationStatus,
@@ -96,6 +94,7 @@ export function ContractLifecycleManagement({
   companyId,
   contract,
   part,
+  target,
 }: {
   companyId: string;
   contract: Contract;
@@ -104,6 +103,7 @@ export function ContractLifecycleManagement({
    * inviting companies to it (Parties tab). Both share this state and dialogs.
    */
   part: "manage" | "invitations";
+  target?: ContractActivityTarget | null;
 }) {
   const query = { companyId, contractId: contract.id };
   const permissionsQuery = useGetContractLifecyclePermissionsQuery(query);
@@ -289,7 +289,11 @@ export function ContractLifecycleManagement({
                   aria-label="Contract details"
                   className="grid items-start gap-4 sm:grid-cols-2"
                 >
-                  <FormField id="contract-title" label="Contract title" required>
+                  <FormField
+                    id="contract-title"
+                    label="Contract title"
+                    required
+                  >
                     {(control) => (
                       <Input
                         {...control}
@@ -355,10 +359,14 @@ export function ContractLifecycleManagement({
                               onCheckedChange={(checked) => {
                                 setSelectedWorkspaces((current) => {
                                   const next =
-                                    current ?? workspacesQuery.currentData ?? [];
+                                    current ??
+                                    workspacesQuery.currentData ??
+                                    [];
                                   return checked
                                     ? [...next, workspace]
-                                    : next.filter((value) => value !== workspace);
+                                    : next.filter(
+                                        (value) => value !== workspace,
+                                      );
                                 });
                               }}
                             />
@@ -376,7 +384,8 @@ export function ContractLifecycleManagement({
                         variant="outline"
                         className="w-fit"
                         disabled={
-                          workspaceState.isLoading || selectedWorkspaces === null
+                          workspaceState.isLoading ||
+                          selectedWorkspaces === null
                         }
                         onClick={() => void saveWorkspaces()}
                       >
@@ -536,7 +545,13 @@ export function ContractLifecycleManagement({
               <ul className="divide-y">
                 {invitationsQuery.currentData.map((invitation) => (
                   <li
-                    className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm"
+                    id={`activity-target-${invitation.id}`}
+                    className={`flex flex-wrap items-center justify-between gap-3 py-3 text-sm ${
+                      target?.type === "contract_party_invitation" &&
+                      target.id === invitation.id
+                        ? "bg-primary/10"
+                        : ""
+                    }`}
                     key={invitation.id}
                   >
                     <span>
@@ -651,6 +666,5 @@ function ErrorAlert({ error, fallback }: { error: unknown; fallback: string }) {
     </Alert>
   );
 }
-
 
 const formatLabel = humanizeEnumValue;

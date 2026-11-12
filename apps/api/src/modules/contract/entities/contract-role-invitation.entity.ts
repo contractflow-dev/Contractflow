@@ -7,7 +7,10 @@ import {
   ManyToOne,
   ForeignKey,
 } from 'typeorm';
-import { EContractRole } from '@contractflow/contracts-schema';
+import {
+  CONTRACT_ROLES,
+  type ContractRole,
+} from '@contractflow/contracts-schema';
 import { Company } from '../../identity/entities/company.entity';
 import { CompanyUser } from '../../identity/entities/company-user.entity';
 import { BaseCustomEntity } from '../../cross-cutting/entities/base-custom.entity';
@@ -98,10 +101,10 @@ export class ContractRoleInvitation extends BaseCustomEntity {
   @Column({
     name: 'contract_role',
     type: 'enum',
-    enum: EContractRole,
+    enum: [...CONTRACT_ROLES],
     enumName: 'contract_role_assignment_contract_role_enum',
   })
-  role!: EContractRole;
+  role!: ContractRole;
 
   @Column({ name: 'workspace', type: 'varchar', length: 20 })
   workspace!: AssignableContractWorkspace;

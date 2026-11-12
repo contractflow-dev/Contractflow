@@ -35,6 +35,7 @@ describe('database migration configuration', () => {
       'PasswordResetToken1793400000000',
       'CompanyLevelDocuments1793500000000',
       'CompanyRoleAssignmentIndex1793500000001',
+      'CompanyMembershipRoles1793600000000',
     ]);
   });
 

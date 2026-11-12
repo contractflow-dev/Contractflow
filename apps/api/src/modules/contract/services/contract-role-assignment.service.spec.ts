@@ -7,9 +7,11 @@ import {
 import {
   ECompanyRole,
   ECompanyUserStatus,
-  EContractRole,
   EContractStatus,
   EPartyType,
+  EClientContractRole,
+  EContractorContractRole,
+  type ContractRole,
 } from '@contractflow/contracts-schema';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
@@ -32,7 +34,7 @@ describe('ContractRoleAssignmentService', () => {
     id: 'target-membership',
     userId: 'target-user',
     companyId: 'company-1',
-    companyRole: ECompanyRole.FINANCE_OFFICER,
+    companyRole: ECompanyRole.MEMBER,
     status: ECompanyUserStatus.ACTIVE,
   };
   const party = {
@@ -46,7 +48,7 @@ describe('ContractRoleAssignmentService', () => {
     companyId: 'company-1',
     contractPartyId: party.id,
     companyUserId: target.id,
-    role: EContractRole.FINANCE_OFFICER,
+    role: EContractorContractRole.FINANCE_OFFICER,
     isWorkspaceAdmin: false,
     assignedAt: new Date('2026-01-01T00:00:00.000Z'),
     assignedById: actor.id,
@@ -69,7 +71,7 @@ describe('ContractRoleAssignmentService', () => {
     tokenHash: 'token-hash',
     status: 'pending',
     workspace: 'finance',
-    role: EContractRole.FINANCE_OFFICER,
+    role: EContractorContractRole.FINANCE_OFFICER,
     isWorkspaceAdmin: false,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     expiresAt: new Date('2027-01-01T00:00:00.000Z'),
@@ -118,6 +120,12 @@ describe('ContractRoleAssignmentService', () => {
       assignments: {
         findActiveForParty: vi.fn(async () => []),
         hasWorkspaceAdmin: vi.fn(async () => false),
+        // The caller's own roles on the party (contract visibility).
+        listActiveForMember: vi.fn(
+          async (): Promise<
+            Array<{ role: ContractRole; isWorkspaceAdmin: boolean }>
+          > => [],
+        ),
         countActiveWorkspaceAdmins: vi.fn(async () => 2),
         findActiveDuplicate: vi.fn(async () => null),
         create: vi.fn(async () => assignment),
@@ -183,12 +191,15 @@ describe('ContractRoleAssignmentService', () => {
       'company-1',
       party.id,
       'contract-1',
-      [EContractRole.FINANCE_OFFICER, EContractRole.FINANCE_DIRECTOR],
+      [
+        EContractorContractRole.FINANCE_OFFICER,
+        EContractorContractRole.FINANCE_DIRECTOR,
+      ],
     );
     expect(result[0]).toMatchObject({
       id: assignment.id,
       companyUserId: target.id,
-      role: EContractRole.FINANCE_OFFICER,
+      role: EContractorContractRole.FINANCE_OFFICER,
       email: 'casey@example.test',
     });
   });
@@ -204,7 +215,7 @@ describe('ContractRoleAssignmentService', () => {
       firstName: 'Casey',
       lastName: 'Member',
       email: 'casey@example.test',
-      role: EContractRole.HSE_OFFICER,
+      role: EContractorContractRole.HSE_OFFICER,
       isWorkspaceAdmin: true,
       assignedAt: new Date('2026-01-01T00:00:00.000Z'),
     };
@@ -227,7 +238,10 @@ describe('ContractRoleAssignmentService', () => {
         'company-1',
         {
           companyUserId: target.id,
-          roles: [EContractRole.HSE_OFFICER, EContractRole.HSE_MANAGER],
+          roles: [
+            EContractorContractRole.HSE_OFFICER,
+            EContractorContractRole.HSE_MANAGER,
+          ],
         },
         { skip: 0, take: 20 },
       );
@@ -272,7 +286,7 @@ describe('ContractRoleAssignmentService', () => {
         'contract-1',
         'project',
         target.id,
-        EContractRole.FINANCE_OFFICER,
+        EContractorContractRole.FINANCE_OFFICER,
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(execute).not.toHaveBeenCalled();
@@ -291,24 +305,215 @@ describe('ContractRoleAssignmentService', () => {
         'contract-1',
         'project',
         target.id,
-        EContractRole.CLIENT_PROJECT_MANAGER,
+        EClientContractRole.CLIENT_PROJECT_MANAGER,
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(transactionContext.assignments.create).not.toHaveBeenCalled();
+  });
+
+  describe('client and contractor role sides', () => {
+    it.each([
+      [
+        EPartyType.CLIENT,
+        'project',
+        'client',
+        [
+          EClientContractRole.CLIENT_PROJECT_MANAGER,
+          EClientContractRole.CLIENT_SITE_ENGINEER,
+        ],
+      ],
+      [
+        EPartyType.CONTRACTOR,
+        'project',
+        'contractor',
+        [
+          EContractorContractRole.CONTRACTOR_PROJECT_LEAD,
+          EContractorContractRole.CONTRACTOR_SITE_SUPERVISOR,
+        ],
+      ],
+      [
+        EPartyType.VENDOR,
+        'hse',
+        'contractor',
+        [
+          EContractorContractRole.HSE_OFFICER,
+          EContractorContractRole.HSE_MANAGER,
+        ],
+      ],
+      [
+        EPartyType.CLIENT,
+        'finance',
+        'client',
+        [
+          EClientContractRole.FINANCE_OFFICER,
+          EClientContractRole.FINANCE_DIRECTOR,
+        ],
+      ],
+    ] as const)(
+      'offers a %s party in %s only its %s roles',
+      async (partyType, workspace, roleSide, roles) => {
+        persistence.parties.findByContractAndCompany = vi.fn(async () => ({
+          ...party,
+          partyType,
+        }));
+
+        await expect(
+          service.managementPermissions(
+            'actor-user',
+            'company-1',
+            'contract-1',
+            workspace,
+          ),
+        ).resolves.toEqual({
+          canManage: true,
+          canGrantWorkspaceAdmin: true,
+          roleSide,
+          roles: [...roles],
+        });
+      },
+    );
+
+    it.each([
+      [
+        EPartyType.CLIENT,
+        'project',
+        EClientContractRole.CLIENT_PROJECT_MANAGER,
+      ],
+      [EPartyType.CLIENT, 'project', EClientContractRole.CLIENT_SITE_ENGINEER],
+      [EPartyType.CLIENT, 'hse', EClientContractRole.HSE_OFFICER],
+      [EPartyType.CLIENT, 'finance', EClientContractRole.FINANCE_DIRECTOR],
+      [
+        EPartyType.CONTRACTOR,
+        'project',
+        EContractorContractRole.CONTRACTOR_PROJECT_LEAD,
+      ],
+      [EPartyType.CONTRACTOR, 'hse', EContractorContractRole.HSE_MANAGER],
+      [
+        EPartyType.CONTRACTOR,
+        'finance',
+        EContractorContractRole.FINANCE_OFFICER,
+      ],
+      [
+        EPartyType.SUBCONTRACTOR,
+        'project',
+        EContractorContractRole.CONTRACTOR_SITE_SUPERVISOR,
+      ],
+      [EPartyType.VENDOR, 'finance', EContractorContractRole.FINANCE_DIRECTOR],
+      [EPartyType.OTHER, 'hse', EContractorContractRole.HSE_OFFICER],
+    ] as const)(
+      'assigns a %s party its own side’s role (%s: %s)',
+      async (partyType, workspace, role) => {
+        transactionContext.parties.findForUpdate = vi.fn(async () => ({
+          ...party,
+          partyType,
+        }));
+
+        await service.assign(
+          'actor-user',
+          'company-1',
+          'contract-1',
+          workspace,
+          target.id,
+          role,
+        );
+
+        expect(transactionContext.assignments.create).toHaveBeenCalledWith(
+          'company-1',
+          expect.objectContaining({ role }),
+        );
+      },
+    );
+
+    it.each([
+      [EPartyType.CLIENT, EContractorContractRole.CONTRACTOR_PROJECT_LEAD],
+      [EPartyType.CLIENT, EContractorContractRole.CONTRACTOR_SITE_SUPERVISOR],
+      [EPartyType.CONTRACTOR, EClientContractRole.CLIENT_PROJECT_MANAGER],
+      [EPartyType.SUBCONTRACTOR, EClientContractRole.CLIENT_SITE_ENGINEER],
+      [EPartyType.VENDOR, EClientContractRole.CLIENT_PROJECT_MANAGER],
+      [EPartyType.OTHER, EClientContractRole.CLIENT_SITE_ENGINEER],
+    ] as const)(
+      'refuses a %s party the other side’s role %s, for assignments and invitations',
+      async (partyType, role) => {
+        transactionContext.parties.findForUpdate = vi.fn(async () => ({
+          ...party,
+          partyType,
+        }));
+
+        await expect(
+          service.assign(
+            'actor-user',
+            'company-1',
+            'contract-1',
+            'project',
+            target.id,
+            role,
+          ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        await expect(
+          service.invite(
+            'actor-user',
+            'company-1',
+            'contract-1',
+            'project',
+            'someone@example.com',
+            role,
+          ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(transactionContext.assignments.create).not.toHaveBeenCalled();
+        expect(transactionContext.invitations.create).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([
+      'Owner',
+      'Company Administrator',
+      'Member',
+      'Workspace Admin',
+      '',
+    ])(
+      'rejects the unknown role %j without opening a unit of work',
+      async (role) => {
+        await expect(
+          service.assign(
+            'actor-user',
+            'company-1',
+            'contract-1',
+            'project',
+            target.id,
+            role as ContractRole,
+          ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        await expect(
+          service.invite(
+            'actor-user',
+            'company-1',
+            'contract-1',
+            'project',
+            'someone@example.com',
+            role as ContractRole,
+          ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(execute).not.toHaveBeenCalled();
+      },
+    );
   });
 
   it('allows workspace admins only within their workspace and not to grant admin privileges', async () => {
     transactionContext.memberships.findActiveMember = vi.fn(
       async (_companyId, userId) =>
         userId === 'target-user'
-          ? { ...target, companyRole: ECompanyRole.FINANCE_OFFICER }
+          ? { ...target, companyRole: ECompanyRole.MEMBER }
           : null,
     );
     transactionContext.memberships.findActiveById = vi.fn(async () => ({
       ...target,
-      companyRole: ECompanyRole.FINANCE_OFFICER,
+      companyRole: ECompanyRole.MEMBER,
     }));
     transactionContext.assignments.hasWorkspaceAdmin = vi.fn(async () => true);
+    // A Workspace Admin holds the role their admin rights are attached to.
+    transactionContext.assignments.listActiveForMember = vi.fn(async () => [
+      { role: EContractorContractRole.FINANCE_OFFICER, isWorkspaceAdmin: true },
+    ]);
 
     await expect(
       service.assign(
@@ -317,7 +522,7 @@ describe('ContractRoleAssignmentService', () => {
         'contract-1',
         'finance',
         target.id,
-        EContractRole.FINANCE_OFFICER,
+        EContractorContractRole.FINANCE_OFFICER,
         true,
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
@@ -336,7 +541,7 @@ describe('ContractRoleAssignmentService', () => {
         'contract-1',
         'finance',
         target.id,
-        EContractRole.FINANCE_OFFICER,
+        EContractorContractRole.FINANCE_OFFICER,
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(transactionContext.assignments.create).not.toHaveBeenCalled();
@@ -349,7 +554,7 @@ describe('ContractRoleAssignmentService', () => {
       'contract-1',
       'finance',
       target.id,
-      EContractRole.FINANCE_OFFICER,
+      EContractorContractRole.FINANCE_OFFICER,
     );
 
     expect(execute).toHaveBeenCalledOnce();
@@ -358,7 +563,7 @@ describe('ContractRoleAssignmentService', () => {
       expect.objectContaining({
         contractPartyId: party.id,
         companyUserId: target.id,
-        role: EContractRole.FINANCE_OFFICER,
+        role: EContractorContractRole.FINANCE_OFFICER,
         assignedById: actor.id,
         revokedAt: null,
       }),
@@ -374,7 +579,7 @@ describe('ContractRoleAssignmentService', () => {
     expect(result).toMatchObject({
       id: assignment.id,
       revokedAt: null,
-      role: EContractRole.FINANCE_OFFICER,
+      role: EContractorContractRole.FINANCE_OFFICER,
     });
   });
 
@@ -390,7 +595,7 @@ describe('ContractRoleAssignmentService', () => {
         'contract-1',
         'finance',
         target.id,
-        EContractRole.FINANCE_OFFICER,
+        EContractorContractRole.FINANCE_OFFICER,
       ),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(transactionContext.assignments.create).not.toHaveBeenCalled();

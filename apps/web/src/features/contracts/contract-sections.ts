@@ -15,6 +15,15 @@ export const CONTRACT_SECTIONS = [
 export type ContractSection = (typeof CONTRACT_SECTIONS)[number]["id"];
 
 /**
+ * Why a contract can be missing. The API answers 404 alike for a contract
+ * that doesn't exist, is archived, or isn't visible to the viewer (no contract
+ * role, and not a Company Administrator of a party company), so the copy
+ * never says which.
+ */
+export const CONTRACT_UNAVAILABLE_TEXT =
+  "It may have been archived, or you don't have access to it. Contracts appear here once you're given a role on them.";
+
+/**
  * Sections whose content only some users can use. Their tab is shown only
  * when the API's permissions allow it; the API still enforces access.
  */
@@ -30,9 +39,19 @@ export type RestrictedContractSection =
 export function contractSectionHref(
   contractId: string,
   section: ContractSection,
+  target?: ContractActivityTarget | null,
 ): string {
   const base = `/dashboards/contracts/${encodeURIComponent(contractId)}`;
-  return section === "overview" ? base : `${base}/${section}`;
+  const path = section === "overview" ? base : `${base}/${section}`;
+  if (!target || target.section !== section) return path;
+  const params = new URLSearchParams({
+    targetType: target.type,
+    targetId: target.id,
+    targetSection: target.section,
+  });
+  if (target.versionId) params.set("targetVersionId", target.versionId);
+  if (target.workspace) params.set("targetWorkspace", target.workspace);
+  return `${path}?${params.toString()}#activity-target-${encodeURIComponent(target.id)}`;
 }
 
 /** The section named by a URL segment, or null for an unknown one. */
@@ -45,3 +64,4 @@ export function isRestrictedContractSection(
 ): section is RestrictedContractSection {
   return (RESTRICTED_CONTRACT_SECTIONS as readonly string[]).includes(section);
 }
+import type { ContractActivityTarget } from "@contractflow/contracts-schema";

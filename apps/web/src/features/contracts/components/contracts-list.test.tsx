@@ -208,6 +208,18 @@ describe("ContractsList", () => {
     expect(markup).not.toContain("Rows per page");
   });
 
+  it("describes the list for its reader: oversight for administrators, own roles for members", () => {
+    const admin = render(true);
+    expect(admin).toContain("Contracts your company is a party to.");
+
+    const member = render(false);
+    expect(member).toContain("Contracts you hold a role on.");
+    expect(member).not.toContain("Contracts your company is a party to.");
+    expect(member).toContain(
+      "No contracts yet. Contracts appear here once a Company Administrator or workspace administrator gives you a role on them.",
+    );
+  });
+
   it("tells a filtered search that nothing matches and offers to clear it", () => {
     setState({ hasFilters: true, search: "zzz", searchInput: "zzz" });
     const markup = render();

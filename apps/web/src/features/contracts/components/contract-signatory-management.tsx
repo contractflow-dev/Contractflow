@@ -1,7 +1,10 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { ECompanyRole } from "@contractflow/contracts-schema";
+import {
+  ECompanyRole,
+  type ContractActivityTarget,
+} from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
 import {
@@ -35,9 +38,11 @@ import {
 export function ContractSignatoryManagement({
   companyId,
   contract,
+  target,
 }: {
   companyId: string;
   contract: Contract;
+  target?: ContractActivityTarget | null;
 }) {
   const membershipQuery = useGetCompanyMembershipQuery({ companyId });
   const isCompanyAdmin =
@@ -51,7 +56,16 @@ export function ContractSignatoryManagement({
   if (!canRecord) return null;
 
   return (
-    <Card>
+    <Card
+      id={
+        target?.type === "contract_party"
+          ? `activity-target-${target.id}`
+          : undefined
+      }
+      className={
+        target?.type === "contract_party" ? "ring-2 ring-primary/40" : undefined
+      }
+    >
       <CardHeader>
         <CardTitle>
           <h2>Your company&apos;s signatory</h2>

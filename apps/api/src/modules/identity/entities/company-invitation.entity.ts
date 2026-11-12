@@ -4,7 +4,7 @@ import { CompanyUser } from './company-user.entity';
 import { BaseCustomEntity } from '../../cross-cutting/entities/base-custom.entity';
 import { ICompanyInvitationEntity } from '../interface/company-invitation.interface';
 import {
-  EInvitationRole,
+  ECompanyRole,
   EInvitationStatus,
 } from '@contractflow/contracts-schema';
 
@@ -51,8 +51,8 @@ export class CompanyInvitation
   @Column({ name: 'last_name', type: 'varchar', length: 100, nullable: true })
   lastName!: string | null;
 
-  @Column({ name: 'company_role', type: 'enum', enum: EInvitationRole })
-  companyRole!: EInvitationRole;
+  @Column({ name: 'company_role', type: 'enum', enum: ECompanyRole })
+  companyRole!: ECompanyRole;
 
   @Column({
     name: 'token_hash',

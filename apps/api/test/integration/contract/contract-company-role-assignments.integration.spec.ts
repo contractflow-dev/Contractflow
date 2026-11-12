@@ -1,5 +1,10 @@
 import { ForbiddenException } from '@nestjs/common';
-import { ECompanyRole, EContractRole } from '@contractflow/contracts-schema';
+import {
+  ECompanyRole,
+  EClientContractRole,
+  EContractorContractRole,
+  type ContractRole,
+} from '@contractflow/contracts-schema';
 import type { DataSource } from 'typeorm';
 import { TypeOrmUnitOfWork } from '../../../src/common/database/typeorm-unit-of-work';
 import type { ContractParty } from '../../../src/modules/contract/entities/contract-party.entity';
@@ -59,7 +64,7 @@ describe('Company-wide contract roles (PostgreSQL)', () => {
   async function assign(
     party: ContractParty,
     member: CompanyUser,
-    role: EContractRole,
+    role: ContractRole,
     options: { admin?: boolean; revoked?: boolean } = {},
   ): Promise<ContractRoleAssignment> {
     const repository = dataSource!.getRepository(ContractRoleAssignment);
@@ -86,23 +91,32 @@ describe('Company-wide contract roles (PostgreSQL)', () => {
       contract,
       party,
     } = await factory!.createRoleAssignmentFixture();
-    const finance = await assign(party, member, EContractRole.FINANCE_OFFICER, {
-      admin: true,
-    });
-    await assign(party, member, EContractRole.CLIENT_PROJECT_MANAGER, {
+    const finance = await assign(
+      party,
+      member,
+      EContractorContractRole.FINANCE_OFFICER,
+      {
+        admin: true,
+      },
+    );
+    await assign(party, member, EClientContractRole.CLIENT_PROJECT_MANAGER, {
       revoked: true,
     });
 
     const second = await factory!.createAdditionalContract(company);
     const secondParty = await factory!.createAdditionalParty(second, company);
-    const hse = await assign(secondParty, member, EContractRole.HSE_OFFICER);
+    const hse = await assign(
+      secondParty,
+      member,
+      EContractorContractRole.HSE_OFFICER,
+    );
 
     const archived = await factory!.createAdditionalContract(company);
     const archivedParty = await factory!.createAdditionalParty(
       archived,
       company,
     );
-    await assign(archivedParty, member, EContractRole.HSE_MANAGER);
+    await assign(archivedParty, member, EContractorContractRole.HSE_MANAGER);
     await dataSource!
       .getRepository(Contract)
       .update({ id: archived.id }, { deletedAt: new Date() });
@@ -115,7 +129,7 @@ describe('Company-wide contract roles (PostgreSQL)', () => {
     const otherRole = await assign(
       otherParty,
       otherMember,
-      EContractRole.CONTRACTOR_PROJECT_LEAD,
+      EContractorContractRole.CONTRACTOR_PROJECT_LEAD,
     );
 
     return {
@@ -149,7 +163,7 @@ describe('Company-wide contract roles (PostgreSQL)', () => {
       contractReference: contract.referenceNumber,
       contractTitle: contract.title,
       companyUserId: member.id,
-      role: EContractRole.FINANCE_OFFICER,
+      role: EContractorContractRole.FINANCE_OFFICER,
       workspace: 'finance',
       isWorkspaceAdmin: true,
     });

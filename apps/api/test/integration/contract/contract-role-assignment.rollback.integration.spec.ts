@@ -1,5 +1,5 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
-import { EContractRole } from '@contractflow/contracts-schema';
+import { EContractorContractRole } from '@contractflow/contracts-schema';
 import type { DataSource } from 'typeorm';
 import { ActivityLog } from '../../../src/modules/cross-cutting/entities/activity-log.entity';
 import { ContractRoleAssignment } from '../../../src/modules/contract/entities/contract-role-assignment.entity';
@@ -60,7 +60,7 @@ describe('ContractRoleAssignmentService PostgreSQL rollback integration', () => 
       fixture.contract.id,
       'finance',
       fixture.target.id,
-      EContractRole.FINANCE_OFFICER,
+      EContractorContractRole.FINANCE_OFFICER,
     );
 
     const persisted = await dataSource!
@@ -77,7 +77,7 @@ describe('ContractRoleAssignmentService PostgreSQL rollback integration', () => 
       contractPartyId: fixture.party.id,
       companyUserId: fixture.target.id,
       companyId: fixture.company.id,
-      role: EContractRole.FINANCE_OFFICER,
+      role: EContractorContractRole.FINANCE_OFFICER,
     });
     expect(activityCount).toBe(1);
   });
@@ -99,7 +99,7 @@ describe('ContractRoleAssignmentService PostgreSQL rollback integration', () => 
           fixture.contract.id,
           'finance',
           fixture.target.id,
-          EContractRole.FINANCE_OFFICER,
+          EContractorContractRole.FINANCE_OFFICER,
         ),
       ).rejects.toThrow();
 
@@ -142,7 +142,7 @@ describe('ContractRoleAssignmentService PostgreSQL rollback integration', () => 
         fixture.contract.id,
         'finance',
         fixture.target.id,
-        EContractRole.FINANCE_OFFICER,
+        EContractorContractRole.FINANCE_OFFICER,
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(
@@ -174,7 +174,7 @@ describe('ContractRoleAssignmentService PostgreSQL rollback integration', () => 
         contractPartyId: otherParty.id,
         companyUserId: fixture.target.id,
         companyId: fixture.company.id,
-        role: EContractRole.FINANCE_OFFICER,
+        role: EContractorContractRole.FINANCE_OFFICER,
         isWorkspaceAdmin: false,
         assignedAt: new Date(),
         assignedById: fixture.actor.id,
@@ -208,7 +208,7 @@ describe('ContractRoleAssignmentService PostgreSQL rollback integration', () => 
         fixture.contract.id,
         'finance',
         fixture.target.id,
-        EContractRole.FINANCE_OFFICER,
+        EContractorContractRole.FINANCE_OFFICER,
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
     await expect(
@@ -218,7 +218,7 @@ describe('ContractRoleAssignmentService PostgreSQL rollback integration', () => 
         fixture.contract.id,
         'finance',
         outsider.member.id,
-        EContractRole.FINANCE_OFFICER,
+        EContractorContractRole.FINANCE_OFFICER,
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(

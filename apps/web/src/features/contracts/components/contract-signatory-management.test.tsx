@@ -98,7 +98,7 @@ describe("ContractSignatoryManagement", () => {
 
   it("is hidden from members who are not Company Administrators", () => {
     mocks.getMembership.mockReturnValue(
-      membership(ECompanyRole.CLIENT_PROJECT_MANAGER),
+      membership(ECompanyRole.MEMBER),
     );
 
     const markup = renderToStaticMarkup(

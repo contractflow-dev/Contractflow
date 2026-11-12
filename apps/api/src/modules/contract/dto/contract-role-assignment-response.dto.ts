@@ -1,6 +1,6 @@
 import type {
   ContractRoleAssignment as ContractRoleAssignmentContract,
-  EContractRole,
+  ContractRole,
 } from '@contractflow/contracts-schema';
 import {
   workspaceForRole,
@@ -14,7 +14,7 @@ export class ContractRoleAssignmentResponseDto implements ContractRoleAssignment
   firstName!: string;
   lastName!: string;
   email!: string;
-  role!: EContractRole;
+  role!: ContractRole;
   workspace!: AssignableContractWorkspace;
   isWorkspaceAdmin!: boolean;
   assignedAt!: string;
@@ -26,7 +26,7 @@ export class ContractRoleAssignmentResponseDto implements ContractRoleAssignment
     id: string;
     contractPartyId: string;
     companyUserId: string;
-    role: EContractRole;
+    role: ContractRole;
     isWorkspaceAdmin: boolean;
     assignedAt: Date;
     assignedById: string;

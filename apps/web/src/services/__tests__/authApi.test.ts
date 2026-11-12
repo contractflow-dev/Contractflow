@@ -9,7 +9,6 @@ import {
   ECompanyRole,
   ECountryCode,
   ECurrencyCode,
-  EInvitationRole,
   EUserStatus,
 } from "@contractflow/contracts-schema";
 import { clearSignedOutClientState } from "@/features/auth/signOut";
@@ -156,7 +155,7 @@ describe("RTK Query authentication and company API contracts", () => {
         status: EUserStatus.ACTIVE,
       }),
     );
-    store.dispatch(setSelectedRole(ECompanyRole.CLIENT_PROJECT_MANAGER));
+    store.dispatch(setSelectedRole(ECompanyRole.MEMBER));
     store.dispatch(setActiveWorkspaceId("company-1"));
     store.dispatch(openModal({ modalId: "CREATE_CONTRACT_MODAL" }));
     await store.dispatch(authApi.endpoints.getCurrentUser.initiate()).unwrap();
@@ -340,7 +339,7 @@ describe("RTK Query authentication and company API contracts", () => {
           companyId: "company-1",
           data: {
             email: "person@example.com",
-            companyRole: EInvitationRole.FINANCE_OFFICER,
+            companyRole: ECompanyRole.MEMBER,
           },
         }),
       )
@@ -354,7 +353,7 @@ describe("RTK Query authentication and company API contracts", () => {
     expect(request.method).toBe("POST");
     await expect(request.clone().json()).resolves.toMatchObject({
       email: "person@example.com",
-      companyRole: "Finance Officer",
+      companyRole: "Member",
     });
 
     fetchMock.mockResolvedValueOnce(

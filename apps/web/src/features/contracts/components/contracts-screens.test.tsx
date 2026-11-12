@@ -27,6 +27,12 @@ vi.mock("../_hooks/use-contract-details", () => ({
   useContractDetails: vi.fn(),
 }));
 
+// The detail page reads activity deep-link targets from the URL (App Router).
+const navigation = vi.hoisted(() => ({ params: new URLSearchParams() }));
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => navigation.params,
+}));
+
 const sectionAccess = vi.hoisted(() => ({
   value: { roles: true, sites: true, signatories: true } as Record<
     "roles" | "sites" | "signatories",
@@ -67,6 +73,17 @@ vi.mock("@/hooks/use-user-time-zone", () => ({
   useUserTimeZone: () => "UTC",
 }));
 
+// The timeline has its own tests; here only its placement matters.
+vi.mock("./contract-workspace-screens", () => ({
+  ContractWorkspacesCard: () => <div>Your workspaces</div>,
+}));
+
+vi.mock("./contract-activity", () => ({
+  ContractActivity: ({ contractId }: { contractId: string }) => (
+    <section>Contract activity for {contractId}</section>
+  ),
+}));
+
 const contractDetail: ContractDetailResponse = {
   contract: {
     id: "contract-1",
@@ -105,6 +122,7 @@ describe("ContractDetail query states", () => {
   const useContractDetailsMock = vi.mocked(useContractDetails);
 
   beforeEach(() => {
+    navigation.params = new URLSearchParams();
     useContractDetailsMock.mockReturnValue({
       detail: contractDetail,
       error: undefined,
@@ -130,6 +148,13 @@ describe("ContractDetail query states", () => {
     expect(parties).not.toContain("No party details are available.");
     expect(history).toContain("Unable to load status history.");
     expect(history).not.toContain("No status changes have been recorded.");
+    // The activity timeline is a separate request and still renders, after
+    // the status history.
+    expect(history).toContain("Contract activity for contract-1");
+    expect(history.indexOf("Status history")).toBeLessThan(
+      history.indexOf("Contract activity for contract-1"),
+    );
+    expect(parties).not.toContain("Contract activity for");
     // Each section shows only its own content.
     expect(parties).not.toContain("Unable to load status history.");
     expect(history).not.toContain("Unable to load contract parties.");

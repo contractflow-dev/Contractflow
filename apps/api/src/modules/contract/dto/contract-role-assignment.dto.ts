@@ -2,20 +2,28 @@ import {
   IsBoolean,
   Matches,
   IsEmail,
-  IsEnum,
   IsIn,
   IsOptional,
   IsString,
   MaxLength,
   MinLength,
 } from 'class-validator';
-import { EContractRole } from '@contractflow/contracts-schema';
+import {
+  CONTRACT_ROLES,
+  type ContractRole,
+} from '@contractflow/contracts-schema';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 import type { AssignableContractWorkspace } from '../services/contract-workspace';
 
 export const ASSIGNABLE_WORKSPACES = ['project', 'hse', 'finance'] as const;
 
 export class ListContractRoleAssignmentsRequestDto {
+  @IsIn(ASSIGNABLE_WORKSPACES)
+  workspace!: AssignableContractWorkspace;
+}
+
+/** The `:workspace` route parameter: one of the three workspaces. */
+export class ContractWorkspaceParamDto {
   @IsIn(ASSIGNABLE_WORKSPACES)
   workspace!: AssignableContractWorkspace;
 }
@@ -43,8 +51,8 @@ export class CreateContractRoleAssignmentRequestDto {
   @MaxLength(26)
   companyUserId!: string;
 
-  @IsEnum(EContractRole)
-  role!: EContractRole;
+  @IsIn([...CONTRACT_ROLES])
+  role!: ContractRole;
 
   @IsOptional()
   @IsBoolean()
@@ -61,8 +69,8 @@ export class CreateContractRoleInvitationRequestDto {
   @MaxLength(320)
   email!: string;
 
-  @IsEnum(EContractRole)
-  role!: EContractRole;
+  @IsIn([...CONTRACT_ROLES])
+  role!: ContractRole;
 
   @IsOptional()
   @IsBoolean()

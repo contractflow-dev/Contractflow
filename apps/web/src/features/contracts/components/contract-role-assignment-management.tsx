@@ -1,7 +1,10 @@
 "use client";
 
 import { useId, useState, type FormEvent } from "react";
-import { EContractRole } from "@contractflow/contracts-schema";
+import type {
+  ContractActivityTarget,
+  ContractRole,
+} from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
 import { Checkbox } from "@workspace/ui/components/checkbox";
@@ -50,17 +53,6 @@ import {
   type ContractRoleAssignment,
 } from "@/services/contractApi";
 
-const roleOptions: Record<AssignableContractWorkspace, EContractRole[]> = {
-  project: [
-    EContractRole.CONTRACTOR_PROJECT_LEAD,
-    EContractRole.CONTRACTOR_SITE_SUPERVISOR,
-    EContractRole.CLIENT_PROJECT_MANAGER,
-    EContractRole.CLIENT_SITE_ENGINEER,
-  ],
-  hse: [EContractRole.HSE_OFFICER, EContractRole.HSE_MANAGER],
-  finance: [EContractRole.FINANCE_OFFICER, EContractRole.FINANCE_DIRECTOR],
-};
-
 const workspaceOptions: AssignableContractWorkspace[] = [
   "project",
   "hse",
@@ -73,15 +65,25 @@ const memberName = (assignment: ContractRoleAssignment) =>
 export function ContractRoleAssignmentManagement({
   companyId,
   contractId,
+  fixedWorkspace,
+  target,
 }: {
   companyId: string;
   contractId: string;
+  /**
+   * Manage only this workspace (inside a workspace's Team screen): the
+   * workspace selector is hidden. The API checks access for it as always.
+   */
+  fixedWorkspace?: AssignableContractWorkspace;
+  target?: ContractActivityTarget | null;
 }) {
   const formId = useId();
-  const [workspace, setWorkspace] =
-    useState<AssignableContractWorkspace>("project");
+  const [workspace, setWorkspace] = useState<AssignableContractWorkspace>(
+    fixedWorkspace ?? "project",
+  );
   const [companyUserId, setCompanyUserId] = useState("");
-  const [role, setRole] = useState<EContractRole>(roleOptions.project[0]);
+  // Empty until chosen: the first of the offered roles is used.
+  const [role, setRole] = useState<ContractRole | "">("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteAsWorkspaceAdmin, setInviteAsWorkspaceAdmin] = useState(false);
   const [assignmentToRevoke, setAssignmentToRevoke] =
@@ -104,8 +106,7 @@ export function ContractRoleAssignmentManagement({
   });
   const permissions = permissionQuery.data;
   const canManage = permissions?.canManage === true;
-  const canGrantWorkspaceAdmin =
-    permissions?.canGrantWorkspaceAdmin === true;
+  const canGrantWorkspaceAdmin = permissions?.canGrantWorkspaceAdmin === true;
   const membersQuery = useGetContractRoleAssignmentMembersQuery(
     { companyId, contractId, workspace },
     { skip: !canManage },
@@ -126,8 +127,13 @@ export function ContractRoleAssignmentManagement({
     useCreateContractRoleInvitationMutation();
   const [revokeInvitation, revokeInvitationState] =
     useRevokeContractRoleInvitationMutation();
-  const roles = roleOptions[workspace];
-  const selectedRole = roles.includes(role) ? role : roles[0];
+  // The API offers only the roles of this company's side of the contract:
+  // client roles for the client, contractor roles for every other party.
+  const roles = permissions?.roles ?? [];
+  const selectedRole: ContractRole | undefined =
+    role && roles.includes(role) ? role : roles[0];
+  const sideLabel =
+    permissions?.roleSide === "client" ? "client" : "contractor";
 
   if (permissionQuery.isLoading) return null;
   if (permissionQuery.error) {
@@ -147,6 +153,7 @@ export function ContractRoleAssignmentManagement({
   async function submitAssignment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFailure(null);
+    if (!selectedRole) return;
     try {
       await assignRole({
         companyId,
@@ -168,6 +175,7 @@ export function ContractRoleAssignmentManagement({
   async function submitInvitation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFailure(null);
+    if (!selectedRole) return;
     try {
       await createInvitation({
         companyId,
@@ -175,8 +183,7 @@ export function ContractRoleAssignmentManagement({
         workspace,
         email: inviteEmail.trim(),
         role: selectedRole,
-        isWorkspaceAdmin:
-          inviteAsWorkspaceAdmin && canGrantWorkspaceAdmin,
+        isWorkspaceAdmin: inviteAsWorkspaceAdmin && canGrantWorkspaceAdmin,
       }).unwrap();
       notifySuccess(
         "Role invitation sent",
@@ -272,7 +279,9 @@ export function ContractRoleAssignmentManagement({
           </CardTitle>
           <CardDescription>
             Manage active roles for members of your company. Contract access
-            ends when an assignment is revoked.
+            ends when an assignment is revoked. Your company is on the{" "}
+            {sideLabel} side of this contract, so only {sideLabel} roles are
+            offered.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -282,35 +291,37 @@ export function ContractRoleAssignmentManagement({
             </Alert>
           ) : null}
 
-          <FormField
-            id={`${formId}-workspace`}
-            label="Workspace"
-            description="Role assignments and invitations below apply to this workspace."
-            className="max-w-sm"
-          >
-            {(control) => (
-              <NativeSelect
-                {...control}
-                className="w-full"
-                value={workspace}
-                onChange={(event) => {
-                  const nextWorkspace = workspaceOptions.find(
-                    (option) => option === event.target.value,
-                  );
-                  if (!nextWorkspace) return;
-                  setWorkspace(nextWorkspace);
-                  setRole(roleOptions[nextWorkspace][0]);
-                  setFailure(null);
-                }}
-              >
-                {workspaceOptions.map((option) => (
-                  <NativeSelectOption key={option} value={option}>
-                    {formatLabel(option)}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
-            )}
-          </FormField>
+          {fixedWorkspace ? null : (
+            <FormField
+              id={`${formId}-workspace`}
+              label="Workspace"
+              description="Role assignments and invitations below apply to this workspace."
+              className="max-w-sm"
+            >
+              {(control) => (
+                <NativeSelect
+                  {...control}
+                  className="w-full"
+                  value={workspace}
+                  onChange={(event) => {
+                    const nextWorkspace = workspaceOptions.find(
+                      (option) => option === event.target.value,
+                    );
+                    if (!nextWorkspace) return;
+                    setWorkspace(nextWorkspace);
+                    setRole("");
+                    setFailure(null);
+                  }}
+                >
+                  {workspaceOptions.map((option) => (
+                    <NativeSelectOption key={option} value={option}>
+                      {formatLabel(option)}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              )}
+            </FormField>
+          )}
 
           <form
             onSubmit={(event) => void submitAssignment(event)}
@@ -369,6 +380,7 @@ export function ContractRoleAssignmentManagement({
               disabled={
                 assignState.isLoading ||
                 !companyUserId ||
+                !selectedRole ||
                 membersQuery.isFetching ||
                 !membersQuery.data?.length
               }
@@ -421,7 +433,16 @@ export function ContractRoleAssignmentManagement({
               </TableHeader>
               <TableBody>
                 {assignmentsQuery.data.map((assignment) => (
-                  <TableRow key={assignment.id}>
+                  <TableRow
+                    key={assignment.id}
+                    id={`activity-target-${assignment.id}`}
+                    className={
+                      target?.type === "contract_role_assignment" &&
+                      target.id === assignment.id
+                        ? "bg-primary/10"
+                        : undefined
+                    }
+                  >
                     <TableCell>
                       <p className="font-medium">{memberName(assignment)}</p>
                       <p className="text-sm text-muted-foreground">
@@ -516,7 +537,11 @@ export function ContractRoleAssignmentManagement({
                 </FormField>
                 <Button
                   type="submit"
-                  disabled={invitationState.isLoading || !inviteEmail.trim()}
+                  disabled={
+                    invitationState.isLoading ||
+                    !inviteEmail.trim() ||
+                    !selectedRole
+                  }
                   aria-busy={invitationState.isLoading || undefined}
                 >
                   {invitationState.isLoading ? "Sending…" : "Send invitation"}
@@ -560,47 +585,53 @@ export function ContractRoleAssignmentManagement({
                     invitation.expiresAt,
                   );
                   return (
-                  <li
-                    className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm"
-                    key={invitation.id}
-                  >
-                    <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                      <span className="font-medium break-all">
-                        {invitation.email}
-                      </span>
-                      <span className="text-muted-foreground">
-                        {invitation.role}
-                        {invitation.isWorkspaceAdmin
-                          ? " · Workspace Admin"
-                          : ""}
-                      </span>
-                      <StatusBadge status={status} />
-                      {status === "pending" ? (
-                        <span className="text-xs text-muted-foreground">
-                          Expires{" "}
-                          {formatDate(invitation.expiresAt, { timeZone })}
+                    <li
+                      id={`activity-target-${invitation.id}`}
+                      className={`flex flex-wrap items-center justify-between gap-3 py-3 text-sm ${
+                        target?.type === "contract_role_invitation" &&
+                        target.id === invitation.id
+                          ? "bg-primary/10"
+                          : ""
+                      }`}
+                      key={invitation.id}
+                    >
+                      <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="font-medium break-all">
+                          {invitation.email}
                         </span>
+                        <span className="text-muted-foreground">
+                          {invitation.role}
+                          {invitation.isWorkspaceAdmin
+                            ? " · Workspace Admin"
+                            : ""}
+                        </span>
+                        <StatusBadge status={status} />
+                        {status === "pending" ? (
+                          <span className="text-xs text-muted-foreground">
+                            Expires{" "}
+                            {formatDate(invitation.expiresAt, { timeZone })}
+                          </span>
+                        ) : null}
+                      </span>
+                      {status === "pending" ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={revokeInvitationState.isLoading}
+                          onClick={() => {
+                            setDialogError("");
+                            setInvitationToRevoke({
+                              id: invitation.id,
+                              email: invitation.email,
+                              role: invitation.role,
+                            });
+                          }}
+                        >
+                          Revoke invitation
+                        </Button>
                       ) : null}
-                    </span>
-                    {status === "pending" ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={revokeInvitationState.isLoading}
-                        onClick={() => {
-                          setDialogError("");
-                          setInvitationToRevoke({
-                            id: invitation.id,
-                            email: invitation.email,
-                            role: invitation.role,
-                          });
-                        }}
-                      >
-                        Revoke invitation
-                      </Button>
-                    ) : null}
-                  </li>
+                    </li>
                   );
                 })}
               </ul>
