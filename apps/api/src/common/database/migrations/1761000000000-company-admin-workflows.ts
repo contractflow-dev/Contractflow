@@ -115,7 +115,9 @@ export class CompanyAdminWorkflows1761000000000 implements MigrationInterface {
       ['occurred_at', 'timestamp with time zone', '', false],
     ] as const;
     for (const [name, type, length, nullable] of expectedColumns) {
-      const column = auditTable.columns.find((candidate) => candidate.name === name);
+      const column = auditTable.columns.find(
+        (candidate) => candidate.name === name,
+      );
       if (
         !column ||
         column.type.toLowerCase() !== type ||
@@ -161,7 +163,8 @@ export class CompanyAdminWorkflows1761000000000 implements MigrationInterface {
         foreignKey.columnNames.join(',') === expected.columns.join(',') &&
         foreignKey.referencedTableName === expected.referencedTable &&
         foreignKey.referencedColumnNames.join(',') === 'id' &&
-        (foreignKey.onDelete ?? 'NO ACTION').toUpperCase() === expected.onDelete;
+        (foreignKey.onDelete ?? 'NO ACTION').toUpperCase() ===
+          expected.onDelete;
       const namedKey = auditTable.foreignKeys.find(
         (foreignKey) => foreignKey.name === expected.name,
       );
