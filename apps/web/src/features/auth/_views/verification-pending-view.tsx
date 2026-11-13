@@ -80,9 +80,7 @@ export function VerificationPendingView() {
               <RiMailLine className="size-6" aria-hidden="true" />
             </div>
             <div className="space-y-2">
-              <h1 className="type-page-title">
-                Check your inbox
-              </h1>
+              <h1 className="type-page-title">Check your inbox</h1>
               <p className="text-sm leading-6 text-muted-foreground">
                 {pendingEmail ? (
                   <>
@@ -95,8 +93,8 @@ export function VerificationPendingView() {
                 ) : (
                   "We sent you a verification link."
                 )}{" "}
-                Open it to verify your email address and finish setting up
-                your ContractFlow account. If you don’t see it, check your spam
+                Open it to verify your email address and finish setting up your
+                ContractFlow account. If you don’t see it, check your spam
                 folder.
               </p>
             </div>
@@ -108,7 +106,7 @@ export function VerificationPendingView() {
                 <FieldLabel htmlFor="verification-email">
                   Didn’t receive the email? Send a new link
                 </FieldLabel>
-                <Input
+                {/* <Input
                   id="verification-email"
                   type="email"
                   autoComplete="email"
@@ -117,7 +115,7 @@ export function VerificationPendingView() {
                   placeholder="you@company.com"
                   value={emailInput}
                   onChange={(event) => setTypedEmail(event.target.value)}
-                />
+                /> */}
               </Field>
 
               {message && (

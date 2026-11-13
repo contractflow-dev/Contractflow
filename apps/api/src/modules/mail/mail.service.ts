@@ -5,6 +5,13 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import nodemailer from 'nodemailer';
+import { renderInvitationEmail } from './invitation-email.template';
+
+const WORKSPACE_LABELS: Readonly<Record<string, string>> = {
+  project: 'Project',
+  hse: 'HSE',
+  finance: 'Finance',
+};
 
 @Injectable()
 export class MailService {
@@ -78,8 +85,27 @@ export class MailService {
 
     const invitationUrl = new URL('/invitations/respond', webUrl);
     invitationUrl.searchParams.set('token', token);
-    const text = `Hello,\n\nYou have been invited to join ${companyName} on ContractFlow as ${role}.\n\nSign in or create an account using this email address, then review the invitation here: ${invitationUrl.toString()}\n\nThis invitation expires in 7 days and can only be used once.`;
-    await this.sendEmail(email, `Invitation to join ${companyName}`, text);
+    const { text, html } = renderInvitationEmail({
+      heading: `You're invited to join ${companyName}`,
+      greeting: 'Hello,',
+      intro: `You have been invited to join ${companyName} on ContractFlow as ${role}.`,
+      details: [
+        { label: 'Company', value: companyName },
+        { label: 'Role', value: role },
+      ],
+      instructions:
+        'Sign in or create an account using this email address, then review the invitation to accept or decline it.',
+      ctaLabel: 'Review Invitation',
+      url: invitationUrl.toString(),
+      expiryNotice:
+        'This invitation expires in 7 days and can only be used once.',
+    });
+    await this.sendEmail(
+      email,
+      `Invitation to join ${companyName}`,
+      text,
+      html,
+    );
   }
 
   async sendContractRoleInvitationEmail(
@@ -88,6 +114,7 @@ export class MailService {
     role: string,
     workspace: string,
     token: string,
+    invitingCompanyName?: string,
   ): Promise<void> {
     const isProduction = this.config.get<string>('NODE_ENV') === 'production';
     const webUrl =
@@ -101,14 +128,30 @@ export class MailService {
 
     const invitationUrl = new URL('/invitations/contract-role', webUrl);
     invitationUrl.searchParams.set('token', token);
-    const text =
-      `You have been invited to join the ${workspace} workspace for ${contractTitle} on ContractFlow as ${role}.\n\n` +
-      `Sign in using the invited email address to accept or decline: ${invitationUrl.toString()}\n\n` +
-      'This invitation expires in 7 days and can only be used once.';
+    const workspaceName = WORKSPACE_LABELS[workspace] ?? workspace;
+    const { text, html } = renderInvitationEmail({
+      heading: `You're invited to work on ${contractTitle}`,
+      intro: `You have been invited to join the ${workspaceName} workspace for ${contractTitle} on ContractFlow as ${role}.`,
+      details: [
+        { label: 'Contract', value: contractTitle },
+        ...(invitingCompanyName
+          ? [{ label: 'Invited by', value: invitingCompanyName }]
+          : []),
+        { label: 'Workspace', value: workspaceName },
+        { label: 'Contract role', value: role },
+      ],
+      instructions:
+        'Sign in using the invited email address, then review the invitation to accept or decline it.',
+      ctaLabel: 'Review Contract Invitation',
+      url: invitationUrl.toString(),
+      expiryNotice:
+        'This invitation expires in 7 days and can only be used once.',
+    });
     await this.sendEmail(
       email,
       `Contract role invitation for ${contractTitle}`,
       text,
+      html,
     );
   }
 
@@ -159,14 +202,28 @@ export class MailService {
 
     const invitationUrl = new URL('/invitations/contract-party', webUrl);
     invitationUrl.searchParams.set('token', token);
-    const text =
-      `${invitingCompanyName} invited your verified company to join ${contractTitle} as ${partyType} on ContractFlow.\n\n` +
-      `A Company Administrator can sign in and review the invitation here: ${invitationUrl.toString()}\n\n` +
-      'This invitation expires in 7 days and can only be used once.';
+    const partyTypeName =
+      partyType.charAt(0).toUpperCase() + partyType.slice(1);
+    const { text, html } = renderInvitationEmail({
+      heading: `Your company is invited to join ${contractTitle}`,
+      intro: `${invitingCompanyName} invited your verified company to join ${contractTitle} as ${partyType} on ContractFlow.`,
+      details: [
+        { label: 'Contract', value: contractTitle },
+        { label: 'Invited by', value: invitingCompanyName },
+        { label: 'Party type', value: partyTypeName },
+      ],
+      instructions:
+        'A Company Administrator can sign in and review the invitation to accept or reject it.',
+      ctaLabel: 'Review Contract Invitation',
+      url: invitationUrl.toString(),
+      expiryNotice:
+        'This invitation expires in 7 days and can only be used once.',
+    });
     await this.sendEmail(
       email,
       `Contract invitation for ${contractTitle}`,
       text,
+      html,
     );
   }
 
@@ -174,6 +231,7 @@ export class MailService {
     email: string,
     subject: string,
     text: string,
+    html?: string,
   ): Promise<void> {
     const isProduction = this.config.get<string>('NODE_ENV') === 'production';
     const provider =
@@ -181,7 +239,7 @@ export class MailService {
       (isProduction ? 'resend' : 'smtp');
 
     if (provider === 'smtp') {
-      await this.sendSmtpEmail(email, subject, text);
+      await this.sendSmtpEmail(email, subject, text, html);
       return;
     }
 
@@ -212,6 +270,7 @@ export class MailService {
           to: [email],
           subject,
           text,
+          ...(html ? { html } : {}),
         }),
       });
     } catch (error) {
@@ -232,6 +291,7 @@ export class MailService {
     email: string,
     subject: string,
     text: string,
+    html?: string,
   ): Promise<void> {
     const host = this.config.get<string>('SMTP_HOST') ?? 'localhost';
     const port = Number(this.config.get<string>('SMTP_PORT') ?? '1025');
@@ -258,6 +318,7 @@ export class MailService {
         to: email,
         subject,
         text,
+        ...(html ? { html } : {}),
       });
     } catch (error) {
       // NEW: log the real SMTP error so it shows up in Render Logs

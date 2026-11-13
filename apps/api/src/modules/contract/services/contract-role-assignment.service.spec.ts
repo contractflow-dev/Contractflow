@@ -583,6 +583,30 @@ describe('ContractRoleAssignmentService', () => {
     });
   });
 
+  it('emails a role invitation naming the inviting company, without accepting it', async () => {
+    await service.invite(
+      'actor-user',
+      'company-1',
+      'contract-1',
+      'finance',
+      'Someone@Example.com',
+      EContractorContractRole.FINANCE_OFFICER,
+    );
+
+    expect(mail.sendContractRoleInvitationEmail).toHaveBeenCalledWith(
+      'someone@example.com',
+      'Sample contract',
+      EContractorContractRole.FINANCE_OFFICER,
+      'finance',
+      expect.any(String),
+      'Sample company',
+    );
+    expect(transactionContext.invitations.create).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'pending', respondedAt: null }),
+    );
+    expect(transactionContext.assignments.create).not.toHaveBeenCalled();
+  });
+
   it('rejects duplicate active assignments', async () => {
     transactionContext.assignments.findActiveDuplicate = vi
       .fn()
