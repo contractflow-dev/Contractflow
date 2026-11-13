@@ -1,30 +1,35 @@
 /**
- * Builds the HTML and plain-text bodies of ContractFlow invitation emails.
+ * Builds the HTML and plain-text bodies of every ContractFlow email.
  *
- * The call-to-action only opens the invitation's review page. Accepting is a
- * separate, explicit step on that page, and the API validates the token,
- * expiry, single use and invited email when the recipient responds.
+ * Each email has one call-to-action link to a ContractFlow page, which holds
+ * the email's single-use token. The page and the API do the work, such as
+ * verifying an address or accepting an invitation, and validate the token.
+ * Opening the email or the link never does anything by itself. The HTML loads
+ * no images, fonts or other remote content, so the token reaches no one else.
  */
 
-export interface InvitationEmailDetail {
+export interface EmailDetail {
   label: string;
   value: string;
 }
 
-export interface InvitationEmailContent {
-  /** Short heading, e.g. "You're invited to join Example Energy". */
+export interface EmailContent {
+  /** Short heading, e.g. "Verify your email address". */
   heading: string;
-  /** Opening line of the plain-text version, e.g. "Hello,". */
+  /** Opening line, e.g. "Hello,". */
   greeting?: string;
   /** Why the recipient is receiving this email. */
   intro: string;
-  details: readonly InvitationEmailDetail[];
-  /** What the recipient does on the review page. */
-  instructions: string;
+  /** Facts shown as a label/value table. Omit when there are none. */
+  details?: readonly EmailDetail[];
+  /** What the recipient does next, shown above the button. */
+  instructions?: string;
   ctaLabel: string;
-  /** The review page link, including its single-use token. */
+  /** The page link, including its single-use token. */
   url: string;
   expiryNotice: string;
+  /** What to do if the recipient didn't expect this email. */
+  securityNotice: string;
 }
 
 export interface RenderedEmail {
@@ -45,10 +50,6 @@ export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => HTML_ESCAPES[character]);
 }
 
-const SECURITY_NOTICE =
-  "If you weren't expecting this invitation, you can ignore this email. " +
-  'Nothing changes unless you sign in and accept it.';
-
 const FONT_STACK =
   "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 const BRAND_COLOR = '#b8491a';
@@ -56,35 +57,35 @@ const TEXT_COLOR = '#1f2328';
 const MUTED_COLOR = '#59636e';
 const BORDER_COLOR = '#e4e7eb';
 
-export function renderInvitationEmail(
-  content: InvitationEmailContent,
-): RenderedEmail {
+export function renderEmail(content: EmailContent): RenderedEmail {
   return { text: renderText(content), html: renderHtml(content) };
 }
 
-function renderText(content: InvitationEmailContent): string {
+function renderText(content: EmailContent): string {
+  const details = content.details ?? [];
   const lines = [
     ...(content.greeting ? [content.greeting, ''] : []),
     content.intro,
     '',
-    ...content.details.map((detail) => `${detail.label}: ${detail.value}`),
-    '',
-    content.instructions,
-    '',
+    ...(details.length > 0
+      ? [...details.map((detail) => `${detail.label}: ${detail.value}`), '']
+      : []),
+    ...(content.instructions ? [content.instructions, ''] : []),
     `${content.ctaLabel}: ${content.url}`,
     '',
     content.expiryNotice,
     '',
-    SECURITY_NOTICE,
+    content.securityNotice,
     '',
     '— ContractFlow',
   ];
   return lines.join('\n');
 }
 
-function renderHtml(content: InvitationEmailContent): string {
+function renderHtml(content: EmailContent): string {
   const url = escapeHtml(content.url);
-  const detailRows = content.details
+  const details = content.details ?? [];
+  const detailRows = details
     .map(
       (detail) => `
                 <tr>
@@ -93,6 +94,20 @@ function renderHtml(content: InvitationEmailContent): string {
                 </tr>`,
     )
     .join('');
+  const detailTable =
+    details.length > 0
+      ? `
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;border-top:1px solid ${BORDER_COLOR};font-family:${FONT_STACK};">${detailRows}
+                </table>`
+      : '';
+  const greeting = content.greeting
+    ? `
+                <p style="margin:0 0 12px;font-size:16px;line-height:24px;color:${TEXT_COLOR};">${escapeHtml(content.greeting)}</p>`
+    : '';
+  const instructions = content.instructions
+    ? `
+                <p style="margin:0 0 20px;font-size:15px;line-height:22px;color:${TEXT_COLOR};">${escapeHtml(content.instructions)}</p>`
+    : '';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -113,11 +128,8 @@ function renderHtml(content: InvitationEmailContent): string {
             </tr>
             <tr>
               <td style="padding:28px 32px 8px;font-family:${FONT_STACK};">
-                <h1 style="margin:0 0 16px;font-size:22px;line-height:30px;font-weight:700;color:${TEXT_COLOR};">${escapeHtml(content.heading)}</h1>
-                <p style="margin:0 0 20px;font-size:16px;line-height:24px;color:${TEXT_COLOR};">${escapeHtml(content.intro)}</p>
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;border-top:1px solid ${BORDER_COLOR};font-family:${FONT_STACK};">${detailRows}
-                </table>
-                <p style="margin:0 0 20px;font-size:15px;line-height:22px;color:${TEXT_COLOR};">${escapeHtml(content.instructions)}</p>
+                <h1 style="margin:0 0 16px;font-size:22px;line-height:30px;font-weight:700;color:${TEXT_COLOR};">${escapeHtml(content.heading)}</h1>${greeting}
+                <p style="margin:0 0 20px;font-size:16px;line-height:24px;color:${TEXT_COLOR};">${escapeHtml(content.intro)}</p>${detailTable}${instructions}
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;">
                   <tr>
                     <td align="center" bgcolor="${BRAND_COLOR}" style="border-radius:6px;background-color:${BRAND_COLOR};">
@@ -132,7 +144,7 @@ function renderHtml(content: InvitationEmailContent): string {
             </tr>
             <tr>
               <td style="padding:16px 32px;background-color:#f9fafb;border-top:1px solid ${BORDER_COLOR};border-radius:0 0 8px 8px;font-family:${FONT_STACK};font-size:13px;line-height:20px;color:${MUTED_COLOR};">
-                <p style="margin:0 0 8px;">${escapeHtml(SECURITY_NOTICE)}</p>
+                <p style="margin:0 0 8px;">${escapeHtml(content.securityNotice)}</p>
                 <p style="margin:0;">This email was sent by ContractFlow.</p>
               </td>
             </tr>

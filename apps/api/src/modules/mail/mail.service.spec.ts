@@ -67,21 +67,68 @@ describe('MailService', () => {
 
     await service.sendPasswordResetEmail('user@example.com', 'reset-token', 30);
 
-    const message = mocks.sendMail.mock.calls[0][0] as {
-      to: string;
-      subject: string;
-      text: string;
-    };
+    const url = 'http://localhost:3202/auth/reset-password?token=reset-token';
+    const message = sentMessage();
     expect(message.to).toBe('user@example.com');
     expect(message.subject).toBe('Reset your ContractFlow password');
-    expect(message.text).toContain(
-      'http://localhost:3202/auth/reset-password?token=reset-token',
-    );
+    expect(message.text).toContain(`Reset Password: ${url}`);
     expect(message.text).toContain('expires in 30 minutes');
+    expect(message.text).toContain('signs you out on every device');
     expect(message.text).toContain("If you didn't ask to reset your password");
-    // Plain text only: no images or tracking links that could see the token.
-    expect(message).not.toHaveProperty('html');
     expect(message.text.match(/https?:\/\//g)).toHaveLength(1);
+    // No images, remote content or tracking links that could see the token:
+    // the only URLs in the HTML are the reset link itself.
+    expect(message.html).toContain('>Reset Password</a>');
+    expect(linksIn(message.html)).toEqual([url, url]);
+    // Button link, fallback link and the fallback link's visible text.
+    expect(message.html?.match(/https?:\/\/[^"<\s]*/g)).toEqual([
+      url,
+      url,
+      url,
+    ]);
+    expect(message.html).not.toMatch(/<img|<link|<script|src=|url\(/i);
+  });
+
+  it('sends account verification as HTML with a verify button and plain text', async () => {
+    const service = createService({ NODE_ENV: 'development' });
+
+    await service.sendVerificationEmail('user@example.com', 'verify-token');
+
+    const url = 'http://localhost:3000/auth/verify-email?token=verify-token';
+    const { subject, text, html } = sentMessage();
+    expect(subject).toBe('Verify your ContractFlow email');
+    expect(html).toContain('>Verify Email Address</a>');
+    expect(linksIn(html)).toEqual([url, url]);
+    expect(html).toContain('expires in 30 minutes');
+    expect(html).toContain('If you didn&#39;t create a ContractFlow account');
+    expect(text).toContain(`Verify Email Address: ${url}`);
+    expect(text).toContain('expires in 30 minutes');
+    expect(text).toContain("If you didn't create a ContractFlow account");
+  });
+
+  it('sends company email verification with the company details', async () => {
+    const service = createService({ NODE_ENV: 'development' });
+
+    await service.sendCompanyVerificationEmail(
+      'admin@energy.example',
+      'Example <Energy>',
+      'company-token',
+    );
+
+    const url = 'http://localhost:3000/auth/verify-company?token=company-token';
+    const { subject, text, html } = sentMessage();
+    expect(subject).toBe('Verify the company email for Example <Energy>');
+    expect(html).toContain('>Verify Company Email</a>');
+    expect(linksIn(html)).toEqual([url, url]);
+    expect(html).toContain('Example &lt;Energy&gt;');
+    expect(html).not.toContain('<Energy>');
+    expect(text).toContain('Company: Example <Energy>');
+    expect(text).toContain('Company email: admin@energy.example');
+    expect(text).toContain(
+      'Other companies can only invite a verified company',
+    );
+    expect(text).toContain('expires in 7 days');
+    expect(text).toContain(`Verify Company Email: ${url}`);
   });
 
   it('refuses to build a reset link without a web URL in production', async () => {
@@ -322,7 +369,7 @@ describe('MailService', () => {
     expect(body.html).toContain('>Review Invitation</a>');
   });
 
-  it('keeps verification emails plain text on Resend', async () => {
+  it('sends verification HTML and text through Resend', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal('fetch', fetchMock);
     const service = createService(resendConfig);
@@ -330,7 +377,11 @@ describe('MailService', () => {
     await service.sendVerificationEmail('user@example.com', 'verify-token');
 
     const [, request] = fetchMock.mock.calls[0] as [string, { body: string }];
-    expect(JSON.parse(request.body)).not.toHaveProperty('html');
+    const body = JSON.parse(request.body) as Record<string, unknown>;
+    expect(body.text).toContain(
+      'https://contractflow.example.com/auth/verify-email?token=verify-token',
+    );
+    expect(body.html).toContain('>Verify Email Address</a>');
   });
 
   it('reports Resend invitation delivery failures as before', async () => {
