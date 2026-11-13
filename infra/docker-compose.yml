@@ -25,17 +25,43 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+  # Local S3-compatible document storage. MinIO no longer publishes official
+  # images (quay.io/minio/minio returns 401 and minio/minio is gone from Docker
+  # Hub), so this uses Chainguard's MinIO build, pinned by digest.
   minio:
-    image: quay.io/minio/minio:latest
-    command: server /data --console-address ":9001"
+    image: cgr.dev/chainguard/minio@sha256:96b6cf3e14084d3427ec46de10c2873af61b945ad9272eec266cfc8df551cba5
+    command: ["server", "/data", "--console-address", ":9001"]
     environment:
       MINIO_ROOT_USER: contractflow
       MINIO_ROOT_PASSWORD: contractflow-secret
+      # Matches AWS_REGION in apps/api/.env.example.
+      MINIO_SITE_REGION: eu-north-1
+      # Browsers upload and download directly with presigned URLs.
+      MINIO_API_CORS_ALLOW_ORIGIN: http://localhost:3000,http://localhost:3100
+      MC_CONFIG_DIR: /tmp/.mc
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     volumes:
       - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  # Creates the local document bucket, then exits.
+  minio-init:
+    image: cgr.dev/chainguard/minio@sha256:96b6cf3e14084d3427ec46de10c2873af61b945ad9272eec266cfc8df551cba5
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - mc alias set local http://minio:9000 contractflow contractflow-secret
+        && mc mb --ignore-existing local/contractflow-local
+    environment:
+      MC_CONFIG_DIR: /tmp/.mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: "no"
   mailpit:
     image: axllent/mailpit:latest
     ports:

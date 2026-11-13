@@ -40,3 +40,10 @@ apps/api/tsconfig.build.tsbuildinfo
 apps/api/tsconfig.build.tsbuildinfo
 **/tsconfig.build.tsbuildinfo
 **/*.tsbuildinfo
+
+# pnpm workspace: only the root pnpm-lock.yaml is used
+package-lock.json
+yarn.lock
+npm-shrinkwrap.json
+apps/*/pnpm-lock.yaml
+packages/*/pnpm-lock.yaml

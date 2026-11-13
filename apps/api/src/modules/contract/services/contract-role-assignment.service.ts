@@ -570,6 +570,7 @@ export class ContractRoleAssignmentService {
         role,
         workspace,
         token,
+        companyName,
       );
       await this.writeInvitationActivity(
         context,

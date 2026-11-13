@@ -5,6 +5,17 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import nodemailer from 'nodemailer';
+import { renderEmail } from './email.template';
+
+const INVITATION_SECURITY_NOTICE =
+  "If you weren't expecting this invitation, you can ignore this email. " +
+  'Nothing changes unless you sign in and accept it.';
+
+const WORKSPACE_LABELS: Readonly<Record<string, string>> = {
+  project: 'Project',
+  hse: 'HSE',
+  finance: 'Finance',
+};
 
 @Injectable()
 export class MailService {
@@ -24,13 +35,24 @@ export class MailService {
 
     const verificationUrl = new URL('/auth/verify-email', webUrl);
     verificationUrl.searchParams.set('token', token);
-    const text = `Verify your email address by opening this link: ${verificationUrl.toString()}\n\nThis link expires in 30 minutes and can only be used once.`;
-    await this.sendEmail(email, 'Verify your ContractFlow email', text);
+    const { text, html } = renderEmail({
+      heading: 'Verify your email address',
+      intro:
+        'Confirm your email address to finish setting up your ContractFlow account.',
+      ctaLabel: 'Verify Email Address',
+      url: verificationUrl.toString(),
+      expiryNotice:
+        'This link expires in 30 minutes and can only be used once.',
+      securityNotice:
+        "If you didn't create a ContractFlow account, you can ignore this email.",
+    });
+    await this.sendEmail(email, 'Verify your ContractFlow email', text, html);
   }
 
   /**
    * The password reset link. The token is only ever in this email's link:
-   * never logged, and the email has no images or tracking links.
+   * never logged, and the email loads no images or remote content and has no
+   * tracking links.
    */
   async sendPasswordResetEmail(
     email: string,
@@ -49,15 +71,19 @@ export class MailService {
 
     const resetUrl = new URL('/auth/reset-password', webUrl);
     resetUrl.searchParams.set('token', token);
-    const text =
-      'ContractFlow password reset\n\n' +
-      'We received a request to reset the password for your ContractFlow account.\n\n' +
-      `Choose a new password here: ${resetUrl.toString()}\n\n` +
-      `This link expires in ${expiresInMinutes} minutes and can only be used once. ` +
-      'Resetting your password signs you out on every device.\n\n' +
-      "If you didn't ask to reset your password, you can ignore this email. " +
-      'Your password stays the same.';
-    await this.sendEmail(email, 'Reset your ContractFlow password', text);
+    const { text, html } = renderEmail({
+      heading: 'Reset your password',
+      intro:
+        'We received a request to reset the password for your ContractFlow account.',
+      instructions:
+        'Choose a new password using the link below. Resetting your password signs you out on every device.',
+      ctaLabel: 'Reset Password',
+      url: resetUrl.toString(),
+      expiryNotice: `This link expires in ${expiresInMinutes} minutes and can only be used once.`,
+      securityNotice:
+        "If you didn't ask to reset your password, you can ignore this email. Your password stays the same.",
+    });
+    await this.sendEmail(email, 'Reset your ContractFlow password', text, html);
   }
 
   async sendCompanyInvitationEmail(
@@ -78,8 +104,28 @@ export class MailService {
 
     const invitationUrl = new URL('/invitations/respond', webUrl);
     invitationUrl.searchParams.set('token', token);
-    const text = `Hello,\n\nYou have been invited to join ${companyName} on ContractFlow as ${role}.\n\nSign in or create an account using this email address, then review the invitation here: ${invitationUrl.toString()}\n\nThis invitation expires in 7 days and can only be used once.`;
-    await this.sendEmail(email, `Invitation to join ${companyName}`, text);
+    const { text, html } = renderEmail({
+      heading: `You're invited to join ${companyName}`,
+      greeting: 'Hello,',
+      intro: `You have been invited to join ${companyName} on ContractFlow as ${role}.`,
+      details: [
+        { label: 'Company', value: companyName },
+        { label: 'Role', value: role },
+      ],
+      instructions:
+        'Sign in or create an account using this email address, then review the invitation to accept or decline it.',
+      ctaLabel: 'Review Invitation',
+      url: invitationUrl.toString(),
+      expiryNotice:
+        'This invitation expires in 7 days and can only be used once.',
+      securityNotice: INVITATION_SECURITY_NOTICE,
+    });
+    await this.sendEmail(
+      email,
+      `Invitation to join ${companyName}`,
+      text,
+      html,
+    );
   }
 
   async sendContractRoleInvitationEmail(
@@ -88,6 +134,7 @@ export class MailService {
     role: string,
     workspace: string,
     token: string,
+    invitingCompanyName?: string,
   ): Promise<void> {
     const isProduction = this.config.get<string>('NODE_ENV') === 'production';
     const webUrl =
@@ -101,14 +148,31 @@ export class MailService {
 
     const invitationUrl = new URL('/invitations/contract-role', webUrl);
     invitationUrl.searchParams.set('token', token);
-    const text =
-      `You have been invited to join the ${workspace} workspace for ${contractTitle} on ContractFlow as ${role}.\n\n` +
-      `Sign in using the invited email address to accept or decline: ${invitationUrl.toString()}\n\n` +
-      'This invitation expires in 7 days and can only be used once.';
+    const workspaceName = WORKSPACE_LABELS[workspace] ?? workspace;
+    const { text, html } = renderEmail({
+      heading: `You're invited to work on ${contractTitle}`,
+      intro: `You have been invited to join the ${workspaceName} workspace for ${contractTitle} on ContractFlow as ${role}.`,
+      details: [
+        { label: 'Contract', value: contractTitle },
+        ...(invitingCompanyName
+          ? [{ label: 'Invited by', value: invitingCompanyName }]
+          : []),
+        { label: 'Workspace', value: workspaceName },
+        { label: 'Contract role', value: role },
+      ],
+      instructions:
+        'Sign in using the invited email address, then review the invitation to accept or decline it.',
+      ctaLabel: 'Review Contract Invitation',
+      url: invitationUrl.toString(),
+      expiryNotice:
+        'This invitation expires in 7 days and can only be used once.',
+      securityNotice: INVITATION_SECURITY_NOTICE,
+    });
     await this.sendEmail(
       email,
       `Contract role invitation for ${contractTitle}`,
       text,
+      html,
     );
   }
 
@@ -129,14 +193,26 @@ export class MailService {
 
     const verificationUrl = new URL('/auth/verify-company', webUrl);
     verificationUrl.searchParams.set('token', token);
-    const text =
-      `Confirm that ${email} is the company email for ${companyName} on ContractFlow: ${verificationUrl.toString()}\n\n` +
-      'Other companies can only invite a verified company to their contracts.\n\n' +
-      'This link expires in 7 days and can only be used once.';
+    const { text, html } = renderEmail({
+      heading: 'Verify your company email',
+      intro: `Confirm that ${email} is the company email for ${companyName} on ContractFlow.`,
+      details: [
+        { label: 'Company', value: companyName },
+        { label: 'Company email', value: email },
+      ],
+      instructions:
+        'Other companies can only invite a verified company to their contracts.',
+      ctaLabel: 'Verify Company Email',
+      url: verificationUrl.toString(),
+      expiryNotice: 'This link expires in 7 days and can only be used once.',
+      securityNotice:
+        "If you don't manage this company on ContractFlow, you can ignore this email. The company email stays unverified.",
+    });
     await this.sendEmail(
       email,
       `Verify the company email for ${companyName}`,
       text,
+      html,
     );
   }
 
@@ -159,14 +235,29 @@ export class MailService {
 
     const invitationUrl = new URL('/invitations/contract-party', webUrl);
     invitationUrl.searchParams.set('token', token);
-    const text =
-      `${invitingCompanyName} invited your verified company to join ${contractTitle} as ${partyType} on ContractFlow.\n\n` +
-      `A Company Administrator can sign in and review the invitation here: ${invitationUrl.toString()}\n\n` +
-      'This invitation expires in 7 days and can only be used once.';
+    const partyTypeName =
+      partyType.charAt(0).toUpperCase() + partyType.slice(1);
+    const { text, html } = renderEmail({
+      heading: `Your company is invited to join ${contractTitle}`,
+      intro: `${invitingCompanyName} invited your verified company to join ${contractTitle} as ${partyType} on ContractFlow.`,
+      details: [
+        { label: 'Contract', value: contractTitle },
+        { label: 'Invited by', value: invitingCompanyName },
+        { label: 'Party type', value: partyTypeName },
+      ],
+      instructions:
+        'A Company Administrator can sign in and review the invitation to accept or reject it.',
+      ctaLabel: 'Review Contract Invitation',
+      url: invitationUrl.toString(),
+      expiryNotice:
+        'This invitation expires in 7 days and can only be used once.',
+      securityNotice: INVITATION_SECURITY_NOTICE,
+    });
     await this.sendEmail(
       email,
       `Contract invitation for ${contractTitle}`,
       text,
+      html,
     );
   }
 
@@ -174,6 +265,7 @@ export class MailService {
     email: string,
     subject: string,
     text: string,
+    html?: string,
   ): Promise<void> {
     const isProduction = this.config.get<string>('NODE_ENV') === 'production';
     const provider =
@@ -181,7 +273,7 @@ export class MailService {
       (isProduction ? 'resend' : 'smtp');
 
     if (provider === 'smtp') {
-      await this.sendSmtpEmail(email, subject, text);
+      await this.sendSmtpEmail(email, subject, text, html);
       return;
     }
 
@@ -212,6 +304,7 @@ export class MailService {
           to: [email],
           subject,
           text,
+          ...(html ? { html } : {}),
         }),
       });
     } catch (error) {
@@ -232,6 +325,7 @@ export class MailService {
     email: string,
     subject: string,
     text: string,
+    html?: string,
   ): Promise<void> {
     const host = this.config.get<string>('SMTP_HOST') ?? 'localhost';
     const port = Number(this.config.get<string>('SMTP_PORT') ?? '1025');
@@ -258,6 +352,7 @@ export class MailService {
         to: email,
         subject,
         text,
+        ...(html ? { html } : {}),
       });
     } catch (error) {
       // NEW: log the real SMTP error so it shows up in Render Logs
