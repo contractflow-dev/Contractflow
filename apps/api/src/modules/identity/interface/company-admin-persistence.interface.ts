@@ -1,5 +1,6 @@
 import type {
   ECompanyRole,
+  ECompanyStatus,
   ECompanyUserStatus,
 } from '@contractflow/contracts-schema';
 import type {
@@ -25,6 +26,33 @@ export interface IListCompanyMembersCriteria extends IPageQuery {
   search?: string;
 }
 
+/** A person who can be named or emailed about an invitation. */
+export interface IInvitationPerson {
+  email: string;
+  firstName: string;
+  lastName: string;
+}
+
+/** A pending invitation as the invitee may see it. */
+export interface IInviteeInvitationRow {
+  invitation: CompanyInvitation;
+  companyName: string;
+  inviterName: string | null;
+}
+
+/** One entry in a company's append-only audit trail. */
+export interface ICompanyAuditEntry {
+  companyId: string;
+  actorCompanyUserId: string | null;
+  actorUserId: string;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  summary: string;
+  changes: Record<string, unknown>;
+  occurredAt: Date;
+}
+
 export interface ICompanyAdminReadRepository {
   findActiveRole(
     scope: ICompanyScope,
@@ -45,7 +73,17 @@ export interface ICompanyAdminReadRepository {
   expireInvitation(scope: ICompanyScope, invitationId: string): Promise<void>;
   findCompanyName(
     companyId: string,
-  ): Promise<{ id: string; name: string } | null>;
+  ): Promise<{ id: string; name: string; status: ECompanyStatus } | null>;
+  /** The full name of the user behind a membership, active or not. */
+  findMemberName(companyUserId: string): Promise<string | null>;
+  /**
+   * Deliberately unscoped: an invitee has no company context yet. Pending,
+   * unexpired invitations to `email` from active companies, oldest first.
+   */
+  listPendingInvitationsForEmail(
+    email: string,
+    at: Date,
+  ): Promise<IInviteeInvitationRow[]>;
 }
 
 export interface ICompanyAdminCompanyWriter {
@@ -78,6 +116,11 @@ export interface ICompanyAdminMemberWriter {
 export interface ICompanyAdminUserReader {
   findIdByEmail(email: string): Promise<{ id: string; email: string } | null>;
   findById(userId: string): Promise<AppUser | null>;
+  /** The user behind a membership, if that membership is still active. */
+  findActiveMemberPerson(
+    scope: ICompanyScope,
+    companyUserId: string,
+  ): Promise<IInvitationPerson | null>;
 }
 
 export interface ICompanyAdminInvitationWriter {
@@ -97,6 +140,21 @@ export interface ICompanyAdminInvitationWriter {
   ): Promise<CompanyInvitation | null>;
   /** Deliberately unscoped: the invitee holds only the token. */
   lockByTokenHash(tokenHash: string): Promise<CompanyInvitation | null>;
+  /**
+   * Deliberately unscoped: a signed-in invitee names their own invitation.
+   * Matches only an invitation addressed to `email`.
+   */
+  lockByIdForEmail(
+    invitationId: string,
+    email: string,
+  ): Promise<CompanyInvitation | null>;
+  /** Another pending, unexpired invitation to the same address, if any. */
+  findOtherActivePendingByEmail(
+    scope: ICompanyScope,
+    email: string,
+    exceptInvitationId: string,
+    now: Date,
+  ): Promise<CompanyInvitation | null>;
   create(data: ICompanyInvitationEntity): Promise<CompanyInvitation>;
   save(invitation: CompanyInvitation): Promise<CompanyInvitation>;
   /** Returns true only when exactly one still-pending row was revoked. */
@@ -107,11 +165,16 @@ export interface ICompanyAdminInvitationWriter {
   ): Promise<boolean>;
 }
 
+export interface ICompanyAuditLogWriter {
+  append(entry: ICompanyAuditEntry): Promise<void>;
+}
+
 export interface ICompanyAdminTransactionContext {
   companies: ICompanyAdminCompanyWriter;
   members: ICompanyAdminMemberWriter;
   users: ICompanyAdminUserReader;
   invitations: ICompanyAdminInvitationWriter;
+  auditLogs: ICompanyAuditLogWriter;
 }
 
 export type ICompanyAdminUnitOfWork =

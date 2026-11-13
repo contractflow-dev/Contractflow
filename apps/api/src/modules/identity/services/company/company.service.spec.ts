@@ -91,6 +91,7 @@ describe('CompanyService', () => {
     };
     invitationRepository = {
       countPending: vi.fn().mockResolvedValue(2),
+      countPendingForEmailUnscoped: vi.fn().mockResolvedValue(0),
     };
     contractPartyRepository = {
       countCompanyContracts: vi.fn().mockResolvedValue(0),
@@ -254,6 +255,7 @@ describe('CompanyService', () => {
       activeCompanyCount: 1,
       hasEndedMembership: true,
       hasInactiveCompanyMembership: true,
+      pendingInvitationCount: 0,
     });
     expect(
       membershipRepository.findAllMembershipsForUser,
@@ -267,7 +269,35 @@ describe('CompanyService', () => {
       activeCompanyCount: 0,
       hasEndedMembership: false,
       hasInactiveCompanyMembership: false,
+      pendingInvitationCount: 0,
     });
+  });
+
+  it('counts pending invitations to a verified email so an invitee skips company setup', async () => {
+    membershipRepository.findAllMembershipsForUser.mockResolvedValue([]);
+    invitationRepository.countPendingForEmailUnscoped.mockResolvedValue(1);
+
+    await expect(
+      service.getAccessSummary('invitee', 'invitee@example.com', true),
+    ).resolves.toMatchObject({
+      activeCompanyCount: 0,
+      pendingInvitationCount: 1,
+    });
+    expect(
+      invitationRepository.countPendingForEmailUnscoped,
+    ).toHaveBeenCalledWith('invitee@example.com', expect.any(Date));
+  });
+
+  it('does not count invitations to an email that is not verified', async () => {
+    membershipRepository.findAllMembershipsForUser.mockResolvedValue([]);
+    invitationRepository.countPendingForEmailUnscoped.mockResolvedValue(3);
+
+    await expect(
+      service.getAccessSummary('invitee', 'invitee@example.com', false),
+    ).resolves.toMatchObject({ pendingInvitationCount: 0 });
+    expect(
+      invitationRepository.countPendingForEmailUnscoped,
+    ).not.toHaveBeenCalled();
   });
 
   it('requires active membership and administrator role for dashboard data', async () => {

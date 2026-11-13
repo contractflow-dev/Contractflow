@@ -91,6 +91,7 @@ export class MailService {
     companyName: string,
     role: string,
     token: string,
+    inviterName?: string | null,
   ): Promise<void> {
     const isProduction = this.config.get<string>('NODE_ENV') === 'production';
     const webUrl =
@@ -107,9 +108,13 @@ export class MailService {
     const { text, html } = renderEmail({
       heading: `You're invited to join ${companyName}`,
       greeting: 'Hello,',
-      intro: `You have been invited to join ${companyName} on ContractFlow as ${role}.`,
+      intro: inviterName
+        ? `${inviterName} invited you to join ${companyName} on ContractFlow as ${role}.`
+        : `You have been invited to join ${companyName} on ContractFlow as ${role}.`,
       details: [
         { label: 'Company', value: companyName },
+        ...(inviterName ? [{ label: 'Invited by', value: inviterName }] : []),
+        { label: 'Invited email', value: email },
         { label: 'Role', value: role },
       ],
       instructions:
@@ -123,6 +128,57 @@ export class MailService {
     await this.sendEmail(
       email,
       `Invitation to join ${companyName}`,
+      text,
+      html,
+    );
+  }
+
+  /**
+   * Tells the administrator who sent a company invitation that it was
+   * accepted or declined. Names the invitee by the invited address only.
+   */
+  async sendCompanyInvitationResponseEmail(
+    inviterEmail: string,
+    companyName: string,
+    inviteeEmail: string,
+    role: string,
+    decision: 'accepted' | 'declined',
+  ): Promise<void> {
+    const isProduction = this.config.get<string>('NODE_ENV') === 'production';
+    const webUrl =
+      this.config.get<string>('WEB_URL') ??
+      (isProduction ? undefined : 'http://localhost:3000');
+    if (!webUrl) {
+      throw new ServiceUnavailableException(
+        'Email delivery is not configured. Set WEB_URL.',
+      );
+    }
+
+    const teamUrl = new URL('/dashboards/team', webUrl);
+    const accepted = decision === 'accepted';
+    const { text, html } = renderEmail({
+      heading: accepted ? 'Invitation accepted' : 'Invitation declined',
+      intro: accepted
+        ? `${inviteeEmail} accepted your invitation and is now a member of ${companyName} on ContractFlow.`
+        : `${inviteeEmail} declined your invitation to join ${companyName} on ContractFlow.`,
+      details: [
+        { label: 'Company', value: companyName },
+        { label: 'Invited email', value: inviteeEmail },
+        { label: 'Role', value: role },
+      ],
+      instructions: accepted
+        ? 'They have no contract access yet. Assign them to a contract and workspace from your team page.'
+        : 'You can send a new invitation from your team page if this was a mistake.',
+      ctaLabel: 'View Team',
+      url: teamUrl.toString(),
+      securityNotice:
+        'You received this email because you sent this invitation as a Company Administrator.',
+    });
+    await this.sendEmail(
+      inviterEmail,
+      accepted
+        ? `${inviteeEmail} joined ${companyName}`
+        : `${inviteeEmail} declined your invitation to ${companyName}`,
       text,
       html,
     );

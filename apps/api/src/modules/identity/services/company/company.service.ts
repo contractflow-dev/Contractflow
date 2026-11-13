@@ -118,15 +118,29 @@ export class CompanyService {
       }));
   }
 
+  /**
+   * `email` counts pending invitations only once it is verified, so a new
+   * invitee is sent to their invitation rather than to company setup.
+   */
   async getAccessSummary(
     userId: string,
+    email?: string,
+    isEmailVerified = false,
   ): Promise<ICompanyAccessSummaryResponse> {
-    const memberships =
-      await this.companyUserRepository.findAllMembershipsForUser(userId);
+    const [memberships, pendingInvitationCount] = await Promise.all([
+      this.companyUserRepository.findAllMembershipsForUser(userId),
+      email && isEmailVerified
+        ? this.invitationRepository.countPendingForEmailUnscoped(
+            email,
+            new Date(),
+          )
+        : Promise.resolve(0),
+    ]);
     const summary: ICompanyAccessSummaryResponse = {
       activeCompanyCount: 0,
       hasEndedMembership: false,
       hasInactiveCompanyMembership: false,
+      pendingInvitationCount,
     };
 
     for (const membership of memberships) {

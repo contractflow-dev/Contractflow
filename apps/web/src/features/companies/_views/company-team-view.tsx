@@ -42,6 +42,7 @@ import {
   useInviteCompanyMemberMutation,
   useRemoveCompanyMemberMutation,
   useRevokeCompanyInvitationMutation,
+  useResendCompanyInvitationMutation,
 } from "@/features/companies";
 import type { ICompanyMember } from "@contractflow/contracts-schema";
 import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
@@ -61,7 +62,7 @@ import { useKeepPageInRange, usePagination } from "@/hooks/use-pagination";
 import { useUserTimeZone } from "@/hooks/use-user-time-zone";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { formatDate } from "@/lib/format";
-import { notifySuccess } from "@/lib/notify";
+import { notifyError, notifySuccess } from "@/lib/notify";
 import { CompanyAdminShell } from "../CompanyAdminShell";
 
 const memberRoles = Object.values(ECompanyRole);
@@ -174,6 +175,8 @@ function TeamContent({ companyId }: { companyId: string }) {
   const [removeMember, removeMemberState] = useRemoveCompanyMemberMutation();
   const [revokeInvitation, revokeInvitationState] =
     useRevokeCompanyInvitationMutation();
+  const [resendInvitation] = useResendCompanyInvitationMutation();
+  const [resendingInvitationId, setResendingInvitationId] = useState("");
 
   async function submitInvitation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -259,6 +262,27 @@ function TeamContent({ companyId }: { companyId: string }) {
       );
     } finally {
       setBusyMemberId("");
+    }
+  }
+
+  // A new link replaces the old one, which stops working.
+  async function resend(invitationId: string, invitedEmail: string) {
+    if (resendingInvitationId) return;
+    setResendingInvitationId(invitationId);
+    try {
+      await resendInvitation({ companyId, invitationId }).unwrap();
+      notifySuccess(
+        "Invitation sent again",
+        `${invitedEmail} has a new link, valid for 7 days. The previous link no longer works.`,
+      );
+    } catch (error) {
+      notifyError(
+        error,
+        "Please try again in a moment.",
+        "The invitation could not be sent again",
+      );
+    } finally {
+      setResendingInvitationId("");
     }
   }
 
@@ -642,21 +666,45 @@ function TeamContent({ companyId }: { companyId: string }) {
                       {formatDate(invitation.expiresAt, { timeZone })}
                     </TableCell>
                     <TableCell className="px-4 py-3 text-right">
-                      {invitation.status === EInvitationStatus.PENDING &&
-                        new Date(invitation.expiresAt) > new Date() && (
+                      <div className="flex justify-end gap-2">
+                        {(invitation.status === EInvitationStatus.PENDING ||
+                          invitation.status === EInvitationStatus.EXPIRED) && (
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
-                            disabled={busyInvitationId === invitation.id}
-                            onClick={() =>
-                              requestRevocation(invitation.id, invitation.email)
+                            disabled={
+                              Boolean(resendingInvitationId) ||
+                              busyInvitationId === invitation.id
                             }
+                            onClick={() =>
+                              void resend(invitation.id, invitation.email)
+                            }
+                            aria-label={`Send the invitation to ${invitation.email} again`}
                           >
-                            {busyInvitationId === invitation.id
-                              ? "Revoking…"
-                              : "Revoke"}
+                            {resendingInvitationId === invitation.id
+                              ? "Sending…"
+                              : "Resend"}
                           </Button>
                         )}
+                        {invitation.status === EInvitationStatus.PENDING &&
+                          new Date(invitation.expiresAt) > new Date() && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={busyInvitationId === invitation.id}
+                              onClick={() =>
+                                requestRevocation(
+                                  invitation.id,
+                                  invitation.email,
+                                )
+                              }
+                            >
+                              {busyInvitationId === invitation.id
+                                ? "Revoking…"
+                                : "Revoke"}
+                            </Button>
+                          )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

@@ -21,5 +21,6 @@ export {
   companyAccessState,
   companyLandingPath,
   resolveWorkspaceRedirect,
+  MY_INVITATIONS_PATH,
 } from "./workspaceLanding";
 export type { CompanyAccessState } from "./workspaceLanding";

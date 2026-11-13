@@ -398,4 +398,56 @@ describe('MailService', () => {
       ),
     ).rejects.toThrow('could not be delivered');
   });
+
+  it('names the inviter and the invited address in a company invitation', async () => {
+    const service = createService({ NODE_ENV: 'development' });
+
+    await service.sendCompanyInvitationEmail(
+      'member@example.com',
+      'Example Energy',
+      'Member',
+      'single-use-token',
+      'Ada <Admin>',
+    );
+
+    const { text, html } = sentMessage();
+    expect(text).toContain(
+      'Ada <Admin> invited you to join Example Energy on ContractFlow as Member.',
+    );
+    expect(text).toContain('Invited by: Ada <Admin>');
+    expect(text).toContain('Invited email: member@example.com');
+    expect(html).toContain('Ada &lt;Admin&gt;');
+    expect(html).not.toContain('<Admin>');
+  });
+
+  it.each([
+    ['accepted', 'member@example.com joined Example Energy', 'is now a member'],
+    [
+      'declined',
+      'member@example.com declined your invitation to Example Energy',
+      'declined your invitation',
+    ],
+  ] as const)(
+    'tells the inviter that an invitation was %s',
+    async (decision, subject, phrase) => {
+      const service = createService({ NODE_ENV: 'development' });
+
+      await service.sendCompanyInvitationResponseEmail(
+        'admin@example.com',
+        'Example Energy',
+        'member@example.com',
+        'Member',
+        decision,
+      );
+
+      const message = sentMessage();
+      const url = 'http://localhost:3000/dashboards/team';
+      expect(message.to).toBe('admin@example.com');
+      expect(message.subject).toBe(subject);
+      expect(message.text).toContain(phrase);
+      expect(message.text).toContain(`View Team: ${url}`);
+      expect(message.text).not.toContain('expires');
+      expect(linksIn(message.html)).toEqual([url, url]);
+    },
+  );
 });

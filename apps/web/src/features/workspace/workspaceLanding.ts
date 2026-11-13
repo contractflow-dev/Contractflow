@@ -3,9 +3,13 @@ import type { ICompanyAccessSummaryResponse } from "@contractflow/contracts-sche
 export const COMPANY_OVERVIEW_PATH = "/dashboards";
 export const MEMBER_LANDING_PATH = "/dashboards/contracts";
 export const ONBOARDING_PATH = "/onboarding";
+/** The signed-in user's own pending company invitations. */
+export const MY_INVITATIONS_PATH = "/invitations";
 
 /**
  * - `active`: the user can use at least one company.
+ * - `invited`: the user has no usable company but a pending invitation to
+ *   their verified email, so they should answer it rather than set one up.
  * - `new`: the user has never had a company and should set one up.
  * - `ended`: the user was removed from their companies.
  * - `company-inactive`: the user belongs to a company that is inactive.
@@ -13,6 +17,7 @@ export const ONBOARDING_PATH = "/onboarding";
  */
 export type CompanyAccessState =
   | "active"
+  | "invited"
   | "new"
   | "ended"
   | "company-inactive"
@@ -33,6 +38,8 @@ export function companyAccessState(
 ): CompanyAccessState {
   if (hasActiveCompany) return "active";
   if (!summary) return "unknown";
+  // An invitation is the way in (or back in), whatever came before.
+  if (summary.pendingInvitationCount > 0) return "invited";
   if (summary.hasInactiveCompanyMembership) return "company-inactive";
   if (summary.hasEndedMembership) return "ended";
   return "new";
@@ -52,6 +59,7 @@ export function resolveWorkspaceRedirect({
   access: CompanyAccessState;
   canManageCompany: boolean | null;
 }): string | null {
+  if (access === "invited") return MY_INVITATIONS_PATH;
   if (access === "new") return ONBOARDING_PATH;
   if (access !== "active") return null;
   // Only the overview is swapped for members. Other admin pages keep the

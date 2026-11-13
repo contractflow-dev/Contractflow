@@ -10,7 +10,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { getApiErrorMessage } from "@/lib/apiError";
-import { useCreateCompanyMutation } from "@/features/companies";
+import {
+  useCreateCompanyMutation,
+  useGetCompanyAccessSummaryQuery,
+} from "@/features/companies";
+import { MY_INVITATIONS_PATH } from "@/features/workspace";
 import { useGetCurrentUserQuery } from "@/services/authApi";
 import { setActiveWorkspaceId } from "@/features/workspace/workspaceSlice";
 import { useAppDispatch } from "@/store/hooks";
@@ -174,6 +178,10 @@ export function OnboardingView() {
     refetch: refetchUser,
   } = useGetCurrentUserQuery();
   const [createCompany] = useCreateCompanyMutation();
+  // Counts invitations to the user's verified email, so someone who was
+  // invited is pointed to the invitation rather than to company setup.
+  const { data: accessSummary } = useGetCompanyAccessSummaryQuery();
+  const pendingInvitations = accessSummary?.pendingInvitationCount ?? 0;
   const [serverError, setServerError] = useState<string | null>(null);
   const [createdCompany, setCreatedCompany] = useState<{
     id: string;
@@ -440,11 +448,32 @@ export function OnboardingView() {
       <Alert>
         <RiMailLine aria-hidden="true" />
         <AlertDescription>
-          <span className="font-medium text-foreground">
-            Were you invited to join a company?
-          </span>{" "}
-          You don&apos;t need to create one. Open the invitation link in your
-          email and accept it while signed in as {currentUser.email}.
+          {pendingInvitations > 0 ? (
+            <>
+              <span className="font-medium text-foreground">
+                You have{" "}
+                {pendingInvitations === 1
+                  ? "a company invitation"
+                  : `${pendingInvitations} company invitations`}
+                .
+              </span>{" "}
+              You don&apos;t need to create a company to join one.{" "}
+              <Link
+                href={MY_INVITATIONS_PATH}
+                className="font-medium text-foreground underline underline-offset-4"
+              >
+                Review your invitations
+              </Link>
+            </>
+          ) : (
+            <>
+              <span className="font-medium text-foreground">
+                Were you invited to join a company?
+              </span>{" "}
+              You don&apos;t need to create one. Open the invitation link in
+              your email and accept it while signed in as {currentUser.email}.
+            </>
+          )}
         </AlertDescription>
       </Alert>
 

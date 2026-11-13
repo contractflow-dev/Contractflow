@@ -27,7 +27,8 @@ export interface EmailContent {
   ctaLabel: string;
   /** The page link, including its single-use token. */
   url: string;
-  expiryNotice: string;
+  /** When the link stops working. Omit for links that don't expire. */
+  expiryNotice?: string;
   /** What to do if the recipient didn't expect this email. */
   securityNotice: string;
 }
@@ -73,8 +74,7 @@ function renderText(content: EmailContent): string {
     ...(content.instructions ? [content.instructions, ''] : []),
     `${content.ctaLabel}: ${content.url}`,
     '',
-    content.expiryNotice,
-    '',
+    ...(content.expiryNotice ? [content.expiryNotice, ''] : []),
     content.securityNotice,
     '',
     '— ContractFlow',
@@ -103,6 +103,9 @@ function renderHtml(content: EmailContent): string {
   const greeting = content.greeting
     ? `
                 <p style="margin:0 0 12px;font-size:16px;line-height:24px;color:${TEXT_COLOR};">${escapeHtml(content.greeting)}</p>`
+    : '';
+  const expiryNotice = content.expiryNotice
+    ? `                <p style="margin:0 0 8px;font-size:14px;line-height:20px;color:${MUTED_COLOR};">${escapeHtml(content.expiryNotice)}</p>`
     : '';
   const instructions = content.instructions
     ? `
@@ -137,7 +140,7 @@ function renderHtml(content: EmailContent): string {
                     </td>
                   </tr>
                 </table>
-                <p style="margin:0 0 8px;font-size:14px;line-height:20px;color:${MUTED_COLOR};">${escapeHtml(content.expiryNotice)}</p>
+${expiryNotice}
                 <p style="margin:0 0 8px;font-size:13px;line-height:20px;color:${MUTED_COLOR};">If the button doesn't work, copy this link into your browser:</p>
                 <p style="margin:0 0 24px;font-size:13px;line-height:20px;word-break:break-all;"><a href="${url}" target="_blank" rel="noopener" style="color:${BRAND_COLOR};text-decoration:underline;">${url}</a></p>
               </td>

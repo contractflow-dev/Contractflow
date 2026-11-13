@@ -1,6 +1,10 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RegisterForm } from "./register-form";
+
+const mocks = vi.hoisted(() => ({
+  invitationPreview: vi.fn(),
+}));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -10,7 +14,92 @@ vi.mock("@/services/authApi", () => ({
   useRegisterMutation: () => [vi.fn(), { isLoading: false }],
 }));
 
+vi.mock("@/services/companiesApi", () => ({
+  useGetPublicCompanyInvitationQuery: mocks.invitationPreview,
+}));
+
 describe("RegisterForm", () => {
+  beforeEach(() => {
+    mocks.invitationPreview.mockReset();
+    mocks.invitationPreview.mockReturnValue({
+      currentData: undefined,
+      isError: false,
+    });
+  });
+
+  describe("for a company invitation", () => {
+    const token = "invite-token";
+
+    beforeEach(() => {
+      mocks.invitationPreview.mockReturnValue({
+        currentData: {
+          status: "pending",
+          companyName: "Acme Works",
+          inviterName: "Ada Admin",
+          email: "ari@example.com",
+          companyRole: "Member",
+          expiresAt: "2099-01-01T00:00:00.000Z",
+        },
+        isError: false,
+      });
+    });
+
+    it("names the company and fixes the email to the invited address", () => {
+      const markup = renderToStaticMarkup(
+        <RegisterForm invitationToken={token} />,
+      );
+
+      expect(mocks.invitationPreview).toHaveBeenCalledWith(
+        { token },
+        { skip: false },
+      );
+      expect(markup).toContain("Join Acme Works on ContractFlow");
+      expect(markup).toContain("Ada Admin invited you as Member.");
+      expect(markup).toContain("You won&#x27;t need to set up a company.");
+      const emailInput = markup.match(/<input[^>]*id="email"[^>]*>/)?.[0] ?? "";
+      expect(emailInput).toContain('value="ari@example.com"');
+      expect(emailInput).toContain("readOnly");
+      expect(emailInput).toContain('aria-readonly="true"');
+    });
+
+    it("signs in back to the invitation instead of the dashboard", () => {
+      const markup = renderToStaticMarkup(
+        <RegisterForm invitationToken={token} />,
+      );
+
+      expect(markup).toContain(
+        `href="/login?redirect=${encodeURIComponent(
+          "/invitations/respond?token=invite-token",
+        ).replaceAll("&", "&amp;")}"`,
+      );
+    });
+
+    it("says when the invitation can no longer be used, and leaves the email editable", () => {
+      mocks.invitationPreview.mockReturnValue({
+        currentData: { status: "revoked" },
+        isError: false,
+      });
+
+      const markup = renderToStaticMarkup(
+        <RegisterForm invitationToken={token} />,
+      );
+
+      expect(markup).toContain("This invitation can&#x27;t be used any more.");
+      expect(markup).toContain("Create your ContractFlow account");
+      const emailInput = markup.match(/<input[^>]*id="email"[^>]*>/)?.[0] ?? "";
+      expect(emailInput).not.toContain("readOnly");
+    });
+  });
+
+  it("skips the invitation lookup for ordinary registration", () => {
+    renderToStaticMarkup(<RegisterForm />);
+
+    expect(mocks.invitationPreview).toHaveBeenCalledWith(
+      { token: "" },
+      { skip: true },
+    );
+  });
+
   it("renders the form on the server instead of an empty placeholder", () => {
     const markup = renderToStaticMarkup(<RegisterForm />);
 

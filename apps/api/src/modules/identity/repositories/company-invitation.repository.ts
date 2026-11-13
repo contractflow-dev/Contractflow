@@ -3,7 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, Repository } from 'typeorm';
 import { CompanyScopedRepository } from '../../../common/database/repositories/company-scoped.repository';
 import type { ICompanyScope } from '../../../common/database/repositories/company-scope.interface';
-import { EInvitationStatus } from '@contractflow/contracts-schema';
+import {
+  ECompanyStatus,
+  EInvitationStatus,
+} from '@contractflow/contracts-schema';
 import { CompanyInvitation } from '../entities/company-invitation.entity';
 
 @Injectable()
@@ -61,5 +64,43 @@ export class CompanyInvitationRepository extends CompanyScopedRepository<Company
     return this.repository.findOne({
       where: { tokenHash } as FindOptionsWhere<CompanyInvitation>,
     });
+  }
+
+  /**
+   * DELIBERATELY UNSCOPED. A signed-in invitee has no company context yet:
+   * these are the invitations addressed to their own verified email. Only
+   * pending, unexpired invitations from active companies are returned, with
+   * the company and the inviting member's user loaded for display.
+   */
+  findPendingForEmailUnscoped(
+    email: string,
+    at: Date,
+  ): Promise<CompanyInvitation[]> {
+    return this.pendingForEmailQuery(email, at)
+      .leftJoinAndSelect('invitation.CompanyUser', 'inviter')
+      .leftJoinAndSelect('inviter.user', 'inviterUser')
+      .orderBy('invitation.createdAt', 'ASC')
+      .addOrderBy('invitation.id', 'ASC')
+      .getMany();
+  }
+
+  /** DELIBERATELY UNSCOPED; see findPendingForEmailUnscoped. */
+  countPendingForEmailUnscoped(email: string, at: Date): Promise<number> {
+    return this.pendingForEmailQuery(email, at).getCount();
+  }
+
+  private pendingForEmailQuery(email: string, at: Date) {
+    return this.repository
+      .createQueryBuilder('invitation')
+      .innerJoinAndSelect('invitation.company', 'company')
+      .where('invitation.email = :email', { email })
+      .andWhere('invitation.status = :status', {
+        status: EInvitationStatus.PENDING,
+      })
+      .andWhere('invitation.revokedAt IS NULL')
+      .andWhere('invitation.expiresAt > :at', { at })
+      .andWhere('company.status = :companyStatus', {
+        companyStatus: ECompanyStatus.ACTIVE,
+      });
   }
 }

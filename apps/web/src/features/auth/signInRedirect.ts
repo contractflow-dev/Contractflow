@@ -28,6 +28,23 @@ export function signInUrl(
 }
 
 /**
+ * The company invitation token when sign-in was opened from an invitation
+ * link, so the page can say why and offer registration that keeps it.
+ */
+export function invitationTokenFromRedirect(
+  requested: string | null,
+): string | null {
+  if (!requested || !isLocalPath(requested)) return null;
+  try {
+    const url = new URL(requested, "https://contractflow.invalid");
+    if (url.pathname !== "/invitations/respond") return null;
+    return url.searchParams.get("token") || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Where to go after signing in: the requested page when it is on this site
  * (and not the sign-in page itself), otherwise the dashboards.
  */

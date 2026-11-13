@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import {
   ECompanyRole,
+  type ECompanyStatus,
   ECompanyUserStatus,
   EInvitationStatus,
 } from '@contractflow/contracts-schema';
@@ -17,6 +18,7 @@ import type {
 } from '../../../common/application/pagination.interface';
 import type {
   ICompanyAdminReadRepository,
+  IInviteeInvitationRow,
   IListCompanyMembersCriteria,
 } from '../interface/company-admin-persistence.interface';
 import { CompanyInvitationRepository } from './company-invitation.repository';
@@ -110,10 +112,39 @@ export class CompanyAdminReadRepository implements ICompanyAdminReadRepository {
 
   findCompanyName(
     companyId: string,
-  ): Promise<{ id: string; name: string } | null> {
+  ): Promise<{ id: string; name: string; status: ECompanyStatus } | null> {
     return this.companies.findOne({
       where: { id: companyId },
-      select: { id: true, name: true },
+      select: { id: true, name: true, status: true },
     });
   }
+
+  async findMemberName(companyUserId: string): Promise<string | null> {
+    const membership = await this.members.findOne({
+      where: { id: companyUserId },
+      relations: { user: true },
+    });
+    return membership?.user ? fullName(membership.user) : null;
+  }
+
+  async listPendingInvitationsForEmail(
+    email: string,
+    at: Date,
+  ): Promise<IInviteeInvitationRow[]> {
+    const invitations = await this.invitations.findPendingForEmailUnscoped(
+      email,
+      at,
+    );
+    return invitations.map((invitation) => ({
+      invitation,
+      companyName: invitation.company.name,
+      inviterName: invitation.CompanyUser?.user
+        ? fullName(invitation.CompanyUser.user)
+        : null,
+    }));
+  }
+}
+
+function fullName(user: { firstName: string; lastName: string }): string {
+  return `${user.firstName} ${user.lastName}`.trim();
 }
