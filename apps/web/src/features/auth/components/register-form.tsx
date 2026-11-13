@@ -40,6 +40,10 @@ import { PasswordInput } from "./password-input";
 import { getApiErrorMessage, getApiErrorStatus } from "@/lib/apiError";
 import { useRegisterMutation } from "@/services/authApi";
 import type { RegisterRequest } from "@/services/authApi";
+import { useGetPublicCompanyInvitationQuery } from "@/services/companiesApi";
+import { EInvitationStatus } from "@contractflow/contracts-schema";
+import { Alert, AlertDescription } from "@workspace/ui/components/alert";
+import { invitationSignInPath } from "@/features/invitations/joinedCompany";
 
 const nameFields = [
   {
@@ -85,9 +89,29 @@ function subscribeToTimezones() {
   return () => {};
 }
 
-export function RegisterForm() {
+/**
+ * With `invitationToken`, the account is created for a company invitation:
+ * the email is the invited address and can't be changed. Registering only
+ * creates the account; the invitation is accepted after verification.
+ */
+export function RegisterForm({
+  invitationToken,
+}: { invitationToken?: string } = {}) {
   const router = useRouter();
   const [registerUser] = useRegisterMutation();
+  const { currentData: invitationPreview, isError: invitationFailed } =
+    useGetPublicCompanyInvitationQuery(
+      { token: invitationToken ?? "" },
+      { skip: !invitationToken },
+    );
+  const invitation =
+    invitationPreview?.status === EInvitationStatus.PENDING
+      ? invitationPreview
+      : null;
+  const invitationUnavailable =
+    Boolean(invitationToken) &&
+    (invitationFailed ||
+      (invitationPreview !== undefined && invitation === null));
 
   const timezones = useSyncExternalStore(
     subscribeToTimezones,
@@ -114,6 +138,12 @@ export function RegisterForm() {
   const { getValues, setValue } = form;
 
   useEffect(() => {
+    if (invitation) {
+      setValue("email", invitation.email, { shouldValidate: true });
+    }
+  }, [invitation, setValue]);
+
+  useEffect(() => {
     if (!getValues("timezone")) {
       const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       // Effects run only in the browser, so check against the browser's full
@@ -131,7 +161,9 @@ export function RegisterForm() {
     if (getApiErrorStatus(err) === 409) {
       form.setError("email", {
         type: "server",
-        message: "An account with this email already exists.",
+        message: invitation
+          ? "An account with this email already exists. Sign in to accept the invitation."
+          : "An account with this email already exists.",
       });
       return;
     }
@@ -146,7 +178,8 @@ export function RegisterForm() {
 
   async function onSubmit(values: RegisterValues) {
     const payload: RegisterRequest = {
-      email: values.email.trim().toLowerCase(),
+      // An invited account always uses the invited address.
+      email: (invitation?.email ?? values.email).trim().toLowerCase(),
       password: values.password,
       firstName: values.firstName,
       middleName: values.middleName?.trim() || undefined,
@@ -159,7 +192,11 @@ export function RegisterForm() {
       await registerUser(payload).unwrap();
       // "Check your inbox" names this address and can resend to it.
       rememberPendingVerificationEmail(payload.email);
-      router.push("/auth/verification-pending");
+      router.push(
+        invitation
+          ? "/auth/verification-pending?invited=1"
+          : "/auth/verification-pending",
+      );
     } catch (err) {
       applyServerError(err);
     }
@@ -172,12 +209,40 @@ export function RegisterForm() {
       className="flex flex-col gap-5"
     >
       <header className="flex flex-col gap-2">
-        <h1 className="type-page-title">Create your ContractFlow account</h1>
-        <p className="text-xs text-muted-foreground">
-          Set up your account and start managing contracts, teams, and workflows
-          in one place.
-        </p>
+        {invitation ? (
+          <>
+            <h1 className="type-page-title">
+              Join {invitation.companyName} on ContractFlow
+            </h1>
+            <p className="text-xs leading-5 text-muted-foreground">
+              {invitation.inviterName
+                ? `${invitation.inviterName} invited you as ${invitation.companyRole}. `
+                : `You've been invited as ${invitation.companyRole}. `}
+              Create your account, verify your email, and you can accept the
+              invitation. You won&apos;t need to set up a company.
+            </p>
+          </>
+        ) : (
+          <>
+            <h1 className="type-page-title">
+              Create your ContractFlow account
+            </h1>
+            <p className="text-xs text-muted-foreground">
+              Set up your account and start managing contracts, teams, and
+              workflows in one place.
+            </p>
+          </>
+        )}
       </header>
+
+      {invitationUnavailable && (
+        <Alert role="status">
+          <AlertDescription>
+            This invitation can&apos;t be used any more. You can still create an
+            account, or ask the company administrator for a new invitation.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <FieldGroup className="gap-5">
         <RequiredFieldsNote />
@@ -221,7 +286,11 @@ export function RegisterForm() {
               id="email"
               label="Email"
               required
-              description="We'll send a verification link to this address."
+              description={
+                invitation
+                  ? "The invitation was sent to this address, so your account uses it. We'll send a verification link here."
+                  : "We'll send a verification link to this address."
+              }
               error={fieldState.error?.message}
             >
               {(control) => (
@@ -236,6 +305,10 @@ export function RegisterForm() {
                     maxLength={254}
                     autoComplete="email"
                     placeholder="name@company.com"
+                    // The invited address, never an edited one.
+                    value={invitation?.email ?? field.value}
+                    readOnly={Boolean(invitation)}
+                    aria-readonly={invitation ? true : undefined}
                   />
                 </InputGroup>
               )}
@@ -386,7 +459,9 @@ export function RegisterForm() {
       <p className="text-center text-xs text-muted-foreground">
         Already have an account?{" "}
         <Link
-          href="/login"
+          href={
+            invitationToken ? invitationSignInPath(invitationToken) : "/login"
+          }
           className="font-medium text-foreground underline underline-offset-4"
         >
           Sign in

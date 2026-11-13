@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import {
   ECompanyRole,
+  ECompanyStatus,
   ECompanyUserStatus,
 } from '@contractflow/contracts-schema';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -28,7 +29,11 @@ const actorMembership = {
   status: ECompanyUserStatus.ACTIVE,
   leftAt: null,
 };
-const company = { id: companyId, name: 'Test Company' };
+const company = {
+  id: companyId,
+  name: 'Test Company',
+  status: ECompanyStatus.ACTIVE,
+};
 const scopeArg = { companyId };
 
 type Mocked<T> = { [K in keyof T]: ReturnType<typeof vi.fn> };
@@ -42,6 +47,7 @@ describe('CompanyAdminService', () => {
   let members: Mocked<ICompanyAdminTransactionContext['members']>;
   let users: Mocked<ICompanyAdminTransactionContext['users']>;
   let invitations: Mocked<ICompanyAdminTransactionContext['invitations']>;
+  let auditLogs: Mocked<ICompanyAdminTransactionContext['auditLogs']>;
   let execute: ReturnType<typeof vi.fn>;
   let companyVerification: { sendAfterEmailChange: ReturnType<typeof vi.fn> };
 
@@ -73,8 +79,13 @@ describe('CompanyAdminService', () => {
       findInvitationByTokenHash: vi.fn(),
       expireInvitation: vi.fn(),
       findCompanyName: vi.fn(),
+      findMemberName: vi.fn().mockResolvedValue('Ada Admin'),
+      listPendingInvitationsForEmail: vi.fn().mockResolvedValue([]),
     };
-    mail = { sendCompanyInvitationEmail: vi.fn() };
+    mail = {
+      sendCompanyInvitationEmail: vi.fn(),
+      sendCompanyInvitationResponseEmail: vi.fn(),
+    };
     companies = {
       lockById: vi.fn().mockResolvedValue({ ...company }),
       save: vi.fn(async (value) => value),
@@ -95,12 +106,19 @@ describe('CompanyAdminService', () => {
         lastName: 'Admin',
         email: 'new@example.com',
       }),
+      findActiveMemberPerson: vi.fn().mockResolvedValue({
+        email: 'inviter@example.com',
+        firstName: 'Ada',
+        lastName: 'Admin',
+      }),
     };
     invitations = {
       findActivePendingByEmail: vi.fn().mockResolvedValue(null),
       expirePendingByEmail: vi.fn(),
       lockById: vi.fn(),
       lockByTokenHash: vi.fn().mockResolvedValue(null),
+      lockByIdForEmail: vi.fn().mockResolvedValue(null),
+      findOtherActivePendingByEmail: vi.fn().mockResolvedValue(null),
       create: vi.fn(async (entity) => ({
         id: 'invitation-1',
         createdAt: new Date(),
@@ -109,11 +127,13 @@ describe('CompanyAdminService', () => {
       save: vi.fn(async (entity) => entity),
       revokePending: vi.fn().mockResolvedValue(true),
     };
+    auditLogs = { append: vi.fn() };
     const context = {
       companies,
       members,
       users,
       invitations,
+      auditLogs,
     } as unknown as ICompanyAdminTransactionContext;
     execute = vi.fn(async (operation) => operation(context));
     companyVerification = { sendAfterEmailChange: vi.fn() };
@@ -293,7 +313,7 @@ describe('CompanyAdminService', () => {
         'A'.repeat(43),
         'accept',
       ),
-    ).resolves.toEqual({ status: 'accepted' });
+    ).resolves.toEqual({ status: 'accepted', companyId });
 
     expect(execute).toHaveBeenCalledOnce();
     expect(members.lockAnyByUser).toHaveBeenCalledWith(scopeArg, 'new-user-id');
@@ -338,6 +358,7 @@ describe('CompanyAdminService', () => {
       expect.any(String),
       ECompanyRole.COMPANY_ADMIN,
       expect.any(String),
+      'New Admin',
     );
   });
 
@@ -369,12 +390,13 @@ describe('CompanyAdminService', () => {
         userId: 'new-user-id',
         companyRole,
       });
-      // The transaction only reaches company records: there is no contract
-      // role, party or workspace repository to write to.
+      // The transaction only reaches company-level records (the company,
+      // its members and users, the invitation and the company audit log):
+      // there is no contract role, party or workspace repository to write to.
       const [operation] = execute.mock.calls[0];
       const touched: string[] = [];
       const spy = new Proxy(
-        { companies, members, users, invitations },
+        { companies, members, users, invitations, auditLogs },
         {
           get(target, key: string) {
             touched.push(key);
@@ -393,7 +415,9 @@ describe('CompanyAdminService', () => {
         revokedAt: null,
       });
       await operation(spy);
-      expect(new Set(touched)).toEqual(new Set(['invitations', 'members']));
+      expect(new Set(touched)).toEqual(
+        new Set(['invitations', 'companies', 'members', 'users', 'auditLogs']),
+      );
     },
   );
 
@@ -529,5 +553,563 @@ describe('CompanyAdminService', () => {
       service.updateCompanyProfile(actorId, companyId, {}),
     ).rejects.toThrow('At least one company field is required.');
     expect(execute).not.toHaveBeenCalled();
+  });
+
+  describe('invitation onboarding', () => {
+    const token = 'A'.repeat(43);
+    const pendingInvitation = (overrides: Record<string, unknown> = {}) => ({
+      id: 'invitation-1',
+      companyId,
+      invitedByCompanyUserId: actorMembership.id,
+      email: 'new.user@example.com',
+      companyRole: ECompanyRole.MEMBER,
+      status: 'pending',
+      expiresAt: new Date(Date.now() + 60_000),
+      acceptedAt: null,
+      revokedAt: null,
+      ...overrides,
+    });
+
+    describe('previewing an invitation link', () => {
+      it('shows a pending invitation with its company, inviter, email and role', async () => {
+        reads.findInvitationByTokenHash.mockResolvedValueOnce(
+          pendingInvitation(),
+        );
+        reads.findCompanyName.mockResolvedValueOnce({ ...company });
+
+        const preview = await service.getInvitationByToken(token);
+
+        expect(preview).toEqual({
+          status: 'pending',
+          companyName: 'Test Company',
+          inviterName: 'Ada Admin',
+          email: 'new.user@example.com',
+          companyRole: ECompanyRole.MEMBER,
+          expiresAt: expect.any(Date),
+        });
+        expect(reads.findMemberName).toHaveBeenCalledWith(actorMembership.id);
+        // Looked up by the token's hash, never the token itself.
+        expect(reads.findInvitationByTokenHash.mock.calls[0][0]).toHaveLength(
+          64,
+        );
+        expect(reads.findInvitationByTokenHash).not.toHaveBeenCalledWith(token);
+      });
+
+      it.each([
+        ['accepted', { status: 'accepted' }],
+        ['declined', { status: 'declined' }],
+        ['revoked', { status: 'revoked', revokedAt: new Date() }],
+        ['expired', { status: 'expired' }],
+      ])(
+        'reports a %s invitation by status only, without its details',
+        async (status, overrides) => {
+          reads.findInvitationByTokenHash.mockResolvedValueOnce(
+            pendingInvitation(overrides),
+          );
+
+          await expect(service.getInvitationByToken(token)).resolves.toEqual({
+            status,
+          });
+          expect(reads.findCompanyName).not.toHaveBeenCalled();
+        },
+      );
+
+      it('records a pending invitation past its expiry as expired', async () => {
+        reads.findInvitationByTokenHash.mockResolvedValueOnce(
+          pendingInvitation({ expiresAt: new Date(Date.now() - 1) }),
+        );
+
+        await expect(service.getInvitationByToken(token)).resolves.toEqual({
+          status: 'expired',
+        });
+        expect(reads.expireInvitation).toHaveBeenCalledWith(
+          scopeArg,
+          'invitation-1',
+        );
+      });
+
+      it('rejects an unknown token', async () => {
+        reads.findInvitationByTokenHash.mockResolvedValueOnce(null);
+
+        await expect(
+          service.getInvitationByToken(token),
+        ).rejects.toBeInstanceOf(NotFoundException);
+      });
+
+      it('does not offer an invitation from an inactive company', async () => {
+        reads.findInvitationByTokenHash.mockResolvedValueOnce(
+          pendingInvitation(),
+        );
+        reads.findCompanyName.mockResolvedValueOnce({
+          ...company,
+          status: ECompanyStatus.INACTIVE,
+        });
+
+        await expect(
+          service.getInvitationByToken(token),
+        ).rejects.toBeInstanceOf(ConflictException);
+      });
+    });
+
+    describe("listing the signed-in user's invitations", () => {
+      it('lists pending invitations to a verified email, without tokens', async () => {
+        reads.listPendingInvitationsForEmail.mockResolvedValueOnce([
+          {
+            invitation: { ...pendingInvitation(), tokenHash: 'secret-hash' },
+            companyName: 'Test Company',
+            inviterName: 'Ada Admin',
+          },
+        ]);
+
+        const result = await service.listMyInvitations(
+          'new.user@example.com',
+          true,
+        );
+
+        expect(result).toEqual([
+          {
+            id: 'invitation-1',
+            companyName: 'Test Company',
+            inviterName: 'Ada Admin',
+            email: 'new.user@example.com',
+            companyRole: ECompanyRole.MEMBER,
+            expiresAt: expect.any(Date),
+          },
+        ]);
+        expect(JSON.stringify(result)).not.toContain('secret-hash');
+      });
+
+      it('lists nothing for an unverified email', async () => {
+        await expect(
+          service.listMyInvitations('new.user@example.com', false),
+        ).resolves.toEqual([]);
+        expect(reads.listPendingInvitationsForEmail).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('accepting', () => {
+      it('records the acceptance in the audit log and tells the inviter after the commit', async () => {
+        invitations.lockByTokenHash.mockResolvedValueOnce(pendingInvitation());
+        members.create.mockImplementationOnce(async (value) => ({
+          id: 'new-membership',
+          ...value,
+        }));
+
+        await service.respondToInvitation(
+          'new-user-id',
+          'new.user@example.com',
+          true,
+          token,
+          'accept',
+        );
+
+        expect(auditLogs.append).toHaveBeenCalledWith(
+          expect.objectContaining({
+            companyId,
+            actorUserId: 'new-user-id',
+            actorCompanyUserId: 'new-membership',
+            action: 'company.invitation_accepted',
+            entityId: 'invitation-1',
+            changes: expect.objectContaining({
+              companyUserId: 'new-membership',
+              companyRole: ECompanyRole.MEMBER,
+            }),
+          }),
+        );
+        expect(JSON.stringify(auditLogs.append.mock.calls)).not.toContain(
+          token,
+        );
+        expect(mail.sendCompanyInvitationResponseEmail).toHaveBeenCalledWith(
+          'inviter@example.com',
+          'Test Company',
+          'new.user@example.com',
+          ECompanyRole.MEMBER,
+          'accepted',
+        );
+        expect(
+          mail.sendCompanyInvitationResponseEmail.mock.invocationCallOrder[0],
+        ).toBeGreaterThan(auditLogs.append.mock.invocationCallOrder[0]);
+      });
+
+      it('keeps the acceptance when the inviter cannot be notified', async () => {
+        invitations.lockByTokenHash.mockResolvedValueOnce(pendingInvitation());
+        mail.sendCompanyInvitationResponseEmail.mockRejectedValueOnce(
+          new Error('SMTP down'),
+        );
+
+        await expect(
+          service.respondToInvitation(
+            'new-user-id',
+            'new.user@example.com',
+            true,
+            token,
+            'accept',
+          ),
+        ).resolves.toEqual({ status: 'accepted', companyId });
+      });
+
+      it('rolls back and sends no notice when part of the acceptance fails', async () => {
+        invitations.lockByTokenHash.mockResolvedValueOnce(pendingInvitation());
+        auditLogs.append.mockRejectedValueOnce(new Error('insert failed'));
+
+        await expect(
+          service.respondToInvitation(
+            'new-user-id',
+            'new.user@example.com',
+            true,
+            token,
+            'accept',
+          ),
+        ).rejects.toThrow('insert failed');
+        // Everything ran in the one unit of work, which rejects as a whole.
+        expect(execute).toHaveBeenCalledOnce();
+        expect(mail.sendCompanyInvitationResponseEmail).not.toHaveBeenCalled();
+      });
+
+      it('takes the company and role from the invitation, never the request', async () => {
+        invitations.lockByTokenHash.mockResolvedValueOnce(
+          pendingInvitation({ companyRole: ECompanyRole.COMPANY_ADMIN }),
+        );
+
+        await service.respondToInvitation(
+          'new-user-id',
+          'new.user@example.com',
+          true,
+          token,
+          'accept',
+        );
+
+        expect(companies.lockById).toHaveBeenCalledWith(scopeArg);
+        expect(members.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            companyId,
+            companyRole: ECompanyRole.COMPANY_ADMIN,
+          }),
+        );
+      });
+
+      it.each([
+        ['already accepted', { status: 'accepted' }, 'already been used'],
+        ['declined', { status: 'declined' }, 'already been used'],
+        ['revoked', { status: 'revoked', revokedAt: new Date() }, 'revoked'],
+        ['expired', { status: 'expired' }, 'expired'],
+      ])(
+        'refuses an invitation that was %s',
+        async (_label, overrides, message) => {
+          invitations.lockByTokenHash.mockResolvedValueOnce(
+            pendingInvitation(overrides),
+          );
+
+          await expect(
+            service.respondToInvitation(
+              'new-user-id',
+              'new.user@example.com',
+              true,
+              token,
+              'accept',
+            ),
+          ).rejects.toThrow(message);
+          expect(members.create).not.toHaveBeenCalled();
+          expect(members.save).not.toHaveBeenCalled();
+          expect(auditLogs.append).not.toHaveBeenCalled();
+        },
+      );
+
+      it('marks a pending invitation past its expiry as expired and refuses it', async () => {
+        invitations.lockByTokenHash.mockResolvedValueOnce(
+          pendingInvitation({ expiresAt: new Date(Date.now() - 1) }),
+        );
+
+        await expect(
+          service.respondToInvitation(
+            'new-user-id',
+            'new.user@example.com',
+            true,
+            token,
+            'accept',
+          ),
+        ).rejects.toThrow('This invitation has expired.');
+        expect(invitations.save).toHaveBeenCalledWith(
+          expect.objectContaining({ status: 'expired' }),
+        );
+        expect(members.create).not.toHaveBeenCalled();
+      });
+
+      it('refuses to join a company that is no longer active', async () => {
+        invitations.lockByTokenHash.mockResolvedValueOnce(pendingInvitation());
+        companies.lockById.mockResolvedValueOnce({
+          ...company,
+          status: ECompanyStatus.INACTIVE,
+        });
+
+        await expect(
+          service.respondToInvitation(
+            'new-user-id',
+            'new.user@example.com',
+            true,
+            token,
+            'accept',
+          ),
+        ).rejects.toThrow('not accepting new members');
+        expect(members.create).not.toHaveBeenCalled();
+        expect(invitations.save).not.toHaveBeenCalled();
+      });
+
+      it('refuses an invitation whose stored role is not a company role', async () => {
+        invitations.lockByTokenHash.mockResolvedValueOnce(
+          pendingInvitation({ companyRole: 'Platform Administrator' }),
+        );
+
+        await expect(
+          service.respondToInvitation(
+            'new-user-id',
+            'new.user@example.com',
+            true,
+            token,
+            'accept',
+          ),
+        ).rejects.toThrow('invalid role');
+        expect(members.create).not.toHaveBeenCalled();
+      });
+
+      it('leaves an existing active member and their role unchanged', async () => {
+        invitations.lockByTokenHash.mockResolvedValueOnce(
+          pendingInvitation({ companyRole: ECompanyRole.COMPANY_ADMIN }),
+        );
+        const existing = {
+          id: 'existing-membership',
+          companyId,
+          userId: 'member-id',
+          companyRole: ECompanyRole.MEMBER,
+          status: ECompanyUserStatus.ACTIVE,
+          leftAt: null,
+        };
+        members.lockAnyByUser.mockResolvedValueOnce(existing);
+
+        await expect(
+          service.respondToInvitation(
+            'member-id',
+            'new.user@example.com',
+            true,
+            token,
+            'accept',
+          ),
+        ).rejects.toThrow('already an active member');
+        expect(existing.companyRole).toBe(ECompanyRole.MEMBER);
+        expect(members.save).not.toHaveBeenCalled();
+        expect(members.create).not.toHaveBeenCalled();
+        expect(invitations.save).not.toHaveBeenCalled();
+      });
+
+      it('lets only one of two concurrent acceptances create a membership', async () => {
+        // The invitation's row lock (FOR UPDATE) serializes the two
+        // transactions, so the second reads the invitation as the first left
+        // it. Model that by running the unit-of-work operations one at a time.
+        const runOperation = execute.getMockImplementation()!;
+        let previous: Promise<unknown> = Promise.resolve();
+        execute.mockImplementation((operation) => {
+          const run = previous.then(() => runOperation(operation));
+          previous = run.catch(() => undefined);
+          return run;
+        });
+        const row = pendingInvitation();
+        invitations.lockByTokenHash.mockResolvedValue(row);
+        invitations.save.mockImplementation(async (entity) =>
+          Object.assign(row, entity),
+        );
+
+        const attempt = () =>
+          service.respondToInvitation(
+            'new-user-id',
+            'new.user@example.com',
+            true,
+            token,
+            'accept',
+          );
+        const [first, second] = await Promise.allSettled([
+          attempt(),
+          attempt(),
+        ]);
+
+        expect([first.status, second.status].sort()).toEqual([
+          'fulfilled',
+          'rejected',
+        ]);
+        expect(members.create).toHaveBeenCalledOnce();
+      });
+    });
+
+    describe('declining', () => {
+      it('declines without a membership, records it and tells the inviter', async () => {
+        invitations.lockByTokenHash.mockResolvedValueOnce(pendingInvitation());
+
+        await expect(
+          service.respondToInvitation(
+            'new-user-id',
+            'new.user@example.com',
+            true,
+            token,
+            'decline',
+          ),
+        ).resolves.toEqual({ status: 'declined' });
+
+        expect(members.create).not.toHaveBeenCalled();
+        expect(members.save).not.toHaveBeenCalled();
+        expect(invitations.save).toHaveBeenCalledWith(
+          expect.objectContaining({ status: 'declined' }),
+        );
+        expect(auditLogs.append).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: 'company.invitation_declined',
+            actorUserId: 'new-user-id',
+            actorCompanyUserId: null,
+          }),
+        );
+        expect(mail.sendCompanyInvitationResponseEmail).toHaveBeenCalledWith(
+          'inviter@example.com',
+          'Test Company',
+          'new.user@example.com',
+          ECompanyRole.MEMBER,
+          'declined',
+        );
+      });
+
+      it('skips the notice when the inviter is no longer an active member', async () => {
+        invitations.lockByTokenHash.mockResolvedValueOnce(pendingInvitation());
+        users.findActiveMemberPerson.mockResolvedValueOnce(null);
+
+        await service.respondToInvitation(
+          'new-user-id',
+          'new.user@example.com',
+          true,
+          token,
+          'decline',
+        );
+
+        expect(mail.sendCompanyInvitationResponseEmail).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("answering one of the user's own invitations by ID", () => {
+      it('finds the invitation only through the signed-in email address', async () => {
+        invitations.lockByIdForEmail.mockResolvedValueOnce(pendingInvitation());
+
+        await expect(
+          service.respondToMyInvitation(
+            'new-user-id',
+            'new.user@example.com',
+            true,
+            'invitation-1',
+            'accept',
+          ),
+        ).resolves.toEqual({ status: 'accepted', companyId });
+        expect(invitations.lockByIdForEmail).toHaveBeenCalledWith(
+          'invitation-1',
+          'new.user@example.com',
+        );
+      });
+
+      it("treats another person's invitation ID as not found", async () => {
+        invitations.lockByIdForEmail.mockResolvedValueOnce(null);
+
+        await expect(
+          service.respondToMyInvitation(
+            'other-user-id',
+            'other@example.com',
+            true,
+            'invitation-1',
+            'accept',
+          ),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(members.create).not.toHaveBeenCalled();
+      });
+
+      it('requires a verified email before opening a transaction', async () => {
+        await expect(
+          service.respondToMyInvitation(
+            'new-user-id',
+            'new.user@example.com',
+            false,
+            'invitation-1',
+            'accept',
+          ),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(execute).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('resending', () => {
+      it('replaces the token, extends the expiry and sends the new link', async () => {
+        const old = pendingInvitation({
+          status: 'expired',
+          tokenHash: 'old-hash',
+          expiresAt: new Date(Date.now() - 1000),
+        });
+        invitations.lockById.mockResolvedValueOnce(old);
+
+        const result = await service.resendInvitation(
+          actorId,
+          companyId,
+          'invitation-1',
+        );
+
+        const saved = invitations.save.mock.calls[0][0];
+        const sentToken = mail.sendCompanyInvitationEmail.mock.calls[0][3];
+        expect(saved.tokenHash).toHaveLength(64);
+        expect(saved.tokenHash).not.toBe('old-hash');
+        expect(saved.tokenHash).not.toBe(sentToken);
+        expect(saved.status).toBe('pending');
+        expect(saved.expiresAt.getTime()).toBeGreaterThan(Date.now());
+        expect(result.status).toBe('pending');
+        expect(auditLogs.append).toHaveBeenCalledWith(
+          expect.objectContaining({ action: 'company.invitation_resent' }),
+        );
+      });
+
+      it.each([
+        ['accepted', { status: 'accepted' }],
+        ['declined', { status: 'declined' }],
+        ['revoked', { status: 'revoked', revokedAt: new Date() }],
+      ])(
+        'refuses to resend an invitation that was %s',
+        async (_label, overrides) => {
+          invitations.lockById.mockResolvedValueOnce(
+            pendingInvitation(overrides),
+          );
+
+          await expect(
+            service.resendInvitation(actorId, companyId, 'invitation-1'),
+          ).rejects.toBeInstanceOf(ConflictException);
+          expect(invitations.save).not.toHaveBeenCalled();
+          expect(mail.sendCompanyInvitationEmail).not.toHaveBeenCalled();
+        },
+      );
+
+      it('refuses when another active invitation exists for the address', async () => {
+        invitations.lockById.mockResolvedValueOnce(
+          pendingInvitation({ status: 'expired' }),
+        );
+        invitations.findOtherActivePendingByEmail.mockResolvedValueOnce({
+          id: 'newer-invitation',
+        });
+
+        await expect(
+          service.resendInvitation(actorId, companyId, 'invitation-1'),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(mail.sendCompanyInvitationEmail).not.toHaveBeenCalled();
+      });
+
+      it('is limited to Company Administrators of the header company', async () => {
+        members.lockActiveByUser.mockResolvedValueOnce({
+          ...actorMembership,
+          companyRole: ECompanyRole.MEMBER,
+        });
+
+        await expect(
+          service.resendInvitation(actorId, companyId, 'invitation-1'),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(invitations.lockById).not.toHaveBeenCalled();
+      });
+    });
   });
 });

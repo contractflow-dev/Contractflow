@@ -23,7 +23,10 @@ function subscribeToPendingEmail() {
   return () => {};
 }
 
-export function VerificationPendingView() {
+/** `invited`: the account was just created to accept a company invitation. */
+export function VerificationPendingView({
+  invited = false,
+}: { invited?: boolean } = {}) {
   const pendingEmail = useSyncExternalStore(
     subscribeToPendingEmail,
     readPendingVerificationEmail,
@@ -97,6 +100,12 @@ export function VerificationPendingView() {
                 ContractFlow account. If you don’t see it, check your spam
                 folder.
               </p>
+              {invited && (
+                <p className="text-sm leading-6 text-muted-foreground">
+                  Once you’ve verified it, sign in and your company invitation
+                  will be waiting for you to accept.
+                </p>
+              )}
             </div>
           </header>
 

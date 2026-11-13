@@ -66,6 +66,7 @@ describe('Company team invitations (PostgreSQL)', () => {
         ) => {
           sentToken = token;
         },
+        sendCompanyInvitationResponseEmail: async () => undefined,
       } as unknown as MailService,
       new CompanyAdminReadRepository(
         dataSource.getRepository(CompanyUser),
@@ -150,7 +151,7 @@ describe('Company team invitations (PostgreSQL)', () => {
           sentToken!,
           'accept',
         ),
-      ).resolves.toEqual({ status: 'accepted' });
+      ).resolves.toEqual({ status: 'accepted', companyId: company.id });
 
       const membership = await dataSource
         .getRepository(CompanyUser)

@@ -73,6 +73,11 @@ export interface ICompanyAccessSummaryResponse {
   hasEndedMembership: boolean;
   /** The user is still a member of at least one company that is inactive. */
   hasInactiveCompanyMembership: boolean;
+  /**
+   * Pending, unexpired invitations from active companies to the user's
+   * verified email address. Zero while the email is unverified.
+   */
+  pendingInvitationCount: number;
 }
 
 /**
@@ -206,18 +211,46 @@ export type ICreateCompanyRequest = Omit<
 
 export type IUpdateCompanyProfileRequest = Partial<ICreateCompanyRequest>;
 
-export interface IPublicCompanyInvitation {
+/** What the invitee sees about a pending company invitation. */
+export interface ICompanyInvitationDetails {
   companyName: string;
+  /** The inviting administrator's name, when known. */
+  inviterName: string | null;
   email: string;
   companyRole: ECompanyRole;
   expiresAt: string;
 }
 
+/**
+ * The preview of an invitation link. Only a pending invitation carries its
+ * details; an answered, expired or revoked one reports only its status.
+ */
+export type IPublicCompanyInvitation =
+  | ({ status: EInvitationStatus.PENDING } & ICompanyInvitationDetails)
+  | {
+      status: Exclude<EInvitationStatus, EInvitationStatus.PENDING>;
+    };
+
+/** A pending invitation to the signed-in user's verified email address. */
+export interface IMyCompanyInvitation extends ICompanyInvitationDetails {
+  id: string;
+}
+
+export type CompanyInvitationDecision = "accept" | "decline";
+
 export interface ICompanyInvitationResponseRequest {
   token: string;
-  decision: "accept" | "decline";
+  decision: CompanyInvitationDecision;
+}
+
+/** Answers one of the signed-in user's own invitations, by its ID. */
+export interface IMyCompanyInvitationResponseRequest {
+  invitationId: string;
+  decision: CompanyInvitationDecision;
 }
 
 export interface ICompanyInvitationResponseResult {
   status: EInvitationStatus;
+  /** The company joined, when the invitation was accepted. */
+  companyId?: string;
 }

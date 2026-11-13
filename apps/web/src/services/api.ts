@@ -20,6 +20,8 @@ const COMPANY_CONTEXT_EXEMPT_ENDPOINTS = new Set([
   "createCompany",
   "getPublicCompanyInvitation",
   "respondToCompanyInvitation",
+  "getMyCompanyInvitations",
+  "respondToMyCompanyInvitation",
   "getPublicContractPartyInvitation",
   "getPublicContractRoleInvitation",
   "respondToContractRoleInvitation",

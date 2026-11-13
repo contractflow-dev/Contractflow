@@ -39,6 +39,7 @@ import {
   readPersistedActiveCompanyId,
   resolveActiveCompanyId,
   resolveWorkspaceRedirect,
+  MY_INVITATIONS_PATH,
   type CompanyAccessState,
 } from "@/features/workspace";
 import { getApiErrorMessage } from "@/lib/apiError";
@@ -56,9 +57,16 @@ import {
 const noCompanyNotices: Partial<
   Record<
     CompanyAccessState,
-    { title: string; description: string; setupLabel: string }
+    { title: string; description: string; setupLabel: string; href?: string }
   >
 > = {
+  invited: {
+    title: "You have a company invitation",
+    description:
+      "You aren't a member of a company yet, but you've been invited to join one. Taking you to your invitation…",
+    setupLabel: "Review your invitation",
+    href: MY_INVITATIONS_PATH,
+  },
   new: {
     title: "Set up your company",
     description:
@@ -277,7 +285,7 @@ export function CompanyAdminShell({
         action={
           <Link
             className="text-brand underline-offset-4 hover:underline"
-            href="/onboarding"
+            href={notice.href ?? "/onboarding"}
           >
             {notice.setupLabel}
           </Link>

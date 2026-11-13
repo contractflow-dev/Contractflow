@@ -15,12 +15,16 @@ import { AppUser } from '../entities/app-user.entity';
 import { Company } from '../entities/company.entity';
 import { CompanyInvitation } from '../entities/company-invitation.entity';
 import { CompanyUser } from '../entities/company-user.entity';
+import { CompanyAuditLog } from '../entities/company-audit-log.entity';
 import type {
   ICompanyAdminCompanyWriter,
   ICompanyAdminInvitationWriter,
   ICompanyAdminMemberWriter,
   ICompanyAdminTransactionContext,
   ICompanyAdminUserReader,
+  ICompanyAuditEntry,
+  ICompanyAuditLogWriter,
+  IInvitationPerson,
 } from '../interface/company-admin-persistence.interface';
 import type { ICompanyInvitationEntity } from '../interface/company-invitation.interface';
 import type { ICompanyUserEntity } from '../interface/company-user.interface';
@@ -106,7 +110,10 @@ class CompanyAdminMemberWriter implements ICompanyAdminMemberWriter {
 }
 
 class CompanyAdminUserReader implements ICompanyAdminUserReader {
-  constructor(private readonly repository: Repository<AppUser>) {}
+  constructor(
+    private readonly repository: Repository<AppUser>,
+    private readonly members: Repository<CompanyUser>,
+  ) {}
 
   findIdByEmail(email: string) {
     return this.repository.findOne({
@@ -117,6 +124,33 @@ class CompanyAdminUserReader implements ICompanyAdminUserReader {
 
   findById(userId: string) {
     return this.repository.findOneBy({ id: userId });
+  }
+
+  async findActiveMemberPerson(
+    scope: ICompanyScope,
+    companyUserId: string,
+  ): Promise<IInvitationPerson | null> {
+    const membership = await this.members.findOne({
+      where: {
+        id: companyUserId,
+        companyId: scope.companyId,
+        status: ECompanyUserStatus.ACTIVE,
+        leftAt: IsNull(),
+      },
+      relations: { user: true },
+    });
+    if (!membership?.user) return null;
+    const { email, firstName, lastName } = membership.user;
+    return { email, firstName, lastName };
+  }
+}
+
+class CompanyAuditLogWriter implements ICompanyAuditLogWriter {
+  constructor(private readonly repository: Repository<CompanyAuditLog>) {}
+
+  async append(entry: ICompanyAuditEntry): Promise<void> {
+    // save, not insert: it runs the entity's @BeforeInsert ULID generation.
+    await this.repository.save(this.repository.create(entry));
   }
 }
 
@@ -169,6 +203,35 @@ class CompanyAdminInvitationWriter implements ICompanyAdminInvitationWriter {
       .getOne();
   }
 
+  lockByIdForEmail(invitationId: string, email: string) {
+    return this.repository
+      .createQueryBuilder('invitation')
+      .where('invitation.id = :invitationId', { invitationId })
+      .andWhere('invitation.email = :email', { email })
+      .setLock('pessimistic_write')
+      .getOne();
+  }
+
+  findOtherActivePendingByEmail(
+    scope: ICompanyScope,
+    email: string,
+    exceptInvitationId: string,
+    now: Date,
+  ) {
+    return this.repository
+      .createQueryBuilder('invitation')
+      .where('invitation.companyId = :companyId', {
+        companyId: scope.companyId,
+      })
+      .andWhere('invitation.email = :email', { email })
+      .andWhere('invitation.id <> :exceptInvitationId', { exceptInvitationId })
+      .andWhere('invitation.status = :status', {
+        status: EInvitationStatus.PENDING,
+      })
+      .andWhere('invitation.expiresAt > :now', { now })
+      .getOne();
+  }
+
   create(data: ICompanyInvitationEntity): Promise<CompanyInvitation> {
     return this.repository.save(this.repository.create(data));
   }
@@ -200,9 +263,15 @@ export class CompanyAdminTransactionContextFactory implements ITransactionContex
     return {
       companies: new CompanyAdminCompanyWriter(manager.getRepository(Company)),
       members: new CompanyAdminMemberWriter(manager.getRepository(CompanyUser)),
-      users: new CompanyAdminUserReader(manager.getRepository(AppUser)),
+      users: new CompanyAdminUserReader(
+        manager.getRepository(AppUser),
+        manager.getRepository(CompanyUser),
+      ),
       invitations: new CompanyAdminInvitationWriter(
         manager.getRepository(CompanyInvitation),
+      ),
+      auditLogs: new CompanyAuditLogWriter(
+        manager.getRepository(CompanyAuditLog),
       ),
     };
   }

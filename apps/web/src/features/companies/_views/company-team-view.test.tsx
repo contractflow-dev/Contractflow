@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   inviteMember: vi.fn(),
   removeMember: vi.fn(),
   revokeInvitation: vi.fn(),
+  resendInvitation: vi.fn(),
 }));
 
 // Covered by its own tests. It renders its own <h2> on the page.
@@ -43,6 +44,10 @@ vi.mock("@/features/companies", () => ({
   ],
   useRevokeCompanyInvitationMutation: () => [
     mocks.revokeInvitation,
+    { isLoading: false },
+  ],
+  useResendCompanyInvitationMutation: () => [
+    mocks.resendInvitation,
     { isLoading: false },
   ],
 }));
@@ -179,10 +184,52 @@ describe("CompanyTeamView", () => {
     expect(markup).toContain('data-status="expired"');
     expect(markup).toContain(">Expired</span>");
     expect(markup).not.toContain(">pending<");
-    // An expired invitation can't be revoked.
+    // An expired invitation can't be revoked, but it can be sent again.
     expect(markup).not.toContain(">Revoke</button>");
+    expect(markup).toContain(">Resend</button>");
+    expect(markup).toContain(
+      'aria-label="Send the invitation to late@example.com again"',
+    );
     expect(markup).toMatch(/Jan 15, 2026|15 Jan 2026/);
   });
+  it.each([
+    ["accepted", false],
+    ["declined", false],
+    ["revoked", false],
+    ["expired", true],
+  ])("offers Resend for a %s invitation: %s", (status, offered) => {
+    const meta = {
+      totalItems: 1,
+      itemCount: 1,
+      itemsPerPage: 20,
+      totalPages: 1,
+      currentPage: 1,
+    };
+    mocks.getInvitations.mockReturnValue({
+      currentData: {
+        data: [
+          {
+            id: "invitation-1",
+            email: "person@example.com",
+            firstName: null,
+            lastName: null,
+            companyRole: "Member",
+            status,
+            expiresAt: "2099-01-01T00:00:00.000Z",
+          },
+        ],
+        meta,
+      },
+      isFetching: false,
+      error: undefined,
+      isLoading: false,
+    });
+
+    const markup = renderToStaticMarkup(<CompanyTeamView />);
+
+    expect(markup.includes(">Resend</button>")).toBe(offered);
+  });
+
   it("gives the page one <h1> and its sections <h2> headings", () => {
     const markup = renderToStaticMarkup(<CompanyTeamView />);
 

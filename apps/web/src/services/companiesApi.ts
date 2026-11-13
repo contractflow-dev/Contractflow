@@ -14,6 +14,8 @@ import type {
   ICreateCompanyRequest,
   ICreateCompanyResponse,
   IInviteCompanyMemberRequest,
+  IMyCompanyInvitation,
+  IMyCompanyInvitationResponseRequest,
   IPaginatedResponse,
   IPaginationQuery,
   IPublicCompanyInvitation,
@@ -23,6 +25,29 @@ import type {
 /** The token's invitation preview; distinct from the per-company admin lists. */
 function publicInvitationTag(token: string) {
   return { type: "CompanyInvitation" as const, id: `PUBLIC_${token}` };
+}
+
+/** The signed-in user's own pending invitations. */
+const MY_INVITATIONS_TAG = { type: "CompanyInvitation" as const, id: "MINE" };
+
+/**
+ * What answering an invitation changes. It is no longer pending whatever the
+ * outcome; only accepting adds a membership.
+ */
+function answeredInvitationTags(result: ICompanyInvitationResponseResult) {
+  return [
+    MY_INVITATIONS_TAG,
+    { type: "Company" as const, id: "ACCESS_SUMMARY" },
+    ...(result.status === EInvitationStatus.ACCEPTED
+      ? [
+          { type: "Company" as const, id: "LIST" },
+          { type: "Company" as const, id: "CURRENT" },
+          // A returning member must not see contracts cached from an
+          // earlier membership; the API decides again.
+          { type: "Contract" as const, id: "LIST" },
+        ]
+      : []),
+  ];
 }
 
 export const companiesApi = api.injectEndpoints({
@@ -143,6 +168,26 @@ export const companiesApi = api.injectEndpoints({
       ],
     }),
 
+    resendCompanyInvitation: builder.mutation<
+      ICompanyInvitation,
+      { companyId: string; invitationId: string }
+    >({
+      query: ({ companyId, invitationId }) => ({
+        ...companyRoute(
+          companyId,
+          `/invitations/${encodeURIComponent(invitationId)}/resend`,
+        ),
+        method: "POST",
+      }),
+      invalidatesTags: (_result, error, { companyId }) =>
+        error
+          ? []
+          : [
+              { type: "CompanyInvitation", id: companyId },
+              { type: "Dashboard", id: companyId },
+            ],
+    }),
+
     revokeCompanyInvitation: builder.mutation<
       ICompanyInvitation,
       { companyId: string; invitationId: string }
@@ -238,25 +283,32 @@ export const companiesApi = api.injectEndpoints({
         body,
       }),
       // Nothing changed on the server when the request failed.
-      invalidatesTags: (result, error, { token }) => {
-        if (error || !result) return [];
-        // The invitation is no longer pending, whatever the outcome. Only
-        // accepting adds a membership; declined and expired invitations leave
-        // the user's companies unchanged.
-        return [
-          publicInvitationTag(token),
-          ...(result.status === EInvitationStatus.ACCEPTED
-            ? [
-                { type: "Company" as const, id: "LIST" },
-                { type: "Company" as const, id: "ACCESS_SUMMARY" },
-                { type: "Company" as const, id: "CURRENT" },
-                // A returning member must not see contracts cached from an
-                // earlier membership; the API decides again.
-                { type: "Contract" as const, id: "LIST" },
-              ]
-            : []),
-        ];
-      },
+      invalidatesTags: (result, error, { token }) =>
+        error || !result
+          ? []
+          : [publicInvitationTag(token), ...answeredInvitationTags(result)],
+    }),
+
+    getMyCompanyInvitations: builder.query<IMyCompanyInvitation[], void>({
+      query: () => "/invitations/mine",
+      providesTags: [MY_INVITATIONS_TAG],
+    }),
+
+    respondToMyCompanyInvitation: builder.mutation<
+      ICompanyInvitationResponseResult,
+      IMyCompanyInvitationResponseRequest
+    >({
+      query: ({ invitationId, decision }) => ({
+        url: `/invitations/${encodeURIComponent(invitationId)}/respond`,
+        method: "POST",
+        body: { decision },
+      }),
+      // A failure may mean the invitation changed meanwhile (expired,
+      // revoked or already answered), so refresh the list either way.
+      invalidatesTags: (result, error) =>
+        error || !result
+          ? [MY_INVITATIONS_TAG]
+          : answeredInvitationTags(result),
     }),
 
     createCompany: builder.mutation<
@@ -290,10 +342,13 @@ export const {
   useGetCompanyInvitationsQuery,
   useInviteCompanyMemberMutation,
   useRevokeCompanyInvitationMutation,
+  useResendCompanyInvitationMutation,
   useChangeCompanyMemberRoleMutation,
   useRemoveCompanyMemberMutation,
   useUpdateCompanyProfileMutation,
   useGetPublicCompanyInvitationQuery,
   useRespondToCompanyInvitationMutation,
+  useGetMyCompanyInvitationsQuery,
+  useRespondToMyCompanyInvitationMutation,
   useCreateCompanyMutation,
 } = companiesApi;

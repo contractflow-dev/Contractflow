@@ -48,7 +48,11 @@ export class CompanyController {
 
   @Get('companies/access-summary')
   getAccessSummary(@CurrentUser() user: AuthenticatedUser) {
-    return this.companyService.getAccessSummary(user.id);
+    return this.companyService.getAccessSummary(
+      user.id,
+      user.email,
+      Boolean(user.emailVerifiedAt),
+    );
   }
 
   // Public: the link may be opened by whoever reads the company inbox, in a
@@ -173,6 +177,20 @@ export class CompanyController {
     @Param('invitationId') invitationId: string,
   ) {
     return this.companyAdminService.revokeInvitation(
+      user.id,
+      companyId,
+      invitationId,
+    );
+  }
+
+  @Post('company/invitations/:invitationId/resend')
+  @UseGuards(CompanyContextGuard)
+  resendInvitation(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @Param('invitationId') invitationId: string,
+  ) {
+    return this.companyAdminService.resendInvitation(
       user.id,
       companyId,
       invitationId,

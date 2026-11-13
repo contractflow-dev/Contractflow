@@ -1,6 +1,10 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { OnboardingView, companySetupSteps } from "./onboarding-view";
+
+const accessSummary = vi.hoisted(() => ({
+  current: undefined as { pendingInvitationCount: number } | undefined,
+}));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
@@ -15,6 +19,7 @@ vi.mock("@/services/authApi", () => ({
 }));
 vi.mock("@/features/companies", () => ({
   useCreateCompanyMutation: () => [vi.fn(), { isLoading: false }],
+  useGetCompanyAccessSummaryQuery: () => ({ data: accessSummary.current }),
 }));
 vi.mock("@/store/hooks", () => ({ useAppDispatch: () => vi.fn() }));
 vi.mock("@/components/auth/auth-hero", () => ({
@@ -64,6 +69,32 @@ describe("OnboardingView", () => {
 
     expect(markup).toContain("Were you invited to join a company?");
     expect(markup).toContain("ada@example.com");
+  });
+
+  describe("with a pending invitation", () => {
+    afterEach(() => {
+      accessSummary.current = undefined;
+    });
+
+    it("points to the invitation instead of company setup", () => {
+      accessSummary.current = { pendingInvitationCount: 1 };
+
+      const markup = renderToStaticMarkup(<OnboardingView />);
+
+      expect(markup).toContain("You have a company invitation.");
+      expect(markup).toMatch(
+        /<a[^>]*href="\/invitations"[^>]*>Review your invitations<\/a>/,
+      );
+      expect(markup).not.toContain("Were you invited to join a company?");
+    });
+
+    it("counts several invitations", () => {
+      accessSummary.current = { pendingInvitationCount: 2 };
+
+      expect(renderToStaticMarkup(<OnboardingView />)).toContain(
+        "You have 2 company invitations.",
+      );
+    });
   });
 
   it("moves on with a submit button, and signs out for real", () => {

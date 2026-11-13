@@ -40,7 +40,9 @@ describe("company invitation response cache", () => {
           });
         case "/api/invitations/preview":
           return json({
+            status: "pending",
             companyName: "Acme Works",
+            inviterName: "Ada Admin",
             email: "ari@example.com",
             companyRole: "HSE Officer",
             expiresAt: "2026-12-01T00:00:00.000Z",
@@ -108,13 +110,18 @@ describe("company invitation response cache", () => {
     ]);
   });
 
-  it("refreshes only the invitation after declining", async () => {
+  // Declining adds no membership, so the company list stays cached. The
+  // access summary is refreshed: its pending-invitation count went down.
+  it("refreshes the invitation and access summary, not the companies, after declining", async () => {
     await loadInvitationScreens();
     respondResult = { status: 200, body: { status: "declined" } };
 
     await respond("decline");
 
-    expect(await refetchedPaths()).toEqual(["/api/invitations/preview"]);
+    expect(await refetchedPaths()).toEqual([
+      "/api/companies/access-summary",
+      "/api/invitations/preview",
+    ]);
   });
 
   // The API currently reports expiry as a 409 (covered below); this guards the
@@ -125,7 +132,10 @@ describe("company invitation response cache", () => {
 
     await respond("accept");
 
-    expect(await refetchedPaths()).toEqual(["/api/invitations/preview"]);
+    expect(await refetchedPaths()).toEqual([
+      "/api/companies/access-summary",
+      "/api/invitations/preview",
+    ]);
   });
 
   it.each([

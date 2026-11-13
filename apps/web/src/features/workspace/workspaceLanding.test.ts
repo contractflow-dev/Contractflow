@@ -9,6 +9,7 @@ const noAccess = {
   activeCompanyCount: 0,
   hasEndedMembership: false,
   hasInactiveCompanyMembership: false,
+  pendingInvitationCount: 0,
 };
 
 describe("companyAccessState", () => {
@@ -41,7 +42,42 @@ describe("companyAccessState", () => {
   });
 });
 
+describe("companyAccessState with a pending invitation", () => {
+  it("sends an invited user without a company to their invitation", () => {
+    expect(
+      companyAccessState(false, { ...noAccess, pendingInvitationCount: 1 }),
+    ).toBe("invited");
+  });
+
+  it("prefers the invitation over an ended or inactive membership", () => {
+    expect(
+      companyAccessState(false, {
+        ...noAccess,
+        hasEndedMembership: true,
+        hasInactiveCompanyMembership: true,
+        pendingInvitationCount: 2,
+      }),
+    ).toBe("invited");
+  });
+
+  it("keeps a user with a company active, invitation or not", () => {
+    expect(
+      companyAccessState(true, { ...noAccess, pendingInvitationCount: 1 }),
+    ).toBe("active");
+  });
+});
+
 describe("resolveWorkspaceRedirect", () => {
+  it("sends an invited user to their invitations, never to company setup", () => {
+    expect(
+      resolveWorkspaceRedirect({
+        pathname: "/dashboards",
+        access: "invited",
+        canManageCompany: null,
+      }),
+    ).toBe("/invitations");
+  });
+
   it("sends only a new user to company setup", () => {
     expect(
       resolveWorkspaceRedirect({

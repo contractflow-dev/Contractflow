@@ -20,7 +20,12 @@ import {
   forgetPendingVerificationEmail,
   rememberPendingVerificationEmail,
 } from "../pendingVerificationEmail";
-import { SESSION_EXPIRED_REASON, safeRedirectPath } from "../signInRedirect";
+import {
+  SESSION_EXPIRED_REASON,
+  invitationTokenFromRedirect,
+  safeRedirectPath,
+} from "../signInRedirect";
+import { invitationRegisterPath } from "@/features/invitations/joinedCompany";
 
 const loginSchema = z.object({
   email: z
@@ -53,6 +58,9 @@ export function LoginView() {
   const sessionExpired = searchParams.get("reason") === SESSION_EXPIRED_REASON;
   const signInToContinue =
     !sessionExpired && Boolean(searchParams.get("redirect"));
+  const invitationToken = invitationTokenFromRedirect(
+    searchParams.get("redirect"),
+  );
   const {
     register,
     handleSubmit,
@@ -110,6 +118,13 @@ export function LoginView() {
                     <AlertDescription>
                       Your session has expired. Sign in again to continue where
                       you left off.
+                    </AlertDescription>
+                  </Alert>
+                ) : invitationToken ? (
+                  <Alert role="status">
+                    <AlertDescription>
+                      Sign in with the invited email address to respond to your
+                      company invitation.
                     </AlertDescription>
                   </Alert>
                 ) : signInToContinue ? (
@@ -208,7 +223,11 @@ export function LoginView() {
             <p className="text-center text-sm text-muted-foreground">
               New to ContractFlow?{" "}
               <Link
-                href="/auth/register"
+                href={
+                  invitationToken
+                    ? invitationRegisterPath(invitationToken)
+                    : "/auth/register"
+                }
                 className="rounded-md font-medium text-foreground underline underline-offset-4"
               >
                 Create an account
