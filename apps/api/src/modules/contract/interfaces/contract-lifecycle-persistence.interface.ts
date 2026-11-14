@@ -58,10 +58,14 @@ export interface ILifecycleContractRepository {
     parentContractId: string,
     contractId: string,
   ): Promise<boolean>;
+  /** Subcontracts of this contract that aren't archived. */
+  countActiveChildren(contractId: string): Promise<number>;
 }
 
 export interface ILifecyclePartyRepository {
   find(contractId: string, companyId: string): Promise<ContractParty | null>;
+  /** Parties to the contract other than `companyId`'s. */
+  countOtherParties(contractId: string, companyId: string): Promise<number>;
   findForShare(
     contractId: string,
     companyId: string,
@@ -111,26 +115,43 @@ export interface ILifecycleRoleAssignmentRepository {
   hasActiveAssignmentForShare(
     criteria: IActiveAssignmentCriteria,
   ): Promise<boolean>;
+  /** Revokes every party's active roles among `roles`; returns how many. */
   revokeForWorkspaceRoles(
     contractId: string,
     roles: ContractRole[],
     revokedById: string,
     now: Date,
-  ): Promise<void>;
+  ): Promise<number>;
+  /** Every party's active roles among `roles`, and how many are admins. */
+  countActiveForWorkspaceRoles(
+    contractId: string,
+    roles: ContractRole[],
+  ): Promise<{ assignments: number; workspaceAdmins: number }>;
+  /** Revokes every party's active roles on the contract; returns how many. */
   revokeAllForContract(
     contractId: string,
     revokedById: string,
     now: Date,
-  ): Promise<void>;
+  ): Promise<number>;
+  countActiveForContract(
+    contractId: string,
+  ): Promise<{ assignments: number; workspaceAdmins: number }>;
 }
 
 export interface ILifecycleRoleInvitationRepository {
+  /** Revokes every party's pending invitations; returns how many. */
   revokePendingForWorkspace(
     contractId: string,
     workspace: AssignableContractWorkspace,
     now: Date,
-  ): Promise<void>;
-  revokeAllPendingForContract(contractId: string, now: Date): Promise<void>;
+  ): Promise<number>;
+  countPendingForWorkspace(
+    contractId: string,
+    workspace: AssignableContractWorkspace,
+  ): Promise<number>;
+  /** Revokes every party's pending role invitations; returns how many. */
+  revokeAllPendingForContract(contractId: string, now: Date): Promise<number>;
+  countPendingForContract(contractId: string): Promise<number>;
 }
 
 export interface ICreatePartyInvitationRecord {
@@ -202,7 +223,9 @@ export interface ILifecyclePartyInvitationRepository {
     tokenHash: string,
   ): Promise<ContractPartyInvitation | null>;
   expireIfPending(invitationId: string): Promise<void>;
-  revokePendingBySource(sourcePartyId: string, now: Date): Promise<void>;
+  /** Revokes the party's pending invitations to companies; returns how many. */
+  revokePendingBySource(sourcePartyId: string, now: Date): Promise<number>;
+  countPendingBySource(sourcePartyId: string): Promise<number>;
   create(data: ICreatePartyInvitationRecord): Promise<ContractPartyInvitation>;
   save(invitation: ContractPartyInvitation): Promise<ContractPartyInvitation>;
 }

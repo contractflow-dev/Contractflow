@@ -5,8 +5,10 @@
   NotFoundException,
 } from '@nestjs/common';
 import {
+  EClientContractRole,
   ECompanyRole,
   ECompanyUserStatus,
+  EContractorContractRole,
   EContractType,
   EContractStatus,
   EContractSiteStatus,
@@ -38,9 +40,11 @@ function createContext() {
       create: vi.fn(),
       save: vi.fn(async (value) => value),
       parentWouldCreateCycle: vi.fn(),
+      countActiveChildren: vi.fn(),
     },
     parties: {
       find: vi.fn(),
+      countOtherParties: vi.fn(),
       findForShare: vi.fn(),
       findByIdWithContractAndCompany: vi.fn(),
       findById: vi.fn(),
@@ -58,11 +62,15 @@ function createContext() {
       hasAnyActiveAssignment: vi.fn(),
       hasActiveAssignmentForShare: vi.fn(),
       revokeForWorkspaceRoles: vi.fn(),
+      countActiveForWorkspaceRoles: vi.fn(),
       revokeAllForContract: vi.fn(),
+      countActiveForContract: vi.fn(),
     },
     roleInvitations: {
       revokePendingForWorkspace: vi.fn(),
+      countPendingForWorkspace: vi.fn(),
       revokeAllPendingForContract: vi.fn(),
+      countPendingForContract: vi.fn(),
     },
     partyInvitations: {
       expirePendingBySource: vi.fn(),
@@ -74,6 +82,7 @@ function createContext() {
       findByTokenHashForUpdate: vi.fn(),
       expireIfPending: vi.fn(),
       revokePendingBySource: vi.fn(),
+      countPendingBySource: vi.fn(),
       create: vi.fn(),
       save: vi.fn(async (value) => value),
     },
@@ -683,6 +692,468 @@ describe('ContractLifecycleService', () => {
         service.updateSite(actor.userId, actor.companyId, contract.id, 'site-1', {}),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(unitOfWork.execute).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('workspace management', () => {
+    const admin = { ...actor, companyRole: ECompanyRole.COMPANY_ADMIN };
+    const owned = { ...contract, createdByCompanyId: actor.companyId };
+
+    beforeEach(() => {
+      context.companies.findActiveForShare.mockResolvedValue({
+        id: actor.companyId,
+      });
+      context.memberships.findActiveForUpdate.mockResolvedValue(admin);
+      context.contracts.findForUpdate.mockResolvedValue(owned);
+      context.workspaces.listWorkspaces.mockResolvedValue(['project']);
+      context.roleAssignments.revokeForWorkspaceRoles.mockResolvedValue(3);
+      context.roleInvitations.revokePendingForWorkspace.mockResolvedValue(1);
+    });
+
+    it('adds a workspace for the owning Company Administrator, with an audit entry and no access for anyone', async () => {
+      await expect(
+        service.addWorkspace(admin.userId, admin.companyId, contract.id, 'hse'),
+      ).resolves.toEqual(['project', 'hse']);
+
+      expect(context.workspaces.addMany).toHaveBeenCalledWith(
+        contract.id,
+        ['hse'],
+        admin.id,
+      );
+      expect(context.activity.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contractId: contract.id,
+          companyId: admin.companyId,
+          actorUserId: admin.id,
+          action: 'contract.workspaces_added',
+          changes: { added: ['hse'] },
+        }),
+      );
+      // Adding a workspace changes no role: the lifecycle context can only
+      // revoke roles, and nothing was revoked either.
+      expect(
+        context.roleAssignments.revokeForWorkspaceRoles,
+      ).not.toHaveBeenCalled();
+      expect(
+        context.roleInvitations.revokePendingForWorkspace,
+      ).not.toHaveBeenCalled();
+      expect(outcomes.committed).toBe(1);
+    });
+
+    it('refuses a workspace the contract already has', async () => {
+      await expect(
+        service.addWorkspace(
+          admin.userId,
+          admin.companyId,
+          contract.id,
+          'project',
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(context.workspaces.addMany).not.toHaveBeenCalled();
+      expect(context.activity.record).not.toHaveBeenCalled();
+    });
+
+    it('treats a contract another company created as not found', async () => {
+      context.contracts.findForUpdate.mockResolvedValue({
+        ...contract,
+        createdByCompanyId: 'another-company',
+      });
+
+      await expect(
+        service.addWorkspace(admin.userId, admin.companyId, contract.id, 'hse'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      await expect(
+        service.removeWorkspace(
+          admin.userId,
+          admin.companyId,
+          contract.id,
+          'project',
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      await expect(
+        service.workspaceRemovalImpact(
+          admin.userId,
+          admin.companyId,
+          contract.id,
+          'project',
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(context.workspaces.addMany).not.toHaveBeenCalled();
+      expect(context.workspaces.remove).not.toHaveBeenCalled();
+    });
+
+    it('refuses a member who is not a Company Administrator, including a workspace admin', async () => {
+      // A workspace admin is an ordinary company member: their right covers
+      // one workspace's roles, not the contract's workspaces.
+      context.memberships.findActiveForUpdate.mockResolvedValue(actor);
+
+      await expect(
+        service.addWorkspace(actor.userId, actor.companyId, contract.id, 'hse'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(
+        service.removeWorkspace(
+          actor.userId,
+          actor.companyId,
+          contract.id,
+          'project',
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(context.workspaces.addMany).not.toHaveBeenCalled();
+      expect(context.workspaces.remove).not.toHaveBeenCalled();
+    });
+
+    it('refuses an archived contract', async () => {
+      context.contracts.findForUpdate.mockResolvedValue({
+        ...owned,
+        deletedAt: new Date(),
+      });
+
+      await expect(
+        service.addWorkspace(admin.userId, admin.companyId, contract.id, 'hse'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('removes a workspace after revoking its roles and pending invitations, keeping their history', async () => {
+      await expect(
+        service.removeWorkspace(
+          admin.userId,
+          admin.companyId,
+          contract.id,
+          'project',
+        ),
+      ).resolves.toEqual([]);
+
+      expect(
+        context.roleAssignments.revokeForWorkspaceRoles,
+      ).toHaveBeenCalledWith(
+        contract.id,
+        expect.arrayContaining([
+          EClientContractRole.CLIENT_PROJECT_MANAGER,
+          EContractorContractRole.CONTRACTOR_PROJECT_LEAD,
+        ]),
+        admin.id,
+        expect.any(Date),
+      );
+      expect(
+        context.roleInvitations.revokePendingForWorkspace,
+      ).toHaveBeenCalledWith(contract.id, 'project', expect.any(Date));
+      expect(context.workspaces.remove).toHaveBeenCalledWith(
+        contract.id,
+        'project',
+      );
+      // Revoked before the workspace goes, never left pointing at nothing.
+      expect(
+        context.roleAssignments.revokeForWorkspaceRoles.mock
+          .invocationCallOrder[0],
+      ).toBeLessThan(context.workspaces.remove.mock.invocationCallOrder[0]);
+      expect(context.activity.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'contract.workspaces_removed',
+          actorUserId: admin.id,
+          changes: {
+            removed: ['project'],
+            revokedRoleAssignments: 3,
+            revokedRoleInvitations: 1,
+          },
+        }),
+      );
+    });
+
+    it('refuses to remove a workspace the contract does not have', async () => {
+      await expect(
+        service.removeWorkspace(
+          admin.userId,
+          admin.companyId,
+          contract.id,
+          'finance',
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(
+        context.roleAssignments.revokeForWorkspaceRoles,
+      ).not.toHaveBeenCalled();
+      expect(context.workspaces.remove).not.toHaveBeenCalled();
+    });
+
+    it('rolls the whole removal back when its audit entry cannot be written', async () => {
+      context.activity.record.mockRejectedValueOnce(new Error('insert failed'));
+
+      await expect(
+        service.removeWorkspace(
+          admin.userId,
+          admin.companyId,
+          contract.id,
+          'project',
+        ),
+      ).rejects.toThrow('insert failed');
+      // One unit of work: revocations and the removal fail together.
+      expect(unitOfWork.execute).toHaveBeenCalledOnce();
+      expect(outcomes).toEqual({ committed: 0, rolledBack: 1 });
+    });
+
+    it('reports what removal would revoke, across parties, without changing anything', async () => {
+      context.roleAssignments.countActiveForWorkspaceRoles.mockResolvedValue({
+        assignments: 4,
+        workspaceAdmins: 1,
+      });
+      context.roleInvitations.countPendingForWorkspace.mockResolvedValue(2);
+
+      await expect(
+        service.workspaceRemovalImpact(
+          admin.userId,
+          admin.companyId,
+          contract.id,
+          'project',
+        ),
+      ).resolves.toEqual({
+        workspace: 'project',
+        activeRoleAssignmentCount: 4,
+        workspaceAdminCount: 1,
+        pendingRoleInvitationCount: 2,
+      });
+      expect(
+        context.roleAssignments.revokeForWorkspaceRoles,
+      ).not.toHaveBeenCalled();
+      expect(context.workspaces.remove).not.toHaveBeenCalled();
+      expect(context.activity.record).not.toHaveBeenCalled();
+    });
+
+    it('records additions and removals when the whole set is replaced', async () => {
+      await service.updateWorkspaces(
+        admin.userId,
+        admin.companyId,
+        contract.id,
+        {
+          workspaces: ['hse', 'finance'],
+        },
+      );
+
+      const actions = context.activity.record.mock.calls.map(([entry]) => [
+        entry.action,
+        entry.changes,
+      ]);
+      expect(actions).toEqual([
+        [
+          'contract.workspaces_removed',
+          {
+            removed: ['project'],
+            revokedRoleAssignments: 3,
+            revokedRoleInvitations: 1,
+          },
+        ],
+        ['contract.workspaces_added', { added: ['hse', 'finance'] }],
+      ]);
+    });
+  });
+
+  describe('archiving (deleting) and restoring', () => {
+    const admin = { ...actor, companyRole: ECompanyRole.COMPANY_ADMIN };
+    let owned: typeof contract & {
+      createdByCompanyId: string;
+      deletedByCompanyUserId: string | null;
+    };
+
+    beforeEach(() => {
+      owned = {
+        ...contract,
+        status: EContractStatus.ACTIVE,
+        createdByCompanyId: actor.companyId,
+        deletedByCompanyUserId: null,
+      };
+      context.companies.findActiveForShare.mockResolvedValue({
+        id: actor.companyId,
+      });
+      context.memberships.findActiveForUpdate.mockResolvedValue(admin);
+      context.contracts.findForUpdate.mockResolvedValue(owned);
+      context.roleAssignments.revokeAllForContract.mockResolvedValue(4);
+      context.roleInvitations.revokeAllPendingForContract.mockResolvedValue(2);
+      context.partyInvitations.revokePendingBySource.mockResolvedValue(1);
+    });
+
+    it('archives the same contract for its creating Company Administrator, ending all access, in one transaction', async () => {
+      await service.archive(admin.userId, admin.companyId, contract.id);
+
+      expect(context.contracts.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: contract.id,
+          deletedAt: expect.any(Date),
+          deletedByCompanyUserId: admin.id,
+          // The business status is kept, so restoring brings it back as it was.
+          status: EContractStatus.ACTIVE,
+        }),
+      );
+      expect(context.roleAssignments.revokeAllForContract).toHaveBeenCalledWith(
+        contract.id,
+        admin.id,
+        expect.any(Date),
+      );
+      expect(
+        context.roleInvitations.revokeAllPendingForContract,
+      ).toHaveBeenCalledWith(contract.id, expect.any(Date));
+      expect(
+        context.partyInvitations.revokePendingBySource,
+      ).toHaveBeenCalledWith(party.id, expect.any(Date));
+      expect(context.activity.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contractId: contract.id,
+          companyId: admin.companyId,
+          actorUserId: admin.id,
+          action: 'contract.deleted',
+          changes: {
+            deletedAt: expect.any(String),
+            status: EContractStatus.ACTIVE,
+            revokedRoleAssignments: 4,
+            revokedRoleInvitations: 2,
+            revokedPartyInvitations: 1,
+          },
+        }),
+      );
+      expect(unitOfWork.execute).toHaveBeenCalledOnce();
+      expect(outcomes).toEqual({ committed: 1, rolledBack: 0 });
+    });
+
+    it('refuses to archive a contract that is already archived', async () => {
+      owned.deletedAt = new Date('2026-02-01T00:00:00.000Z');
+
+      await expect(
+        service.archive(admin.userId, admin.companyId, contract.id),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(context.contracts.save).not.toHaveBeenCalled();
+      expect(
+        context.roleAssignments.revokeAllForContract,
+      ).not.toHaveBeenCalled();
+      expect(context.activity.record).not.toHaveBeenCalled();
+    });
+
+    it('treats a contract another company created as not found, for archiving and restoring', async () => {
+      context.contracts.findForUpdate.mockResolvedValue({
+        ...owned,
+        createdByCompanyId: 'other-party-company',
+      });
+
+      await expect(
+        service.archive(admin.userId, admin.companyId, contract.id),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      await expect(
+        service.restore(admin.userId, admin.companyId, contract.id),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      await expect(
+        service.deletionImpact(admin.userId, admin.companyId, contract.id),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(context.contracts.save).not.toHaveBeenCalled();
+    });
+
+    it('treats an unknown contract as not found', async () => {
+      context.contracts.findForUpdate.mockResolvedValue(null);
+
+      await expect(
+        service.archive(admin.userId, admin.companyId, 'missing'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      await expect(
+        service.restore(admin.userId, admin.companyId, 'missing'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('refuses an ordinary member or workspace administrator of the creating company', async () => {
+      // Workspace-admin rights belong to a role on one workspace; the member
+      // is still an ordinary company member.
+      context.memberships.findActiveForUpdate.mockResolvedValue(actor);
+
+      await expect(
+        service.archive(actor.userId, actor.companyId, contract.id),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(
+        service.restore(actor.userId, actor.companyId, contract.id),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(context.contracts.save).not.toHaveBeenCalled();
+    });
+
+    it('rolls the archive back when its audit entry cannot be written', async () => {
+      context.activity.record.mockRejectedValueOnce(new Error('insert failed'));
+
+      await expect(
+        service.archive(admin.userId, admin.companyId, contract.id),
+      ).rejects.toThrow('insert failed');
+      expect(outcomes).toEqual({ committed: 0, rolledBack: 1 });
+    });
+
+    it('restores the same contract and record, without restoring any access', async () => {
+      owned.deletedAt = new Date('2026-02-01T00:00:00.000Z');
+      owned.deletedByCompanyUserId = 'someone';
+
+      const restored = await service.restore(
+        admin.userId,
+        admin.companyId,
+        contract.id,
+      );
+
+      expect(restored).toMatchObject({
+        id: contract.id,
+        referenceNumber: contract.referenceNumber,
+        status: EContractStatus.ACTIVE,
+        deletedAt: null,
+        deletedByCompanyUserId: null,
+      });
+      // Nothing is re-created or copied, and no role or invitation is restored.
+      expect(context.contracts.create).not.toHaveBeenCalled();
+      expect(context.parties.create).not.toHaveBeenCalled();
+      expect(context.workspaces.addMany).not.toHaveBeenCalled();
+      expect(
+        context.roleAssignments.revokeAllForContract,
+      ).not.toHaveBeenCalled();
+      expect(context.activity.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'contract.restored',
+          actorUserId: admin.id,
+          changes: {
+            restoredAt: expect.any(String),
+            status: EContractStatus.ACTIVE,
+          },
+        }),
+      );
+    });
+
+    it('refuses to restore a contract that is not archived, so a retry changes nothing', async () => {
+      await expect(
+        service.restore(admin.userId, admin.companyId, contract.id),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(context.contracts.save).not.toHaveBeenCalled();
+      expect(context.activity.record).not.toHaveBeenCalled();
+    });
+
+    it('reports what archiving would end, without changing anything', async () => {
+      context.roleAssignments.countActiveForContract.mockResolvedValue({
+        assignments: 5,
+        workspaceAdmins: 2,
+      });
+      context.roleInvitations.countPendingForContract.mockResolvedValue(3);
+      context.partyInvitations.countPendingBySource.mockResolvedValue(1);
+      context.parties.countOtherParties.mockResolvedValue(2);
+      context.contracts.countActiveChildren.mockResolvedValue(1);
+
+      await expect(
+        service.deletionImpact(admin.userId, admin.companyId, contract.id),
+      ).resolves.toEqual({
+        activeRoleAssignmentCount: 5,
+        workspaceAdminCount: 2,
+        pendingRoleInvitationCount: 3,
+        pendingPartyInvitationCount: 1,
+        otherPartyCount: 2,
+        subcontractCount: 1,
+      });
+      expect(context.parties.countOtherParties).toHaveBeenCalledWith(
+        contract.id,
+        admin.companyId,
+      );
+      expect(context.contracts.save).not.toHaveBeenCalled();
+      expect(context.activity.record).not.toHaveBeenCalled();
+    });
+
+    it('has no deletion impact for an archived contract', async () => {
+      owned.deletedAt = new Date();
+
+      await expect(
+        service.deletionImpact(admin.userId, admin.companyId, contract.id),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 });

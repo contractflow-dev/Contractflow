@@ -810,14 +810,42 @@ describe('Contract visibility (PostgreSQL)', () => {
       expect(real.body).toEqual(fake.body);
     });
 
-    it('hides an archived contract from oversight and from role holders', async () => {
+    it('hides an archived contract from role holders on every side', async () => {
       await dataSource
         .getRepository(Contract)
         .update({ id: contract.id }, { deletedAt: new Date() });
-      for (const member of [adminA, projectLead]) {
-        await getContract('', await signIn(member), companyA.id, contract.id).expect(
+      for (const [member, companyId] of [
+        [projectLead, companyA.id],
+        [memberB, companyB.id],
+      ] as const) {
+        await getContract('', await signIn(member), companyId, contract.id).expect(
           404,
         );
+      }
+    });
+
+    it("keeps an archived contract readable, read-only, to its creating company's administrator", async () => {
+      await dataSource
+        .getRepository(Contract)
+        .update({ id: contract.id }, { deletedAt: new Date() });
+      const cookie = await signIn(adminA);
+
+      const detail = await getContract('', cookie, companyA.id, contract.id).expect(
+        200,
+      );
+      expect(detail.body.contract).toMatchObject({
+        id: contract.id,
+        deletedAt: expect.any(String),
+      });
+      await getContract('/parties', cookie, companyA.id, contract.id).expect(200);
+      await getContract('/status-history', cookie, companyA.id, contract.id).expect(
+        200,
+      );
+      await getContract('/workspaces', cookie, companyA.id, contract.id).expect(200);
+      // Read-only history opens no protected record or workspace.
+      for (const path of PROTECTED_PATHS) {
+        const response = await getContract(path, cookie, companyA.id, contract.id);
+        expect({ path, ok: response.status < 300 }).toEqual({ path, ok: false });
       }
     });
   });

@@ -51,6 +51,15 @@ vi.mock("./contract-role-assignment-management", () => ({
 vi.mock("./contract-lifecycle-management", () => ({
   ContractLifecycleManagement: () => <div>Contract lifecycle management</div>,
 }));
+// Covered by its own tests.
+vi.mock("./contract-archive", () => ({
+  ArchivedContractNotice: () => null,
+  RestoreContractButton: () => <button type="button">Restore</button>,
+}));
+// Covered by its own tests.
+vi.mock("./contract-workspace-management", () => ({
+  ContractWorkspaceManagement: () => <div>Contract workspace management</div>,
+}));
 
 vi.mock("./create-contract-form", () => ({
   CreateContractForm: () => <div>Create contract</div>,

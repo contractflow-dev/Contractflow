@@ -93,6 +93,19 @@ vi.mock("./contract-activity", () => ({
 vi.mock("./contract-workspace-screens", () => ({
   ContractWorkspacesCard: () => <div>WORKSPACES</div>,
 }));
+// Covered by its own tests.
+vi.mock("./contract-archive", () => ({
+  ArchivedContractNotice: ({
+    contract,
+  }: {
+    contract: { deletedAt: string | null };
+  }) => (contract.deletedAt ? <div>ARCHIVED NOTICE</div> : null),
+  RestoreContractButton: () => <button type="button">Restore</button>,
+}));
+// Covered by its own tests.
+vi.mock("./contract-workspace-management", () => ({
+  ContractWorkspaceManagement: () => <div>WORKSPACE MANAGEMENT</div>,
+}));
 vi.mock("./contract-site-management", () => ({
   ContractSiteManagement: ({
     target,
@@ -211,6 +224,39 @@ describe("contract detail sections", () => {
 
     expect(markup).toContain(">Contract details</h2>");
     expect(markup).not.toContain(">Contract parties</h2>");
+    // The contract's workspaces, beside the viewer's own workspace access.
+    expect(markup).toContain("WORKSPACE MANAGEMENT");
+    expect(markup).toContain("WORKSPACES");
+  });
+
+  it("marks an archived contract as read-only history, without workspace access", () => {
+    vi.mocked(useContractDetails).mockReturnValue({
+      ...loadedDetails,
+      detail: {
+        ...detail,
+        contract: { ...detail.contract, deletedAt: "2026-06-01T00:00:00.000Z" },
+      },
+    } as unknown as ReturnType<typeof useContractDetails>);
+
+    const markup = render("overview");
+
+    expect(markup).toContain("ARCHIVED NOTICE");
+    expect(markup).toContain(">Archived</span>");
+    // Details and the contract's workspaces stay readable...
+    expect(markup).toContain(">Contract details</h2>");
+    expect(markup).toContain("WORKSPACE MANAGEMENT");
+    // ...but nobody can enter a workspace: every role was revoked.
+    expect(markup).not.toContain(">WORKSPACES<");
+  });
+
+  it("shows no archived notice on a contract in use", () => {
+    expect(render("overview")).not.toContain("ARCHIVED NOTICE");
+  });
+
+  it("shows workspace management on the overview only", () => {
+    for (const section of ["parties", "history"] as const) {
+      expect(render(section), section).not.toContain("WORKSPACE MANAGEMENT");
+    }
   });
 
   it("explains a restricted section opened without permission, instead of an empty page", () => {

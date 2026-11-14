@@ -51,13 +51,8 @@ import {
   formatMoneyMinor,
   humanizeEnumValue,
 } from "@/lib/format";
-import { notifySuccess } from "@/lib/notify";
 import { CreateContractForm } from "./create-contract-form";
-import {
-  useRestoreContractMutation,
-  type Contract,
-  type ContractListItem,
-} from "@/services/contractApi";
+import type { Contract, ContractListItem } from "@/services/contractApi";
 import { ContractRoleAssignmentManagement } from "./contract-role-assignment-management";
 import { ContractSignatoryManagement } from "./contract-signatory-management";
 import { ContractDocuments } from "./contract-documents";
@@ -73,6 +68,11 @@ import {
 import { ContractSectionNav } from "./contract-section-nav";
 import { ContractActivity } from "./contract-activity";
 import { ContractWorkspacesCard } from "./contract-workspace-screens";
+import { ContractWorkspaceManagement } from "./contract-workspace-management";
+import {
+  ArchivedContractNotice,
+  RestoreContractButton,
+} from "./contract-archive";
 import {
   contractSortOptions,
   useContractsList,
@@ -377,7 +377,7 @@ export function ContractsList({
                     {showActions && contract.deletedAt ? (
                       <RestoreContractButton
                         companyId={companyId}
-                        contractId={contract.id}
+                        contract={contract}
                       />
                     ) : null}
                   </li>
@@ -441,7 +441,7 @@ export function ContractsList({
                             {contract.deletedAt ? (
                               <RestoreContractButton
                                 companyId={companyId}
-                                contractId={contract.id}
+                                contract={contract}
                               />
                             ) : null}
                           </TableCell>
@@ -524,13 +524,10 @@ export function Counterparties({ contract }: { contract: ContractListItem }) {
 }
 
 /**
- * The contract's title, linking to its detail page. Archived contracts can't
- * be opened, so their title is plain text.
+ * The contract's title, linking to its detail page. An archived contract
+ * opens read-only; only its creating company's administrators list it.
  */
 function ContractTitle({ contract }: { contract: Contract }) {
-  if (contract.deletedAt) {
-    return <p className="font-medium break-words">{contract.title}</p>;
-  }
   return (
     <Link
       className="font-medium break-words text-primary underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:outline-none"
@@ -538,46 +535,6 @@ function ContractTitle({ contract }: { contract: Contract }) {
     >
       {contract.title}
     </Link>
-  );
-}
-
-function RestoreContractButton({
-  companyId,
-  contractId,
-}: {
-  companyId: string;
-  contractId: string;
-}) {
-  const [restore, state] = useRestoreContractMutation();
-
-  async function restoreContract() {
-    const result = await restore({ companyId, contractId });
-    if (!("error" in result)) {
-      notifySuccess(
-        "Contract restored",
-        "It is back in the contract register. Assign roles again to give members access.",
-      );
-    }
-  }
-
-  return (
-    <div className="space-y-2">
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        disabled={state.isLoading}
-        aria-busy={state.isLoading || undefined}
-        onClick={() => void restoreContract()}
-      >
-        {state.isLoading ? "Restoring…" : "Restore"}
-      </Button>
-      {state.error ? (
-        <p className="max-w-48 text-xs text-destructive">
-          {getApiErrorMessage(state.error, "Unable to restore contract.")}
-        </p>
-      ) : null}
-    </div>
   );
 }
 
@@ -685,7 +642,12 @@ export function ContractDetail({
               {contract.title}
             </h1>
           </div>
-          <StatusBadge status={contract.status} />
+          <div className="flex flex-wrap gap-2">
+            {contract.deletedAt ? (
+              <StatusBadge status={ARCHIVED_STATUS} />
+            ) : null}
+            <StatusBadge status={contract.status} />
+          </div>
         </div>
         {contract.description ? (
           <p className="mt-3 max-w-3xl text-sm text-muted-foreground">
@@ -704,6 +666,8 @@ export function ContractDetail({
           </p>
         ) : null}
       </div>
+
+      <ArchivedContractNotice companyId={companyId} contract={contract} />
 
       <ContractSectionNav
         contractId={contractId}
@@ -756,10 +720,18 @@ export function ContractDetail({
               />
             </CardContent>
           </Card>
-          <ContractWorkspacesCard
+          {/* Archiving revoked every role: nobody can enter a workspace. */}
+          {contract.deletedAt ? null : (
+            <ContractWorkspacesCard
+              companyId={companyId}
+              contractId={contractId}
+              canAssignRoles={access.roles === true}
+            />
+          )}
+          <ContractWorkspaceManagement
             companyId={companyId}
             contractId={contractId}
-            canAssignRoles={access.roles === true}
+            contractReference={contract.referenceNumber}
           />
           <ContractLifecycleManagement
             companyId={companyId}

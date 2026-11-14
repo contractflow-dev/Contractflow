@@ -53,6 +53,7 @@ export interface ContractActivityItem {
  * in step with the actions its services write.
  */
 export const CONTRACT_ACTIVITY_ACTIONS = [
+  "contract.workspaces_added",
   "contract.workspaces_removed",
   "contract.status_transitioned",
   "contract.deleted",

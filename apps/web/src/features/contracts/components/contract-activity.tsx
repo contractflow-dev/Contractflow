@@ -94,6 +94,7 @@ const CATEGORY: Record<
 /** Readable names for the actions the API currently records. */
 const ACTION_LABEL: Record<string, string> = {
   "contract.updated": "Contract details updated",
+  "contract.workspaces_added": "Workspaces added",
   "contract.workspaces_removed": "Workspaces removed",
   "contract.deleted": "Contract archived",
   "contract.restored": "Contract restored",

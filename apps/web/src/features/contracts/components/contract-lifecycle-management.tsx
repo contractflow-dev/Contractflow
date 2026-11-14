@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -10,8 +10,6 @@ import {
 } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
-import { Checkbox } from "@workspace/ui/components/checkbox";
-import { Field, FieldLabel } from "@workspace/ui/components/field";
 import {
   Card,
   CardContent,
@@ -26,7 +24,8 @@ import {
 } from "@workspace/ui/components/native-select";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
-import { FormField, FormSection } from "@/components/forms/form-field";
+import { ArchiveContractDialog } from "./contract-archive";
+import { FormField } from "@/components/forms/form-field";
 import {
   StatusBadge,
   effectiveInvitationStatus,
@@ -35,20 +34,15 @@ import { getApiErrorMessage } from "@/lib/apiError";
 import { humanizeEnumValue } from "@/lib/format";
 import { notifySuccess } from "@/lib/notify";
 import {
-  useArchiveContractMutation,
   useCreateContractPartyInvitationMutation,
   useGetContractLifecyclePermissionsQuery,
   useGetContractPartyInvitationsQuery,
-  useGetContractWorkspacesQuery,
   useRevokeContractPartyInvitationMutation,
   useTransitionContractMutation,
   useUpdateContractMutation,
-  useUpdateContractWorkspacesMutation,
-  type AssignableContractWorkspace,
   type Contract,
   type ContractTransition,
 } from "@/services/contractApi";
-import { contractWorkspaces as workspaces } from "../create-contract-schema";
 
 const transitionOptions: Record<
   EContractStatus,
@@ -108,17 +102,11 @@ export function ContractLifecycleManagement({
   const query = { companyId, contractId: contract.id };
   const permissionsQuery = useGetContractLifecyclePermissionsQuery(query);
   const permissions = permissionsQuery.data;
-  const workspacesQuery = useGetContractWorkspacesQuery(query, {
-    skip: !permissions?.canManage,
-  });
   const invitationsQuery = useGetContractPartyInvitationsQuery(query, {
     skip: !permissions?.canManage,
   });
   const [updateContract, updateState] = useUpdateContractMutation();
-  const [updateWorkspaces, workspaceState] =
-    useUpdateContractWorkspacesMutation();
   const [transitionContract, transitionState] = useTransitionContractMutation();
-  const [archiveContract, archiveState] = useArchiveContractMutation();
   const [createInvitation, invitationState] =
     useCreateContractPartyInvitationMutation();
   const [revokeInvitation, revokeInvitationState] =
@@ -139,15 +127,9 @@ export function ContractLifecycleManagement({
   // The failure of the confirmation currently open, shown inside it.
   const [dialogError, setDialogError] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
-  const workspaceFieldId = useId();
   const [inviteType, setInviteType] = useState<EPartyType>(
     EPartyType.CONTRACTOR,
   );
-  const [selectedWorkspaces, setSelectedWorkspaces] = useState<
-    AssignableContractWorkspace[] | null
-  >(null);
-  const activeWorkspaces =
-    selectedWorkspaces ?? workspacesQuery.currentData ?? [];
 
   if (permissionsQuery.isLoading) return null;
   if (permissionsQuery.isError) {
@@ -173,17 +155,6 @@ export function ContractLifecycleManagement({
       body: { title: title.trim(), description: description.trim() || null },
     });
     if (!("error" in result)) notifySuccess("Contract details saved");
-  }
-
-  async function saveWorkspaces() {
-    const result = await updateWorkspaces({
-      ...query,
-      workspaces: activeWorkspaces,
-    });
-    if (!("error" in result)) {
-      setSelectedWorkspaces(null);
-      notifySuccess("Workspaces updated");
-    }
   }
 
   function requestTransition(
@@ -236,23 +207,6 @@ export function ContractLifecycleManagement({
     setInvitationToRevoke(null);
   }
 
-  async function confirmArchive() {
-    if (archiveState.isLoading) return;
-    const result = await archiveContract(query);
-    if ("error" in result) {
-      setDialogError(
-        getApiErrorMessage(result.error, "Unable to archive the contract."),
-      );
-      return;
-    }
-    setArchiveRequested(false);
-    notifySuccess(
-      "Contract archived",
-      `${contract.referenceNumber} · ${contract.title} was archived. You can restore it from the contract register.`,
-    );
-    router.push("/dashboards/contracts");
-  }
-
   async function invite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const result = await createInvitation({
@@ -278,7 +232,8 @@ export function ContractLifecycleManagement({
               <h2>Manage contract</h2>
             </CardTitle>
             <CardDescription>
-              Draft details, workspace availability, and lifecycle actions.
+              Draft details and lifecycle actions. Workspaces are managed in
+              Contract workspaces.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -333,73 +288,6 @@ export function ContractLifecycleManagement({
                     fallback="Unable to update contract details."
                   />
                 ) : null}
-
-                <FormSection
-                  legend="Available workspaces"
-                  description="Removing a workspace revokes its active assignments and pending invitations."
-                  className="border-t pt-5"
-                >
-                  {workspacesQuery.error ? (
-                    <ErrorAlert
-                      error={workspacesQuery.error}
-                      fallback="Unable to load contract workspaces."
-                    />
-                  ) : (
-                    <>
-                      <div className="flex flex-wrap gap-x-6 gap-y-3">
-                        {workspaces.map((workspace) => (
-                          <Field
-                            orientation="horizontal"
-                            className="w-fit"
-                            key={workspace}
-                          >
-                            <Checkbox
-                              id={`${workspaceFieldId}-${workspace}`}
-                              checked={activeWorkspaces.includes(workspace)}
-                              onCheckedChange={(checked) => {
-                                setSelectedWorkspaces((current) => {
-                                  const next =
-                                    current ??
-                                    workspacesQuery.currentData ??
-                                    [];
-                                  return checked
-                                    ? [...next, workspace]
-                                    : next.filter(
-                                        (value) => value !== workspace,
-                                      );
-                                });
-                              }}
-                            />
-                            <FieldLabel
-                              htmlFor={`${workspaceFieldId}-${workspace}`}
-                              className="font-normal"
-                            >
-                              {formatLabel(workspace)}
-                            </FieldLabel>
-                          </Field>
-                        ))}
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-fit"
-                        disabled={
-                          workspaceState.isLoading ||
-                          selectedWorkspaces === null
-                        }
-                        onClick={() => void saveWorkspaces()}
-                      >
-                        Save workspaces
-                      </Button>
-                    </>
-                  )}
-                  {workspaceState.error ? (
-                    <ErrorAlert
-                      error={workspaceState.error}
-                      fallback="Unable to update workspaces."
-                    />
-                  ) : null}
-                </FormSection>
               </>
             ) : null}
 
@@ -460,7 +348,6 @@ export function ContractLifecycleManagement({
                 <Button
                   type="button"
                   variant="destructive"
-                  disabled={archiveState.isLoading}
                   onClick={() => {
                     setDialogError("");
                     setArchiveRequested(true);
@@ -643,18 +530,17 @@ export function ContractLifecycleManagement({
         onCancel={() => setInvitationToRevoke(null)}
       />
 
-      <ConfirmDialog
-        open={archiveRequested}
-        title="Archive this contract?"
-        description={`${contract.referenceNumber} · ${contract.title} will be removed from the contract register. All contract role assignments and pending invitations are revoked. A Company Administrator can restore the contract from the register, but access must then be granted again.`}
-        confirmLabel="Archive contract"
-        pendingLabel="Archiving…"
-        isPending={archiveState.isLoading}
-        error={archiveRequested ? dialogError : undefined}
-        destructive
-        onConfirm={() => void confirmArchive()}
-        onCancel={() => setArchiveRequested(false)}
-      />
+      {archiveRequested ? (
+        <ArchiveContractDialog
+          companyId={companyId}
+          contract={contract}
+          onCancel={() => setArchiveRequested(false)}
+          onArchived={() => {
+            setArchiveRequested(false);
+            router.push("/dashboards/contracts");
+          }}
+        />
+      ) : null}
     </section>
   );
 }

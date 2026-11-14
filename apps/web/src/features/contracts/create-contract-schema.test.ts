@@ -206,6 +206,23 @@ describe("toCreateContractRequest", () => {
     expect(request.parentContractId).toBe("01J0000000000000000000000A");
   });
 
+  it("sends each chosen workspace once, whatever the form holds", () => {
+    const values = validValues();
+    values.parties.workspaces = ["hse", "hse", "project", "hse"];
+
+    expect(toCreateContractRequest(values).workspaces).toEqual([
+      "project",
+      "hse",
+    ]);
+  });
+
+  it("allows a contract with no workspaces, to add later", () => {
+    const values = validValues();
+    values.parties.workspaces = [];
+
+    expect(toCreateContractRequest(values).workspaces).toEqual([]);
+  });
+
   it("refuses values that have not passed validation", () => {
     const values = validValues();
     values.commercial.originalValue = "1.234";

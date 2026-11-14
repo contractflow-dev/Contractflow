@@ -35,7 +35,11 @@ import {
 } from '../dto/list-contracts-request.dto';
 import { TransitionContractRequestDto } from '../dto/transition-contract-request.dto';
 import { UpdateContractRequestDto } from '../dto/update-contract-request.dto';
-import { UpdateContractWorkspacesRequestDto } from '../dto/update-contract-workspaces-request.dto';
+import {
+  AddContractWorkspaceRequestDto,
+  ContractWorkspaceParamDto,
+  UpdateContractWorkspacesRequestDto,
+} from '../dto/update-contract-workspaces-request.dto';
 import { ContractService } from '../services/contract.service';
 import { ContractLifecycleService } from '../services/contract-lifecycle.service';
 import { ContractRoleAssignmentService } from '../services/contract-role-assignment.service';
@@ -114,6 +118,54 @@ export class ContractController {
     );
   }
 
+  @Post('contract/workspaces')
+  @UseGuards(ContractContextGuard)
+  addWorkspace(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
+    @Body() body: AddContractWorkspaceRequestDto,
+  ) {
+    return this.lifecycle.addWorkspace(
+      user.id,
+      companyId,
+      contractId,
+      body.workspace,
+    );
+  }
+
+  @Get('contract/workspaces/:workspace/removal-impact')
+  @UseGuards(ContractContextGuard)
+  workspaceRemovalImpact(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
+    @Param() params: ContractWorkspaceParamDto,
+  ) {
+    return this.lifecycle.workspaceRemovalImpact(
+      user.id,
+      companyId,
+      contractId,
+      params.workspace,
+    );
+  }
+
+  @Delete('contract/workspaces/:workspace')
+  @UseGuards(ContractContextGuard)
+  removeWorkspace(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
+    @Param() params: ContractWorkspaceParamDto,
+  ) {
+    return this.lifecycle.removeWorkspace(
+      user.id,
+      companyId,
+      contractId,
+      params.workspace,
+    );
+  }
+
   @Post('contract/transitions')
   @UseGuards(ContractContextGuard)
   transition(
@@ -133,6 +185,16 @@ export class ContractController {
     @CurrentContractId() contractId: string,
   ) {
     return this.lifecycle.archive(user.id, companyId, contractId);
+  }
+
+  @Get('contract/deletion-impact')
+  @UseGuards(ContractContextGuard)
+  deletionImpact(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
+  ) {
+    return this.lifecycle.deletionImpact(user.id, companyId, contractId);
   }
 
   @Post('contract/restore')

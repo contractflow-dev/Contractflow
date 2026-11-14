@@ -21,6 +21,8 @@ import type {
   ContractRoleManagementPermissions,
   ContractWorkspaceAccess,
   ContractWorkspaceAccessResponse,
+  ContractWorkspaceRemovalImpact,
+  ContractDeletionImpact,
   CreateContractRequest,
   CreateContractSiteRequest,
   ContractRole,
@@ -77,6 +79,8 @@ export type {
   ContractRoleManagementPermissions,
   ContractWorkspaceAccess,
   ContractWorkspaceAccessResponse,
+  ContractWorkspaceRemovalImpact,
+  ContractDeletionImpact,
   CreateContractRequest,
   CreateContractSiteRequest,
   ContractRole,
@@ -113,6 +117,16 @@ const roleInvitationTag = (
   type: "ContractRoleAssignment" as const,
   id: `invitations:${contractId}:${workspace}`,
 });
+
+/** What archiving or restoring a contract changes in the cache. */
+const archiveLifecycleTags = (contractId: string) => [
+  { type: "Contract" as const, id: contractId },
+  { type: "Contract" as const, id: "LIST" },
+  { type: "ContractRoleAssignment" as const, id: "LIST" },
+  { type: "ContractLifecyclePermission" as const, id: contractId },
+  { type: "ContractLifecyclePermission" as const, id: "LIST" },
+  "Dashboard" as const,
+];
 
 export const contractApi = api.injectEndpoints({
   endpoints: (builder) => ({
@@ -392,6 +406,62 @@ export const contractApi = api.injectEndpoints({
       ],
     }),
 
+    /** Adds one workspace; it gives nobody access. */
+    addContractWorkspace: builder.mutation<
+      AssignableContractWorkspace[],
+      CompanyContractDetailQuery & { workspace: AssignableContractWorkspace }
+    >({
+      query: ({ companyId, contractId, workspace }) => ({
+        ...contractRoute(companyId, contractId, `/workspaces`),
+        method: "POST",
+        body: { workspace },
+      }),
+      invalidatesTags: (_result, error, { contractId }) =>
+        error ? [] : [{ type: "Contract", id: contractId }],
+    }),
+
+    /** What removing a workspace would revoke, for its confirmation. */
+    getContractWorkspaceRemovalImpact: builder.query<
+      ContractWorkspaceRemovalImpact,
+      CompanyContractDetailQuery & { workspace: AssignableContractWorkspace }
+    >({
+      query: ({ companyId, contractId, workspace }) =>
+        contractRoute(
+          companyId,
+          contractId,
+          `/workspaces/${encodeURIComponent(workspace)}/removal-impact`,
+        ),
+      // Always asked afresh when a confirmation opens.
+      keepUnusedDataFor: 0,
+    }),
+
+    /**
+     * Removes one workspace. Its roles are revoked, which can hide the
+     * contract from members, so role lists and the register refresh too.
+     */
+    removeContractWorkspace: builder.mutation<
+      AssignableContractWorkspace[],
+      CompanyContractDetailQuery & { workspace: AssignableContractWorkspace }
+    >({
+      query: ({ companyId, contractId, workspace }) => ({
+        ...contractRoute(
+          companyId,
+          contractId,
+          `/workspaces/${encodeURIComponent(workspace)}`,
+        ),
+        method: "DELETE",
+      }),
+      invalidatesTags: (_result, error, { contractId }) =>
+        error
+          ? []
+          : [
+              { type: "Contract", id: contractId },
+              { type: "Contract", id: "LIST" },
+              { type: "ContractRoleAssignment", id: "LIST" },
+              { type: "ContractLifecyclePermission", id: contractId },
+            ],
+    }),
+
     transitionContract: builder.mutation<
       Contract,
       CompanyContractDetailQuery & {
@@ -409,15 +479,26 @@ export const contractApi = api.injectEndpoints({
       ],
     }),
 
+    /** What archiving the contract would end, for its confirmation. */
+    getContractDeletionImpact: builder.query<
+      ContractDeletionImpact,
+      CompanyContractDetailQuery
+    >({
+      query: ({ companyId, contractId }) =>
+        contractRoute(companyId, contractId, `/deletion-impact`),
+      // Always asked afresh when the confirmation opens.
+      keepUnusedDataFor: 0,
+    }),
+
     archiveContract: builder.mutation<void, CompanyContractDetailQuery>({
       query: ({ companyId, contractId }) => ({
         ...contractRoute(companyId, contractId),
         method: "DELETE",
       }),
-      invalidatesTags: (_result, _error, { contractId }) => [
-        { type: "Contract", id: contractId },
-        { type: "Contract", id: "LIST" },
-      ],
+      // Archiving revokes every role, and the contract leaves the register
+      // and the dashboard figures.
+      invalidatesTags: (_result, error, { contractId }) =>
+        error ? [] : archiveLifecycleTags(contractId),
     }),
 
     restoreContract: builder.mutation<Contract, CompanyContractDetailQuery>({
@@ -425,10 +506,8 @@ export const contractApi = api.injectEndpoints({
         ...contractRoute(companyId, contractId, `/restore`),
         method: "POST",
       }),
-      invalidatesTags: (_result, _error, { contractId }) => [
-        { type: "Contract", id: contractId },
-        { type: "Contract", id: "LIST" },
-      ],
+      invalidatesTags: (_result, error, { contractId }) =>
+        error ? [] : archiveLifecycleTags(contractId),
     }),
 
     getContractPartyInvitations: builder.query<
@@ -763,8 +842,12 @@ export const {
   useCreateContractMutation,
   useUpdateContractMutation,
   useUpdateContractWorkspacesMutation,
+  useAddContractWorkspaceMutation,
+  useGetContractWorkspaceRemovalImpactQuery,
+  useRemoveContractWorkspaceMutation,
   useTransitionContractMutation,
   useArchiveContractMutation,
+  useGetContractDeletionImpactQuery,
   useRestoreContractMutation,
   useGetContractPartyInvitationsQuery,
   useCreateContractPartyInvitationMutation,
