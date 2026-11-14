@@ -18,17 +18,51 @@ describe("company navigation", () => {
           "Company documents",
           "Tasks",
           "Calendar",
-          "Reports",
         ],
       },
       {
         label: "Department workspaces",
-        items: ["Contractor", "Client Project Mgmt", "HSE", "Finance"],
+        items: ["Project", "HSE", "Finance"],
       },
       {
         label: undefined,
         items: ["Team", "Company profile", "Help & Support"],
       },
+    ]);
+  });
+
+  it("gives administrators live department pages, and members the planned items", () => {
+    const department = (canManage: boolean) =>
+      companyNavigationFor(canManage).find(
+        ({ label }) => label === "Department workspaces",
+      )!.items;
+
+    expect(
+      department(true).map(({ label, href, plannedNote }) => ({
+        label,
+        href,
+        planned: Boolean(plannedNote),
+      })),
+    ).toEqual([
+      {
+        label: "Project",
+        href: "/dashboards/departments/project",
+        planned: false,
+      },
+      { label: "HSE", href: "/dashboards/departments/hse", planned: false },
+      {
+        label: "Finance",
+        href: "/dashboards/departments/finance",
+        planned: false,
+      },
+    ]);
+    expect(department(false).every(({ plannedNote }) => plannedNote)).toBe(
+      true,
+    );
+    expect(department(false).map(({ label }) => label)).toEqual([
+      "Project",
+      "HSE",
+      "Finance",
     ]);
   });
 
@@ -44,9 +78,7 @@ describe("company navigation", () => {
     expect(planned.map((item) => item.label)).toEqual([
       "Tasks",
       "Calendar",
-      "Reports",
-      "Contractor",
-      "Client Project Mgmt",
+      "Project",
       "HSE",
       "Finance",
       "Help & Support",

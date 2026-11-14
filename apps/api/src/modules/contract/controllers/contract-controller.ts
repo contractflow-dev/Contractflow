@@ -43,6 +43,11 @@ import {
 import { ContractService } from '../services/contract.service';
 import { ContractLifecycleService } from '../services/contract-lifecycle.service';
 import { ContractRoleAssignmentService } from '../services/contract-role-assignment.service';
+import { CompanyDepartmentService } from '../services/company-department.service';
+import {
+  CompanyDepartmentParamDto,
+  ListDepartmentContractsRequestDto,
+} from '../dto/company-department.dto';
 
 @Controller()
 @UseGuards(CompanyContextGuard)
@@ -51,6 +56,7 @@ export class ContractController {
     private readonly contractService: ContractService,
     private readonly roleAssignments: ContractRoleAssignmentService,
     private readonly lifecycle: ContractLifecycleService,
+    private readonly departments: CompanyDepartmentService,
   ) {}
 
   @Post('contracts')
@@ -348,6 +354,25 @@ export class ContractController {
     @Query() query: ListCompanyRoleAssignmentsRequestDto,
   ) {
     return this.roleAssignments.listForCompany(user.id, companyId, query);
+  }
+
+  /**
+   * One department's contracts across the header company: staffing and what
+   * holds progress. Company Administrators only; read-only oversight.
+   */
+  @Get('company/departments/:department/contracts')
+  listDepartmentContracts(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @Param() { department }: CompanyDepartmentParamDto,
+    @Query() query: ListDepartmentContractsRequestDto,
+  ) {
+    return this.departments.listContracts(
+      user.id,
+      companyId,
+      department,
+      query,
+    );
   }
 
   @Get('contract/role-assignments')

@@ -36,6 +36,17 @@ export interface IContractOversightAuthorization {
   isCompanyAdmin: boolean;
 }
 
+/**
+ * The result of `authorizeCompanyOversight`: read-only oversight of the
+ * contracts a company is party to. Internal; never serialized.
+ */
+export interface ICompanyOversightScope {
+  /** Every read must stay within this company's own parties. */
+  companyId: string;
+  /** The administrator's own membership, for their own role look-ups. */
+  companyUserId: string;
+}
+
 function contractNotFound(): NotFoundException {
   return new NotFoundException('Contract was not found');
 }
@@ -100,6 +111,38 @@ export class ContractAccessService {
       contract,
       isCompanyAdmin,
     };
+  }
+
+  /**
+   * Read-only oversight across the company's contracts, for lists that span
+   * many of them (the department pages). Only an active Company
+   * Administrator of the header company passes. The scope it returns limits
+   * every read to contracts the company is party to; like
+   * `authorizeContractOversight`, it never opens a workspace or a protected
+   * contract resource.
+   */
+  async authorizeCompanyOversight(
+    userId: string,
+    companyId: string,
+  ): Promise<ICompanyOversightScope> {
+    const user = userId?.trim();
+    const company = companyId?.trim();
+    if (!user || !company) {
+      throw new ForbiddenException('Active company membership is required');
+    }
+    const membership = await this.companyUsers.findActiveMember(
+      { companyId: company },
+      user,
+    );
+    if (!membership) {
+      throw new ForbiddenException('Active company membership is required');
+    }
+    if (membership.companyRole !== ECompanyRole.COMPANY_ADMIN) {
+      throw new ForbiddenException(
+        'Only a Company Administrator can oversee the company’s contracts.',
+      );
+    }
+    return Object.freeze({ companyId: company, companyUserId: membership.id });
   }
 
   async authorize(

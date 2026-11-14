@@ -54,6 +54,7 @@ import {
 import { CreateContractForm } from "./create-contract-form";
 import type { Contract, ContractListItem } from "@/services/contractApi";
 import { ContractRoleAssignmentManagement } from "./contract-role-assignment-management";
+import { parseContractWorkspace } from "../contract-workspaces";
 import { ContractSignatoryManagement } from "./contract-signatory-management";
 import { ContractDocuments } from "./contract-documents";
 import { ContractSiteManagement } from "./contract-site-management";
@@ -552,6 +553,10 @@ export function ContractDetail({
 }) {
   const searchParams = useSearchParams();
   const target = parseActivityTarget(searchParams);
+  // "Assign member" links open the Roles section on one workspace.
+  const rolesWorkspace = parseContractWorkspace(
+    searchParams?.get("workspace") ?? "",
+  );
   const query = { companyId, contractId };
   const timeZone = useUserTimeZone();
   const {
@@ -817,6 +822,7 @@ export function ContractDetail({
             <ContractRoleAssignmentManagement
               companyId={companyId}
               contractId={contractId}
+              initialWorkspace={rolesWorkspace ?? undefined}
               target={target}
             />
           ) : section === "sites" ? (

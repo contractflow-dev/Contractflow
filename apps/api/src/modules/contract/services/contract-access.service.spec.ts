@@ -65,6 +65,51 @@ describe('ContractAccessService', () => {
     );
   });
 
+  describe('authorizeCompanyOversight', () => {
+    it('gives a Company Administrator a scope limited to their own company', async () => {
+      users.findActiveMember.mockResolvedValue({
+        id: 'admin-1',
+        companyRole: ECompanyRole.COMPANY_ADMIN,
+      });
+
+      const scope = await service.authorizeCompanyOversight('u1', ' co1 ');
+
+      expect(scope).toEqual({ companyId: 'co1', companyUserId: 'admin-1' });
+      expect(Object.isFrozen(scope)).toBe(true);
+      expect(users.findActiveMember).toHaveBeenCalledWith(
+        { companyId: 'co1' },
+        'u1',
+      );
+      // Company-level oversight reads no contract and opens no workspace.
+      expect(parties.findByCompany).not.toHaveBeenCalled();
+      expect(contracts.findById).not.toHaveBeenCalled();
+      expect(workspaces.exists).not.toHaveBeenCalled();
+    });
+
+    it('refuses an ordinary member, even one holding contract roles', async () => {
+      await expect(
+        service.authorizeCompanyOversight('u1', 'co1'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it("refuses someone who isn't an active member of the header company", async () => {
+      users.findActiveMember.mockResolvedValue(null);
+      await expect(
+        service.authorizeCompanyOversight('u1', 'other-company'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('refuses blank identifiers without a look-up', async () => {
+      await expect(
+        service.authorizeCompanyOversight(' ', 'co1'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(
+        service.authorizeCompanyOversight('u1', ''),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(users.findActiveMember).not.toHaveBeenCalled();
+    });
+  });
+
   it('rejects non-members before touching contract data', async () => {
     users.findActiveMember.mockResolvedValue(null);
     await expect(
