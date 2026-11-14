@@ -4,9 +4,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  ECompanyMemberSortField,
   ECompanyRole,
   ECompanyStatus,
   ECompanyUserStatus,
+  ESortOrder,
 } from '@contractflow/contracts-schema';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
@@ -81,6 +83,8 @@ describe('CompanyAdminService', () => {
       findCompanyName: vi.fn(),
       findMemberName: vi.fn().mockResolvedValue('Ada Admin'),
       listPendingInvitationsForEmail: vi.fn().mockResolvedValue([]),
+      countMembers: vi.fn(),
+      countPendingInvitations: vi.fn(),
     };
     mail = {
       sendCompanyInvitationEmail: vi.fn(),
@@ -1109,6 +1113,70 @@ describe('CompanyAdminService', () => {
           service.resendInvitation(actorId, companyId, 'invitation-1'),
         ).rejects.toBeInstanceOf(ForbiddenException);
         expect(invitations.lockById).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('team management', () => {
+    it('summarizes the team for a Company Administrator of the header company', async () => {
+      reads.countMembers.mockResolvedValueOnce({
+        total: 7,
+        active: 5,
+        activeAdmins: 2,
+      });
+      reads.countPendingInvitations.mockResolvedValueOnce(3);
+
+      await expect(service.getTeamSummary(actorId, companyId)).resolves.toEqual(
+        {
+          memberCount: 7,
+          activeMemberCount: 5,
+          companyAdminCount: 2,
+          pendingInvitationCount: 3,
+        },
+      );
+      expect(scope.forUser).toHaveBeenCalledWith(actorId, companyId);
+      expect(reads.countMembers).toHaveBeenCalledWith(scopeArg);
+      expect(reads.countPendingInvitations).toHaveBeenCalledWith(
+        scopeArg,
+        expect.any(Date),
+      );
+    });
+
+    it('refuses the team summary to an ordinary member', async () => {
+      reads.findActiveRole.mockResolvedValueOnce(ECompanyRole.MEMBER);
+
+      await expect(
+        service.getTeamSummary(actorId, companyId),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(reads.countMembers).not.toHaveBeenCalled();
+    });
+
+    it('refuses the team summary without membership of the header company', async () => {
+      scope.forUser.mockRejectedValueOnce(
+        new ForbiddenException('Active company membership is required.'),
+      );
+
+      await expect(
+        service.getTeamSummary('someone-from-another-company', companyId),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(reads.countMembers).not.toHaveBeenCalled();
+    });
+
+    it('passes the role filter and sort to the scoped member query', async () => {
+      await service.listMembers(actorId, companyId, {
+        companyRole: ECompanyRole.COMPANY_ADMIN,
+        sortBy: ECompanyMemberSortField.NAME,
+        sortOrder: ESortOrder.ASC,
+        page: 2,
+        limit: 10,
+      });
+
+      expect(reads.listMembers).toHaveBeenCalledWith(scopeArg, {
+        companyRole: ECompanyRole.COMPANY_ADMIN,
+        sortBy: ECompanyMemberSortField.NAME,
+        sortOrder: ESortOrder.ASC,
+        page: 2,
+        limit: 10,
       });
     });
   });

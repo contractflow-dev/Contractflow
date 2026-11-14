@@ -32,6 +32,8 @@ export interface IContractOversightAuthorization {
   /** The reader's company's party row on this contract. */
   party: ContractParty;
   contract: Contract;
+  /** The reader is an active Company Administrator of the header company. */
+  isCompanyAdmin: boolean;
 }
 
 function contractNotFound(): NotFoundException {
@@ -96,6 +98,7 @@ export class ContractAccessService {
       basis: hasAssignment ? 'assignment' : 'company_admin_oversight',
       party,
       contract,
+      isCompanyAdmin,
     };
   }
 

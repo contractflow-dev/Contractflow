@@ -3,9 +3,11 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import {
+  ECompanyMemberSortField,
   ECompanyRole,
   ECompanyUserStatus,
   EInvitationStatus,
+  ESortOrder,
 } from "@contractflow/contracts-schema";
 import {
   Alert,
@@ -57,6 +59,8 @@ import {
 } from "@/components/status-badge/status-legend";
 import { PageHeader } from "@/components/page-header/page-header";
 import { CompanyContractRoles } from "../components/company-contract-roles";
+import { MemberDetailsSheet } from "../components/member-details-sheet";
+import { TeamSummary } from "../components/team-summary";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useKeepPageInRange, usePagination } from "@/hooks/use-pagination";
 import { useUserTimeZone } from "@/hooks/use-user-time-zone";
@@ -66,6 +70,35 @@ import { notifyError, notifySuccess } from "@/lib/notify";
 import { CompanyAdminShell } from "../CompanyAdminShell";
 
 const memberRoles = Object.values(ECompanyRole);
+
+/** Member list orders the API supports; newest first is its default. */
+const memberSorts = [
+  {
+    value: "joined-desc",
+    label: "Newest first",
+    sortBy: ECompanyMemberSortField.JOINED_AT,
+    sortOrder: ESortOrder.DESC,
+  },
+  {
+    value: "joined-asc",
+    label: "Oldest first",
+    sortBy: ECompanyMemberSortField.JOINED_AT,
+    sortOrder: ESortOrder.ASC,
+  },
+  {
+    value: "name-asc",
+    label: "Name (A–Z)",
+    sortBy: ECompanyMemberSortField.NAME,
+    sortOrder: ESortOrder.ASC,
+  },
+  {
+    value: "name-desc",
+    label: "Name (Z–A)",
+    sortBy: ECompanyMemberSortField.NAME,
+    sortOrder: ESortOrder.DESC,
+  },
+] as const;
+type MemberSort = (typeof memberSorts)[number]["value"];
 
 /**
  * A company invitation grants company membership only. Contract roles are
@@ -111,6 +144,13 @@ export function CompanyTeamView() {
 function TeamContent({ companyId }: { companyId: string }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<ECompanyUserStatus | "">("");
+  const [roleFilter, setRoleFilter] = useState<ECompanyRole | "">("");
+  const [sort, setSort] = useState<MemberSort>("joined-desc");
+  const sortOption =
+    memberSorts.find((option) => option.value === sort) ?? memberSorts[0];
+  const [selectedMember, setSelectedMember] = useState<ICompanyMember | null>(
+    null,
+  );
   const memberPages = usePagination();
   const invitationPages = usePagination(10);
   const debouncedSearch = useDebouncedValue(search.trim());
@@ -154,6 +194,9 @@ function TeamContent({ companyId }: { companyId: string }) {
     limit: memberPages.limit,
     search: appliedSearch || undefined,
     status: status || undefined,
+    companyRole: roleFilter || undefined,
+    sortBy: sortOption.sortBy,
+    sortOrder: sortOption.sortOrder,
   });
   const membersLoading = membersInitialLoading || (membersFetching && !members);
   useKeepPageInRange(members?.meta, memberPages.setPage);
@@ -323,6 +366,8 @@ function TeamContent({ companyId }: { companyId: string }) {
         description="Manage company memberships and invite colleagues. Removing a member does not delete their account."
       />
 
+      <TeamSummary companyId={companyId} />
+
       <Card>
         <CardHeader>
           <CardTitle>
@@ -431,7 +476,7 @@ function TeamContent({ companyId }: { companyId: string }) {
             </div>
 
             {/* Member filters */}
-            <div className="grid gap-3 border-t pt-4 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-end">
+            <div className="grid gap-3 border-t pt-4 sm:grid-cols-2 sm:items-end lg:grid-cols-[minmax(0,1fr)_11rem_13rem_11rem]">
               <div className="space-y-1.5">
                 <label htmlFor="member-search" className="text-sm font-medium">
                   Search members
@@ -466,6 +511,57 @@ function TeamContent({ companyId }: { companyId: string }) {
                   <NativeSelectOption value={ECompanyUserStatus.INACTIVE}>
                     Inactive
                   </NativeSelectOption>
+                </NativeSelect>
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="member-role" className="text-sm font-medium">
+                  Company role
+                </label>
+                <NativeSelect
+                  id="member-role"
+                  className="w-full"
+                  value={roleFilter}
+                  onChange={(event) => {
+                    setRoleFilter(
+                      memberRoles.find(
+                        (option) => option === event.target.value,
+                      ) ?? "",
+                    );
+                    memberPages.resetPage();
+                  }}
+                >
+                  <NativeSelectOption value="">All roles</NativeSelectOption>
+                  {memberRoles.map((option) => (
+                    <NativeSelectOption key={option} value={option}>
+                      {option}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="member-sort" className="text-sm font-medium">
+                  Sort by
+                </label>
+                <NativeSelect
+                  id="member-sort"
+                  className="w-full"
+                  value={sort}
+                  onChange={(event) => {
+                    const next = memberSorts.find(
+                      (option) => option.value === event.target.value,
+                    );
+                    if (!next) return;
+                    setSort(next.value);
+                    memberPages.resetPage();
+                  }}
+                >
+                  {memberSorts.map((option) => (
+                    <NativeSelectOption key={option.value} value={option.value}>
+                      {option.label}
+                    </NativeSelectOption>
+                  ))}
                 </NativeSelect>
               </div>
             </div>
@@ -506,6 +602,7 @@ function TeamContent({ companyId }: { companyId: string }) {
                       onRoleChange={(value) => requestRoleChange(member, value)}
                       timeZone={timeZone}
                       onRemove={() => requestRemoval(member)}
+                      onDetails={() => setSelectedMember(member)}
                     />
                   ))}
                 </div>
@@ -556,18 +653,28 @@ function TeamContent({ companyId }: { companyId: string }) {
                           </TableCell>
 
                           <TableCell className="px-4 py-3 text-right">
-                            {member.status === ECompanyUserStatus.ACTIVE && (
+                            <div className="flex justify-end gap-2">
                               <Button
-                                variant="outline"
+                                variant="ghost"
                                 size="sm"
-                                disabled={busyMemberId === member.id}
-                                onClick={() => requestRemoval(member)}
+                                onClick={() => setSelectedMember(member)}
+                                aria-label={`View details and contract roles for ${member.firstName} ${member.lastName}`}
                               >
-                                {busyMemberId === member.id
-                                  ? "Saving…"
-                                  : "Remove"}
+                                Details
                               </Button>
-                            )}
+                              {member.status === ECompanyUserStatus.ACTIVE && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={busyMemberId === member.id}
+                                  onClick={() => requestRemoval(member)}
+                                >
+                                  {busyMemberId === member.id
+                                    ? "Saving…"
+                                    : "Remove"}
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -596,6 +703,12 @@ function TeamContent({ companyId }: { companyId: string }) {
             )}
         </Card>
       </section>
+
+      <MemberDetailsSheet
+        companyId={companyId}
+        member={selectedMember}
+        onClose={() => setSelectedMember(null)}
+      />
 
       <CompanyContractRoles companyId={companyId} />
 
@@ -833,12 +946,14 @@ function MemberCard({
   timeZone,
   onRoleChange,
   onRemove,
+  onDetails,
 }: {
   member: ICompanyMember;
   busy: boolean;
   timeZone: string | undefined;
   onRoleChange: (value: string) => void;
   onRemove: () => void;
+  onDetails: () => void;
 }) {
   return (
     <article className="space-y-3 p-4">
@@ -854,16 +969,26 @@ function MemberCard({
       </p>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <MemberRoleSelect member={member} busy={busy} onChange={onRoleChange} />
-        {member.status === ECompanyUserStatus.ACTIVE && (
+        <div className="flex gap-2">
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
-            disabled={busy}
-            onClick={onRemove}
+            onClick={onDetails}
+            aria-label={`View details and contract roles for ${member.firstName} ${member.lastName}`}
           >
-            {busy ? "Saving…" : "Remove"}
+            Details
           </Button>
-        )}
+          {member.status === ECompanyUserStatus.ACTIVE && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={onRemove}
+            >
+              {busy ? "Saving…" : "Remove"}
+            </Button>
+          )}
+        </div>
       </div>
     </article>
   );

@@ -1,8 +1,10 @@
 import { api, companyRoute } from "@/services/api";
 import { EInvitationStatus } from "@contractflow/contracts-schema";
 import type {
+  ECompanyMemberSortField,
   ECompanyRole,
   ECompanyUserStatus,
+  ESortOrder,
   ICompanyAccessResponse,
   ICompanyAccessSummaryResponse,
   ICompanyDashboardResponse,
@@ -11,6 +13,7 @@ import type {
   ICompanyInvitationResponseResult,
   ICompanyMember,
   ICompanyProfileResponse,
+  ICompanyTeamSummaryResponse,
   ICreateCompanyRequest,
   ICreateCompanyResponse,
   IInviteCompanyMemberRequest,
@@ -129,6 +132,9 @@ export const companiesApi = api.injectEndpoints({
         companyId: string;
         search?: string;
         status?: ECompanyUserStatus;
+        companyRole?: ECompanyRole;
+        sortBy?: ECompanyMemberSortField;
+        sortOrder?: ESortOrder;
       }
     >({
       query: ({ companyId, ...params }) => ({
@@ -137,6 +143,18 @@ export const companiesApi = api.injectEndpoints({
       }),
       providesTags: (_result, _error, { companyId }) => [
         { type: "CompanyMember", id: companyId },
+      ],
+    }),
+
+    /** Team figures; refreshed by any member or invitation change. */
+    getCompanyTeamSummary: builder.query<
+      ICompanyTeamSummaryResponse,
+      { companyId: string }
+    >({
+      query: ({ companyId }) => companyRoute(companyId, "/team-summary"),
+      providesTags: (_result, _error, { companyId }) => [
+        { type: "CompanyMember", id: companyId },
+        { type: "CompanyInvitation", id: companyId },
       ],
     }),
 
@@ -339,6 +357,7 @@ export const {
   useGetCompanyMembershipQuery,
   useGetCompanyDashboardQuery,
   useGetCompanyMembersQuery,
+  useGetCompanyTeamSummaryQuery,
   useGetCompanyInvitationsQuery,
   useInviteCompanyMemberMutation,
   useRevokeCompanyInvitationMutation,

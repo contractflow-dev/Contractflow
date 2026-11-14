@@ -18,7 +18,9 @@ import {
   EToStatus,
 } from '@contractflow/contracts-schema';
 import type {
+  ContractDeletionImpact,
   ContractSite as ContractSiteResponse,
+  ContractWorkspaceRemovalImpact,
   IncomingContractInvitation,
 } from '@contractflow/contracts-schema';
 import type {
@@ -373,6 +375,11 @@ export class ContractLifecycleService {
     });
   }
 
+  /**
+   * Replaces the contract's workspaces with `dto.workspaces`. Kept for
+   * existing clients; the single-workspace operations below avoid replacing
+   * a set that another administrator changed meanwhile.
+   */
   async updateWorkspaces(
     userId: string,
     companyId: string,
@@ -397,37 +404,174 @@ export class ContractLifecycleService {
       const now = new Date();
 
       for (const workspace of removed) {
-        await context.roleAssignments.revokeForWorkspaceRoles(
-          contractId,
-          WORKSPACE_ROLES[workspace],
-          actor.id,
-          now,
-        );
-        await context.roleInvitations.revokePendingForWorkspace(
-          contractId,
-          workspace,
-          now,
-        );
-        await context.workspaces.remove(contractId, workspace);
-      }
-
-      if (added.length) {
-        await context.workspaces.addMany(contractId, added, actor.id);
-      }
-
-      if (removed.length) {
-        await this.writeActivity(
+        await this.removeWorkspaceLocked(
           context,
           contract,
           actor,
-          'contract.workspaces_removed',
-          `Removed ${removed.join(', ')} workspaces from ${contract.referenceNumber}.`,
-          { removed },
+          workspace,
           now,
         );
       }
+      if (added.length) {
+        await this.addWorkspacesLocked(context, contract, actor, added, now);
+      }
       return dto.workspaces;
     });
+  }
+
+  /**
+   * Adds one workspace. Nobody gets access to it: that still takes an
+   * explicit contract role assignment.
+   */
+  async addWorkspace(
+    userId: string,
+    companyId: string,
+    contractId: string,
+    workspace: AssignableContractWorkspace,
+  ): Promise<AssignableContractWorkspace[]> {
+    return this.unitOfWork.execute(async (context) => {
+      const { contract, actor } = await this.requireOwnedContract(
+        context,
+        userId,
+        companyId,
+        contractId,
+      );
+      const current = await context.workspaces.listWorkspaces(contractId);
+      if (current.includes(workspace)) {
+        throw new ConflictException(
+          'This workspace is already on the contract.',
+        );
+      }
+      await this.addWorkspacesLocked(
+        context,
+        contract,
+        actor,
+        [workspace],
+        new Date(),
+      );
+      return [...current, workspace];
+    });
+  }
+
+  /**
+   * Removes one workspace. Its role assignments and pending role invitations
+   * are revoked, not deleted, so their history stays; records, documents and
+   * conversations are kept. Adding the workspace again restores nobody's
+   * access.
+   */
+  async removeWorkspace(
+    userId: string,
+    companyId: string,
+    contractId: string,
+    workspace: AssignableContractWorkspace,
+  ): Promise<AssignableContractWorkspace[]> {
+    return this.unitOfWork.execute(async (context) => {
+      const { contract, actor } = await this.requireOwnedContract(
+        context,
+        userId,
+        companyId,
+        contractId,
+      );
+      const current = await context.workspaces.listWorkspaces(contractId);
+      if (!current.includes(workspace)) {
+        throw new NotFoundException('This workspace is not on the contract.');
+      }
+      await this.removeWorkspaceLocked(
+        context,
+        contract,
+        actor,
+        workspace,
+        new Date(),
+      );
+      return current.filter((value) => value !== workspace);
+    });
+  }
+
+  /** What removing a workspace would revoke, for the confirmation step. */
+  async workspaceRemovalImpact(
+    userId: string,
+    companyId: string,
+    contractId: string,
+    workspace: AssignableContractWorkspace,
+  ): Promise<ContractWorkspaceRemovalImpact> {
+    return this.unitOfWork.execute(async (context) => {
+      await this.requireOwnedContract(context, userId, companyId, contractId);
+      const current = await context.workspaces.listWorkspaces(contractId);
+      if (!current.includes(workspace)) {
+        throw new NotFoundException('This workspace is not on the contract.');
+      }
+      const [roles, pendingRoleInvitationCount] = await Promise.all([
+        context.roleAssignments.countActiveForWorkspaceRoles(
+          contractId,
+          WORKSPACE_ROLES[workspace],
+        ),
+        context.roleInvitations.countPendingForWorkspace(contractId, workspace),
+      ]);
+      return {
+        workspace,
+        activeRoleAssignmentCount: roles.assignments,
+        workspaceAdminCount: roles.workspaceAdmins,
+        pendingRoleInvitationCount,
+      };
+    });
+  }
+
+  private async addWorkspacesLocked(
+    context: IContractLifecycleContext,
+    contract: Contract,
+    actor: CompanyUser,
+    added: AssignableContractWorkspace[],
+    now: Date,
+  ): Promise<void> {
+    await context.workspaces.addMany(contract.id, added, actor.id);
+    await this.writeActivity(
+      context,
+      contract,
+      actor,
+      'contract.workspaces_added',
+      added.length === 1
+        ? `Added the ${added[0]} workspace to ${contract.referenceNumber}.`
+        : `Added ${added.join(', ')} workspaces to ${contract.referenceNumber}.`,
+      { added },
+      now,
+    );
+  }
+
+  /**
+   * Revokes the workspace's roles and pending invitations for every party,
+   * then removes it. The whole workspace goes, so no administrator is left
+   * over a workspace that still exists.
+   */
+  private async removeWorkspaceLocked(
+    context: IContractLifecycleContext,
+    contract: Contract,
+    actor: CompanyUser,
+    workspace: AssignableContractWorkspace,
+    now: Date,
+  ): Promise<void> {
+    const revokedRoleAssignments =
+      await context.roleAssignments.revokeForWorkspaceRoles(
+        contract.id,
+        WORKSPACE_ROLES[workspace],
+        actor.id,
+        now,
+      );
+    const revokedRoleInvitations =
+      await context.roleInvitations.revokePendingForWorkspace(
+        contract.id,
+        workspace,
+        now,
+      );
+    await context.workspaces.remove(contract.id, workspace);
+    await this.writeActivity(
+      context,
+      contract,
+      actor,
+      'contract.workspaces_removed',
+      `Removed the ${workspace} workspace from ${contract.referenceNumber}.`,
+      { removed: [workspace], revokedRoleAssignments, revokedRoleInvitations },
+      now,
+    );
   }
 
   async transition(
@@ -485,6 +629,13 @@ export class ContractLifecycleService {
     });
   }
 
+  /**
+   * Archives (soft-deletes) the contract: it leaves the register and every
+   * contract view, and all access to it ends. Nothing is deleted: its parties,
+   * workspaces, sites, records, documents, history and activity stay, and
+   * revoked roles and invitations keep their history. `restore` brings it
+   * back without restoring any access.
+   */
   async archive(
     userId: string,
     companyId: string,
@@ -496,30 +647,80 @@ export class ContractLifecycleService {
         userId,
         companyId,
         contractId,
+        true,
       );
+      if (contract.deletedAt) {
+        throw new ConflictException('This contract is already archived.');
+      }
       const now = new Date();
       contract.deletedAt = now;
       contract.deletedByCompanyUserId = actor.id;
       await context.contracts.save(contract);
-      await context.roleAssignments.revokeAllForContract(
-        contractId,
-        actor.id,
-        now,
-      );
-      await context.roleInvitations.revokeAllPendingForContract(
-        contractId,
-        now,
-      );
-      await context.partyInvitations.revokePendingBySource(party.id, now);
+      const revokedRoleAssignments =
+        await context.roleAssignments.revokeAllForContract(
+          contractId,
+          actor.id,
+          now,
+        );
+      const revokedRoleInvitations =
+        await context.roleInvitations.revokeAllPendingForContract(
+          contractId,
+          now,
+        );
+      const revokedPartyInvitations =
+        await context.partyInvitations.revokePendingBySource(party.id, now);
       await this.writeActivity(
         context,
         contract,
         actor,
         'contract.deleted',
         `Archived contract ${contract.referenceNumber}.`,
-        { deletedAt: now.toISOString() },
+        {
+          deletedAt: now.toISOString(),
+          status: contract.status,
+          revokedRoleAssignments,
+          revokedRoleInvitations,
+          revokedPartyInvitations,
+        },
         now,
       );
+    });
+  }
+
+  /** What archiving the contract would end, for the confirmation step. */
+  async deletionImpact(
+    userId: string,
+    companyId: string,
+    contractId: string,
+  ): Promise<ContractDeletionImpact> {
+    return this.unitOfWork.execute(async (context) => {
+      const { party } = await this.requireOwnedContract(
+        context,
+        userId,
+        companyId,
+        contractId,
+      );
+      const [
+        roles,
+        pendingRoleInvitationCount,
+        pendingPartyInvitationCount,
+        otherPartyCount,
+        subcontractCount,
+      ] = await Promise.all([
+        context.roleAssignments.countActiveForContract(contractId),
+        context.roleInvitations.countPendingForContract(contractId),
+        context.partyInvitations.countPendingBySource(party.id),
+        context.parties.countOtherParties(contractId, companyId),
+        context.contracts.countActiveChildren(contractId),
+      ]);
+      return {
+        activeRoleAssignmentCount: roles.assignments,
+        workspaceAdminCount: roles.workspaceAdmins,
+        pendingRoleInvitationCount,
+        pendingPartyInvitationCount,
+        otherPartyCount,
+        subcontractCount,
+      };
     });
   }
 
@@ -549,7 +750,8 @@ export class ContractLifecycleService {
         actor,
         'contract.restored',
         `Restored contract ${contract.referenceNumber}.`,
-        { restoredAt: now.toISOString() },
+        // Access isn't restored: roles revoked on archiving stay revoked.
+        { restoredAt: now.toISOString(), status: contract.status },
         now,
       );
       return restored;

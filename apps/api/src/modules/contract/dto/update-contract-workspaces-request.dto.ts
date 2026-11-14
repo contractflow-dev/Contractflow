@@ -9,3 +9,15 @@ export class UpdateContractWorkspacesRequestDto {
   @IsIn(workspaces, { each: true })
   workspaces!: AssignableContractWorkspace[];
 }
+
+/** Body of adding one workspace to the header contract. */
+export class AddContractWorkspaceRequestDto {
+  @IsIn(workspaces)
+  workspace!: AssignableContractWorkspace;
+}
+
+/** The workspace named in the path, for removal and its impact. */
+export class ContractWorkspaceParamDto {
+  @IsIn(workspaces)
+  workspace!: AssignableContractWorkspace;
+}

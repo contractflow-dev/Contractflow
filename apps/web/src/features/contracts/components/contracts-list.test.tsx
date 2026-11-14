@@ -177,7 +177,7 @@ describe("ContractsList", () => {
     expect(render()).toMatch(/Mar 31, 2027|31 Mar 2027/);
   });
 
-  it("shows an archived contract as archived, unlinked, with its restore action", () => {
+  it("shows an archived contract as archived, opening read-only, with its restore action", () => {
     setState({
       includeDeleted: true,
       hasFilters: true,
@@ -185,7 +185,8 @@ describe("ContractsList", () => {
     });
     const markup = render();
 
-    expect(markup).not.toContain('href="/dashboards/contracts/c-1"');
+    // It opens as read-only history; the API decides who may read it.
+    expect(markup).toContain('href="/dashboards/contracts/c-1"');
     expect(markup).toContain(">Archived</span>");
     // The API lists no parties for archived contracts; don't claim "none".
     expect(markup).toContain(">Not shown<");

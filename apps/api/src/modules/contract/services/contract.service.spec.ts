@@ -154,8 +154,10 @@ describe('ContractService', () => {
     await service.listStatusHistory('u', 'co-1', 'c-1', { page: 1, limit: 10 });
     await service.listWorkspaces('u', 'co-1', 'c-1');
     expect(access.authorizeContractOversight).toHaveBeenCalledTimes(4);
+    // Archived contracts are loaded too; the service then decides who may
+    // read one (see the archived-contract tests below).
     for (const call of access.authorizeContractOversight.mock.calls) {
-      expect(call).toEqual(['u', 'co-1', 'c-1']);
+      expect(call).toEqual(['u', 'co-1', 'c-1', { includeArchived: true }]);
     }
   });
 
@@ -182,11 +184,12 @@ describe('ContractService', () => {
       'u',
       'co-1',
       'c-1',
+      { includeArchived: true },
     );
   });
 
-  it('hides archived contracts from party, history, and detail reads', async () => {
-    // The oversight check loads only non-archived contracts.
+  it('hides a contract the oversight check refuses from every read', async () => {
+    // Not visible to the reader at all: no party, history or detail.
     access.authorizeContractOversight.mockRejectedValue(
       new NotFoundException(),
     );
@@ -202,6 +205,70 @@ describe('ContractService', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(parties.findAllWithCompany).not.toHaveBeenCalled();
     expect(history.searchPage).not.toHaveBeenCalled();
+  });
+
+  describe('archived contracts', () => {
+    const archived = {
+      ...contractRecord,
+      deletedAt: new Date('2026-03-01T00:00:00.000Z'),
+    };
+    const reads = (svc: ContractService) => [
+      () => svc.get('u', 'co-1', 'c-1'),
+      () => svc.listParties('u', 'co-1', 'c-1'),
+      () => svc.listStatusHistory('u', 'co-1', 'c-1', { page: 1, limit: 10 }),
+      () => svc.listWorkspaces('u', 'co-1', 'c-1'),
+    ];
+
+    it("stay readable, read-only, to the creating company's Company Administrator", async () => {
+      access.authorizeContractOversight.mockResolvedValue({
+        scope: { contractId: 'c-1', companyId: 'co-1' },
+        basis: 'company_admin_oversight',
+        party,
+        contract: archived,
+        isCompanyAdmin: true,
+      });
+
+      await expect(service.get('u', 'co-1', 'c-1')).resolves.toMatchObject({
+        contract: { id: 'c-1', deletedAt: '2026-03-01T00:00:00.000Z' },
+      });
+      for (const read of reads(service).slice(1)) {
+        await expect(read()).resolves.toBeDefined();
+      }
+    });
+
+    it.each([
+      [
+        "another party's Company Administrator",
+        { isCompanyAdmin: true, companyId: 'co-2' },
+      ],
+      [
+        'a member of the creating company who is not an administrator',
+        { isCompanyAdmin: false, companyId: 'co-1' },
+      ],
+    ])('are not found for %s', async (_label, reader) => {
+      access.authorizeContractOversight.mockResolvedValue({
+        scope: { contractId: 'c-1', companyId: reader.companyId },
+        basis: reader.isCompanyAdmin ? 'company_admin_oversight' : 'assignment',
+        party,
+        contract: archived,
+        isCompanyAdmin: reader.isCompanyAdmin,
+      });
+
+      for (const read of [
+        () => service.get('u', reader.companyId, 'c-1'),
+        () => service.listParties('u', reader.companyId, 'c-1'),
+        () =>
+          service.listStatusHistory('u', reader.companyId, 'c-1', {
+            page: 1,
+            limit: 10,
+          }),
+        () => service.listWorkspaces('u', reader.companyId, 'c-1'),
+      ]) {
+        await expect(read()).rejects.toBeInstanceOf(NotFoundException);
+      }
+      expect(parties.findAllWithCompany).not.toHaveBeenCalled();
+      expect(history.searchPage).not.toHaveBeenCalled();
+    });
   });
 
   it('exposes only minimal counterparty details', async () => {

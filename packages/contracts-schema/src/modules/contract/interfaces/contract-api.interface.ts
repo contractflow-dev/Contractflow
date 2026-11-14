@@ -299,6 +299,44 @@ export interface ContractRoleManagementPermissions {
   roles: ContractRole[];
 }
 
+/**
+ * What archiving (deleting) a contract would end, for its confirmation.
+ * Counts only, across every party: no names or other parties' details.
+ */
+export interface ContractDeletionImpact {
+  /** Active contract roles, which would be revoked. */
+  activeRoleAssignmentCount: number;
+  /** Of those, how many hold workspace-administrator rights. */
+  workspaceAdminCount: number;
+  /** Pending role invitations, which would be revoked. */
+  pendingRoleInvitationCount: number;
+  /** Pending invitations to other companies, which would be revoked. */
+  pendingPartyInvitationCount: number;
+  /** Other companies party to the contract, who would lose sight of it. */
+  otherPartyCount: number;
+  /** Subcontracts that aren't archived; they are not archived with it. */
+  subcontractCount: number;
+}
+
+/** Adds one workspace to a contract (the contract is in X-Contract-Id). */
+export interface AddContractWorkspaceRequest {
+  workspace: AssignableContractWorkspace;
+}
+
+/**
+ * What removing a workspace would end, across every party to the contract.
+ * Counts only: no names or other parties' details.
+ */
+export interface ContractWorkspaceRemovalImpact {
+  workspace: AssignableContractWorkspace;
+  /** Active contract roles in the workspace, which would be revoked. */
+  activeRoleAssignmentCount: number;
+  /** Of those, how many hold workspace-administrator rights. */
+  workspaceAdminCount: number;
+  /** Pending role invitations to the workspace, which would be revoked. */
+  pendingRoleInvitationCount: number;
+}
+
 export interface ContractWorkspaceAccess {
   workspace: AssignableContractWorkspace;
   /** True when the member holds an active role in this workspace. */

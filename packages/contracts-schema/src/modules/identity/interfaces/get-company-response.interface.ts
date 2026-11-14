@@ -169,6 +169,17 @@ export interface ICreateCompanyResponse extends ICompanyAccessResponse {
   message?: string;
 }
 
+/** Company-level team figures for the Team page. Administrators only. */
+export interface ICompanyTeamSummaryResponse {
+  /** Every membership the company has had, active or ended. */
+  memberCount: number;
+  activeMemberCount: number;
+  /** Active members with the Company Administrator role. */
+  companyAdminCount: number;
+  /** Pending invitations that haven't expired. */
+  pendingInvitationCount: number;
+}
+
 export interface ICompanyMember {
   id: string;
   userId: string;

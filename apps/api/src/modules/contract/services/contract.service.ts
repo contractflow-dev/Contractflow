@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { ECompanyRole } from '@contractflow/contracts-schema';
 import type {
@@ -26,7 +27,10 @@ import { ContractStatusHistory } from '../entities/contract-status-history.entit
 import { CompanyUserRepository } from '../../identity/repositories/company-user.respository';
 import { ContractWorkspaceRepository } from '../repositories/contract-workspace.repository';
 import { ContractRoleAssignmentRepository } from '../repositories/contract-role-assignment.repository';
-import { ContractAccessService } from './contract-access.service';
+import {
+  ContractAccessService,
+  type IContractOversightAuthorization,
+} from './contract-access.service';
 import { workspaceForRole } from './contract-workspace';
 import type { AssignableContractWorkspace } from './contract-workspace';
 import type {
@@ -137,7 +141,7 @@ export class ContractService {
     companyId: string,
     contractId: string,
   ): Promise<ContractDetail> {
-    const { contract, party } = await this.access.authorizeContractOversight(
+    const { contract, party } = await this.authorizeReadIncludingArchived(
       userId,
       companyId,
       contractId,
@@ -154,7 +158,7 @@ export class ContractService {
     contractId: string,
   ): Promise<ContractPartySummary[]> {
     // Visibility must be proven first: the query below is NOT company-scoped.
-    const { scope } = await this.access.authorizeContractOversight(
+    const { scope } = await this.authorizeReadIncludingArchived(
       userId,
       companyId,
       contractId,
@@ -170,12 +174,11 @@ export class ContractService {
     contractId: string,
     query: ListContractStatusHistoryQuery,
   ) {
-    const { scope: contractScope } =
-      await this.access.authorizeContractOversight(
-        userId,
-        companyId,
-        contractId,
-      );
+    const { scope: contractScope } = await this.authorizeReadIncludingArchived(
+      userId,
+      companyId,
+      contractId,
+    );
 
     if (
       query.fromDate &&
@@ -208,12 +211,40 @@ export class ContractService {
   ): Promise<AssignableContractWorkspace[]> {
     // Which workspaces the contract has enabled is general contract setup
     // information, not access to any of them.
-    const { scope } = await this.access.authorizeContractOversight(
+    const { scope } = await this.authorizeReadIncludingArchived(
       userId,
       companyId,
       contractId,
     );
     return this.workspaces.findWorkspaces(scope);
+  }
+
+  /**
+   * Contract oversight for the read-only contract pages (detail, parties,
+   * status history, workspaces). An archived contract stays readable only to
+   * a Company Administrator of the company that created it, the one who can
+   * find and restore it; everyone else gets the same "not found" as for a
+   * contract that doesn't exist. It opens no workspace or protected record.
+   */
+  private async authorizeReadIncludingArchived(
+    userId: string,
+    companyId: string,
+    contractId: string,
+  ): Promise<IContractOversightAuthorization> {
+    const authorization = await this.access.authorizeContractOversight(
+      userId,
+      companyId,
+      contractId,
+      { includeArchived: true },
+    );
+    const { contract, isCompanyAdmin } = authorization;
+    if (
+      contract.deletedAt &&
+      !(isCompanyAdmin && contract.createdByCompanyId === companyId)
+    ) {
+      throw new NotFoundException('Contract was not found');
+    }
+    return authorization;
   }
 }
 

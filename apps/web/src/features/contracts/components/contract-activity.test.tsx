@@ -709,6 +709,7 @@ describe("related-record navigation", () => {
   const NOT_LINKED = [
     "contract.deleted",
     "contract.restored",
+    "contract.workspaces_added",
     "contract.workspaces_removed",
     "contract.status_transitioned",
     "document.deleted",

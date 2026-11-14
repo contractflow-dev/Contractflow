@@ -3,7 +3,7 @@ import {
   ECompanyStatus,
   ECompanyUserStatus,
 } from '@contractflow/contracts-schema';
-import { IsNull, LessThanOrEqual, type EntityManager } from 'typeorm';
+import { IsNull, LessThanOrEqual, Not, type EntityManager } from 'typeorm';
 import type { ITransactionContextFactory } from '../../../common/database/transaction-context.factory.interface';
 import { ActivityLog } from '../../cross-cutting/entities/activity-log.entity';
 import { Company } from '../../identity/entities/company.entity';
@@ -24,6 +24,9 @@ import type {
 
 const CONTRACT_PARTY_IDS_SQL =
   '"contract_party_id" IN (SELECT "id" FROM "contract_party" WHERE "contract_id" = :contractId)';
+/** The same condition for a query builder alias. */
+const aliasedPartyIdsSql = (alias: string) =>
+  `"${alias}"."contract_party_id" IN (SELECT "id" FROM "contract_party" WHERE "contract_id" = :contractId)`;
 
 export class ContractLifecycleContextFactory implements ITransactionContextFactory<IContractLifecycleContext> {
   create(manager: EntityManager): IContractLifecycleContext {
@@ -121,6 +124,10 @@ export class ContractLifecycleContextFactory implements ITransactionContextFacto
           contracts.findOne({ where: { id: contractId, deletedAt: IsNull() } }),
         create: (data) => contracts.save(contracts.create(data)),
         save: (contract) => contracts.save(contract),
+        countActiveChildren: (contractId) =>
+          contracts.count({
+            where: { parentContractId: contractId, deletedAt: IsNull() },
+          }),
         parentWouldCreateCycle: async (parentContractId, contractId) => {
           const rows = (await manager.query(
             `
@@ -147,6 +154,8 @@ export class ContractLifecycleContextFactory implements ITransactionContextFacto
       parties: {
         find: (contractId, companyId) =>
           parties.findOne({ where: { contractId, companyId } }),
+        countOtherParties: (contractId, companyId) =>
+          parties.count({ where: { contractId, companyId: Not(companyId) } }),
         findForShare: (contractId, companyId) =>
           parties.findOne({
             where: { contractId, companyId },
@@ -212,7 +221,7 @@ export class ContractLifecycleContextFactory implements ITransactionContextFacto
           revokedById,
           now,
         ) => {
-          await assignments
+          const result = await assignments
             .createQueryBuilder()
             .update()
             .set({ revokedAt: now, revokedById, updatedAt: now })
@@ -220,20 +229,55 @@ export class ContractLifecycleContextFactory implements ITransactionContextFacto
             .andWhere('"contract_role" IN (:...roles)', { roles })
             .andWhere('"revoked_at" IS NULL')
             .execute();
+          return result.affected ?? 0;
+        },
+        countActiveForWorkspaceRoles: async (contractId, roles) => {
+          const row = await assignments
+            .createQueryBuilder('assignment')
+            .select('COUNT(*)::int', 'assignments')
+            .addSelect(
+              'COUNT(*) FILTER (WHERE assignment.isWorkspaceAdmin)::int',
+              'workspaceAdmins',
+            )
+            .where(aliasedPartyIdsSql('assignment'), { contractId })
+            .andWhere('assignment.role IN (:...roles)', { roles })
+            .andWhere('assignment.revokedAt IS NULL')
+            .getRawOne<{ assignments: number; workspaceAdmins: number }>();
+          return {
+            assignments: Number(row?.assignments ?? 0),
+            workspaceAdmins: Number(row?.workspaceAdmins ?? 0),
+          };
         },
         revokeAllForContract: async (contractId, revokedById, now) => {
-          await assignments
+          const result = await assignments
             .createQueryBuilder()
             .update()
             .set({ revokedAt: now, revokedById, updatedAt: now })
             .where(CONTRACT_PARTY_IDS_SQL, { contractId })
             .andWhere('"revoked_at" IS NULL')
             .execute();
+          return result.affected ?? 0;
+        },
+        countActiveForContract: async (contractId) => {
+          const row = await assignments
+            .createQueryBuilder('assignment')
+            .select('COUNT(*)::int', 'assignments')
+            .addSelect(
+              'COUNT(*) FILTER (WHERE assignment.isWorkspaceAdmin)::int',
+              'workspaceAdmins',
+            )
+            .where(aliasedPartyIdsSql('assignment'), { contractId })
+            .andWhere('assignment.revokedAt IS NULL')
+            .getRawOne<{ assignments: number; workspaceAdmins: number }>();
+          return {
+            assignments: Number(row?.assignments ?? 0),
+            workspaceAdmins: Number(row?.workspaceAdmins ?? 0),
+          };
         },
       },
       roleInvitations: {
         revokePendingForWorkspace: async (contractId, workspace, now) => {
-          await roleInvitations
+          const result = await roleInvitations
             .createQueryBuilder()
             .update()
             .set({ status: 'revoked', revokedAt: now, updatedAt: now })
@@ -241,16 +285,31 @@ export class ContractLifecycleContextFactory implements ITransactionContextFacto
             .andWhere('"workspace" = :workspace', { workspace })
             .andWhere('"status" = :pending', { pending: 'pending' })
             .execute();
+          return result.affected ?? 0;
         },
+        countPendingForWorkspace: (contractId, workspace) =>
+          roleInvitations
+            .createQueryBuilder('invitation')
+            .where(aliasedPartyIdsSql('invitation'), { contractId })
+            .andWhere('invitation.workspace = :workspace', { workspace })
+            .andWhere('invitation.status = :pending', { pending: 'pending' })
+            .getCount(),
         revokeAllPendingForContract: async (contractId, now) => {
-          await roleInvitations
+          const result = await roleInvitations
             .createQueryBuilder()
             .update()
             .set({ status: 'revoked', revokedAt: now, updatedAt: now })
             .where(CONTRACT_PARTY_IDS_SQL, { contractId })
             .andWhere('"status" = :pending', { pending: 'pending' })
             .execute();
+          return result.affected ?? 0;
         },
+        countPendingForContract: (contractId) =>
+          roleInvitations
+            .createQueryBuilder('invitation')
+            .where(aliasedPartyIdsSql('invitation'), { contractId })
+            .andWhere('invitation.status = :pending', { pending: 'pending' })
+            .getCount(),
       },
       partyInvitations: {
         expirePendingBySource: async (sourcePartyId, now) => {
@@ -359,11 +418,16 @@ export class ContractLifecycleContextFactory implements ITransactionContextFacto
           );
         },
         revokePendingBySource: async (sourcePartyId, now) => {
-          await invitations.update(
+          const result = await invitations.update(
             { sourceContractPartyId: sourcePartyId, status: 'pending' },
             { status: 'revoked', revokedAt: now },
           );
+          return result.affected ?? 0;
         },
+        countPendingBySource: (sourcePartyId) =>
+          invitations.count({
+            where: { sourceContractPartyId: sourcePartyId, status: 'pending' },
+          }),
         create: (data) => invitations.save(invitations.create(data)),
         save: (invitation) => invitations.save(invitation),
       },

@@ -373,6 +373,22 @@ describe('ContractRoleAssignmentService', () => {
       },
     );
 
+    it('offers no role management on an archived contract', async () => {
+      persistence.contracts.findActive = vi.fn(async () => null);
+
+      await expect(
+        service.managementPermissions(
+          'actor-user',
+          'company-1',
+          'contract-1',
+          'project',
+        ),
+      ).resolves.toMatchObject({
+        canManage: false,
+        canGrantWorkspaceAdmin: false,
+      });
+    });
+
     it.each([
       [
         EPartyType.CLIENT,

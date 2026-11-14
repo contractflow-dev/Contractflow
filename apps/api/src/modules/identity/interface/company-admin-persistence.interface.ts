@@ -1,7 +1,9 @@
 import type {
+  ECompanyMemberSortField,
   ECompanyRole,
   ECompanyStatus,
   ECompanyUserStatus,
+  ESortOrder,
 } from '@contractflow/contracts-schema';
 import type {
   IPageQuery,
@@ -23,7 +25,17 @@ export const COMPANY_ADMIN_UNIT_OF_WORK = Symbol('COMPANY_ADMIN_UNIT_OF_WORK');
 
 export interface IListCompanyMembersCriteria extends IPageQuery {
   status?: ECompanyUserStatus;
+  companyRole?: ECompanyRole;
   search?: string;
+  sortBy?: ECompanyMemberSortField;
+  sortOrder?: ESortOrder;
+}
+
+/** Membership counts for one company. */
+export interface ICompanyMemberCounts {
+  total: number;
+  active: number;
+  activeAdmins: number;
 }
 
 /** A person who can be named or emailed about an invitation. */
@@ -74,6 +86,9 @@ export interface ICompanyAdminReadRepository {
   findCompanyName(
     companyId: string,
   ): Promise<{ id: string; name: string; status: ECompanyStatus } | null>;
+  countMembers(scope: ICompanyScope): Promise<ICompanyMemberCounts>;
+  /** Pending invitations that haven't expired by `at`. */
+  countPendingInvitations(scope: ICompanyScope, at: Date): Promise<number>;
   /** The full name of the user behind a membership, active or not. */
   findMemberName(companyUserId: string): Promise<string | null>;
   /**

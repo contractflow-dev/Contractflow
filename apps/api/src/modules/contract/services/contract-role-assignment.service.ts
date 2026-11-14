@@ -96,17 +96,21 @@ export class ContractRoleAssignmentService {
     ) {
       throw new NotFoundException('Contract was not found.');
     }
+    // An archived contract is read-only: its roles can't change (the write
+    // paths refuse it too), so nothing is offered.
+    const archived = !(await this.persistence.contracts.findActive(contractId));
     const canManage =
-      canGrantWorkspaceAdmin ||
-      (await this.persistence.assignments.hasWorkspaceAdmin(
-        companyId,
-        membership.id,
-        party.id,
-        WORKSPACE_ROLES[workspace],
-      ));
+      !archived &&
+      (canGrantWorkspaceAdmin ||
+        (await this.persistence.assignments.hasWorkspaceAdmin(
+          companyId,
+          membership.id,
+          party.id,
+          WORKSPACE_ROLES[workspace],
+        )));
     return {
       canManage,
-      canGrantWorkspaceAdmin,
+      canGrantWorkspaceAdmin: canGrantWorkspaceAdmin && !archived,
       roleSide: contractRoleSide(party.partyType),
       // The workspace's roles for this party's side only.
       roles: WORKSPACE_ROLES[workspace].filter((role) =>
