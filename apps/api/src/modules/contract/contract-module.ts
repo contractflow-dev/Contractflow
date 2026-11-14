@@ -41,6 +41,9 @@ import {
 } from './repositories/contract-role-assignment-transaction-context.factory';
 import { ContractWorkspaceController } from './controllers/contract-workspace.controller';
 import { ContractWorkspaceAccessService } from './services/contract-workspace-access.service';
+import { CompanyDepartmentService } from './services/company-department.service';
+import { COMPANY_DEPARTMENT_PERSISTENCE } from './interfaces/company-department-persistence.interface';
+import { CompanyDepartmentRepository } from './repositories/company-department.repository';
 
 @Module({
   imports: [
@@ -70,6 +73,13 @@ import { ContractWorkspaceAccessService } from './services/contract-workspace-ac
     ContractAccessService,
     ContractRoleAssignmentService,
     ContractWorkspaceAccessService,
+    CompanyDepartmentService,
+    {
+      provide: COMPANY_DEPARTMENT_PERSISTENCE,
+      useFactory: (dataSource: DataSource) =>
+        new CompanyDepartmentRepository(dataSource.manager),
+      inject: [DataSource],
+    },
     ContractRepository,
     ContractPartyRepository,
     ContractRoleAssignmentRepository,

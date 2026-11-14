@@ -18,9 +18,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("next/navigation", () => ({
   usePathname: () => mocks.pathname,
   useRouter: () => ({ replace: mocks.replace }),
-  useSearchParams: () => ({
-    toString: () => mocks.search,
-  }),
+  useSearchParams: () => new URLSearchParams(mocks.search),
 }));
 
 vi.mock("@/store/hooks", () => ({
@@ -163,6 +161,21 @@ describe("CompanyAdminShell", () => {
     expect(markup).toContain(">Contracts</a>");
     expect(markup).not.toContain(">Team</a>");
     expect(markup).not.toContain(">Company profile</a>");
+  });
+
+  it("denies department pages to a regular company member, who sees them as planned", () => {
+    mocks.pathname = "/dashboards/departments/hse";
+    mocks.activeCompanyId = "company-2";
+
+    const markup = renderToStaticMarkup(
+      <CompanyAdminShell>
+        {() => <p>Protected department oversight</p>}
+      </CompanyAdminShell>,
+    );
+
+    expect(markup).toContain("Company administrator access required");
+    expect(markup).not.toContain("Protected department oversight");
+    expect(markup).not.toContain('href="/dashboards/departments/');
   });
 
   it("does not render scoped content until an invalid active company is resolved", () => {
@@ -364,5 +377,23 @@ describe("CompanyAdminShell", () => {
 
     expect(markup).toContain("Admin overview");
     expect(markup).toContain(">Overview</a>");
+  });
+
+  it("opens department pages for a company administrator, marking the one in use", () => {
+    // The page's own filters don't change which item is in use.
+    mocks.pathname = "/dashboards/departments/project";
+    mocks.search = "partyType=client";
+
+    const markup = renderToStaticMarkup(
+      <CompanyAdminShell>{() => <p>Department page</p>}</CompanyAdminShell>,
+    );
+
+    expect(markup).toContain("Department page");
+    const active = markup.match(/<a[^>]*aria-current="page"[^>]*>/g) ?? [];
+    expect(active).toHaveLength(1);
+    expect(active[0]).toContain('href="/dashboards/departments/project"');
+    expect(markup).toContain('href="/dashboards/departments/hse"');
+    expect(markup).not.toContain("Client Project Mgmt");
+    expect(markup).not.toContain("The HSE workspace is planned.");
   });
 });

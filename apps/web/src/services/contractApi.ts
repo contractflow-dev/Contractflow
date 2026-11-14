@@ -29,6 +29,9 @@ import type {
   EPartyType,
   CompanyRoleAssignment,
   CompanyRoleAssignmentFilters,
+  DepartmentContractsQuery,
+  DepartmentContractsResponse,
+  ECompanyDepartment,
   IncomingContractInvitation,
   ContractActivityActor,
   ContractActivityFilters,
@@ -50,6 +53,13 @@ import {
 export type {
   CompanyRoleAssignment,
   CompanyRoleAssignmentFilters,
+  DepartmentBlocker,
+  DepartmentContract,
+  DepartmentContractsQuery,
+  DepartmentContractsResponse,
+  DepartmentContractsSummary,
+  DepartmentMember,
+  DepartmentWaitingOn,
   ContractActivityActor,
   ContractActivityFilters,
   ContractActivityItem,
@@ -195,7 +205,11 @@ export const contractApi = api.injectEndpoints({
       invalidatesTags: (_result, error, { contractId }) =>
         error
           ? []
-          : [signatoryTag(contractId), { type: "Contract", id: contractId }],
+          : [
+              signatoryTag(contractId),
+              { type: "Contract", id: contractId },
+              { type: "CompanyDepartment", id: "LIST" },
+            ],
     }),
 
     getManagedContractSites: builder.query<
@@ -388,6 +402,7 @@ export const contractApi = api.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, { contractId }) => [
         { type: "Contract", id: contractId },
+        { type: "CompanyDepartment", id: "LIST" },
         { type: "Contract", id: "LIST" },
       ],
     }),
@@ -403,6 +418,7 @@ export const contractApi = api.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, { contractId }) => [
         { type: "Contract", id: contractId },
+        { type: "CompanyDepartment", id: "LIST" },
       ],
     }),
 
@@ -417,7 +433,12 @@ export const contractApi = api.injectEndpoints({
         body: { workspace },
       }),
       invalidatesTags: (_result, error, { contractId }) =>
-        error ? [] : [{ type: "Contract", id: contractId }],
+        error
+          ? []
+          : [
+              { type: "Contract", id: contractId },
+              { type: "CompanyDepartment", id: "LIST" },
+            ],
     }),
 
     /** What removing a workspace would revoke, for its confirmation. */
@@ -459,6 +480,7 @@ export const contractApi = api.injectEndpoints({
               { type: "Contract", id: "LIST" },
               { type: "ContractRoleAssignment", id: "LIST" },
               { type: "ContractLifecyclePermission", id: contractId },
+              { type: "CompanyDepartment", id: "LIST" },
             ],
     }),
 
@@ -476,6 +498,7 @@ export const contractApi = api.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, { contractId }) => [
         { type: "Contract", id: contractId },
+        { type: "CompanyDepartment", id: "LIST" },
       ],
     }),
 
@@ -537,6 +560,7 @@ export const contractApi = api.injectEndpoints({
       invalidatesTags: (_result, _error, { contractId }) => [
         { type: "ContractPartyInvitation", id: contractId },
         { type: "Contract", id: contractId },
+        { type: "CompanyDepartment", id: "LIST" },
       ],
     }),
 
@@ -550,6 +574,7 @@ export const contractApi = api.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, { contractId }) => [
         { type: "ContractPartyInvitation", id: contractId },
+        { type: "CompanyDepartment", id: "LIST" },
       ],
     }),
 
@@ -788,6 +813,33 @@ export const contractApi = api.injectEndpoints({
       ],
     }),
 
+    /**
+     * One department's contracts across the header company: staffing and
+     * what holds progress. Company Administrators only; read-only.
+     */
+    getCompanyDepartmentContracts: builder.query<
+      DepartmentContractsResponse,
+      {
+        companyId: string;
+        department: ECompanyDepartment;
+      } & DepartmentContractsQuery
+    >({
+      query: ({ companyId, department, ...params }) => ({
+        ...companyRoute(
+          companyId,
+          `/departments/${encodeURIComponent(department)}/contracts`,
+        ),
+        params,
+      }),
+      // Role, invitation, workspace, signatory and contract changes all
+      // change the rows.
+      providesTags: [
+        { type: "CompanyDepartment", id: "LIST" },
+        { type: "Contract", id: "LIST" },
+        { type: "ContractRoleAssignment", id: "LIST" },
+      ],
+    }),
+
     /** Invitations for the header company to join other companies' contracts. */
     getIncomingContractInvitations: builder.query<
       IncomingContractInvitation[],
@@ -866,6 +918,8 @@ export const {
   useGetPublicContractRoleInvitationQuery,
   useRespondToContractRoleInvitationMutation,
   useGetCompanyRoleAssignmentsQuery,
+  useGetCompanyDepartmentContractsQuery,
+  useLazyGetCompanyDepartmentContractsQuery,
   useGetIncomingContractInvitationsQuery,
   useRespondToIncomingContractInvitationMutation,
 } = contractApi;

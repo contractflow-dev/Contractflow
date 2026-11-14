@@ -150,6 +150,7 @@ export const api = createApi({
     "ContractRoleAssignment",
     "ContractLifecyclePermission",
     "ContractPartyInvitation",
+    "CompanyDepartment",
   ],
   endpoints: () => ({}),
 });

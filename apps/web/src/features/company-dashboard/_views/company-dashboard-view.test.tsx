@@ -204,9 +204,34 @@ describe("CompanyDashboardView", () => {
     ]) {
       expect(markup).toMatch(new RegExp(`>${value}</p><p[^>]*>${label}</p>`));
     }
-    // Workspaces aren't built yet: they say so and link nowhere.
-    expect(markup.match(/Workspace planned/g)).toHaveLength(4);
+    // Each card opens Team → Contract roles for its workspace (D1) and its
+    // department page: one card each for Project, HSE and Finance.
+    expect(markup).not.toContain("Workspace planned");
     expect(markup).not.toContain('href="#planned');
+    expect(
+      markup.split('href="/dashboards/team?workspace=project#contract-roles"')
+        .length - 1,
+    ).toBe(1);
+    expect(markup).toContain(
+      'href="/dashboards/team?workspace=hse#contract-roles"',
+    );
+    expect(markup).toContain(
+      'href="/dashboards/team?workspace=finance#contract-roles"',
+    );
+    for (const href of [
+      "/dashboards/departments/project",
+      "/dashboards/departments/hse",
+      "/dashboards/departments/finance",
+    ]) {
+      expect(markup).toContain(`href="${href.replace("&", "&amp;")}"`);
+    }
+    expect(markup).toContain('aria-label="Manage HSE staffing"');
+    expect(markup).toContain('aria-label="View Project contracts"');
+    for (const name of ["Project", "HSE", "Finance"]) {
+      expect(markup).toContain(`>${name}</h3>`);
+    }
+    expect(markup).not.toContain(">Contractor</h3>");
+    expect(markup).not.toContain(">Client PM</h3>");
   });
 
   it("offers real quick actions and marks stage configuration as planned", () => {
@@ -223,9 +248,9 @@ describe("CompanyDashboardView", () => {
 
   it("flips the KPI, department and quick-action cards to the other theme on hover", () => {
     const markup = render();
-    // 4 portfolio KPIs, 4 department cards and all 3 quick actions, which
+    // 4 portfolio KPIs, 3 department cards and all 3 quick actions, which
     // now look alike: none of them is dark at rest.
-    expect(markup.match(/data-highlight="true"/g)).toHaveLength(11);
+    expect(markup.match(/data-highlight="true"/g)).toHaveLength(10);
     expect(markup).not.toContain("bg-navy");
   });
 

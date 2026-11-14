@@ -1,11 +1,12 @@
 "use client";
 
-import { useId, useState, type FormEvent } from "react";
+import { useId, useRef, useState, type FormEvent } from "react";
 import type {
   ContractActivityTarget,
   ContractRole,
 } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
+import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import { Field, FieldLabel } from "@workspace/ui/components/field";
@@ -46,6 +47,7 @@ import {
   useGetContractRoleAssignmentsQuery,
   useGetContractRoleInvitationsQuery,
   useGetContractRoleManagementPermissionsQuery,
+  useGetContractWorkspacesQuery,
   useRevokeContractRoleMutation,
   useRevokeContractRoleInvitationMutation,
   useSetContractWorkspaceAdminMutation,
@@ -66,10 +68,13 @@ export function ContractRoleAssignmentManagement({
   companyId,
   contractId,
   fixedWorkspace,
+  initialWorkspace,
   target,
 }: {
   companyId: string;
   contractId: string;
+  /** The workspace the assign and invite forms start on (from ?workspace=). */
+  initialWorkspace?: AssignableContractWorkspace;
   /**
    * Manage only this workspace (inside a workspace's Team screen): the
    * workspace selector is hidden. The API checks access for it as always.
@@ -79,8 +84,13 @@ export function ContractRoleAssignmentManagement({
 }) {
   const formId = useId();
   const [workspace, setWorkspace] = useState<AssignableContractWorkspace>(
-    fixedWorkspace ?? "project",
+    fixedWorkspace ?? initialWorkspace ?? "project",
   );
+  // The workspace of the role being revoked: a workspace card may differ
+  // from the one selected in the forms.
+  const [revokeWorkspace, setRevokeWorkspace] =
+    useState<AssignableContractWorkspace>(workspace);
+  const formRef = useRef<HTMLFormElement>(null);
   const [companyUserId, setCompanyUserId] = useState("");
   // Empty until chosen: the first of the offered roles is used.
   const [role, setRole] = useState<ContractRole | "">("");
@@ -135,7 +145,33 @@ export function ContractRoleAssignmentManagement({
   const sideLabel =
     permissions?.roleSide === "client" ? "client" : "contractor";
 
-  if (permissionQuery.isLoading) return null;
+  // Without a fixed workspace, every enabled workspace is shown side by side
+  // (prototype D5); the forms below act on the selected one.
+  const workspaceCards = fixedWorkspace ? null : (
+    <ContractWorkspaceTeams
+      companyId={companyId}
+      contractId={contractId}
+      target={target}
+      busy={workspaceAdminState.isLoading || revokeState.isLoading}
+      onAdd={(next) => {
+        setWorkspace(next);
+        setRole("");
+        setFailure(null);
+        formRef.current?.scrollIntoView({ block: "center" });
+        formRef.current?.querySelector("select")?.focus();
+      }}
+      onToggleAdmin={(assignment, next) =>
+        void changeWorkspaceAdmin(assignment, next)
+      }
+      onRevoke={(assignment, next) => {
+        setDialogError("");
+        setRevokeWorkspace(next);
+        setAssignmentToRevoke(assignment);
+      }}
+    />
+  );
+
+  if (permissionQuery.isLoading) return workspaceCards;
   if (permissionQuery.error) {
     return (
       <Alert variant="destructive">
@@ -148,7 +184,14 @@ export function ContractRoleAssignmentManagement({
       </Alert>
     );
   }
-  if (!canManage || !permissions) return null;
+  if (!canManage || !permissions) {
+    return workspaceCards ? (
+      <>
+        {workspaceCards}
+        {revocationDialog()}
+      </>
+    ) : null;
+  }
 
   async function submitAssignment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -198,13 +241,16 @@ export function ContractRoleAssignmentManagement({
     }
   }
 
-  async function changeWorkspaceAdmin(assignment: ContractRoleAssignment) {
+  async function changeWorkspaceAdmin(
+    assignment: ContractRoleAssignment,
+    assignmentWorkspace: AssignableContractWorkspace = workspace,
+  ) {
     setFailure(null);
     try {
       await setWorkspaceAdmin({
         companyId,
         contractId,
-        workspace,
+        workspace: assignmentWorkspace,
         assignmentId: assignment.id,
         isWorkspaceAdmin: !assignment.isWorkspaceAdmin,
       }).unwrap();
@@ -255,7 +301,7 @@ export function ContractRoleAssignmentManagement({
       await revokeRole({
         companyId,
         contractId,
-        workspace,
+        workspace: revokeWorkspace,
         assignmentId: assignmentToRevoke.id,
       }).unwrap();
       notifySuccess(
@@ -270,12 +316,42 @@ export function ContractRoleAssignmentManagement({
     }
   }
 
+  function revocationDialog() {
+    return (
+      <ConfirmDialog
+        open={assignmentToRevoke !== null}
+        title={
+          assignmentToRevoke
+            ? `Revoke ${assignmentToRevoke.role}?`
+            : "Revoke this contract role?"
+        }
+        description={
+          assignmentToRevoke
+            ? `${memberName(assignmentToRevoke)} will lose access to the ${humanizeEnumValue(revokeWorkspace)} workspace of this contract. You can assign the role again later.`
+            : ""
+        }
+        confirmLabel="Revoke role"
+        pendingLabel="Revoking…"
+        isPending={revokeState.isLoading}
+        error={assignmentToRevoke ? dialogError : undefined}
+        destructive
+        onConfirm={() => void confirmRevocation()}
+        onCancel={() => setAssignmentToRevoke(null)}
+      />
+    );
+  }
+
   return (
     <>
+      {workspaceCards}
       <Card>
         <CardHeader>
           <CardTitle>
-            <h2>Contract role assignments</h2>
+            <h2>
+              {fixedWorkspace
+                ? "Contract role assignments"
+                : "Assign or invite"}
+            </h2>
           </CardTitle>
           <CardDescription>
             Manage active roles for members of your company. Contract access
@@ -324,6 +400,7 @@ export function ContractRoleAssignmentManagement({
           )}
 
           <form
+            ref={formRef}
             onSubmit={(event) => void submitAssignment(event)}
             aria-label="Assign a contract role"
             className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
@@ -417,7 +494,7 @@ export function ContractRoleAssignmentManagement({
             </Alert>
           ) : null}
 
-          {assignmentsQuery.isLoading ? (
+          {!fixedWorkspace ? null : assignmentsQuery.isLoading ? (
             <p role="status" className="py-4 text-sm text-muted-foreground">
               Loading role assignments…
             </p>
@@ -469,7 +546,7 @@ export function ContractRoleAssignmentManagement({
                             size="sm"
                             disabled={workspaceAdminState.isLoading}
                             onClick={() =>
-                              void changeWorkspaceAdmin(assignment)
+                              void changeWorkspaceAdmin(assignment, workspace)
                             }
                           >
                             {assignment.isWorkspaceAdmin
@@ -484,6 +561,7 @@ export function ContractRoleAssignmentManagement({
                           disabled={revokeState.isLoading}
                           onClick={() => {
                             setDialogError("");
+                            setRevokeWorkspace(workspace);
                             setAssignmentToRevoke(assignment);
                           }}
                         >
@@ -644,26 +722,7 @@ export function ContractRoleAssignmentManagement({
         </CardContent>
       </Card>
 
-      <ConfirmDialog
-        open={assignmentToRevoke !== null}
-        title={
-          assignmentToRevoke
-            ? `Revoke ${assignmentToRevoke.role}?`
-            : "Revoke this contract role?"
-        }
-        description={
-          assignmentToRevoke
-            ? `${memberName(assignmentToRevoke)} will lose access to the ${humanizeEnumValue(workspace)} workspace of this contract. You can assign the role again later.`
-            : ""
-        }
-        confirmLabel="Revoke role"
-        pendingLabel="Revoking…"
-        isPending={revokeState.isLoading}
-        error={assignmentToRevoke ? dialogError : undefined}
-        destructive
-        onConfirm={() => void confirmRevocation()}
-        onCancel={() => setAssignmentToRevoke(null)}
-      />
+      {revocationDialog()}
 
       <ConfirmDialog
         open={invitationToRevoke !== null}
@@ -686,3 +745,253 @@ export function ContractRoleAssignmentManagement({
 }
 
 const formatLabel = humanizeEnumValue;
+
+const WORKSPACE_DOTS: Record<AssignableContractWorkspace, string> = {
+  project: "bg-dept-client-pm",
+  hse: "bg-dept-hse",
+  finance: "bg-dept-finance",
+};
+
+/**
+ * The contract's enabled workspaces side by side, each with the company's
+ * people in it (prototype D5). Actions go through the parent, which owns
+ * the confirmation and the mutations; the API checks every change again.
+ */
+function ContractWorkspaceTeams({
+  companyId,
+  contractId,
+  target,
+  busy,
+  onAdd,
+  onToggleAdmin,
+  onRevoke,
+}: {
+  companyId: string;
+  contractId: string;
+  target?: ContractActivityTarget | null;
+  busy: boolean;
+  onAdd: (workspace: AssignableContractWorkspace) => void;
+  onToggleAdmin: (
+    assignment: ContractRoleAssignment,
+    workspace: AssignableContractWorkspace,
+  ) => void;
+  onRevoke: (
+    assignment: ContractRoleAssignment,
+    workspace: AssignableContractWorkspace,
+  ) => void;
+}) {
+  const enabled = useGetContractWorkspacesQuery({ companyId, contractId });
+  const workspaces = enabled.data ?? [];
+  return (
+    <section
+      aria-labelledby="contract-workspace-teams-heading"
+      className="space-y-3"
+    >
+      <div>
+        <h2
+          id="contract-workspace-teams-heading"
+          className="type-section-title"
+        >
+          Roles and workspaces
+        </h2>
+        <p className="type-lead">
+          Your company&apos;s people in each workspace of this contract. Each
+          role opens one workspace only.
+        </p>
+      </div>
+      {enabled.isLoading ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          Loading workspaces…
+        </p>
+      ) : enabled.error ? (
+        <Alert variant="destructive">
+          <AlertDescription>
+            {getApiErrorMessage(enabled.error, "Unable to load workspaces.")}
+          </AlertDescription>
+        </Alert>
+      ) : workspaces.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          This contract has no workspaces enabled yet.
+        </p>
+      ) : (
+        <ul className="grid gap-4 lg:grid-cols-3">
+          {workspaceOptions
+            .filter((option) => workspaces.includes(option))
+            .map((option) => (
+              <li key={option}>
+                <WorkspaceTeamCard
+                  companyId={companyId}
+                  contractId={contractId}
+                  workspace={option}
+                  target={target}
+                  busy={busy}
+                  onAdd={() => onAdd(option)}
+                  onToggleAdmin={(assignment) =>
+                    onToggleAdmin(assignment, option)
+                  }
+                  onRevoke={(assignment) => onRevoke(assignment, option)}
+                />
+              </li>
+            ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function WorkspaceTeamCard({
+  companyId,
+  contractId,
+  workspace,
+  target,
+  busy,
+  onAdd,
+  onToggleAdmin,
+  onRevoke,
+}: {
+  companyId: string;
+  contractId: string;
+  workspace: AssignableContractWorkspace;
+  target?: ContractActivityTarget | null;
+  busy: boolean;
+  onAdd: () => void;
+  onToggleAdmin: (assignment: ContractRoleAssignment) => void;
+  onRevoke: (assignment: ContractRoleAssignment) => void;
+}) {
+  const label = formatLabel(workspace);
+  const permissionQuery = useGetContractRoleManagementPermissionsQuery({
+    companyId,
+    contractId,
+    workspace,
+  });
+  const permissions = permissionQuery.data;
+  const canManage = permissions?.canManage === true;
+  const assignments = useGetContractRoleAssignmentsQuery(
+    { companyId, contractId, workspace },
+    { skip: !canManage },
+  );
+  const rows = assignments.data ?? [];
+  const admins = rows.filter(({ isWorkspaceAdmin }) => isWorkspaceAdmin);
+
+  return (
+    <Card className="h-full gap-3">
+      <CardHeader className="flex flex-row items-center justify-between gap-2">
+        <CardTitle>
+          <h3 className="flex items-center gap-2 type-subsection-title">
+            <span
+              aria-hidden="true"
+              className={`size-2 rounded-full ${WORKSPACE_DOTS[workspace]}`}
+            />
+            {label} workspace
+          </h3>
+        </CardTitle>
+        {canManage ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={onAdd}
+            aria-label={`Add a member to the ${label} workspace`}
+          >
+            Add
+          </Button>
+        ) : null}
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {permissionQuery.isLoading || assignments.isLoading ? (
+          <p role="status" className="text-sm text-muted-foreground">
+            Loading the {label} team…
+          </p>
+        ) : !canManage ? (
+          <p className="text-sm text-muted-foreground">
+            This workspace&apos;s team is managed by its Workspace Admin or a
+            Company Administrator.
+          </p>
+        ) : assignments.error ? (
+          <Alert variant="destructive">
+            <AlertDescription>
+              {getApiErrorMessage(
+                assignments.error,
+                "Unable to load this workspace's team.",
+              )}
+            </AlertDescription>
+          </Alert>
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {label} is enabled, but nobody from your company is assigned yet.
+          </p>
+        ) : (
+          <ul className="divide-y" aria-label={`${label} team`}>
+            {rows.map((assignment) => (
+              <li
+                key={assignment.id}
+                id={`activity-target-${assignment.id}`}
+                className={`space-y-2 py-3 first:pt-0 last:pb-0 ${
+                  target?.type === "contract_role_assignment" &&
+                  target.id === assignment.id
+                    ? "bg-primary/10"
+                    : ""
+                }`}
+              >
+                <div className="min-w-0">
+                  <p className="flex flex-wrap items-center gap-1.5 font-medium break-words">
+                    {memberName(assignment)}
+                    {assignment.isWorkspaceAdmin ? (
+                      <Badge variant="info">Workspace Admin</Badge>
+                    ) : null}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {assignment.role}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {permissions?.canGrantWorkspaceAdmin ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={busy}
+                      onClick={() => onToggleAdmin(assignment)}
+                      aria-label={
+                        assignment.isWorkspaceAdmin
+                          ? `Remove Workspace Admin rights from ${memberName(assignment)}`
+                          : `Make ${memberName(assignment)} Workspace Admin`
+                      }
+                    >
+                      {assignment.isWorkspaceAdmin
+                        ? "Remove admin"
+                        : "Make admin"}
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => onRevoke(assignment)}
+                    aria-label={`Revoke ${assignment.role} from ${memberName(assignment)}`}
+                  >
+                    Revoke
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        {canManage && admins.length === 1 ? (
+          <p className="rounded-lg bg-warning-soft px-3 py-2 text-xs text-warning-soft-foreground">
+            {memberName(admins[0])} is the only {label} Workspace Admin. Make
+            another member admin before removing them, so the workspace is never
+            left without one.
+          </p>
+        ) : null}
+        {canManage && rows.length > 0 && admins.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            No Workspace Admin yet: only Company Administrators manage this
+            team.
+          </p>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}

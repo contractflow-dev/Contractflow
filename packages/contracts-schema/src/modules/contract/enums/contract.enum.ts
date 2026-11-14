@@ -122,3 +122,41 @@ export enum EContractSortField {
   START_DATE = 'startDate',
   END_DATE = 'endDate',
 }
+
+/**
+ * A department of the Company Administrator's oversight: the contract
+ * workspace it looks at. "Contractor" and "Client Project Mgmt" both open
+ * the Project department, with a party-type filter.
+ */
+export enum ECompanyDepartment {
+  PROJECT = 'project',
+  HSE = 'hse',
+  FINANCE = 'finance',
+}
+
+/**
+ * What can hold a contract's progress on the department page. Version 1
+ * uses only information a Company Administrator may already see; signals
+ * from workspace content (milestones, invoices, incidents, compliance) are
+ * deliberately absent.
+ */
+export enum EDepartmentBlockerType {
+  SUSPENDED = 'suspended',
+  DRAFT = 'draft',
+  PARTY_INVITATION_PENDING = 'party_invitation_pending',
+  ROLE_INVITATION_PENDING = 'role_invitation_pending',
+  SIGNATORY_MISSING = 'signatory_missing',
+  NO_WORKSPACE_ADMIN = 'no_workspace_admin',
+  NO_MEMBERS = 'no_members',
+  STALLED = 'stalled',
+}
+
+/** Orders of the department contract list. */
+export enum EDepartmentContractSort {
+  /** Contracts waiting on my company first, then the longest stalled. */
+  WAITING_ON_US = 'waiting_on_us',
+  /** The longest without movement first. */
+  LONGEST_STALLED = 'longest_stalled',
+  REFERENCE = 'reference',
+  TITLE = 'title',
+}
