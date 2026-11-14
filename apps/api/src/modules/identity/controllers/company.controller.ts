@@ -109,6 +109,15 @@ export class CompanyController {
     return this.companyVerification.resend(user.id, companyId);
   }
 
+  @Get('company/team-summary')
+  @UseGuards(CompanyContextGuard)
+  getTeamSummary(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+  ) {
+    return this.companyAdminService.getTeamSummary(user.id, companyId);
+  }
+
   @Get('company/members')
   @UseGuards(CompanyContextGuard)
   listMembers(

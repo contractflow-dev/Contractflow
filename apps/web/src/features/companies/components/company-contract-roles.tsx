@@ -21,20 +21,19 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components/table";
-import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
 import { DataPagination } from "@/components/pagination/data-pagination";
 import { contractSectionHref } from "@/features/contracts/contract-sections";
 import { useUserTimeZone } from "@/hooks/use-user-time-zone";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { formatDate, humanizeEnumValue } from "@/lib/format";
-import { notifySuccess } from "@/lib/notify";
 import { useGetCompanyMembersQuery } from "@/services/companiesApi";
 import {
   useGetCompanyRoleAssignmentsQuery,
-  useRevokeContractRoleMutation,
   type AssignableContractWorkspace,
   type CompanyRoleAssignment,
 } from "@/services/contractApi";
+import { AssignContractRoleDialog } from "./assign-contract-role-dialog";
+import { ContractRoleActions } from "./contract-role-actions";
 
 const WORKSPACES: AssignableContractWorkspace[] = ["project", "hse", "finance"];
 /** The API's largest page; enough members for the filter list. */
@@ -43,7 +42,8 @@ const MEMBER_OPTIONS_LIMIT = 100;
 /**
  * Every contract role the company's members hold, across its contracts that
  * are not archived ("Can view every role assignment at my company"). Roles
- * are assigned on each contract; here they can be reviewed and revoked.
+ * can be assigned, reviewed and revoked here or on each contract; either way
+ * the contract's own routes and checks apply.
  */
 export function CompanyContractRoles({ companyId }: { companyId: string }) {
   const timeZone = useUserTimeZone();
@@ -53,7 +53,7 @@ export function CompanyContractRoles({ companyId }: { companyId: string }) {
   const [workspace, setWorkspace] = useState<AssignableContractWorkspace | "">(
     "",
   );
-  const [revoking, setRevoking] = useState<CompanyRoleAssignment | null>(null);
+  const [assigning, setAssigning] = useState(false);
   const roles = useGetCompanyRoleAssignmentsQuery(
     {
       companyId,
@@ -71,7 +71,6 @@ export function CompanyContractRoles({ companyId }: { companyId: string }) {
     limit: MEMBER_OPTIONS_LIMIT,
     status: ECompanyUserStatus.ACTIVE,
   });
-  const [revoke, revokeState] = useRevokeContractRoleMutation();
   const data = roles.currentData;
   const filtered = Boolean(member || workspace);
   const clearFilters = () => {
@@ -82,14 +81,20 @@ export function CompanyContractRoles({ companyId }: { companyId: string }) {
 
   return (
     <section aria-labelledby="contract-roles-heading" className="space-y-4">
-      <div className="space-y-1">
-        <h2 id="contract-roles-heading" className="type-section-title">
-          Contract roles
-        </h2>
-        <p className="type-lead">
-          Roles your members hold on your company&apos;s contracts. Assign new
-          roles from a contract&apos;s Roles section.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="space-y-1">
+          <h2 id="contract-roles-heading" className="type-section-title">
+            Contract roles
+          </h2>
+          <p className="type-lead">
+            Roles your members hold on your company&apos;s contracts. Company
+            membership alone gives no contract access: each role opens one
+            workspace of one contract.
+          </p>
+        </div>
+        <Button type="button" onClick={() => setAssigning(true)}>
+          Assign a contract role
+        </Button>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:max-w-2xl">
@@ -184,7 +189,7 @@ export function CompanyContractRoles({ companyId }: { companyId: string }) {
                   <p className="text-xs text-muted-foreground">
                     Assigned {formatDate(row.assignedAt, { timeZone })}
                   </p>
-                  <RevokeButton row={row} onRevoke={setRevoking} />
+                  <ContractRoleActions companyId={companyId} row={row} />
                 </li>
               ))}
             </ul>
@@ -224,7 +229,7 @@ export function CompanyContractRoles({ companyId }: { companyId: string }) {
                         {formatDate(row.assignedAt, { timeZone })}
                       </TableCell>
                       <TableCell className="text-end">
-                        <RevokeButton row={row} onRevoke={setRevoking} />
+                        <ContractRoleActions companyId={companyId} row={row} />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -256,62 +261,18 @@ export function CompanyContractRoles({ companyId }: { companyId: string }) {
           <div className="space-y-2 p-6 text-center">
             <h3 className="font-semibold">No contract roles yet</h3>
             <p className="mx-auto max-w-prose text-sm leading-6 text-muted-foreground">
-              Members get access to a contract&apos;s workspaces when you assign
-              them a role from that contract&apos;s Roles section.
+              Members get access to a contract&apos;s workspace when you assign
+              them a role there. Use “Assign a contract role” to give the first
+              one.
             </p>
           </div>
         )}
       </Card>
 
-      <ConfirmDialog
-        open={revoking !== null}
-        title="Revoke this contract role?"
-        description={
-          revoking
-            ? `${revoking.firstName} ${revoking.lastName} will lose the ${revoking.role} role on “${revoking.contractTitle}” straight away. Records they created stay on the contract.`
-            : ""
-        }
-        error={
-          revokeState.error
-            ? getApiErrorMessage(
-                revokeState.error,
-                "The role couldn't be revoked.",
-              )
-            : undefined
-        }
-        confirmLabel="Revoke role"
-        pendingLabel="Revoking…"
-        isPending={revokeState.isLoading}
-        destructive
-        onCancel={() => {
-          revokeState.reset();
-          setRevoking(null);
-        }}
-        onConfirm={() => {
-          if (!revoking) return;
-          const row = revoking;
-          // The contract's own route and checks decide; including that a
-          // workspace keeps at least one administrator.
-          void revoke({
-            companyId,
-            contractId: row.contractId,
-            workspace: row.workspace,
-            assignmentId: row.id,
-          })
-            .unwrap()
-            .then(() => {
-              notifySuccess(
-                "Contract role revoked",
-                `${row.role} on ${row.contractTitle}`,
-              );
-              revokeState.reset();
-              setRevoking(null);
-              void roles.refetch();
-            })
-            .catch(() => {
-              // Shown in the dialog through `revokeState.error`.
-            });
-        }}
+      <AssignContractRoleDialog
+        companyId={companyId}
+        open={assigning}
+        onOpenChange={setAssigning}
       />
     </section>
   );
@@ -341,25 +302,5 @@ function RoleContract({ row }: { row: CompanyRoleAssignment }) {
         {row.contractReference}
       </p>
     </div>
-  );
-}
-
-function RevokeButton({
-  row,
-  onRevoke,
-}: {
-  row: CompanyRoleAssignment;
-  onRevoke: (row: CompanyRoleAssignment) => void;
-}) {
-  return (
-    <Button
-      type="button"
-      size="sm"
-      variant="destructive"
-      aria-label={`Revoke ${row.role} from ${row.firstName} ${row.lastName} on ${row.contractTitle}`}
-      onClick={() => onRevoke(row)}
-    >
-      Revoke
-    </Button>
   );
 }

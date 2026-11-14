@@ -15,6 +15,10 @@ vi.mock("@/services/contractApi", () => ({
     vi.fn(),
     { isLoading: false, reset: vi.fn() },
   ],
+  useSetContractWorkspaceAdminMutation: () => [
+    vi.fn(),
+    { isLoading: false, reset: vi.fn() },
+  ],
 }));
 vi.mock("@/services/companiesApi", () => ({
   useGetCompanyMembersQuery: () => ({
@@ -88,6 +92,20 @@ describe("CompanyContractRoles", () => {
     );
     // The member filter is filled from the company's active members.
     expect(markup).toMatch(/value="member-1"[^>]*>Casey Okafor</);
+  });
+
+  it("offers workspace-admin changes and assignment, without opening a dialog", () => {
+    mocks.roles.mockReturnValue({ currentData: page([row]) });
+    const markup = render();
+
+    // The row is a workspace admin, so the action removes the right.
+    expect(markup).toContain(
+      'aria-label="Remove workspace administrator rights from Casey Okafor for HSE on Pipeline integrity"',
+    );
+    expect(markup).toMatch(/<button[^>]*>Assign a contract role<\/button>/);
+    // Confirmations and the assignment form only open on request.
+    expect(markup).not.toContain("Revoke this contract role?");
+    expect(markup).not.toContain("Assign to a contract");
   });
 
   it("explains where roles come from when there are none", () => {

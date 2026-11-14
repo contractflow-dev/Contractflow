@@ -157,6 +157,13 @@ export enum ECompanyUserStatus {
   INACTIVE = "inactive",
 }
 
+/** How the company members list can be ordered. */
+export enum ECompanyMemberSortField {
+  /** Last name, then first name. */
+  NAME = "name",
+  JOINED_AT = "joinedAt",
+}
+
 export enum ECompanyStatus {
   ACTIVE = "active",
   INACTIVE = "inactive",

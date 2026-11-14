@@ -601,6 +601,7 @@ export const contractApi = api.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, { contractId, workspace }) => [
         roleAssignmentTag(contractId, workspace),
+        { type: "ContractRoleAssignment", id: "LIST" },
         // The list shows the viewer's own Workspace Admin flag.
         { type: "Contract", id: "LIST" },
       ],
@@ -700,8 +701,11 @@ export const contractApi = api.injectEndpoints({
         ...companyRoute(companyId, "/role-assignments"),
         params,
       }),
+      // LIST too: assigning, revoking or changing workspace-admin rights on
+      // any contract refreshes the company-wide list.
       providesTags: (_result, _error, { companyId }) => [
         { type: "ContractRoleAssignment", id: `company:${companyId}` },
+        { type: "ContractRoleAssignment", id: "LIST" },
       ],
     }),
 

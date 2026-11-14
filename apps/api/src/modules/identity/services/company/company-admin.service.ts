@@ -15,6 +15,7 @@ import {
   ECompanyUserStatus,
   EInvitationStatus,
   type ICompanyInvitationResponseResult,
+  type ICompanyTeamSummaryResponse,
   type IPaginatedResponse,
 } from '@contractflow/contracts-schema';
 import { toPaginatedResponse } from '../../../../common/application/pagination';
@@ -105,7 +106,10 @@ export class CompanyAdminService {
     const scope = await this.requireCompanyAdmin(userId, companyId);
     const { items, total } = await this.reads.listMembers(scope, {
       status: query.status,
+      companyRole: query.companyRole,
       search: query.search,
+      sortBy: query.sortBy,
+      sortOrder: query.sortOrder,
       page: query.page,
       limit: query.limit,
     });
@@ -114,6 +118,24 @@ export class CompanyAdminService {
       { items: items.map(CompanyMemberResponseDto.fromEntity), total },
       query,
     );
+  }
+
+  /** Membership and invitation counts for the Team page. */
+  async getTeamSummary(
+    userId: string,
+    companyId: string,
+  ): Promise<ICompanyTeamSummaryResponse> {
+    const scope = await this.requireCompanyAdmin(userId, companyId);
+    const [members, pendingInvitationCount] = await Promise.all([
+      this.reads.countMembers(scope),
+      this.reads.countPendingInvitations(scope, new Date()),
+    ]);
+    return {
+      memberCount: members.total,
+      activeMemberCount: members.active,
+      companyAdminCount: members.activeAdmins,
+      pendingInvitationCount,
+    };
   }
 
   async updateMemberRole(

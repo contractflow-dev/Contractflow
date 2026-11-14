@@ -19,6 +19,11 @@ vi.mock("../components/company-contract-roles", () => ({
   CompanyContractRoles: () => <h2>Contract roles</h2>,
 }));
 
+// Covered by its own tests.
+vi.mock("../components/team-summary", () => ({
+  TeamSummary: () => <section aria-label="Team summary">TEAM SUMMARY</section>,
+}));
+
 vi.mock("../CompanyAdminShell", () => ({
   CompanyAdminShell: ({
     children,
@@ -228,6 +233,61 @@ describe("CompanyTeamView", () => {
     const markup = renderToStaticMarkup(<CompanyTeamView />);
 
     expect(markup.includes(">Resend</button>")).toBe(offered);
+  });
+
+  it("filters members by company role, sorts them, and opens a member's details", () => {
+    mocks.getMembers.mockReturnValue({
+      currentData: {
+        data: [
+          {
+            id: "membership-1",
+            userId: "user-1",
+            firstName: "Ada",
+            lastName: "Obi",
+            email: "ada@example.com",
+            companyRole: "Member",
+            status: "active",
+            joinedAt: "2026-01-15T10:00:00.000Z",
+            leftAt: null,
+          },
+        ],
+        meta: {
+          totalItems: 1,
+          itemCount: 1,
+          itemsPerPage: 20,
+          totalPages: 1,
+          currentPage: 1,
+        },
+      },
+      isFetching: false,
+      error: undefined,
+      isLoading: false,
+    });
+
+    const markup = renderToStaticMarkup(<CompanyTeamView />);
+
+    // Newest first is the default, sent to the API explicitly.
+    expect(mocks.getMembers).toHaveBeenCalledWith(
+      expect.objectContaining({
+        companyId: "company-1",
+        sortBy: "joinedAt",
+        sortOrder: "DESC",
+        companyRole: undefined,
+      }),
+    );
+    const roleFilter = markup.slice(
+      markup.indexOf('id="member-role"'),
+      markup.indexOf("</select>", markup.indexOf('id="member-role"')),
+    );
+    expect(
+      [...roleFilter.matchAll(/value="([^"]*)"/g)].map(([, v]) => v),
+    ).toEqual(["", "Company Administrator", "Member"]);
+    expect(markup).toContain('id="member-sort"');
+    expect(markup).toContain("Name (A–Z)");
+    expect(markup).toContain(
+      'aria-label="View details and contract roles for Ada Obi"',
+    );
+    expect(markup).toContain("TEAM SUMMARY");
   });
 
   it("gives the page one <h1> and its sections <h2> headings", () => {

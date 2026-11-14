@@ -2,10 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import {
+  ECompanyMemberSortField,
   ECompanyRole,
   type ECompanyStatus,
   ECompanyUserStatus,
   EInvitationStatus,
+  ESortOrder,
 } from '@contractflow/contracts-schema';
 import type { ICompanyScope } from '../../../common/database/repositories/company-scope.interface';
 import { Company } from '../entities/company.entity';
@@ -18,6 +20,7 @@ import type {
 } from '../../../common/application/pagination.interface';
 import type {
   ICompanyAdminReadRepository,
+  ICompanyMemberCounts,
   IInviteeInvitationRow,
   IListCompanyMembersCriteria,
 } from '../interface/company-admin-persistence.interface';
@@ -66,6 +69,12 @@ export class CompanyAdminReadRepository implements ICompanyAdminReadRepository {
       });
     }
 
+    if (criteria.companyRole) {
+      builder.andWhere('membership.companyRole = :companyRole', {
+        companyRole: criteria.companyRole,
+      });
+    }
+
     if (criteria.search) {
       const search = criteria.search.replace(/[\\%_]/g, '\\$&');
       builder.andWhere(
@@ -74,9 +83,17 @@ export class CompanyAdminReadRepository implements ICompanyAdminReadRepository {
       );
     }
 
-    // `id` breaks ties so members who joined together keep their page.
+    // Only known fields reach ORDER BY. `id` breaks ties so rows that
+    // compare equal keep their page.
+    const order = criteria.sortOrder === ESortOrder.ASC ? 'ASC' : 'DESC';
+    if (criteria.sortBy === ECompanyMemberSortField.NAME) {
+      builder
+        .orderBy('user.lastName', order)
+        .addOrderBy('user.firstName', order);
+    } else {
+      builder.orderBy('membership.joinedAt', order);
+    }
     const [items, total] = await builder
-      .orderBy('membership.joinedAt', 'DESC')
       .addOrderBy('membership.id', 'ASC')
       .skip(pageOffset(criteria))
       .take(criteria.limit)
@@ -117,6 +134,37 @@ export class CompanyAdminReadRepository implements ICompanyAdminReadRepository {
       where: { id: companyId },
       select: { id: true, name: true, status: true },
     });
+  }
+
+  async countMembers(scope: ICompanyScope): Promise<ICompanyMemberCounts> {
+    const row = await this.members
+      .createQueryBuilder('membership')
+      .select('COUNT(*)::int', 'total')
+      .addSelect(
+        'COUNT(*) FILTER (WHERE membership.status = :active AND membership.leftAt IS NULL)::int',
+        'active',
+      )
+      .addSelect(
+        'COUNT(*) FILTER (WHERE membership.status = :active AND membership.leftAt IS NULL AND membership.companyRole = :admin)::int',
+        'activeAdmins',
+      )
+      .where('membership.companyId = :companyId', {
+        companyId: scope.companyId,
+      })
+      .setParameters({
+        active: ECompanyUserStatus.ACTIVE,
+        admin: ECompanyRole.COMPANY_ADMIN,
+      })
+      .getRawOne<{ total: number; active: number; activeAdmins: number }>();
+    return {
+      total: Number(row?.total ?? 0),
+      active: Number(row?.active ?? 0),
+      activeAdmins: Number(row?.activeAdmins ?? 0),
+    };
+  }
+
+  countPendingInvitations(scope: ICompanyScope, at: Date): Promise<number> {
+    return this.invitations.countPending(scope, at);
   }
 
   async findMemberName(companyUserId: string): Promise<string | null> {
