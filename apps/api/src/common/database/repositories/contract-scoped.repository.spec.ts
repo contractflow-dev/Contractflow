@@ -23,12 +23,12 @@ class ItemRepository extends ContractScopedRepository<
   protected override readonly companyProperty = 'ownerCompanyId';
 }
 
-const matches = (row: Where, where: Where) =>
+const matches = (row: object, where: Where) =>
   Object.entries(where).every(([key, value]) => {
     if (key === 'id' && typeof value === 'object' && value !== null) {
       return true;
     }
-    return row[key] === value;
+    return Reflect.get(row, key) === value;
   });
 
 describe('ContractScopedRepository writes', () => {

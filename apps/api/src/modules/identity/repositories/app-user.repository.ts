@@ -54,11 +54,6 @@ export class AppUserRepository
     return email.trim().toLowerCase();
   }
 
-  /** Escapes LIKE wildcards so user input is matched literally. */
-  // private escapeLike(term: string): string {
-  //   return term.replace(/[\\%_]/g, '\\$&');
-  // }
-
   /** Runs a single UPDATE by id and throws if no row matched. */
   private async updateByIdOrFail(
     id: string,

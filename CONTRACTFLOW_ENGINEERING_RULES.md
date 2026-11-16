@@ -311,9 +311,12 @@ Use the smallest relevant validation commands, then expand if needed:
 - API integration: `pnpm --filter @contractflow/api test:integration` (requires
   a PostgreSQL test database)
 - API lint/build: `pnpm --filter @contractflow/api lint` and
-  `pnpm --filter @contractflow/api build`. Use the build to type-check the
-  API; `tsc -p tsconfig.json` also checks spec files, which lack Vitest global
-  types and report errors that do not affect the build.
+  `pnpm --filter @contractflow/api build`.
+- API type check: `pnpm --filter @contractflow/api typecheck` checks the
+  application (`tsconfig.build.json`) and every spec and test helper
+  (`tsconfig.test.json`, which has the Vitest types). Don't use
+  `tsc -p tsconfig.json` for tests: it compiles them as CommonJS without the
+  Vitest types and reports errors that don't apply.
 - Web: `pnpm --filter @contractflow/web test -- <test-selector>`
 - Web lint/build: `pnpm --filter @contractflow/web lint` and
   `pnpm --filter @contractflow/web build`

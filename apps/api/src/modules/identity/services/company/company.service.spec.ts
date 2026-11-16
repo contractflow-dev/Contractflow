@@ -14,7 +14,7 @@ import {
   ECurrencyCode,
   EUserStatus,
 } from '@contractflow/contracts-schema';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { CompanyUser } from '../../entities/company-user.entity';
 import { CompanyInvitationRepository } from '../../repositories/company-invitation.repository';
 import { CompanyUserRepository } from '../../repositories/company-user.respository';
@@ -58,15 +58,15 @@ const companyInput = {
 
 describe('CompanyService', () => {
   let service: CompanyService;
-  let users: Record<string, ReturnType<typeof vi.fn>>;
-  let companyRepository: Record<string, ReturnType<typeof vi.fn>>;
-  let membershipRepository: Record<string, ReturnType<typeof vi.fn>>;
-  let invitationRepository: Record<string, ReturnType<typeof vi.fn>>;
-  let contractPartyRepository: Record<string, ReturnType<typeof vi.fn>>;
-  let companyVerification: { sendAfterEmailChange: ReturnType<typeof vi.fn> };
-  let configService: { get: ReturnType<typeof vi.fn> };
-  let execute: ReturnType<typeof vi.fn>;
-  let companyCreationContext: Record<string, ReturnType<typeof vi.fn>>;
+  let users: Record<string, Mock>;
+  let companyRepository: Record<string, Mock>;
+  let membershipRepository: Record<string, Mock>;
+  let invitationRepository: Record<string, Mock>;
+  let contractPartyRepository: Record<string, Mock>;
+  let companyVerification: { sendAfterEmailChange: Mock };
+  let configService: { get: Mock };
+  let execute: Mock;
+  let companyCreationContext: Record<string, Mock>;
 
   beforeEach(() => {
     users = {

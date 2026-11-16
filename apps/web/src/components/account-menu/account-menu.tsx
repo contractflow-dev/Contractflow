@@ -69,9 +69,6 @@ export function AccountMenu({ area }: { area: AccountMenuArea }) {
           <span className="block max-w-36 truncate text-xs font-medium">
             {displayName}
           </span>
-          {/* <span className="block max-w-36 truncate text-xs text-muted-foreground">
-            {user?.email ?? "Your account"}
-          </span> */}
         </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent

@@ -10,7 +10,7 @@ import {
   ECompanyUserStatus,
   ESortOrder,
 } from '@contractflow/contracts-schema';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type {
   ICompanyAdminReadRepository,
   ICompanyAdminTransactionContext,
@@ -50,7 +50,7 @@ describe('CompanyAdminService', () => {
   let users: Mocked<ICompanyAdminTransactionContext['users']>;
   let invitations: Mocked<ICompanyAdminTransactionContext['invitations']>;
   let auditLogs: Mocked<ICompanyAdminTransactionContext['auditLogs']>;
-  let execute: ReturnType<typeof vi.fn>;
+  let execute: Mock;
   let companyVerification: { sendAfterEmailChange: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {

@@ -19,6 +19,8 @@ describe('ContractWorkspaceRepository', () => {
 
   it('requires explicit company and contract scope', async () => {
     await expect(
+      // @ts-expect-error The runtime guard is what's under test: a caller
+      // that bypasses the type and omits companyId must still be refused.
       repository.exists({ contractId: 'c1' }, 'finance'),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(parties.exists).not.toHaveBeenCalled();

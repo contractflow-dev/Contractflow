@@ -10,15 +10,23 @@ import type { IContractResourceRepository } from '../interfaces/contract-resourc
 import type { ContractAccessService } from './contract-access.service';
 import type { ContractWorkspace } from './contract-workspace';
 
-/** Read-only list/get of one contract-scoped resource, behind the access gate. */
+/**
+ * Read-only list/get of one contract-scoped resource, behind the access gate.
+ *
+ * Records are returned only through `toResponse`, which names the fields of
+ * the public response; a database entity is never returned as it is.
+ */
 export class ContractResourceReader<
   Entity extends IContractScopedEntity & { createdAt: Date },
+  Response,
 > {
   constructor(
     private readonly access: ContractAccessService,
     private readonly repository: IContractResourceRepository<Entity>,
-    private readonly workspace: ContractWorkspace,
+    /** The workspace whose roles may read this resource. */
+    readonly workspace: ContractWorkspace,
     private readonly label: string,
+    private readonly toResponse: (entity: Entity) => Response,
   ) {}
 
   async list(
@@ -26,7 +34,7 @@ export class ContractResourceReader<
     companyId: string,
     contractId: string,
     query: IPageQuery,
-  ): Promise<IPaginatedResponse<Entity>> {
+  ): Promise<IPaginatedResponse<Response>> {
     const scope = await this.access.authorize(
       userId,
       companyId,
@@ -38,7 +46,10 @@ export class ContractResourceReader<
       skip: pageOffset(query),
       take: query.limit,
     });
-    return toPaginatedResponse(page, query);
+    return toPaginatedResponse(
+      { items: page.items.map(this.toResponse), total: page.total },
+      query,
+    );
   }
 
   async get(
@@ -46,7 +57,7 @@ export class ContractResourceReader<
     companyId: string,
     contractId: string,
     id: string,
-  ): Promise<Entity> {
+  ): Promise<Response> {
     const scope = await this.access.authorize(
       userId,
       companyId,
@@ -57,6 +68,6 @@ export class ContractResourceReader<
     if (!record) {
       throw new NotFoundException(`${this.label} was not found`);
     }
-    return record;
+    return this.toResponse(record);
   }
 }

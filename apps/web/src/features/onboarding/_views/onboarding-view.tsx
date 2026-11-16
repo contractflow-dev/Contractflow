@@ -229,11 +229,10 @@ export function OnboardingView() {
   const [stepIndex, setStepIndex] = useState(0);
   const step = companySetupSteps[stepIndex];
   const formRef = useRef<HTMLFormElement>(null);
-  const headingRef = useRef<HTMLHeadingElement>(null);
   // Focus moves once the new step has rendered; the counter re-runs it.
-  const focusTarget = useRef<"heading" | "error" | null>(null);
+  const focusTarget = useRef<"error" | null>(null);
   const [focusRequest, setFocusRequest] = useState(0);
-  const requestFocus = (target: "heading" | "error") => {
+  const requestFocus = (target: "error") => {
     focusTarget.current = target;
     setFocusRequest((count) => count + 1);
   };
@@ -254,8 +253,7 @@ export function OnboardingView() {
   useEffect(() => {
     const target = focusTarget.current;
     focusTarget.current = null;
-    if (target === "heading") headingRef.current?.focus();
-    else if (target === "error") focusFirstInvalid();
+    if (target === "error") focusFirstInvalid();
   }, [focusRequest, focusFirstInvalid, stepIndex]);
 
   // Once a field shows an error, re-check it as it changes, so the error
@@ -316,12 +314,10 @@ export function OnboardingView() {
       return;
     }
     setStepIndex((index) => Math.min(index + 1, lastStep));
-    requestFocus("heading");
   }
 
   function back() {
     setStepIndex((index) => Math.max(index - 1, 0));
-    requestFocus("heading");
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -523,13 +519,6 @@ export function OnboardingView() {
         </ol>
 
         <div className="space-y-1">
-          {/* <h2
-            ref={headingRef}
-            tabIndex={-1}
-            className="text-base font-semibold focus-visible:outline-none"
-          >
-            Step {stepIndex + 1} of {companySetupSteps.length}: {step.title}
-          </h2> */}
           <RequiredFieldsNote />
         </div>
 
