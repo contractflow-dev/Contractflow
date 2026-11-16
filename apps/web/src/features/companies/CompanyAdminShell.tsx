@@ -44,7 +44,6 @@ import {
   type CompanyAccessState,
 } from "@/features/workspace";
 import { getApiErrorMessage } from "@/lib/apiError";
-import { cn } from "@/lib/utils";
 import {
   useGetCompaniesQuery,
   useGetCompanyAccessSummaryQuery,
