@@ -13,6 +13,14 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./geography": {
+      "types": "./dist/common/geography/index.d.ts",
+      "default": "./dist/common/geography/index.js"
+    },
+    "./phone": {
+      "types": "./dist/common/phone/index.d.ts",
+      "default": "./dist/common/phone/index.js"
+    },
     "./common": {
       "types": "./dist/common/index.d.ts",
       "default": "./dist/common/index.js"
@@ -62,6 +70,8 @@
     "typescript": "^5.6.0"
   },
   "dependencies": {
-    "country-phone-codes": "^1.0.1"
+    "country-phone-codes": "^1.0.1",
+    "country-region-data": "4.1.0",
+    "libphonenumber-js": "1.13.14"
   }
 }

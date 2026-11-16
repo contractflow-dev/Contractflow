@@ -120,7 +120,7 @@ describe("OnboardingView", () => {
         "registrationNumber",
         "taxIdentificationNumber",
         "email",
-        "phoneNumber",
+        "phone",
         "website",
         "addressLine1",
         "addressLine2",

@@ -8,6 +8,7 @@ import { themeInitScript } from "@/components/theme/theme-script";
 export const metadata: Metadata = {
   title: "Contractflow",
   description: "Contractflow",
+  appleWebApp: { title: "ContractFlow" },
 };
 
 // Loaded as a stylesheet at runtime: next/font/google downloads fonts at build

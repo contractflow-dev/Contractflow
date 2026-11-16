@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
+import { LogoMark } from "@workspace/ui/components/logo";
 import {
   Card,
   CardContent,
@@ -61,7 +62,10 @@ export function ContractRoleInvitationResponse({ token }: { token: string }) {
     <main className="grid min-h-svh place-items-center bg-background p-4">
       <Card className="w-full max-w-xl">
         <CardHeader>
-          <p className="text-sm font-semibold text-primary">ContractFlow</p>
+          <p className="flex items-center gap-2 text-sm font-semibold text-primary">
+            <LogoMark variant="auto" className="size-5" />
+            ContractFlow
+          </p>
           <CardTitle>
             <h1 className="mt-2 type-page-title">Contract role invitation</h1>
           </CardTitle>

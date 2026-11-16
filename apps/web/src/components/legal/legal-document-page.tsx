@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { buttonVariants } from "@workspace/ui/components/button";
 import { Separator } from "@workspace/ui/components/separator";
+import { LogoMark } from "@workspace/ui/components/logo";
 import { cn } from "@/lib/utils";
 
 export function LegalDocumentPage({
@@ -23,7 +24,10 @@ export function LegalDocumentPage({
         </Link>
 
         <header className="space-y-3 pb-3">
-          <p className="text-sm font-semibold text-primary">ContractFlow</p>
+          <p className="flex items-center gap-2 text-sm font-semibold text-primary">
+            <LogoMark variant="auto" className="size-5" />
+            ContractFlow
+          </p>
           <h1 className="break-words text-3xl font-semibold tracking-tight sm:text-4xl">
             {title}
           </h1>
@@ -38,9 +42,9 @@ export function LegalDocumentPage({
         <Alert role="note">
           <AlertDescription className="leading-6">
             Draft for service-owner and legal review. Complete every bracketed
-            placeholder and confirm the statements against the production service
-            before publishing. This document is not legal advice or a guarantee
-            of compliance with any law.
+            placeholder and confirm the statements against the production
+            service before publishing. This document is not legal advice or a
+            guarantee of compliance with any law.
           </AlertDescription>
         </Alert>
 

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
+import { LogoMark } from "@workspace/ui/components/logo";
 import {
   Card,
   CardContent,
@@ -19,11 +20,7 @@ import {
   useRespondToContractPartyInvitationMutation,
 } from "@/services/contractApi";
 
-export function ContractPartyInvitationResponse({
-  token,
-}: {
-  token: string;
-}) {
+export function ContractPartyInvitationResponse({ token }: { token: string }) {
   const router = useRouter();
   const [responseError, setResponseError] = useState("");
   const [result, setResult] = useState("");
@@ -37,7 +34,8 @@ export function ContractPartyInvitationResponse({
     error: userError,
     isLoading: isLoadingUser,
   } = useGetCurrentUserQuery(undefined, { refetchOnMountOrArgChange: true });
-  const [respond, { isLoading }] = useRespondToContractPartyInvitationMutation();
+  const [respond, { isLoading }] =
+    useRespondToContractPartyInvitationMutation();
   const isSignedOut = getApiErrorStatus(userError) === 401;
   const responseUrl = `/invitations/contract-party?token=${encodeURIComponent(token)}`;
   const loginHref = `/login?redirect=${encodeURIComponent(responseUrl)}`;
@@ -73,9 +71,14 @@ export function ContractPartyInvitationResponse({
     <main className="grid min-h-svh place-items-center bg-background p-4">
       <Card className="w-full max-w-xl">
         <CardHeader>
-          <p className="text-sm font-semibold text-primary">ContractFlow</p>
+          <p className="flex items-center gap-2 text-sm font-semibold text-primary">
+            <LogoMark variant="auto" className="size-5" />
+            ContractFlow
+          </p>
           <CardTitle>
-            <h1 className="mt-2 type-page-title">Company contract invitation</h1>
+            <h1 className="mt-2 type-page-title">
+              Company contract invitation
+            </h1>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -105,8 +108,12 @@ export function ContractPartyInvitationResponse({
                   <span className="font-medium">
                     {invitation.invitingCompanyName}
                   </span>{" "}
-                  invited <span className="font-medium">{invitation.email}</span>{" "}
-                  to join <span className="font-medium">{invitation.contractTitle}</span>{" "}
+                  invited{" "}
+                  <span className="font-medium">{invitation.email}</span> to
+                  join{" "}
+                  <span className="font-medium">
+                    {invitation.contractTitle}
+                  </span>{" "}
                   as a {invitation.partyType}.
                 </p>
                 <p className="text-muted-foreground">

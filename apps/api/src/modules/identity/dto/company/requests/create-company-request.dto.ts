@@ -11,6 +11,7 @@ import {
   Matches,
   IsUrl,
 } from 'class-validator';
+import { IsInternationalPhoneNumber } from '../../../../../common/dto/phone-number.validation';
 
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
@@ -70,10 +71,8 @@ export class CreateCompanyRequestDto {
   @MaxLength(254)
   email!: string;
 
-  @Transform(trim)
-  @IsString()
-  @MinLength(1)
-  @MaxLength(20)
+  /** International format; stored in E.164 (`+2348031234567`). */
+  @IsInternationalPhoneNumber()
   phoneNumber!: string;
 
   @Transform(({ value }) => normalizeWebsite(value) || undefined)
@@ -102,9 +101,13 @@ export class CreateCompanyRequestDto {
   @MaxLength(100)
   city!: string;
 
+  /**
+   * A subdivision of `countryCode` (name or code), required where ContractFlow
+   * supports the country's subdivisions and free text otherwise. The service
+   * checks it against the country and stores the canonical name.
+   */
   @Transform(trim)
   @IsString()
-  @MinLength(1)
   @MaxLength(100)
   stateRegion!: string;
 

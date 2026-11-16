@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { RiExternalLinkLine, RiShieldUserLine } from "@remixicon/react";
+import { LogoMark } from "@workspace/ui/components/logo";
 import { AppShell } from "@/components/app-shell/app-shell";
 import { ADMIN_NAVIGATION } from "../admin-navigation";
 import { AdminHeader } from "./admin-header";
@@ -13,9 +14,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
       navigationLabel="Platform admin navigation"
       brand={
         <Link href="/admin" className="flex items-center gap-2.5">
-          <span className="grid size-8 place-items-center rounded-lg bg-brand text-sm font-bold tracking-tight text-brand-foreground shadow-sm">
-            CF
-          </span>
+          <LogoMark variant="inverse" className="size-8" />
           <span className="flex flex-col">
             <span className="font-heading text-sm leading-none font-bold tracking-tight text-sidebar-accent-foreground">
               ContractFlow

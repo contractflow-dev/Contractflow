@@ -37,7 +37,9 @@ import {
 } from "@/components/forms/form-field";
 import { StatusBadge } from "@/components/status-badge/status-badge";
 import { getApiErrorMessage } from "@/lib/apiError";
-import { countryName, countryOptions } from "@/lib/countries";
+import { countryName } from "@/lib/countries";
+import { normalizeStateRegion, stateRegionError } from "@/lib/address";
+import { CountryRegionFields } from "@/components/forms/country-region-fields";
 import { humanizeEnumValue } from "@/lib/format";
 import { notifySuccess } from "@/lib/notify";
 import {
@@ -218,17 +220,40 @@ function SiteForm({
   const [updateSite, updateState] = useUpdateContractSiteMutation();
   const saving = createState.isLoading || updateState.isLoading;
   const error = site ? updateState.error : createState.error;
+  const [countryCode, setCountryCode] = useState<string>(
+    site?.countryCode ?? "",
+  );
+  const [stateRegion, setStateRegion] = useState(() =>
+    site ? normalizeStateRegion(site.countryCode, site.stateRegion) : "",
+  );
+  const [countryError, setCountryError] = useState<string>();
+  const [regionError, setRegionError] = useState<string>();
+
+  function changeCountryCode(value: string) {
+    setCountryCode(value);
+    setCountryError(undefined);
+  }
+
+  function changeStateRegion(value: string) {
+    setStateRegion(value);
+    setRegionError(undefined);
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const missingCountry = countryCode ? undefined : "Select a country";
+    const invalidRegion = stateRegionError(countryCode, stateRegion);
+    setCountryError(missingCountry);
+    setRegionError(invalidRegion);
+    if (missingCountry || invalidRegion) return;
     const form = new FormData(event.currentTarget);
     const body = {
       name: String(form.get("name") ?? "").trim(),
       siteCode: String(form.get("siteCode") ?? "").trim(),
       addressLine1: String(form.get("addressLine1") ?? "").trim(),
       city: String(form.get("city") ?? "").trim(),
-      stateRegion: String(form.get("stateRegion") ?? "").trim(),
-      countryCode: String(form.get("countryCode") ?? "") as ECountryCode,
+      stateRegion: stateRegion.trim(),
+      countryCode: countryCode as ECountryCode,
       latitudeE6: toMicroDegrees(String(form.get("latitude") ?? "")),
       longitudeE6: toMicroDegrees(String(form.get("longitude") ?? "")),
       status: String(form.get("status")) as EContractSiteStatus,
@@ -310,33 +335,18 @@ function SiteForm({
             defaultValue={site?.city}
             maxLength={100}
           />
-          <SiteInput
-            id={`${idPrefix}-region`}
-            name="stateRegion"
-            label="State or region"
-            defaultValue={site?.stateRegion}
-            maxLength={100}
+          <CountryRegionFields
+            countryId={`${idPrefix}-country`}
+            stateRegionId={`${idPrefix}-region`}
+            countryName="countryCode"
+            stateRegionName="stateRegion"
+            countryCode={countryCode}
+            stateRegion={stateRegion}
+            onCountryCodeChange={changeCountryCode}
+            onStateRegionChange={changeStateRegion}
+            countryError={countryError}
+            stateRegionError={regionError}
           />
-          <FormField id={`${idPrefix}-country`} label="Country" required>
-            {(control) => (
-              <NativeSelect
-                {...control}
-                name="countryCode"
-                className="w-full"
-                defaultValue={site?.countryCode ?? ""}
-                required
-              >
-                <NativeSelectOption value="" disabled>
-                  Select a country
-                </NativeSelectOption>
-                {countryOptions.map(({ code, name }) => (
-                  <NativeSelectOption key={code} value={code}>
-                    {name}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
-            )}
-          </FormField>
         </FormGrid>
       </FormSection>
 

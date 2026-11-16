@@ -552,6 +552,43 @@ describe('CompanyAdminService', () => {
     expect(companyVerification.sendAfterEmailChange).not.toHaveBeenCalled();
   });
 
+  it('keeps a legacy free-text region when the address is not edited', async () => {
+    companies.lockById.mockResolvedValue({
+      ...company,
+      countryCode: 'NG',
+      stateRegion: 'Old free text',
+    } as never);
+
+    await service.updateCompanyProfile(actorId, companyId, { name: 'Renamed' });
+
+    expect(companies.save).toHaveBeenCalledWith(
+      expect.objectContaining({ stateRegion: 'Old free text' }),
+    );
+  });
+
+  it('checks an edited region against the country being saved', async () => {
+    companies.lockById.mockResolvedValue({
+      ...company,
+      countryCode: 'NG',
+      stateRegion: 'Lagos',
+    } as never);
+
+    await service.updateCompanyProfile(actorId, companyId, {
+      stateRegion: 'rivers',
+    });
+    expect(companies.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({ stateRegion: 'Rivers' }),
+    );
+
+    companies.save.mockClear();
+    await expect(
+      service.updateCompanyProfile(actorId, companyId, {
+        countryCode: 'US' as never,
+      }),
+    ).rejects.toThrow('Select a state of the selected country.');
+    expect(companies.save).not.toHaveBeenCalled();
+  });
+
   it('rejects empty company profile updates without opening a transaction', async () => {
     await expect(
       service.updateCompanyProfile(actorId, companyId, {}),

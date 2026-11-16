@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { LogoMark } from "@workspace/ui/components/logo";
 import { HeroMetrics } from "./HeroMetrics";
 
 const IMAGE_CLASS = {
@@ -25,7 +26,8 @@ export function AuthHero({
     >
       <div className="absolute inset-0 bg-hero-overlay" aria-hidden="true" />
 
-      <span className="relative z-10 text-lg font-semibold tracking-tight">
+      <span className="relative z-10 flex items-center gap-2.5 text-lg font-semibold tracking-tight">
+        <LogoMark variant="inverse" className="size-8" />
         ContractFlow
       </span>
 

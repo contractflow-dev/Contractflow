@@ -17,6 +17,7 @@ import {
   type ECompanyRole,
 } from "@contractflow/contracts-schema";
 import { Button, buttonVariants } from "@workspace/ui/components/button";
+import { LogoMark } from "@workspace/ui/components/logo";
 import {
   Card,
   CardContent,
@@ -51,7 +52,10 @@ export function InvitationLayout({
     <main className="grid min-h-svh place-items-center bg-muted/30 p-4 sm:p-6">
       <Card className="w-full max-w-lg rounded-xl">
         <CardHeader className="space-y-4">
-          <p className="text-sm font-semibold text-primary">ContractFlow</p>
+          <p className="flex items-center gap-2 text-sm font-semibold text-primary">
+            <LogoMark variant="auto" className="size-5" />
+            ContractFlow
+          </p>
           {Icon && (
             <div
               className={cn(

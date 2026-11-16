@@ -1,4 +1,8 @@
-import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { getMetadataArgsStorage } from 'typeorm';
 import {
@@ -30,7 +34,7 @@ const companyData = {
   addressLine1: '1 Test Street',
   addressLine2: '',
   city: 'Test City',
-  stateRegion: 'Test Region',
+  stateRegion: 'California',
   postalCode: '00000',
   countryCode: ECountryCode.US,
   defaultCurrencyCode: ECurrencyCode.USD,
@@ -167,6 +171,43 @@ describe('CompanyService', () => {
     expect(companyRepository.save.mock.calls[0][0]).toMatchObject({
       registrationNumber: '',
       taxIdentificationNumber: '',
+    });
+  });
+
+  it('stores the canonical name of a state given by name or code', async () => {
+    await service.create('user-from-session', {
+      ...companyInput,
+      countryCode: ECountryCode.NG,
+      stateRegion: 'NG-FC',
+    });
+
+    expect(companyRepository.save.mock.calls[0][0]).toMatchObject({
+      countryCode: ECountryCode.NG,
+      stateRegion: 'Federal Capital Territory',
+    });
+  });
+
+  it('rejects a state of another country without opening a transaction', async () => {
+    await expect(
+      service.create('user-from-session', {
+        ...companyInput,
+        countryCode: ECountryCode.US,
+        stateRegion: 'Lagos',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('allows a blank region for a country without supported subdivisions', async () => {
+    await service.create('user-from-session', {
+      ...companyInput,
+      countryCode: ECountryCode.GI,
+      stateRegion: '',
+    });
+
+    expect(companyRepository.save.mock.calls[0][0]).toMatchObject({
+      countryCode: ECountryCode.GI,
+      stateRegion: '',
     });
   });
 
