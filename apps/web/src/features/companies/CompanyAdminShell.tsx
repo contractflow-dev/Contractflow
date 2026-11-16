@@ -379,15 +379,6 @@ export function CompanyAdminShell({
       header={
         <>
           <div className="min-w-0 flex-1">
-            {/* <p className="text-xs text-muted-foreground">Company workspace</p> */}
-            {/* <p
-              className={cn(
-                "truncate text-sm font-semibold",
-                hasMultipleCompanies && "hidden md:block",
-              )}
-            >
-              {access.company.name}
-            </p> */}
             {/* The sidebar holding the desktop switcher is a drawer below md. */}
             {hasMultipleCompanies && (
               <CompanySwitcher

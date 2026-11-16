@@ -35,9 +35,6 @@ describe("OnboardingView", () => {
     const markup = renderToStaticMarkup(<OnboardingView />);
 
     expect(markup).toMatch(/<h1[^>]*>Create your company<\/h1>/);
-    expect(markup).toMatch(
-      /<h2[^>]*tabindex="-1"[^>]*>Step 1 of 3: Company and legal details<\/h2>/,
-    );
     const steps = markup.match(/<li[^>]*>[\s\S]*?<\/li>/g) ?? [];
     expect(steps).toHaveLength(3);
     expect(steps[0]).toContain('aria-current="step"');

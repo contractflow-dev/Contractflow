@@ -246,7 +246,7 @@ export function RegisterForm({
       <FieldGroup className="gap-5">
         <RequiredFieldsNote />
 
-        <FormSection legend="">
+        <FormSection legend="Full name" legendHidden>
           <div className="grid gap-3 sm:grid-cols-2 sm:gap-2">
             {nameFields.map(({ name, label, required, autoComplete }) => (
               <Controller

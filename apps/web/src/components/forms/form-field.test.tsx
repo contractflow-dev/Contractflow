@@ -120,6 +120,22 @@ describe("FormSection", () => {
     expect(markup).toContain(`id="${describedBy}"`);
     expect(markup).toContain("Choose the workspaces.");
   });
+
+  it("can keep the legend for screen readers only, still naming the group", () => {
+    const hidden = renderToStaticMarkup(
+      <FormSection legend="Full name" legendHidden>
+        <span>fields</span>
+      </FormSection>,
+    );
+    expect(hidden).toMatch(/<legend[^>]*class="[^"]*\bsr-only\b[^"]*"[^>]*>Full name<\/legend>/);
+
+    const visible = renderToStaticMarkup(
+      <FormSection legend="Full name">
+        <span>fields</span>
+      </FormSection>,
+    );
+    expect(visible).not.toContain("sr-only");
+  });
 });
 
 describe("FormGrid", () => {

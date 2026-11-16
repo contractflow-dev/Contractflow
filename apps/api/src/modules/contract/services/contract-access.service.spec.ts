@@ -331,23 +331,41 @@ describe('ContractAccessService', () => {
   });
 });
 describe('ContractResourceReader', () => {
+  interface Row {
+    id: string;
+    contractId: string;
+    createdAt: Date;
+    internalKey: string;
+  }
   const access = { authorize: vi.fn() };
   const repository = { findPage: vi.fn(), findById: vi.fn() };
-  let reader: ContractResourceReader<{ id: string; contractId: string }>;
+  const toResponse = vi.fn((row: Row) => ({ id: row.id, label: 'shown' }));
+  let reader: ContractResourceReader<Row, { id: string; label: string }>;
+  const row = (id: string): Row => ({
+    id,
+    contractId: 'c1',
+    createdAt: new Date('2026-01-01T00:00:00Z'),
+    internalKey: 'never-returned',
+  });
 
   beforeEach(() => {
     vi.resetAllMocks();
+    toResponse.mockImplementation((item: Row) => ({
+      id: item.id,
+      label: 'shown',
+    }));
     access.authorize.mockResolvedValue({ contractId: 'c1', companyId: 'co1' });
     reader = new ContractResourceReader(
       access as never,
       repository as never,
       'finance',
       'Invoice',
+      toResponse,
     );
   });
 
   it('lists only through the authorized scope with paging and stable order', async () => {
-    repository.findPage.mockResolvedValue({ items: [{ id: 'i1' }], total: 1 });
+    repository.findPage.mockResolvedValue({ items: [row('i1')], total: 1 });
 
     const result = await reader.list('u1', 'co1', 'c1', { page: 3, limit: 10 });
 
@@ -357,7 +375,7 @@ describe('ContractResourceReader', () => {
       { order: { createdAt: 'DESC', id: 'ASC' }, skip: 20, take: 10 },
     );
     expect(result).toEqual({
-      data: [{ id: 'i1' }],
+      data: [{ id: 'i1', label: 'shown' }],
       meta: {
         totalItems: 1,
         itemCount: 1,
@@ -368,12 +386,57 @@ describe('ContractResourceReader', () => {
     });
   });
 
+  it('returns only the mapped response, never the stored record', async () => {
+    repository.findPage.mockResolvedValue({ items: [row('i1')], total: 1 });
+    repository.findById.mockResolvedValue(row('i2'));
+
+    const page = await reader.list('u1', 'co1', 'c1', { page: 1, limit: 10 });
+    const one = await reader.get('u1', 'co1', 'c1', 'i2');
+
+    expect(page.data[0]).not.toHaveProperty('internalKey');
+    expect(one).toEqual({ id: 'i2', label: 'shown' });
+    expect(one).not.toHaveProperty('createdAt');
+  });
+
+  it('answers an empty page for a contract with no records', async () => {
+    repository.findPage.mockResolvedValue({ items: [], total: 0 });
+
+    await expect(
+      reader.list('u1', 'co1', 'c1', { page: 1, limit: 20 }),
+    ).resolves.toEqual({
+      data: [],
+      meta: {
+        totalItems: 0,
+        itemCount: 0,
+        itemsPerPage: 20,
+        totalPages: 0,
+        currentPage: 1,
+      },
+    });
+    expect(toResponse).not.toHaveBeenCalled();
+  });
+
+  it('queries with the scope authorization returns, not the request identifiers', async () => {
+    // The trusted scope is whatever the access check resolved; a request
+    // naming another contract or company never reaches the repository.
+    access.authorize.mockResolvedValue({ contractId: 'c1', companyId: 'co1' });
+    repository.findById.mockResolvedValue(row('i1'));
+
+    await reader.get('u1', ' co1 ', ' c1 ', 'i1');
+
+    expect(repository.findById).toHaveBeenCalledWith(
+      { contractId: 'c1', companyId: 'co1' },
+      'i1',
+    );
+  });
+
   it('returns not found for records outside the scope', async () => {
     repository.findById.mockResolvedValue(null);
 
     await expect(
       reader.get('u1', 'co1', 'c1', 'foreign'),
     ).rejects.toBeInstanceOf(NotFoundException);
+    expect(toResponse).not.toHaveBeenCalled();
   });
 
   it('never queries when authorization fails', async () => {

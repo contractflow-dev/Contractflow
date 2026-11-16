@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { EUserStatus } from '@contractflow/contracts-schema';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type { MailService } from '../../../mail/mail.service';
 import type { AuthenticatedSession } from '../../interface/auth-context.interface';
 import type { IAuthTransactionContext } from '../../interface/auth-persistence.interface';
@@ -11,15 +11,15 @@ import type { SessionService } from './session.service';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let appUsers: Record<string, ReturnType<typeof vi.fn>>;
-  let appUserRepository: Record<string, ReturnType<typeof vi.fn>>;
-  let tokens: Record<string, ReturnType<typeof vi.fn>>;
-  let tokenRepository: Record<string, ReturnType<typeof vi.fn>>;
-  let passwordService: Record<string, ReturnType<typeof vi.fn>>;
-  let sessionService: Record<string, ReturnType<typeof vi.fn>>;
-  let mail: { sendVerificationEmail: ReturnType<typeof vi.fn> };
-  let execute: ReturnType<typeof vi.fn>;
-  let configGet: ReturnType<typeof vi.fn>;
+  let appUsers: Record<string, Mock>;
+  let appUserRepository: Record<string, Mock>;
+  let tokens: Record<string, Mock>;
+  let tokenRepository: Record<string, Mock>;
+  let passwordService: Record<string, Mock>;
+  let sessionService: Record<string, Mock>;
+  let mail: { sendVerificationEmail: Mock };
+  let execute: Mock;
+  let configGet: Mock;
 
   beforeEach(() => {
     appUsers = {

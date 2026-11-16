@@ -103,9 +103,6 @@ export function LoginView() {
           <div className="w-full min-w-0 max-w-md space-y-6 py-4 sm:py-6">
             <header className="space-y-2">
               <h1 className="type-page-title">Welcome back</h1>
-              {/* <p className="text-sm text-muted-foreground">
-                Sign in to continue to your company workspace.
-              </p> */}
             </header>
             <form
               onSubmit={handleSubmit(onSubmit)}

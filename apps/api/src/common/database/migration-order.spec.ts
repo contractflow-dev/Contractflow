@@ -14,7 +14,11 @@ class TestableMigrationExecutor extends MigrationExecutor {
 describe('database migration configuration', () => {
   it('orders identity and domain bootstraps before dependent migrations', () => {
     const dataSource = new DataSource({ type: 'postgres' });
-    dataSource.migrations.push(...registeredMigrations);
+    // A DataSource holds migration instances; TypeORM orders them by the
+    // timestamp at the end of each class name.
+    dataSource.migrations.push(
+      ...registeredMigrations.map((Migration) => new Migration()),
+    );
 
     expect(
       new TestableMigrationExecutor(dataSource).orderedMigrationNames(),

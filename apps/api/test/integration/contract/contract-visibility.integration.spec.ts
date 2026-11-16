@@ -736,12 +736,13 @@ describe('Contract visibility (PostgreSQL)', () => {
     });
 
     it('never lets search or sorting reveal an inaccessible contract', async () => {
-      for (const query of [
+      const queries: Array<Record<string, string>> = [
         { search: contract.title },
         { search: contract.referenceNumber },
         { sortBy: 'title', sortOrder: 'ASC' },
         { status: contract.status },
-      ]) {
+      ];
+      for (const query of queries) {
         await expect(listedIds(plainA, companyA.id, query)).resolves.toEqual({
           ids: [],
           total: 0,

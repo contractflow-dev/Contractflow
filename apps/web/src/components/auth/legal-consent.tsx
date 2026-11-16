@@ -82,23 +82,6 @@ export function LegalConsent({
             {error}
           </FieldError>
         )}
-        {/* <p className="ps-8 text-xs text-muted-foreground">
-          You may also read the{" "}
-          <Link
-            href="/terms-of-service"
-            className="underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            full Terms of Service
-          </Link>{" "}
-          and{" "}
-          <Link
-            href="/privacy-policy"
-            className="underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            full Privacy Policy
-          </Link>
-          .
-        </p> */}
       </div>
 
       <LegalDocumentDialog

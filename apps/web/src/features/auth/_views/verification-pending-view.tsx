@@ -5,8 +5,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { RiMailLine } from "@remixicon/react";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
-import { Field, FieldGroup, FieldLabel } from "@workspace/ui/components/field";
-import { Input } from "@workspace/ui/components/input";
+import { FieldGroup } from "@workspace/ui/components/field";
 import { useResendVerificationEmailMutation } from "@/services/authApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { AuthTopBar } from "@/components/auth/authTopBar";
@@ -32,10 +31,8 @@ export function VerificationPendingView({
     readPendingVerificationEmail,
     () => null,
   );
-  // null until the user edits the field: until then it shows the address
-  // the link was sent to.
-  const [typedEmail, setTypedEmail] = useState<string | null>(null);
-  const emailInput = typedEmail ?? pendingEmail ?? "";
+  // The address the link was sent to; without it there is nothing to resend.
+  const emailInput = pendingEmail ?? "";
   const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
@@ -111,21 +108,9 @@ export function VerificationPendingView({
 
           <form onSubmit={onResend}>
             <FieldGroup className="gap-4">
-              <Field>
-                <FieldLabel htmlFor="verification-email">
-                  Didn’t receive the email? Send a new link
-                </FieldLabel>
-                {/* <Input
-                  id="verification-email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  maxLength={254}
-                  placeholder="you@company.com"
-                  value={emailInput}
-                  onChange={(event) => setTypedEmail(event.target.value)}
-                /> */}
-              </Field>
+              <p className="text-sm font-medium">
+                Didn’t receive the email? Send a new link
+              </p>
 
               {message && (
                 <Alert role="status">

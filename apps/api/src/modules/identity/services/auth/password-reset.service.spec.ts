@@ -141,7 +141,7 @@ describe('PasswordResetService', () => {
 
     it.each([
       ['an unknown address', null],
-      ['a suspended account', user({ status: EUserStatus.SUSPENDED })],
+      ['an inactive account', user({ status: EUserStatus.INACTIVE })],
       ['an unverified account', user({ emailVerifiedAt: null })],
     ])('answers the same for %s and sends nothing', async (_case, found) => {
       context.users.findByEmailForUpdate.mockResolvedValue(found);
@@ -256,7 +256,7 @@ describe('PasswordResetService', () => {
 
     it.each([
       ['no longer exists', null],
-      ['is suspended', user({ status: EUserStatus.SUSPENDED })],
+      ['is inactive', user({ status: EUserStatus.INACTIVE })],
     ])('refuses when the account %s', async (_case, found) => {
       context.users.findByIdForUpdate.mockResolvedValue(found);
 

@@ -116,8 +116,12 @@ describe('ContractRoleAssignmentService', () => {
         })),
       },
       companies: { findName: vi.fn(async () => 'Sample company') },
-      workspaces: { exists: vi.fn(async () => true) },
+      workspaces: {
+        exists: vi.fn(async () => true),
+        listEnabled: vi.fn(async () => []),
+      },
       assignments: {
+        listActiveForCompany: vi.fn(async () => ({ items: [], total: 0 })),
         findActiveForParty: vi.fn(async () => []),
         hasWorkspaceAdmin: vi.fn(async () => false),
         // The caller's own roles on the party (contract visibility).
@@ -721,7 +725,7 @@ describe('ContractRoleAssignmentService', () => {
   it('rejects expired or reused invitation tokens without accepting them', async () => {
     transactionContext.invitations.findByTokenHash = vi.fn(async () => ({
       ...invitation,
-      status: 'accepted',
+      status: 'accepted' as const,
     }));
 
     await expect(

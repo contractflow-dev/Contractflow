@@ -132,11 +132,17 @@ export function RequiredFieldsNote({ className }: { className?: string }) {
  */
 export function FormSection({
   legend,
+  legendHidden = false,
   description,
   className,
   children,
 }: {
   legend: ReactNode;
+  /**
+   * Keeps the legend for screen readers only, for groups whose purpose is
+   * clear on screen from their fields. The group still has a name.
+   */
+  legendHidden?: boolean;
   description?: ReactNode;
   className?: string;
   children: ReactNode;
@@ -159,7 +165,10 @@ export function FormSection({
           subsection title. font-semibold replaces its font-medium. */}
       <FieldLegend
         variant="label"
-        className="mb-1 type-subsection-title font-semibold"
+        className={cn(
+          "mb-1 type-subsection-title font-semibold",
+          legendHidden && "sr-only",
+        )}
       >
         {legend}
       </FieldLegend>
