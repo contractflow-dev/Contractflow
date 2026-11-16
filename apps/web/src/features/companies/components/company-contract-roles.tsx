@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { ECompanyUserStatus } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
@@ -50,9 +51,22 @@ export function CompanyContractRoles({ companyId }: { companyId: string }) {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [member, setMember] = useState("");
-  const [workspace, setWorkspace] = useState<AssignableContractWorkspace | "">(
-    "",
-  );
+  // The workspace filter lives in the URL (?workspace=hse), so the
+  // dashboard and department pages can open this list already filtered.
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const workspace: AssignableContractWorkspace | "" =
+    WORKSPACES.find((w) => w === searchParams.get("workspace")) ?? "";
+  const setWorkspace = (next: AssignableContractWorkspace | "") => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next) params.set("workspace", next);
+    else params.delete("workspace");
+    const query = params.toString();
+    router.replace(`${pathname}${query ? `?${query}` : ""}#contract-roles`, {
+      scroll: false,
+    });
+  };
   const [assigning, setAssigning] = useState(false);
   const roles = useGetCompanyRoleAssignmentsQuery(
     {
@@ -80,7 +94,11 @@ export function CompanyContractRoles({ companyId }: { companyId: string }) {
   };
 
   return (
-    <section aria-labelledby="contract-roles-heading" className="space-y-4">
+    <section
+      id="contract-roles"
+      aria-labelledby="contract-roles-heading"
+      className="scroll-mt-24 space-y-4"
+    >
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">
           <h2 id="contract-roles-heading" className="type-section-title">

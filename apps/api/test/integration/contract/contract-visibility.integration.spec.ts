@@ -36,6 +36,8 @@ import { ContractAccessService } from '../../../src/modules/contract/services/co
 import { ContractLifecycleService } from '../../../src/modules/contract/services/contract-lifecycle.service';
 import { ContractRoleAssignmentService } from '../../../src/modules/contract/services/contract-role-assignment.service';
 import { ContractWorkspaceAccessService } from '../../../src/modules/contract/services/contract-workspace-access.service';
+import { CompanyDepartmentRepository } from '../../../src/modules/contract/repositories/company-department.repository';
+import { CompanyDepartmentService } from '../../../src/modules/contract/services/company-department.service';
 import { ContractService } from '../../../src/modules/contract/services/contract.service';
 import { ActivityController } from '../../../src/modules/cross-cutting/controllers/activity.controller';
 import { ActivityLogRepository } from '../../../src/modules/cross-cutting/repositories/activity-log.repository';
@@ -237,6 +239,15 @@ describe('Contract visibility (PostgreSQL)', () => {
             ),
             mail,
           ),
+        },
+        {
+          provide: CompanyDepartmentService,
+          useFactory: (access: ContractAccessService) =>
+            new CompanyDepartmentService(
+              access,
+              new CompanyDepartmentRepository(dataSource.manager),
+            ),
+          inject: [ContractAccessService],
         },
         CompanyContextGuard,
         ContractContextGuard,
@@ -631,6 +642,58 @@ describe('Contract visibility (PostgreSQL)', () => {
       expect(rows.map(({ companyUserId }) => companyUserId).sort()).toEqual(
         [projectLead.id, financeMember.id, hseAdmin.id, otherContractMember.id].sort(),
       );
+    });
+
+    it("serves a department's contracts to the Company Administrator, with the company's own people only", async () => {
+      const cookie = await signIn(adminA);
+      const response = await request(app.getHttpServer())
+        .get('/api/company/departments/hse/contracts')
+        .query({ page: '1', limit: '20' })
+        .set('Cookie', cookie)
+        .set('X-Company-Id', companyA.id)
+        .expect(200);
+      const body = response.body as {
+        data: Array<{ contractId: string; memberCount: number; workspaceAdmins: Array<{ companyUserId: string }> }>;
+        summary: { contractCount: number };
+      };
+      expect(body.data.map(({ contractId }) => contractId)).toEqual([contract.id]);
+      expect(body.data[0]).toMatchObject({
+        memberCount: 1,
+        workspaceAdmins: [{ companyUserId: hseAdmin.id }],
+      });
+      // Company B's HSE Manager on the same contract is never shown.
+      expect(JSON.stringify(body)).not.toContain(memberB.id);
+
+      for (const [path, query] of [
+        ['/api/company/departments/payroll/contracts', {}],
+        ['/api/company/departments/hse/contracts', { companyId: companyB.id }],
+        ['/api/company/departments/hse/contracts', { sort: 'random' }],
+      ] as const) {
+        const refused = await request(app.getHttpServer())
+          .get(path)
+          .query(query)
+          .set('Cookie', cookie)
+          .set('X-Company-Id', companyA.id);
+        expect({ path, query, status: refused.status }).toEqual({ path, query, status: 400 });
+      }
+    });
+
+    it('keeps department pages closed to members, role holders and other companies', async () => {
+      for (const member of [plainA, hseAdmin]) {
+        const response = await request(app.getHttpServer())
+          .get('/api/company/departments/hse/contracts')
+          .set('Cookie', await signIn(member))
+          .set('X-Company-Id', companyA.id);
+        expect(response.status).toBe(403);
+      }
+      await request(app.getHttpServer())
+        .get('/api/company/departments/hse/contracts')
+        .set('Cookie', await signIn(adminO))
+        .set('X-Company-Id', companyA.id)
+        .expect(403);
+      await request(app.getHttpServer())
+        .get('/api/company/departments/hse/contracts')
+        .expect(401);
     });
 
     it('lets an administrator without a role reach the transition check only to be refused (403), and keeps conflicts as 409', async () => {

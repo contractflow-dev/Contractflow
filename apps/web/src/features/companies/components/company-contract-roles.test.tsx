@@ -7,7 +7,18 @@ import {
 import type { CompanyRoleAssignment } from "@/services/contractApi";
 import { CompanyContractRoles } from "./company-contract-roles";
 
-const mocks = vi.hoisted(() => ({ roles: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  roles: vi.fn(),
+  search: "",
+  replace: vi.fn(),
+}));
+
+// The workspace filter lives in the URL.
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/dashboards/team",
+  useRouter: () => ({ replace: mocks.replace }),
+  useSearchParams: () => new URLSearchParams(mocks.search),
+}));
 
 vi.mock("@/services/contractApi", () => ({
   useGetCompanyRoleAssignmentsQuery: mocks.roles,
@@ -67,7 +78,38 @@ const render = () =>
   renderToStaticMarkup(<CompanyContractRoles companyId="company-1" />);
 
 describe("CompanyContractRoles", () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mocks.search = "";
+  });
+
+  it("applies the workspace filter from the URL, and marks the section for links", () => {
+    mocks.search = "workspace=hse";
+    mocks.roles.mockReturnValue({ currentData: page([row]) });
+
+    const markup = render();
+
+    expect(mocks.roles).toHaveBeenCalledWith(
+      { companyId: "company-1", page: 1, limit: 10, workspace: "hse" },
+      { refetchOnMountOrArgChange: true },
+    );
+    expect(markup).toContain('id="contract-roles"');
+    expect(markup).toMatch(
+      /<option(?=[^>]*value="hse")(?=[^>]*selected="")[^>]*>/,
+    );
+  });
+
+  it("ignores an unknown workspace in the URL", () => {
+    mocks.search = "workspace=payroll";
+    mocks.roles.mockReturnValue({ isLoading: true });
+
+    render();
+
+    expect(mocks.roles).toHaveBeenCalledWith(
+      { companyId: "company-1", page: 1, limit: 10 },
+      { refetchOnMountOrArgChange: true },
+    );
+  });
 
   it("asks for the header company's roles, first page, without filters", () => {
     mocks.roles.mockReturnValue({ isLoading: true });

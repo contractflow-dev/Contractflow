@@ -1,4 +1,5 @@
 import type {
+  IPaginatedResponse,
   IPaginationQuery,
   ISortQuery,
 } from "../../../common/interfaces/pagination.interface.js";
@@ -8,6 +9,8 @@ import type {
   EContractSortField,
   EContractStatus,
   EContractType,
+  EDepartmentBlockerType,
+  EDepartmentContractSort,
   EFromStatus,
   EPartyType,
   EToStatus,
@@ -356,4 +359,93 @@ export interface ContractWorkspaceAccess {
 /** `GET /contract/workspace-access`: every workspace enabled on the contract. */
 export interface ContractWorkspaceAccessResponse {
   workspaces: ContractWorkspaceAccess[];
+}
+
+/**
+ * The company a department blocker waits on. `companyId` and `companyName`
+ * are null when it can't be told ("Unknown").
+ */
+export interface DepartmentBlockerHolder {
+  companyId: string | null;
+  companyName: string | null;
+  /** The holder is the Company Administrator's own company. */
+  myCompany: boolean;
+}
+
+export interface DepartmentBlocker {
+  type: EDepartmentBlockerType;
+  /** Plain language, for example "Invitation to Ridgeline Ltd is pending". */
+  label: string;
+  holder: DepartmentBlockerHolder;
+}
+
+/** A member of the Company Administrator's own company. */
+export interface DepartmentMember {
+  companyUserId: string;
+  firstName: string;
+  lastName: string;
+}
+
+/**
+ * `GET /company/departments/:department/contracts`: one contract where the
+ * department's workspace exists and the company is a party. Only oversight
+ * information: no workspace content, and only the company's own people.
+ */
+export interface DepartmentContract {
+  contractId: string;
+  referenceNumber: string;
+  title: string;
+  status: EContractStatus;
+  /** Archived contracts are listed only on request, read-only. */
+  archived: boolean;
+  /** The company's own party type on the contract. */
+  partyType: EPartyType;
+  /** Distinct members of the company with an active role in the workspace. */
+  memberCount: number;
+  /** The first few of them, Workspace Admins first. */
+  members: DepartmentMember[];
+  /** The company's Workspace Admins in the workspace; empty when none. */
+  workspaceAdmins: DepartmentMember[];
+  /** The highest-ranked blocker; null when nothing holds progress. */
+  primaryBlocker: DepartmentBlocker | null;
+  /** How many more blockers apply. */
+  otherBlockerCount: number;
+  /** The latest status change or contract edit. */
+  lastMovementAt: string;
+  daysSinceMovement: number;
+  /** The requesting administrator holds a role in this workspace. */
+  hasWorkspaceRole: boolean;
+}
+
+export interface DepartmentContractsSummary {
+  /** Contracts (not archived) where the workspace exists. */
+  contractCount: number;
+  /** Distinct members of the company with a role in the workspace. */
+  memberCount: number;
+  /** Contracts whose main blocker waits on the company. */
+  waitingOnMyCompanyCount: number;
+  /** Contracts whose main blocker waits on another company. */
+  waitingOnOtherCompaniesCount: number;
+}
+
+export interface DepartmentContractsResponse extends IPaginatedResponse<DepartmentContract> {
+  summary: DepartmentContractsSummary;
+}
+
+/** Whose move a contract waits on, by its main blocker. */
+export type DepartmentWaitingOn = "us" | "others";
+
+/** Filters, order and page of the department contract list. */
+export interface DepartmentContractsQuery extends IPaginationQuery {
+  search?: string;
+  status?: EContractStatus;
+  partyType?: EPartyType;
+  /**
+   * Only contracts whose main blocker waits on the company (`us`) or on
+   * another company (`others`).
+   */
+  waitingOn?: DepartmentWaitingOn;
+  sort?: EDepartmentContractSort;
+  /** Also list archived contracts the company created (read-only). */
+  includeArchived?: boolean;
 }

@@ -11,10 +11,12 @@ import {
   RiRefreshLine,
   RiSettings3Line,
   RiShieldCheckLine,
-  RiTimeLine,
   RiUserAddLine,
 } from "@remixicon/react";
-import type { ICompanyDashboardResponse } from "@contractflow/contracts-schema";
+import {
+  ECompanyDepartment,
+  type ICompanyDashboardResponse,
+} from "@contractflow/contracts-schema";
 import {
   Alert,
   AlertDescription,
@@ -45,6 +47,8 @@ import { useGetCompanyDashboardQuery } from "@/features/companies";
 import { useGetCurrentUserQuery } from "@/services/authApi";
 import { CompanyAdminShell } from "@/features/companies/CompanyAdminShell";
 import { CompanyVerificationNotice } from "@/features/companies/company-verification-notice";
+import { departmentHref } from "@/features/companies/company-navigation";
+import { departmentStaffingHref } from "@/features/companies/departments";
 import { NEW_CONTRACT_ANCHOR } from "@/features/contracts/components/create-contract-form";
 import { IncomingContractInvitations } from "@/features/contracts/components/incoming-contract-invitations";
 
@@ -240,36 +244,54 @@ function DepartmentWorkspaces({ data }: { data: ICompanyDashboardResponse }) {
     name: string;
     icon: ComponentType<{ className?: string }>;
     tint: string;
-    value: number;
-    label: string;
+    /** The first is the card's headline figure; any others follow it. */
+    figures: Array<{ value: number; label: string }>;
+    /** Team → Contract roles for the department's workspace (D1). */
+    staffingHref: string;
+    /** The department's oversight page. */
+    overviewHref: string;
   }> = [
     {
-      name: "Contractor",
-      icon: RiFileTextLine,
-      tint: "bg-dept-contractor/15 text-dept-contractor",
-      value: data.departments.complianceAttentionCount,
-      label: "Compliance records needing attention",
-    },
-    {
-      name: "Client PM",
+      // One Project department for both sides, as in the sidebar.
+      name: "Project",
       icon: RiBarChart2Line,
       tint: "bg-dept-client-pm/15 text-dept-client-pm",
-      value: data.departments.contractsNeedingAttentionCount,
-      label: "Contracts needing attention",
+      figures: [
+        {
+          value: data.departments.contractsNeedingAttentionCount,
+          label: "Contracts needing attention",
+        },
+      ],
+      staffingHref: departmentStaffingHref(ECompanyDepartment.PROJECT),
+      overviewHref: departmentHref("project"),
     },
     {
       name: "HSE",
       icon: RiShieldCheckLine,
       tint: "bg-dept-hse/15 text-dept-hse",
-      value: data.departments.openIncidentCount,
-      label: "Open incidents",
+      // Compliance records belong to the HSE workspace.
+      figures: [
+        { value: data.departments.openIncidentCount, label: "Open incidents" },
+        {
+          value: data.departments.complianceAttentionCount,
+          label: "Compliance records needing attention",
+        },
+      ],
+      staffingHref: departmentStaffingHref(ECompanyDepartment.HSE),
+      overviewHref: departmentHref("hse"),
     },
     {
       name: "Finance",
       icon: RiMoneyDollarCircleLine,
       tint: "bg-dept-finance/15 text-dept-finance",
-      value: data.departments.invoicesDueSoonCount,
-      label: `Invoices due in the next ${data.departments.dueWindowDays} days`,
+      figures: [
+        {
+          value: data.departments.invoicesDueSoonCount,
+          label: `Invoices due in the next ${data.departments.dueWindowDays} days`,
+        },
+      ],
+      staffingHref: departmentStaffingHref(ECompanyDepartment.FINANCE),
+      overviewHref: departmentHref("finance"),
     },
   ];
   return (
@@ -279,37 +301,70 @@ function DepartmentWorkspaces({ data }: { data: ICompanyDashboardResponse }) {
         title="Department workspaces"
         description="Each department sees your contracts through its own lens."
       />
-      <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {departments.map(({ name, icon: Icon, tint, value, label }) => (
-          <li key={name}>
-            <Card highlight className="h-full">
-              <CardContent className="flex h-full flex-col gap-3">
-                <div className="flex items-center gap-3">
-                  <span
-                    className={cn(
-                      "grid size-9 place-items-center rounded-xl",
-                      tint,
-                    )}
-                  >
-                    <Icon className="size-5" aria-hidden="true" />
-                  </span>
-                  <h3 className="type-subsection-title">{name}</h3>
-                </div>
-                <div>
-                  <p className="font-heading text-2xl font-semibold tabular-nums">
-                    {formatNumber(value)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{label}</p>
-                </div>
-                {/* Workspaces are not built yet: no link to a missing page. */}
-                <p className="mt-auto flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <RiTimeLine className="size-3.5" aria-hidden="true" />
-                  Workspace planned
-                </p>
-              </CardContent>
-            </Card>
-          </li>
-        ))}
+      <ul className="grid gap-4 md:grid-cols-3">
+        {departments.map(
+          ({
+            name,
+            icon: Icon,
+            tint,
+            figures: [headline, ...more],
+            staffingHref,
+            overviewHref,
+          }) => (
+            <li key={name}>
+              <Card highlight className="h-full">
+                <CardContent className="flex h-full flex-col gap-3">
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={cn(
+                        "grid size-9 place-items-center rounded-xl",
+                        tint,
+                      )}
+                    >
+                      <Icon className="size-5" aria-hidden="true" />
+                    </span>
+                    <h3 className="type-subsection-title">{name}</h3>
+                  </div>
+                  <div>
+                    <p className="font-heading text-2xl font-semibold tabular-nums">
+                      {formatNumber(headline.value)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {headline.label}
+                    </p>
+                  </div>
+                  {more.map((figure) => (
+                    <div key={figure.label}>
+                      <p className="text-base font-semibold tabular-nums">
+                        {formatNumber(figure.value)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {figure.label}
+                      </p>
+                    </div>
+                  ))}
+                  <div className="mt-auto flex flex-wrap gap-x-4 gap-y-1">
+                    <Link
+                      href={staffingHref}
+                      aria-label={`Manage ${name} staffing`}
+                      className="inline-flex items-center gap-1.5 text-sm font-medium text-primary underline-offset-4 group-hover/card:text-card-foreground group-hover/card:underline hover:underline"
+                    >
+                      Manage staffing
+                      <RiArrowRightLine className="size-4" aria-hidden="true" />
+                    </Link>
+                    <Link
+                      href={overviewHref}
+                      aria-label={`View ${name} contracts`}
+                      className="text-sm font-medium text-primary underline-offset-4 group-hover/card:text-card-foreground group-hover/card:underline hover:underline"
+                    >
+                      View contracts
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            </li>
+          ),
+        )}
       </ul>
     </section>
   );

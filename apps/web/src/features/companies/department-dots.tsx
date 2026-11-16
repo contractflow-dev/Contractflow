@@ -20,5 +20,7 @@ function departmentDot(colour: string) {
 
 export const ContractorDot = departmentDot("bg-dept-contractor");
 export const ClientPmDot = departmentDot("bg-dept-client-pm");
+/** The Project workspace, both sides: the same colour as elsewhere. */
+export const ProjectDot = ClientPmDot;
 export const HseDot = departmentDot("bg-dept-hse");
 export const FinanceDot = departmentDot("bg-dept-finance");
