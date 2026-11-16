@@ -5,12 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  RiArrowRightLine,
-  RiGlobalLine,
-  RiMailLine,
-  RiPhoneLine,
-} from "@remixicon/react";
+import { RiArrowRightLine, RiGlobalLine, RiMailLine } from "@remixicon/react";
 
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
@@ -34,6 +29,8 @@ import {
 } from "@workspace/ui/components/select";
 
 import { LegalConsent } from "@/components/auth/legal-consent";
+import { PhoneNumberInput } from "@/components/forms/phone-number-input";
+import { EMPTY_PHONE, phoneToE164 } from "@/lib/phone";
 import { registerSchema, type RegisterValues } from "../registerSchema";
 import { rememberPendingVerificationEmail } from "../pendingVerificationEmail";
 import { PasswordInput } from "./password-input";
@@ -127,7 +124,8 @@ export function RegisterForm({
       lastName: "",
       middleName: "",
       email: "",
-      phone: "",
+      // No country is preselected: the user picks it with the number.
+      phone: EMPTY_PHONE,
       timezone: "",
       password: "",
       confirmPassword: "",
@@ -184,7 +182,8 @@ export function RegisterForm({
       firstName: values.firstName,
       middleName: values.middleName?.trim() || undefined,
       lastName: values.lastName,
-      phoneNumber: values.phone?.trim() ?? "",
+      // E.164, or "" when no number was given.
+      phoneNumber: phoneToE164(values.phone),
       timezone: values.timezone,
     };
 
@@ -319,28 +318,22 @@ export function RegisterForm({
         <Controller
           name="phone"
           control={form.control}
-          render={({ field, fieldState }) => (
+          render={({ field, formState }) => (
             <FormField
               id="phone"
               label="Phone number"
               optional
-              error={fieldState.error?.message}
+              error={formState.errors.phone?.nationalNumber?.message}
             >
               {(control) => (
-                <InputGroup>
-                  <InputGroupAddon>
-                    <RiPhoneLine aria-hidden="true" />
-                  </InputGroupAddon>
-                  <InputGroupInput
-                    {...field}
-                    {...control}
-                    value={field.value ?? ""}
-                    type="tel"
-                    maxLength={100}
-                    autoComplete="tel"
-                    placeholder="+1 (555) 000-0000"
-                  />
-                </InputGroup>
+                <PhoneNumberInput
+                  {...control}
+                  countryName="phone.countryCode"
+                  nationalNumberName="phone.nationalNumber"
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  onBlur={field.onBlur}
+                />
               )}
             </FormField>
           )}

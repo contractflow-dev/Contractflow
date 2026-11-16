@@ -33,9 +33,14 @@ export class CreateContractSiteRequestDto implements CreateContractSiteRequest {
   @Length(1, 100)
   city!: string;
 
+  /**
+   * A subdivision of `countryCode` (name or code), required where ContractFlow
+   * supports the country's subdivisions and free text otherwise. The service
+   * checks it against the country and stores the canonical name.
+   */
   @Transform(trim)
   @IsString()
-  @Length(1, 100)
+  @Length(0, 100)
   stateRegion!: string;
 
   @Transform(({ value }) =>

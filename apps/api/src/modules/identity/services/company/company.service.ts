@@ -12,6 +12,7 @@ import {
   ECompanyUserStatus,
   EUserStatus,
 } from '@contractflow/contracts-schema';
+import { resolveStateRegion } from '../../../../common/application/state-region';
 import { CompanyUser } from '../../entities/company-user.entity';
 import { CompanyInvitationRepository } from '../../repositories/company-invitation.repository';
 import { ContractPartyRepository } from '../../../contract/repositories/contract-party.repository';
@@ -57,6 +58,7 @@ export class CompanyService {
     userId: string,
     dto: CreateCompanyRequestDto,
   ): Promise<ICompanyAccessResponse> {
+    const stateRegion = resolveStateRegion(dto.countryCode, dto.stateRegion);
     const result = await this.companyCreation.execute(async (context) => {
       const user = await context.findUserById(userId);
 
@@ -72,6 +74,7 @@ export class CompanyService {
 
       const savedCompany = await context.createCompany({
         ...dto,
+        stateRegion,
         registrationNumber: dto.registrationNumber ?? '',
         taxIdentificationNumber: dto.taxIdentificationNumber ?? '',
         website: dto.website ?? '',

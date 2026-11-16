@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { useForm, useWatch, type FieldPath } from "react-hook-form";
+import { Controller, useForm, useWatch, type FieldPath } from "react-hook-form";
 import { RiMailLine } from "@remixicon/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -26,7 +26,11 @@ import {
   ECurrencyCode,
   COUNTRY_CURRENCY_MAP,
 } from "@contractflow/contracts-schema";
-import { countryCodes, countryOptions } from "@/lib/countries";
+import { countryCodes } from "@/lib/countries";
+import { refineStateRegion } from "@/lib/address";
+import { CountryRegionFields } from "@/components/forms/country-region-fields";
+import { PhoneNumberInput } from "@/components/forms/phone-number-input";
+import { EMPTY_PHONE, phoneFieldSchema, phoneToE164 } from "@/lib/phone";
 import { websiteSchema } from "@/lib/website";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button, buttonVariants } from "@workspace/ui/components/button";
@@ -45,39 +49,42 @@ import { Separator } from "@workspace/ui/components/separator";
 
 const currencyCodes = Object.values(ECurrencyCode);
 
-const companySchema = z.object({
-  name: z.string().trim().min(1, "Company name is required").max(255),
-  legalName: z.string().trim().min(1, "Legal name is required").max(255),
-  registrationNumber: z.string().trim().max(64),
-  taxIdentificationNumber: z.string().trim().max(64),
-  email: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .max(254)
-    .pipe(z.email("Enter a valid company email")),
-  phoneNumber: z.string().trim().min(1, "Phone number is required").max(20),
-  website: websiteSchema,
-  addressLine1: z.string().trim().min(1, "Address is required").max(255),
-  addressLine2: z.string().trim().max(255),
-  city: z.string().trim().min(1, "City is required").max(100),
-  stateRegion: z.string().trim().min(1, "State or region is required").max(100),
-  postalCode: z.string().trim().min(1, "Postal code is required").max(20),
-  countryCode: z
-    .string()
-    .trim()
-    .toUpperCase()
-    .refine((code) => countryCodes.includes(code as ECountryCode), {
-      message: "Select a country",
-    }),
-  defaultCurrencyCode: z
-    .string()
-    .trim()
-    .toUpperCase()
-    .refine((code) => currencyCodes.includes(code as ECurrencyCode), {
-      message: "Select a valid currency code",
-    }),
-});
+const companySchema = z
+  .object({
+    name: z.string().trim().min(1, "Company name is required").max(255),
+    legalName: z.string().trim().min(1, "Legal name is required").max(255),
+    registrationNumber: z.string().trim().max(64),
+    taxIdentificationNumber: z.string().trim().max(64),
+    email: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .max(254)
+      .pipe(z.email("Enter a valid company email")),
+    phone: phoneFieldSchema({ required: true }),
+    website: websiteSchema,
+    addressLine1: z.string().trim().min(1, "Address is required").max(255),
+    addressLine2: z.string().trim().max(255),
+    city: z.string().trim().min(1, "City is required").max(100),
+    // Required only where the country has supported subdivisions; see below.
+    stateRegion: z.string().trim().max(100),
+    postalCode: z.string().trim().min(1, "Postal code is required").max(20),
+    countryCode: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .refine((code) => countryCodes.includes(code as ECountryCode), {
+        message: "Select a country",
+      }),
+    defaultCurrencyCode: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .refine((code) => currencyCodes.includes(code as ECurrencyCode), {
+        message: "Select a valid currency code",
+      }),
+  })
+  .superRefine(refineStateRegion);
 
 type CompanyFormValues = z.infer<typeof companySchema>;
 
@@ -88,7 +95,7 @@ type CompanyFormValues = z.infer<typeof companySchema>;
 export const companySetupSteps: Array<{
   id: "company" | "contact" | "address";
   title: string;
-  fields: Array<FieldPath<CompanyFormValues>>;
+  fields: Array<keyof CompanyFormValues>;
 }> = [
   {
     id: "company",
@@ -103,7 +110,7 @@ export const companySetupSteps: Array<{
   {
     id: "contact",
     title: "Contact",
-    fields: ["email", "phoneNumber", "website"],
+    fields: ["email", "phone", "website"],
   },
   {
     id: "address",
@@ -196,7 +203,8 @@ export function OnboardingView() {
       registrationNumber: "",
       taxIdentificationNumber: "",
       email: "",
-      phoneNumber: "",
+      // No country is preselected: the user picks it with the number.
+      phone: EMPTY_PHONE,
       website: "",
       addressLine1: "",
       addressLine2: "",
@@ -267,6 +275,7 @@ export function OnboardingView() {
   );
 
   const countryCode = useWatch({ control, name: "countryCode" });
+  const stateRegion = useWatch({ control, name: "stateRegion" });
   const defaultCurrencyCode = useWatch({
     control,
     name: "defaultCurrencyCode",
@@ -331,11 +340,12 @@ export function OnboardingView() {
     })(event);
   }
 
-  async function onSubmit(values: CompanyFormValues) {
+  async function onSubmit({ phone, ...values }: CompanyFormValues) {
     setServerError(null);
     try {
       const response = await createCompany({
         ...values,
+        phoneNumber: phoneToE164(phone),
         countryCode: values.countryCode as ECountryCode,
         defaultCurrencyCode: values.defaultCurrencyCode as ECurrencyCode,
       }).unwrap();
@@ -603,21 +613,31 @@ export function OnboardingView() {
                   />
                 )}
               </FormField>
-              <FormField
-                id="phoneNumber"
-                label="Phone number"
-                required
-                error={errors.phoneNumber?.message}
-              >
-                {(control) => (
-                  <Input
-                    {...control}
-                    type="tel"
-                    autoComplete="tel"
-                    {...register("phoneNumber")}
-                  />
+              <Controller
+                name="phone"
+                control={control}
+                render={({ field }) => (
+                  <FormField
+                    id="phoneNumber"
+                    label="Phone number"
+                    required
+                    error={errors.phone?.nationalNumber?.message}
+                  >
+                    {(controlProps) => (
+                      <PhoneNumberInput
+                        {...controlProps}
+                        // Named so focusFirstInvalid can find the number.
+                        countryName="phone.countryCode"
+                        nationalNumberName="phone.nationalNumber"
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        onBlur={field.onBlur}
+                        required
+                      />
+                    )}
+                  </FormField>
                 )}
-              </FormField>
+              />
               <FormField
                 id="website"
                 label="Website"
@@ -669,44 +689,19 @@ export function OnboardingView() {
                   />
                 )}
               </FormField>
-              <FormField
-                id="countryCode"
-                label="Country"
-                required
-                error={errors.countryCode?.message}
-              >
-                {(control) => (
-                  <NativeSelect
-                    {...control}
-                    autoComplete="country"
-                    className="w-full"
-                    {...register("countryCode")}
-                  >
-                    <NativeSelectOption value="">
-                      Select a country
-                    </NativeSelectOption>
-                    {countryOptions.map(({ code, name }) => (
-                      <NativeSelectOption key={code} value={code}>
-                        {name}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                )}
-              </FormField>
-              <FormField
-                id="stateRegion"
-                label="State or region"
-                required
-                error={errors.stateRegion?.message}
-              >
-                {(control) => (
-                  <Input
-                    {...control}
-                    autoComplete="address-level1"
-                    {...register("stateRegion")}
-                  />
-                )}
-              </FormField>
+              <CountryRegionFields
+                countryId="countryCode"
+                stateRegionId="stateRegion"
+                // Named so focusFirstInvalid can find the controls.
+                countryName="countryCode"
+                stateRegionName="stateRegion"
+                countryCode={countryCode}
+                stateRegion={stateRegion}
+                onCountryCodeChange={(code) => setValue("countryCode", code)}
+                onStateRegionChange={(value) => setValue("stateRegion", value)}
+                countryError={errors.countryCode?.message}
+                stateRegionError={errors.stateRegion?.message}
+              />
               <FormField
                 id="city"
                 label="City"

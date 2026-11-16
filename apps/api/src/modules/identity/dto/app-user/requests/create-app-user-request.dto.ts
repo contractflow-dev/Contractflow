@@ -13,6 +13,7 @@ import {
   MAX_PASSWORD_LENGTH,
   STRONG_PASSWORD_OPTIONS,
 } from '../../auth/password-policy';
+import { IsInternationalPhoneNumber } from '../../../../../common/dto/phone-number.validation';
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
 
@@ -47,9 +48,8 @@ export class CreateAppUserRequestDto implements RegisterRequest {
   @IsNotEmpty()
   password: string;
 
-  @Transform(trim)
-  @IsString()
-  @MaxLength(100)
+  /** Optional: `""` or an international number, stored in E.164. */
+  @IsInternationalPhoneNumber({ allowEmpty: true })
   phoneNumber: string;
 
   @IsTimeZone()

@@ -6,7 +6,7 @@ const valid = {
   middleName: "",
   lastName: "Lovelace",
   email: "ada@example.com",
-  phone: "",
+  phone: { countryCode: "", nationalNumber: "" },
   timezone: "Africa/Lagos",
   password: "Correct-Horse-9",
   confirmPassword: "Correct-Horse-9",
@@ -25,6 +25,31 @@ function messages(values: Record<string, unknown>) {
 describe("registerSchema", () => {
   it("accepts a complete registration", () => {
     expect(messages(valid)).toEqual({});
+  });
+
+  it("keeps the phone number optional and checks it against its country", () => {
+    expect(
+      messages({ ...valid, phone: { countryCode: "NG", nationalNumber: "" } }),
+    ).toEqual({});
+    expect(
+      messages({
+        ...valid,
+        phone: { countryCode: "NG", nationalNumber: "0803 123 4567" },
+      }),
+    ).toEqual({});
+    expect(
+      messages({
+        ...valid,
+        phone: { countryCode: "", nationalNumber: "0803 123 4567" },
+      }),
+    ).toEqual({
+      "phone.nationalNumber": "Select the country for this number.",
+    });
+    expect(
+      messages({ ...valid, phone: { countryCode: "NG", nationalNumber: "0803" } }),
+    ).toEqual({
+      "phone.nationalNumber": "This number is too short for Nigeria.",
+    });
   });
 
   it("keeps the API's password rules", () => {

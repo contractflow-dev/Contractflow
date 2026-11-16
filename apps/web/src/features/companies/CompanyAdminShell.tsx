@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, type ReactNode } from "react";
-import { RiBuilding3Fill, RiBuilding4Line } from "@remixicon/react";
+import { RiBuilding3Fill } from "@remixicon/react";
 import { Button } from "@workspace/ui/components/button";
 import {
   Card,
@@ -18,6 +18,7 @@ import {
   NativeSelectOption,
 } from "@workspace/ui/components/native-select";
 import { Skeleton } from "@workspace/ui/components/skeleton";
+import { LogoMark } from "@workspace/ui/components/logo";
 import { AppShell } from "@/components/app-shell/app-shell";
 import { isNavItemActive } from "@/components/app-shell/navigation";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
@@ -43,16 +44,12 @@ import {
   type CompanyAccessState,
 } from "@/features/workspace";
 import { getApiErrorMessage } from "@/lib/apiError";
-import { cn } from "@/lib/utils";
 import {
   useGetCompaniesQuery,
   useGetCompanyAccessSummaryQuery,
 } from "@/services/companiesApi";
 import type { ICompanyAccessResponse } from "@contractflow/contracts-schema";
-import {
-  COMPANY_NAVIGATION,
-  companyNavigationFor,
-} from "./company-navigation";
+import { COMPANY_NAVIGATION, companyNavigationFor } from "./company-navigation";
 
 const noCompanyNotices: Partial<
   Record<
@@ -343,9 +340,7 @@ export function CompanyAdminShell({
       navigationLabel="Company dashboard"
       brand={
         <Link href={homePath} className="flex items-center gap-3">
-          <span className="grid size-9 place-items-center rounded-lg bg-primary text-primary-foreground">
-            <RiBuilding4Line className="size-5" aria-hidden="true" />
-          </span>
+          <LogoMark variant="inverse" className="size-9" />
           <span className="font-heading text-lg font-semibold text-sidebar-accent-foreground">
             ContractFlow
           </span>

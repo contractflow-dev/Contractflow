@@ -52,6 +52,10 @@ import {
 } from '../interfaces/contract-lifecycle-persistence.interface';
 import { MailService } from '../../mail/mail.service';
 import {
+  resolveStateRegion,
+  resolveStateRegionUpdate,
+} from '../../../common/application/state-region';
+import {
   WORKSPACE_ROLES,
   type AssignableContractWorkspace,
 } from './contract-workspace';
@@ -780,6 +784,7 @@ export class ContractLifecycleService {
     contractId: string,
     dto: CreateContractSiteRequestDto,
   ): Promise<ContractSiteResponse> {
+    const stateRegion = resolveStateRegion(dto.countryCode, dto.stateRegion);
     return this.unitOfWork.execute(async (context) => {
       const { contract, actor } = await this.requireOwnedContract(
         context,
@@ -794,7 +799,7 @@ export class ContractLifecycleService {
         siteCode: dto.siteCode.trim(),
         addressLine1: dto.addressLine1.trim(),
         city: dto.city.trim(),
-        stateRegion: dto.stateRegion.trim(),
+        stateRegion,
         countryCode: dto.countryCode,
         latitudeE6: dto.latitudeE6,
         longitudeE6: dto.longitudeE6,
@@ -845,9 +850,8 @@ export class ContractLifecycleService {
         site.addressLine1 = dto.addressLine1.trim();
       }
       if (dto.city !== undefined) site.city = dto.city.trim();
-      if (dto.stateRegion !== undefined) {
-        site.stateRegion = dto.stateRegion.trim();
-      }
+      const stateRegion = resolveStateRegionUpdate(site, dto);
+      if (stateRegion !== undefined) site.stateRegion = stateRegion;
       if (dto.countryCode !== undefined) site.countryCode = dto.countryCode;
       if (dto.latitudeE6 !== undefined) site.latitudeE6 = dto.latitudeE6;
       if (dto.longitudeE6 !== undefined) site.longitudeE6 = dto.longitudeE6;

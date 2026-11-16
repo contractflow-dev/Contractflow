@@ -6,6 +6,7 @@ import {
   IsTimeZone,
   MaxLength,
 } from 'class-validator';
+import { IsInternationalPhoneNumber } from '../../../../../common/dto/phone-number.validation';
 import type { UpdateMyProfileRequest } from '@contractflow/contracts-schema';
 
 const trim = ({ value }: { value: unknown }) =>
@@ -38,11 +39,9 @@ export class UpdateAppUserRequestDto implements UpdateMyProfileRequest {
   @MaxLength(100)
   lastName?: string;
 
-  /** `app_user.phone_number` is varchar(20). */
+  /** `""` clears it; otherwise an international number, stored in E.164. */
   @IsOptional()
-  @Transform(trim)
-  @IsString()
-  @MaxLength(20)
+  @IsInternationalPhoneNumber({ allowEmpty: true })
   phoneNumber?: string;
 
   @IsOptional()

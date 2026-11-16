@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { phoneFieldSchema } from "@/lib/phone";
 
 /** The API's password policy for any new password (registration and reset). */
 export const newPasswordSchema = z
@@ -19,7 +20,7 @@ const registerFields = z.object({
   middleName: z.string().trim().max(100).optional(),
   lastName: z.string().trim().min(1, "Enter your last name").max(100),
   email: z.string().trim().email("Enter a valid email").max(254),
-  phone: z.string().trim().max(100).optional(),
+  phone: phoneFieldSchema({ required: false }),
   timezone: z.string().min(1, "Select a timezone"),
   password: newPasswordSchema,
   confirmPassword: z.string().min(1, "Confirm your password"),

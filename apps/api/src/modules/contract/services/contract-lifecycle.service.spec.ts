@@ -687,6 +687,48 @@ describe('ContractLifecycleService', () => {
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
+    it('stores a site region by its canonical name and rejects another country’s', async () => {
+      await service.createSite(actor.userId, actor.companyId, contract.id, {
+        ...siteInput,
+        stateRegion: 'Lagos State',
+      });
+      expect(context.sites.create).toHaveBeenCalledWith(
+        expect.objectContaining({ stateRegion: 'Lagos' }),
+      );
+
+      context.sites.create.mockClear();
+      await expect(
+        service.createSite(actor.userId, actor.companyId, contract.id, {
+          ...siteInput,
+          countryCode: ECountryCode.GH,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(context.sites.create).not.toHaveBeenCalled();
+    });
+
+    it('does not keep a region when the site moves to another country', async () => {
+      context.sites.findForUpdate.mockResolvedValue({ ...storedSite });
+
+      await expect(
+        service.updateSite(actor.userId, actor.companyId, contract.id, 'site-1', {
+          countryCode: ECountryCode.CA,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(context.sites.save).not.toHaveBeenCalled();
+
+      const result = await service.updateSite(
+        actor.userId,
+        actor.companyId,
+        contract.id,
+        'site-1',
+        { countryCode: ECountryCode.CA, stateRegion: 'ON' },
+      );
+      expect(result).toMatchObject({
+        countryCode: ECountryCode.CA,
+        stateRegion: 'Ontario',
+      });
+    });
+
     it('rejects an empty site update', async () => {
       await expect(
         service.updateSite(actor.userId, actor.companyId, contract.id, 'site-1', {}),

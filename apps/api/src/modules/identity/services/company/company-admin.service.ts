@@ -20,6 +20,7 @@ import {
 } from '@contractflow/contracts-schema';
 import { toPaginatedResponse } from '../../../../common/application/pagination';
 import type { IPageQuery } from '../../../../common/application/pagination.interface';
+import { resolveStateRegionUpdate } from '../../../../common/application/state-region';
 import type { ICompanyScope } from '../../../../common/database/repositories/company-scope.interface';
 import type { Company } from '../../entities/company.entity';
 import type { CompanyInvitation } from '../../entities/company-invitation.entity';
@@ -792,7 +793,9 @@ export class CompanyAdminService {
         const emailChanged =
           dto.email !== undefined &&
           dto.email.toLowerCase() !== company.email.toLowerCase();
+        const stateRegion = resolveStateRegionUpdate(company, dto);
         Object.assign(company, dto);
+        if (stateRegion !== undefined) company.stateRegion = stateRegion;
         // Verification proves control of one inbox; a new address must be
         // verified again before the company can receive contract invitations.
         if (emailChanged) company.verifiedAt = null;
