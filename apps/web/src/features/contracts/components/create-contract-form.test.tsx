@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { CreateContractForm, CreateContractWizard } from "./create-contract-form";
+import { CreateContractWizard } from "./create-contract-form";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -9,22 +9,6 @@ vi.mock("@/services/contractApi", () => ({
   useGetContractsQuery: () => ({ currentData: undefined, isFetching: false }),
   useCreateContractMutation: () => [vi.fn(), { isLoading: false }],
 }));
-
-describe("CreateContractForm", () => {
-  it("is offered only to company administrators", () => {
-    expect(
-      renderToStaticMarkup(
-        <CreateContractForm companyId="company-1" canCreate={false} />,
-      ),
-    ).toBe("");
-
-    const markup = renderToStaticMarkup(
-      <CreateContractForm companyId="company-1" canCreate />,
-    );
-    expect(markup).toContain(">Contract setup</h2>");
-    expect(markup).toMatch(/<button[^>]*aria-expanded="false"[^>]*>New contract</);
-  });
-});
 
 describe("CreateContractWizard", () => {
   const wizard = () =>
@@ -40,7 +24,9 @@ describe("CreateContractWizard", () => {
     const markup = wizard();
 
     expect(markup).toContain('aria-label="New draft contract"');
-    expect(markup).toMatch(/<h3[^>]*tabindex="-1"[^>]*>Step 1 of 4: Basics<\/h3>/);
+    expect(markup).toMatch(
+      /<h3[^>]*tabindex="-1"[^>]*>Step 1 of 4: Basics<\/h3>/,
+    );
     const steps = [...markup.matchAll(/<li[^>]*>[\s\S]*?<\/li>/g)].map(
       (match) => match[0],
     );

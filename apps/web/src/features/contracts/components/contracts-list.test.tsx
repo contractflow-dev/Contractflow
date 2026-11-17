@@ -25,17 +25,14 @@ vi.mock("./contract-lifecycle-management", () => ({
   ContractLifecycleManagement: () => null,
 }));
 vi.mock("./create-contract-form", () => ({
-  CreateContractForm: ({ canCreate }: { canCreate: boolean }) =>
-    canCreate ? <section>CREATE CONTRACT</section> : null,
+  CreateContractWizard: () => <section>CREATE CONTRACT</section>,
 }));
 vi.mock("@/services/contractApi", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/contractApi")>()),
   useRestoreContractMutation: () => [vi.fn(), { isLoading: false }],
 }));
 
-function contract(
-  overrides: Partial<ContractListItem> = {},
-): ContractListItem {
+function contract(overrides: Partial<ContractListItem> = {}): ContractListItem {
   return {
     id: "c-1",
     referenceNumber: "CTR-001",
@@ -114,14 +111,24 @@ function render(canViewArchived = true) {
 describe("ContractsList", () => {
   beforeEach(() => setState({}));
 
-  it("puts the page heading first, then the create action, then the register", () => {
+  it("puts the page heading first, then the register with its New contract action", () => {
     const markup = render();
     const heading = markup.indexOf("<h1");
+    const register = markup.indexOf(">Contract register</h2>");
     expect(heading).toBeGreaterThanOrEqual(0);
-    expect(heading).toBeLessThan(markup.indexOf("CREATE CONTRACT"));
-    expect(markup.indexOf("CREATE CONTRACT")).toBeLessThan(
-      markup.indexOf(">Contract register</h2>"),
+    expect(heading).toBeLessThan(register);
+    const button = markup.search(
+      /<button[^>]*aria-haspopup="dialog"[^>]*>New contract</,
     );
+    expect(button).toBeGreaterThan(register);
+    expect(button).toBeLessThan(markup.indexOf('role="search"'));
+    // The form opens, in a dialog, only when asked.
+    expect(markup).not.toContain("CREATE CONTRACT");
+  });
+
+  it("offers New contract only to company administrators", () => {
+    const markup = render(false);
+    expect(markup).not.toContain("New contract");
   });
 
   it("links each contract's title to its detail page and shows its key facts", () => {

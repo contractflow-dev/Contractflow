@@ -450,8 +450,9 @@ describe("activity filters", () => {
     expect(markup).toContain(">Site added<");
     // Status changes live in the status history, not in this filter.
     expect(markup).not.toContain(`value="${STATUS_CHANGE_ACTION}"`);
-    // The same responsive grid as the contract register's filters.
-    expect(markup).toContain("sm:grid-cols-2 lg:grid-cols-4");
+    // Never more than two fields on a line: dates, then member and action.
+    expect(markup).toContain('class="grid gap-3 sm:grid-cols-2"');
+    expect(markup).not.toMatch(/grid-cols-[3-9]/);
   });
 
   it("asks for members only once the activity has loaded, and never on a 403", () => {

@@ -278,6 +278,13 @@ apps/web/src/
   web app.
 - Preserve existing accessibility, responsive behavior, and user-facing
   workflows when changing UI.
+- Put at most two input fields on the same line, at every screen width. This
+  applies to forms (including dialogs and multi-step wizards) and to the
+  search, filter, and sort controls above tables, as well as any inputs inside
+  table rows. Use a one-column layout on narrow screens and at most two columns
+  (for example `sm:grid-cols-2`) on wider ones; never `grid-cols-3` or more for
+  inputs. Checkboxes, switches, and buttons that sit beside a field do not
+  count as input fields.
 
 ## 5. Naming and imports
 

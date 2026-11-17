@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -17,13 +17,6 @@ import {
 } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@workspace/ui/components/card";
 import { cn } from "@/lib/utils";
 import { RequiredFieldsNote } from "@/components/forms/form-field";
 import { getApiErrorMessage } from "@/lib/apiError";
@@ -49,73 +42,6 @@ import {
   ContractDatesFields,
   ContractPartiesFields,
 } from "./contract-setup-fields";
-
-/** Link here to open the form directly: `/dashboards/contracts#new-contract`. */
-export const NEW_CONTRACT_ANCHOR = "new-contract";
-
-/**
- * "New contract" for company administrators: a card that opens a four-step
- * form. `canCreate` is the shell's `membership.canManageCompany`; the API
- * makes the same check when the contract is created.
- */
-export function CreateContractForm({
-  companyId,
-  canCreate,
-}: {
-  companyId: string;
-  canCreate: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  // The Overview's "Create a contract" links here with #new-contract. On a
-  // client-side navigation the page renders before the URL changes, so the
-  // hash is read just after mounting, and again if it changes later.
-  useEffect(() => {
-    const openFromHash = () => {
-      if (window.location.hash === `#${NEW_CONTRACT_ANCHOR}`) setOpen(true);
-    };
-    const pending = window.setTimeout(openFromHash, 0);
-    window.addEventListener("hashchange", openFromHash);
-    return () => {
-      window.clearTimeout(pending);
-      window.removeEventListener("hashchange", openFromHash);
-    };
-  }, []);
-  const formId = useId();
-  if (!canCreate) return null;
-
-  return (
-    <Card id={NEW_CONTRACT_ANCHOR} className="scroll-mt-24">
-      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
-        <div>
-          <CardTitle>
-            <h2>Contract setup</h2>
-          </CardTitle>
-          <CardDescription>
-            Create a draft contract for this company.
-          </CardDescription>
-        </div>
-        <Button
-          type="button"
-          aria-expanded={open}
-          aria-controls={open ? formId : undefined}
-          onClick={() => setOpen((value) => !value)}
-        >
-          {open ? "Close" : "New contract"}
-        </Button>
-      </CardHeader>
-      {open ? (
-        <CardContent>
-          {/* Mounted only while open, so each new contract starts afresh. */}
-          <CreateContractWizard
-            formId={formId}
-            companyId={companyId}
-            onCancel={() => setOpen(false)}
-          />
-        </CardContent>
-      ) : null}
-    </Card>
-  );
-}
 
 const lastStep = createContractSteps.length - 1;
 
@@ -180,9 +106,9 @@ export function CreateContractWizard({
     const controls =
       formRef.current?.querySelectorAll<HTMLElement>("[name]") ?? [];
     for (const control of controls) {
-      const name = control.getAttribute("name") as FieldPath<
-        CreateContractFormValues
-      >;
+      const name = control.getAttribute(
+        "name",
+      ) as FieldPath<CreateContractFormValues>;
       if (form.getFieldState(name).invalid) {
         control.focus();
         return;

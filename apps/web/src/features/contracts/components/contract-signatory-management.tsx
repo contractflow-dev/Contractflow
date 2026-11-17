@@ -147,7 +147,7 @@ function SignatoryForm({
       className="space-y-4"
     >
       <RequiredFieldsNote />
-      <FormGrid columns={2} className="lg:grid-cols-4">
+      <FormGrid columns={2}>
         <FormField id="signatory-first-name" label="First name" required>
           {(control) => (
             <Input

@@ -23,13 +23,15 @@ vi.mock("next/navigation", () => ({
 }));
 
 /** What a section component was given as its deep-link target. */
-function targetLabel(target?: {
-  type: string;
-  id: string;
-  section: string;
-  versionId?: string;
-  workspace?: string;
-} | null) {
+function targetLabel(
+  target?: {
+    type: string;
+    id: string;
+    section: string;
+    versionId?: string;
+    workspace?: string;
+  } | null,
+) {
   if (!target) return "";
   return ` target=${[
     target.type,
@@ -75,7 +77,7 @@ vi.mock("./contract-lifecycle-management", () => ({
   ),
 }));
 vi.mock("./create-contract-form", () => ({
-  CreateContractForm: () => null,
+  CreateContractWizard: () => null,
 }));
 vi.mock("./contract-signatory-management", () => ({
   ContractSignatoryManagement: () => <div>SIGNATORY</div>,
@@ -412,13 +414,17 @@ describe("activity deep links into a contract section", () => {
         "roles",
         "targetType=contract_role_assignment&targetId=ra-1&targetSection=roles&targetWorkspace=hse",
       ),
-    ).toContain("ROLE ASSIGNMENTS target=contract_role_assignment:ra-1:roles:-:hse");
+    ).toContain(
+      "ROLE ASSIGNMENTS target=contract_role_assignment:ra-1:roles:-:hse",
+    );
     expect(
       renderWith(
         "parties",
         "targetType=contract_party_invitation&targetId=inv-1&targetSection=parties",
       ),
-    ).toContain("LIFECYCLE invitations target=contract_party_invitation:inv-1:parties:-:-");
+    ).toContain(
+      "LIFECYCLE invitations target=contract_party_invitation:inv-1:parties:-:-",
+    );
     expect(
       renderWith(
         "sites",
@@ -440,12 +446,17 @@ describe("activity deep links into a contract section", () => {
         "roles",
         "targetType=contract_role_assignment&targetId=ra-1&targetSection=roles&targetWorkspace=payroll",
       ),
-    ).toContain("ROLE ASSIGNMENTS target=contract_role_assignment:ra-1:roles:-:-");
+    ).toContain(
+      "ROLE ASSIGNMENTS target=contract_role_assignment:ra-1:roles:-:-",
+    );
   });
 
   it("follows the URL when its query changes", () => {
     expect(
-      renderWith("documents", "targetType=document&targetId=doc-1&targetSection=documents"),
+      renderWith(
+        "documents",
+        "targetType=document&targetId=doc-1&targetSection=documents",
+      ),
     ).toContain("target=document:doc-1:");
     const next = renderWith(
       "documents",

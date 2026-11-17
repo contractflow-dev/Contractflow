@@ -49,7 +49,7 @@ import { CompanyAdminShell } from "@/features/companies/CompanyAdminShell";
 import { CompanyVerificationNotice } from "@/features/companies/company-verification-notice";
 import { departmentHref } from "@/features/companies/company-navigation";
 import { departmentStaffingHref } from "@/features/companies/departments";
-import { NEW_CONTRACT_ANCHOR } from "@/features/contracts/components/create-contract-form";
+import { NEW_CONTRACT_ANCHOR } from "@/features/contracts/_hooks/use-new-contract-form";
 import { IncomingContractInvitations } from "@/features/contracts/components/incoming-contract-invitations";
 
 const NEW_CONTRACT_HREF = `/dashboards/contracts#${NEW_CONTRACT_ANCHOR}`;

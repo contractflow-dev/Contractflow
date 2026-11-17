@@ -85,7 +85,9 @@ describe("FormField", () => {
     expect(markup).not.toMatch(
       /data-slot="field"[^>]*class="[^"]*data-\[invalid=true\]:text-destructive/,
     );
-    expect(markup).toContain("group-data-[invalid=true]/field:text-destructive");
+    expect(markup).toContain(
+      "group-data-[invalid=true]/field:text-destructive",
+    );
   });
 
   it("does not mark a field invalid without an error", () => {
@@ -127,7 +129,9 @@ describe("FormSection", () => {
         <span>fields</span>
       </FormSection>,
     );
-    expect(hidden).toMatch(/<legend[^>]*class="[^"]*\bsr-only\b[^"]*"[^>]*>Full name<\/legend>/);
+    expect(hidden).toMatch(
+      /<legend[^>]*class="[^"]*\bsr-only\b[^"]*"[^>]*>Full name<\/legend>/,
+    );
 
     const visible = renderToStaticMarkup(
       <FormSection legend="Full name">
@@ -142,7 +146,6 @@ describe("FormGrid", () => {
   it.each([
     [1, "grid gap-4"],
     [2, "sm:grid-cols-2"],
-    [3, "lg:grid-cols-3"],
   ] as const)("lays out %i column(s), one on phones", (columns, expected) => {
     const markup = renderToStaticMarkup(
       <FormGrid columns={columns}>

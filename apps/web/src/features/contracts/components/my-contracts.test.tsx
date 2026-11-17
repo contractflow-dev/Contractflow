@@ -19,7 +19,7 @@ vi.mock("../_hooks/use-contracts-list", () => ({
 vi.mock("./contract-lifecycle-management", () => ({
   ContractLifecycleManagement: () => null,
 }));
-vi.mock("./create-contract-form", () => ({ CreateContractForm: () => null }));
+vi.mock("./create-contract-form", () => ({ CreateContractWizard: () => null }));
 vi.mock("@/services/contractApi", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/contractApi")>()),
   useRestoreContractMutation: () => [vi.fn(), { isLoading: false }],
@@ -42,7 +42,9 @@ function contract(overrides: Partial<ContractListItem> = {}): ContractListItem {
     endDate: "2026-12-31",
     revisedEndDate: null,
     deletedAt: null,
-    counterparties: [{ companyName: "Bravo Energy", partyType: EPartyType.CLIENT }],
+    counterparties: [
+      { companyName: "Bravo Energy", partyType: EPartyType.CLIENT },
+    ],
     myRoles: [
       {
         role: EContractorContractRole.FINANCE_OFFICER,
@@ -90,7 +92,9 @@ function setState(state: Record<string, unknown>) {
 }
 
 const render = () =>
-  renderToStaticMarkup(<MyContracts companyId="company-1" companyName="Acme Works" />);
+  renderToStaticMarkup(
+    <MyContracts companyId="company-1" companyName="Acme Works" />,
+  );
 
 describe("MyContracts", () => {
   beforeEach(() => setState({}));
@@ -138,7 +142,9 @@ describe("MyContracts", () => {
     setState({ hasFilters: true });
     const markup = render();
 
-    expect(markup).toContain("None of your contracts match your search or filters.");
+    expect(markup).toContain(
+      "None of your contracts match your search or filters.",
+    );
     expect(markup).not.toContain("No contracts assigned to you yet");
     expect(markup.match(/>Clear filters</g)).toHaveLength(2);
   });
