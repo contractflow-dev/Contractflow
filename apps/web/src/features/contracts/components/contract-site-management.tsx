@@ -282,13 +282,14 @@ function SiteForm({
       </div>
 
       <FormSection legend="Site details">
-        <FormGrid columns={3}>
+        <FormGrid columns={2}>
           <SiteInput
             id={`${idPrefix}-name`}
             name="name"
             label="Site name"
             defaultValue={site?.name}
             maxLength={255}
+            className="sm:col-span-2"
           />
           <SiteInput
             id={`${idPrefix}-code`}

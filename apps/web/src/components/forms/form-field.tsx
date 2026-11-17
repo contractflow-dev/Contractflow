@@ -76,7 +76,11 @@ export function FormField({
         className="flex-wrap gap-x-1.5 gap-y-0.5 group-data-[invalid=true]/field:text-destructive"
       >
         {label}
-        {required ? <RequiredIndicator /> : optional ? <OptionalIndicator /> : null}
+        {required ? (
+          <RequiredIndicator />
+        ) : optional ? (
+          <OptionalIndicator />
+        ) : null}
       </FieldLabel>
       {children({
         id,
@@ -185,10 +189,12 @@ export function FormSection({
 const GRID_COLUMNS = {
   1: "grid gap-4",
   2: "grid gap-4 sm:grid-cols-2",
-  3: "grid gap-4 sm:grid-cols-2 lg:grid-cols-3",
 } as const;
 
-/** A responsive grid of fields that collapses to one column on phones. */
+/**
+ * A responsive grid of fields that collapses to one column on phones. Two
+ * columns at most: forms never put more than two fields on a line.
+ */
 export function FormGrid({
   columns = 2,
   className,

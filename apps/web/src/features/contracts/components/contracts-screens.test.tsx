@@ -62,7 +62,7 @@ vi.mock("./contract-workspace-management", () => ({
 }));
 
 vi.mock("./create-contract-form", () => ({
-  CreateContractForm: () => <div>Create contract</div>,
+  CreateContractWizard: () => <div>Create contract</div>,
 }));
 
 vi.mock("../_hooks/use-contracts-list", async (importOriginal) => ({
@@ -344,7 +344,11 @@ describe("contract screen headings", () => {
     } as unknown as ReturnType<typeof useContractsList>);
 
     const markup = renderToStaticMarkup(
-      <ContractsList companyId="company-1" canViewArchived canCreateContracts />,
+      <ContractsList
+        companyId="company-1"
+        canViewArchived
+        canCreateContracts
+      />,
     );
 
     expect(markup).toMatch(/<h1[^>]*>Contracts<\/h1>/);

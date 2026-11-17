@@ -500,7 +500,7 @@ export function ContractActivity({
             <div
               role="group"
               aria-label="Filter activity"
-              className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+              className="grid gap-3 sm:grid-cols-2"
             >
               <Field>
                 <FieldLabel htmlFor={ids.from}>From</FieldLabel>

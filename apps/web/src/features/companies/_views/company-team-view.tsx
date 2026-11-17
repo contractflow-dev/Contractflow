@@ -434,7 +434,10 @@ function TeamContent({ companyId }: { companyId: string }) {
                     }}
                   >
                     {invitationRoles.map((option) => (
-                      <NativeSelectOption key={option.value} value={option.value}>
+                      <NativeSelectOption
+                        key={option.value}
+                        value={option.value}
+                      >
                         {option.label}
                       </NativeSelectOption>
                     ))}
@@ -476,7 +479,7 @@ function TeamContent({ companyId }: { companyId: string }) {
             </div>
 
             {/* Member filters */}
-            <div className="grid gap-3 border-t pt-4 sm:grid-cols-2 sm:items-end lg:grid-cols-[minmax(0,1fr)_11rem_13rem_11rem]">
+            <div className="grid gap-3 border-t pt-4 sm:grid-cols-2 sm:items-end">
               <div className="space-y-1.5">
                 <label htmlFor="member-search" className="text-sm font-medium">
                   Search members

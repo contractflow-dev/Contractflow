@@ -272,7 +272,9 @@ export function ContractCommercialFields() {
   // decimal point is visible before the contract is saved.
   const amountHint = (typed: string) => {
     const digits = currencyDigits(currencyCode) ?? 2;
-    const minor = typed.trim() ? parseDecimalToMinor(typed, currencyCode) : null;
+    const minor = typed.trim()
+      ? parseDecimalToMinor(typed, currencyCode)
+      : null;
     const precision =
       digits === 0
         ? `${currencyCode} has no decimal places.`
@@ -290,7 +292,7 @@ export function ContractCommercialFields() {
 
   return (
     <FormSection legend="Commercial terms">
-      <FormGrid columns={3}>
+      <FormGrid columns={2}>
         <FormField
           id={fieldId("currencyCode")}
           label="Currency"
@@ -347,7 +349,10 @@ export function ContractCommercialFields() {
           id={fieldId("retentionRate")}
           label="Retention rate (%)"
           required
-          description={percentHint(retention, "Enter 0 if there is no retention.")}
+          description={percentHint(
+            retention,
+            "Enter 0 if there is no retention.",
+          )}
           error={fieldErrors?.retentionRate?.message}
         >
           {(control) => (
@@ -407,7 +412,7 @@ export function ContractDatesFields() {
 
   return (
     <FormSection legend="Contract dates and duration">
-      <FormGrid columns={3}>
+      <FormGrid columns={2}>
         <FormField
           id={fieldId("awardDate")}
           label="Award date"

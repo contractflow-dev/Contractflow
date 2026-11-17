@@ -13,6 +13,7 @@ import { Button } from "@workspace/ui/components/button";
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -51,7 +52,15 @@ import {
   formatMoneyMinor,
   humanizeEnumValue,
 } from "@/lib/format";
-import { CreateContractForm } from "./create-contract-form";
+import { CreateContractWizard } from "./create-contract-form";
+import { useNewContractForm } from "../_hooks/use-new-contract-form";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@workspace/ui/components/dialog";
 import type { Contract, ContractListItem } from "@/services/contractApi";
 import { ContractRoleAssignmentManagement } from "./contract-role-assignment-management";
 import { parseContractWorkspace } from "../contract-workspaces";
@@ -188,11 +197,35 @@ export function ContractsList({
   const initialLoading = isLoading || (isFetching && !currentData);
   const contracts = currentData?.data ?? [];
   const showActions = includeDeleted;
+  // "New contract" is for company administrators; the API makes the same
+  // check when the contract is created.
+  const newContract = useNewContractForm();
+  const newContractOpen = canCreateContracts && newContract.open;
 
   return (
     <div className="space-y-6">
       {/* Company Administrators oversee every contract the company is a
           party to; other members see only those they hold a role on. */}
+      {canCreateContracts ? (
+        <Dialog open={newContractOpen} onOpenChange={newContract.setOpen}>
+          <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>New contract</DialogTitle>
+              <DialogDescription>
+                Create a draft contract for this company.
+              </DialogDescription>
+            </DialogHeader>
+            {/* Mounted only while open, so each new contract starts afresh. */}
+            {newContractOpen ? (
+              <CreateContractWizard
+                formId={newContract.formId}
+                companyId={companyId}
+                onCancel={() => newContract.setOpen(false)}
+              />
+            ) : null}
+          </DialogContent>
+        </Dialog>
+      ) : null}
       <PageHeader
         title="Contracts"
         description={
@@ -201,11 +234,6 @@ export function ContractsList({
             : "Contracts you hold a role on. Open one to see its parties and history, and your workspaces."
         }
       />
-      <CreateContractForm
-        companyId={companyId}
-        canCreate={canCreateContracts}
-      />
-
       <Card>
         <CardHeader>
           <CardTitle>
@@ -215,15 +243,26 @@ export function ContractsList({
             Search by title or reference, filter by status, and choose the
             order. Results update as you type.
           </CardDescription>
+          {canCreateContracts ? (
+            <CardAction>
+              <Button
+                type="button"
+                aria-haspopup="dialog"
+                onClick={() => newContract.setOpen(true)}
+              >
+                New contract
+              </Button>
+            </CardAction>
+          ) : null}
         </CardHeader>
         <CardContent className="space-y-5">
           <form
             role="search"
             aria-label="Contracts"
             onSubmit={submitSearch}
-            className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_12rem_14rem]"
+            className="grid gap-3 sm:grid-cols-2"
           >
-            <Field className="sm:col-span-2 lg:col-span-1">
+            <Field className="sm:col-span-2">
               <FieldLabel htmlFor="contract-search">
                 Search contracts
               </FieldLabel>
