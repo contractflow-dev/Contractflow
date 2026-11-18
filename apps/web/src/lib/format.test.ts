@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { MinorAmount } from "@contractflow/contracts-schema/money";
 import {
   EMPTY_VALUE,
   currencyDigits,
@@ -10,6 +11,7 @@ import {
   formatDateTime,
   formatFileSize,
   formatMoneyMinor,
+  groupDecimalInput,
   formatNumber,
   formatPercent,
   formatRelativeTime,
@@ -140,39 +142,58 @@ describe("calendar day arithmetic", () => {
 
 describe("formatMoneyMinor", () => {
   it("formats minor units in the contract's own currency", () => {
-    expect(formatMoneyMinor(123456, "USD", { locale })).toBe("$1,234.56");
-    expect(formatMoneyMinor(123456, "EUR", { locale })).toBe("€1,234.56");
-    expect(spaced(formatMoneyMinor(5000000, "NGN", { locale }))).toBe(
+    expect(formatMoneyMinor("123456", "USD", { locale })).toBe("$1,234.56");
+    expect(formatMoneyMinor("123456", "EUR", { locale })).toBe("€1,234.56");
+    expect(spaced(formatMoneyMinor("5000000", "NGN", { locale }))).toBe(
       "NGN 50,000.00",
     );
   });
 
   it("respects each currency's minor-unit precision", () => {
-    expect(formatMoneyMinor(1500, "JPY", { locale })).toBe("¥1,500");
-    expect(spaced(formatMoneyMinor(1234567, "KWD", { locale }))).toBe(
+    expect(formatMoneyMinor("1500", "JPY", { locale })).toBe("¥1,500");
+    expect(spaced(formatMoneyMinor("1234567", "KWD", { locale }))).toBe(
       "KWD 1,234.567",
     );
   });
 
-  it("formats large string amounts exactly", () => {
+  it("formats large amounts exactly, up to the database's limits", () => {
     expect(formatMoneyMinor("900719925474099312", "USD", { locale })).toBe(
       "$9,007,199,254,740,993.12",
+    );
+    expect(formatMoneyMinor("9223372036854775807", "USD", { locale })).toBe(
+      "$92,233,720,368,547,758.07",
+    );
+    expect(formatMoneyMinor("-9223372036854775808", "JPY", { locale })).toBe(
+      "-¥9,223,372,036,854,775,808",
     );
   });
 
   it("handles small and negative amounts", () => {
-    expect(formatMoneyMinor(5, "USD", { locale })).toBe("$0.05");
+    expect(formatMoneyMinor("5", "USD", { locale })).toBe("$0.05");
     expect(formatMoneyMinor("-250", "USD", { locale })).toBe("-$2.50");
-    expect(formatMoneyMinor(0, "GBP", { locale })).toBe("£0.00");
+    expect(spaced(formatMoneyMinor("-1", "KWD", { locale }))).toBe(
+      "-KWD 0.001",
+    );
+    expect(formatMoneyMinor("0", "GBP", { locale })).toBe("£0.00");
   });
 
   it("returns the fallback for invalid amounts or currencies", () => {
     expect(formatMoneyMinor(null, "USD")).toBe(EMPTY_VALUE);
-    expect(formatMoneyMinor(100, null)).toBe(EMPTY_VALUE);
-    expect(formatMoneyMinor(100, "DOLLARS")).toBe(EMPTY_VALUE);
-    expect(formatMoneyMinor("12.5", "USD")).toBe(EMPTY_VALUE);
-    expect(formatMoneyMinor(12.5, "USD")).toBe(EMPTY_VALUE);
-    expect(formatMoneyMinor(Number.NaN, "USD")).toBe(EMPTY_VALUE);
+    expect(formatMoneyMinor("100", null)).toBe(EMPTY_VALUE);
+    expect(formatMoneyMinor("100", "DOLLARS")).toBe(EMPTY_VALUE);
+    for (const amount of ["12.5", "1e6", " 100", "007", "abc", ""]) {
+      expect(formatMoneyMinor(amount, "USD"), amount).toBe(EMPTY_VALUE);
+    }
+    expect(formatMoneyMinor("9223372036854775808", "USD")).toBe(EMPTY_VALUE);
+  });
+
+  it("never shows a JavaScript number as an amount", () => {
+    // Amounts arrive as strings; a number may already have lost digits.
+    for (const amount of [12.5, 100, Number.NaN]) {
+      expect(formatMoneyMinor(amount as unknown as MinorAmount, "USD")).toBe(
+        EMPTY_VALUE,
+      );
+    }
   });
 });
 
@@ -235,25 +256,45 @@ describe("currencyDigits", () => {
 });
 
 describe("parseDecimalToMinor", () => {
-  it("converts a decimal amount to whole minor units exactly", () => {
-    expect(parseDecimalToMinor("1500000.50", "NGN")).toBe(150000050);
-    expect(parseDecimalToMinor("1500000", "NGN")).toBe(150000000);
-    expect(parseDecimalToMinor("0.1", "USD")).toBe(10);
-    expect(parseDecimalToMinor(" 12.34 ", "USD")).toBe(1234);
+  it("converts a decimal amount to whole minor units, as an integer string, exactly", () => {
+    expect(parseDecimalToMinor("1500000.50", "NGN")).toBe("150000050");
+    expect(parseDecimalToMinor("2,500,000.00", "NGN")).toBe("250000000");
+    expect(parseDecimalToMinor("1500000", "NGN")).toBe("150000000");
+    expect(parseDecimalToMinor("0.1", "USD")).toBe("10");
+    expect(parseDecimalToMinor(" 12.34 ", "USD")).toBe("1234");
     // 0.29 * 100 is 28.999999999999996 in floating point.
-    expect(parseDecimalToMinor("0.29", "USD")).toBe(29);
+    expect(parseDecimalToMinor("0.29", "USD")).toBe("29");
   });
 
-  it("accepts grouping commas only in their usual places", () => {
-    expect(parseDecimalToMinor("1,500,000.50", "NGN")).toBe(150000050);
+  it("writes canonical digits, without leading zeros", () => {
+    expect(parseDecimalToMinor("0.05", "USD")).toBe("5");
+    expect(parseDecimalToMinor("0", "USD")).toBe("0");
+    expect(parseDecimalToMinor("0.00", "USD")).toBe("0");
+    expect(parseDecimalToMinor("007.50", "USD")).toBe("750");
+  });
+
+  it("reads commas as grouping wherever they can only be grouping", () => {
+    expect(parseDecimalToMinor("1,500,000.50", "NGN")).toBe("150000050");
+    // Moved by an edit, or grouped Indian-style: still the digits as written.
+    expect(parseDecimalToMinor("1,50,000", "NGN")).toBe("15000000");
+    expect(parseDecimalToMinor("1,500,00", "NGN")).toBe("15000000");
+    expect(parseDecimalToMinor(",500,000", "NGN")).toBe("50000000");
+    expect(parseDecimalToMinor("1,50,000.5", "NGN")).toBe("15000050");
+  });
+
+  it("refuses a single comma that might be a decimal separator", () => {
     expect(parseDecimalToMinor("15,00", "NGN")).toBeNull();
     expect(parseDecimalToMinor("1,5000", "NGN")).toBeNull();
+    expect(parseDecimalToMinor("500,", "NGN")).toBeNull();
+    expect(parseDecimalToMinor(",", "NGN")).toBeNull();
+    expect(parseDecimalToMinor(",,", "NGN")).toBeNull();
   });
 
-  it("follows the currency's precision", () => {
-    expect(parseDecimalToMinor("500", "JPY")).toBe(500);
+  it("follows the currency's precision and never rounds", () => {
+    expect(parseDecimalToMinor("500", "JPY")).toBe("500");
     expect(parseDecimalToMinor("500.5", "JPY")).toBeNull();
-    expect(parseDecimalToMinor("1.234", "BHD")).toBe(1234);
+    expect(parseDecimalToMinor("1.234", "BHD")).toBe("1234");
+    expect(parseDecimalToMinor("1.5", "KWD")).toBe("1500");
     expect(parseDecimalToMinor("1.234", "USD")).toBeNull();
   });
 
@@ -264,11 +305,69 @@ describe("parseDecimalToMinor", () => {
     expect(parseDecimalToMinor("10", "NOT-A-CODE")).toBeNull();
   });
 
-  it("rejects amounts too large to send exactly", () => {
-    expect(parseDecimalToMinor("90071992547409.91", "USD")).toBe(
-      Number.MAX_SAFE_INTEGER,
+  it("keeps amounts beyond the safe integer range exact, up to the database's limit", () => {
+    expect(parseDecimalToMinor("90071992547409.93", "USD")).toBe(
+      "9007199254740993",
     );
-    expect(parseDecimalToMinor("90071992547409.92", "USD")).toBeNull();
+    expect(parseDecimalToMinor("92,233,720,368,547,758.07", "USD")).toBe(
+      "9223372036854775807",
+    );
+    expect(parseDecimalToMinor("92233720368547758.08", "USD")).toBeNull();
+    expect(parseDecimalToMinor("9223372036854775808", "JPY")).toBeNull();
+  });
+});
+
+describe("groupDecimalInput", () => {
+  it("adds grouping commas to a typed amount", () => {
+    expect(groupDecimalInput("1500000")).toBe("1,500,000");
+    expect(groupDecimalInput("2500000.00")).toBe("2,500,000.00");
+    expect(groupDecimalInput("999")).toBe("999");
+    expect(groupDecimalInput("1000")).toBe("1,000");
+    expect(groupDecimalInput(" 1500 ")).toBe("1,500");
+  });
+
+  it("keeps the decimals exactly as typed, never padding or rounding them", () => {
+    expect(groupDecimalInput("1500000.5")).toBe("1,500,000.5");
+    expect(groupDecimalInput("1234.5678")).toBe("1,234.5678");
+    expect(groupDecimalInput("0.29")).toBe("0.29");
+  });
+
+  it("regroups correctly grouped amounts and drops leading zeros", () => {
+    expect(groupDecimalInput("1,500,000.50")).toBe("1,500,000.50");
+    expect(groupDecimalInput("007.50")).toBe("7.50");
+    expect(groupDecimalInput("0")).toBe("0");
+  });
+
+  it("regroups an amount after an edit has moved its commas", () => {
+    // A zero removed from "1,500,000", from either group.
+    expect(groupDecimalInput("1,50,000")).toBe("150,000");
+    expect(groupDecimalInput("1,500,00")).toBe("150,000");
+    // The leading digit removed.
+    expect(groupDecimalInput(",500,000")).toBe("500,000");
+    // A digit added.
+    expect(groupDecimalInput("1,5000,000")).toBe("15,000,000");
+    expect(groupDecimalInput("1,50,000.5")).toBe("150,000.5");
+  });
+
+  it("groups large amounts exactly, without going through a number", () => {
+    expect(groupDecimalInput("92233720368547758.07")).toBe(
+      "92,233,720,368,547,758.07",
+    );
+  });
+
+  it("leaves text it can't read unchanged, so its amount can't change", () => {
+    // "15,00" could be a mistyped 15.00; regrouping it would make it 1,500.
+    for (const text of ["15,00", "1,5000", "12.", ".5", "-5", "1e6", "abc", "1 000", ""]) {
+      expect(groupDecimalInput(text), text).toBe(text);
+    }
+  });
+
+  it("never changes the amount it represents", () => {
+    for (const text of ["1500000.5", "1,500,000.50", "007.50", "1234.567"]) {
+      expect(parseDecimalToMinor(groupDecimalInput(text), "KWD"), text).toBe(
+        parseDecimalToMinor(text, "KWD"),
+      );
+    }
   });
 });
 

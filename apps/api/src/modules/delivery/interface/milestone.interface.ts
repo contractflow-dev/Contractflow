@@ -9,7 +9,7 @@ export interface IMilestoneEntity {
     progressBps : number
     weightBps : number
     isPaymentMilestone : boolean
-    amountMinor : number
+    amountMinor : string
     currencyCode : ECurrencyCode
     dueDate : Date
     revisedDueDate : Date

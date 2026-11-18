@@ -92,6 +92,16 @@ leads can transition contracts between draft/active/suspended/completed states;
 each transition requires a reason and writes status history and an activity
 event.
 
+Monetary amounts are sent and returned as integer strings of minor units
+(`MinorAmount` in `@contractflow/contracts-schema`), never as JSON numbers:
+`POST /api/contracts` and `PATCH /api/contract` take
+`"originalValueMinor": "250000000"`, and every response, including contract
+detail and lists, returns amounts the same way. A JSON number is rejected with
+a 400. Request fields use `@IsMinorAmount(sign)` from
+`src/common/dto/minor-amount.validation.ts` with the field's own sign rule;
+responses use `toIntegerString`. Amounts are stored as PostgreSQL `bigint`;
+compare or calculate them with `BigInt`, never `Number`.
+
 The session guard is registered globally and protects routes by default.
 Only controllers or handlers explicitly marked public (currently the auth
 controller) bypass session validation; future API controllers must not opt out

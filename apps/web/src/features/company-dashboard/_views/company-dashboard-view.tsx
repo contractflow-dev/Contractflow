@@ -49,10 +49,8 @@ import { CompanyAdminShell } from "@/features/companies/CompanyAdminShell";
 import { CompanyVerificationNotice } from "@/features/companies/company-verification-notice";
 import { departmentHref } from "@/features/companies/company-navigation";
 import { departmentStaffingHref } from "@/features/companies/departments";
-import { NEW_CONTRACT_ANCHOR } from "@/features/contracts/_hooks/use-new-contract-form";
+import { NEW_CONTRACT_PATH } from "@/features/contracts/contract-sections";
 import { IncomingContractInvitations } from "@/features/contracts/components/incoming-contract-invitations";
-
-const NEW_CONTRACT_HREF = `/dashboards/contracts#${NEW_CONTRACT_ANCHOR}`;
 
 export function CompanyDashboardView() {
   return (
@@ -394,7 +392,7 @@ function QuickActions({ data }: { data: ICompanyDashboardResponse }) {
               created.
             </p>
             <Link
-              href={NEW_CONTRACT_HREF}
+              href={NEW_CONTRACT_PATH}
               className={cn(buttonVariants(), "mt-auto self-start")}
             >
               Create a contract
@@ -481,7 +479,7 @@ function RecentActivity({
               here and in every department workspace.
             </p>
             <div className="flex flex-wrap justify-center gap-2">
-              <Link href={NEW_CONTRACT_HREF} className={buttonVariants()}>
+              <Link href={NEW_CONTRACT_PATH} className={buttonVariants()}>
                 Create a contract
               </Link>
               <Link

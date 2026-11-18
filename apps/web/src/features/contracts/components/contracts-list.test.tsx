@@ -15,17 +15,23 @@ import {
 } from "../_hooks/use-contracts-list";
 import { ContractsList } from "./contracts-screens";
 
-const list = vi.hoisted(() => ({ state: {} as Record<string, unknown> }));
+const list = vi.hoisted(() => ({
+  state: {} as Record<string, unknown>,
+  counts: {} as Record<string, number | undefined>,
+}));
 
 vi.mock("../_hooks/use-contracts-list", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../_hooks/use-contracts-list")>()),
   useContractsList: vi.fn(() => list.state),
 }));
+vi.mock("../_hooks/use-contract-status-counts", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("../_hooks/use-contract-status-counts")
+  >()),
+  useContractStatusCounts: vi.fn(() => list.counts),
+}));
 vi.mock("./contract-lifecycle-management", () => ({
   ContractLifecycleManagement: () => null,
-}));
-vi.mock("./create-contract-form", () => ({
-  CreateContractWizard: () => <section>CREATE CONTRACT</section>,
 }));
 vi.mock("@/services/contractApi", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/contractApi")>()),
@@ -81,11 +87,15 @@ function setState(state: Record<string, unknown>) {
     setIncludeDeleted: vi.fn(),
     sort: "newest",
     setSort: vi.fn(),
+    sortBy: EContractSortField.CREATED_AT,
+    sortOrder: ESortOrder.DESC,
+    toggleSort: vi.fn(),
     page: 1,
     setPage: vi.fn(),
     limit: 20,
     setLimit: vi.fn(),
     submitSearch: vi.fn(),
+    clearSearch: vi.fn(),
     search: "",
     hasFilters: false,
     clearFilters: vi.fn(),
@@ -109,21 +119,30 @@ function render(canViewArchived = true) {
 }
 
 describe("ContractsList", () => {
-  beforeEach(() => setState({}));
+  beforeEach(() => {
+    setState({});
+    list.counts = {};
+  });
 
-  it("puts the page heading first, then the register with its New contract action", () => {
+  it("puts the page heading, its New contract action, the status filters, then the toolbar, in that order", () => {
     const markup = render();
-    const heading = markup.indexOf("<h1");
-    const register = markup.indexOf(">Contract register</h2>");
+    const heading = markup.search(/<h1[^>]*>Contract register<\/h1>/);
     expect(heading).toBeGreaterThanOrEqual(0);
-    expect(heading).toBeLessThan(register);
-    const button = markup.search(
-      /<button[^>]*aria-haspopup="dialog"[^>]*>New contract</,
+    // New contract is its own page, not a dialog over the register.
+    const link = markup.search(
+      /<a[^>]*href="\/dashboards\/contracts\/new"[^>]*>(?:<svg[\s\S]*?<\/svg>)?New contract<\/a>/,
     );
-    expect(button).toBeGreaterThan(register);
-    expect(button).toBeLessThan(markup.indexOf('role="search"'));
-    // The form opens, in a dialog, only when asked.
-    expect(markup).not.toContain("CREATE CONTRACT");
+    const filters = markup.indexOf('aria-label="Filter contracts by status"');
+    const search = markup.indexOf('role="search"');
+    expect(link).toBeGreaterThan(heading);
+    expect(filters).toBeGreaterThan(link);
+    expect(search).toBeGreaterThan(filters);
+    const linkTag = /<a[^>]*href="\/dashboards\/contracts\/new"[^>]*>/.exec(
+      markup,
+    )?.[0];
+    expect(linkTag).not.toContain("aria-haspopup");
+    expect(markup).not.toContain('role="dialog"');
+    expect(markup).not.toContain("New draft contract");
   });
 
   it("offers New contract only to company administrators", () => {
@@ -150,7 +169,9 @@ describe("ContractsList", () => {
     expect(markup).toMatch(/Feb 1, 2026|1 Feb 2026/);
     expect(markup).toMatch(/Dec 31, 2026|31 Dec 2026/);
     expect(markup).toContain(">Value</th>");
-    expect(markup).toContain(">Start date</th>");
+    expect(markup).toMatch(
+      /<th[^>]*aria-sort="none"[^>]*><button[^>]*>Start date/,
+    );
   });
 
   it("names the other parties to each contract, on cards and in the table", () => {
@@ -198,13 +219,16 @@ describe("ContractsList", () => {
     // The API lists no parties for archived contracts; don't claim "none".
     expect(markup).toContain(">Not shown<");
     expect(markup).not.toContain(">None yet<");
-    expect(markup).toContain(">Actions</th>");
+    expect(markup).toContain('<span class="sr-only">Actions</span></th>');
     expect(markup).toContain("Restore");
+    // The archived-only filter is listed as active, and can be removed.
+    expect(markup).toContain(">Archived only");
+    expect(markup).toContain('aria-label="Remove filter: Archived only"');
   });
 
-  it("offers archived contracts only to company administrators", () => {
-    expect(render(true)).toContain("Show archived contracts only");
-    expect(render(false)).not.toContain("Show archived contracts only");
+  it("offers archived contracts, under More filters, only to company administrators", () => {
+    expect(render(true)).toContain("More filters");
+    expect(render(false)).not.toContain("More filters");
   });
 
   it("tells a company with no contracts that it has none yet", () => {
@@ -218,13 +242,16 @@ describe("ContractsList", () => {
 
   it("describes the list for its reader: oversight for administrators, own roles for members", () => {
     const admin = render(true);
-    expect(admin).toContain("Contracts your company is a party to.");
+    expect(admin).toContain(
+      "Manage and monitor the contracts your company is a party to.",
+    );
 
     const member = render(false);
     expect(member).toContain("Contracts you hold a role on.");
-    expect(member).not.toContain("Contracts your company is a party to.");
+    expect(member).not.toContain("contracts your company is a party to.");
+    expect(member).toContain("No contracts yet.");
     expect(member).toContain(
-      "No contracts yet. Contracts appear here once a Company Administrator or workspace administrator gives you a role on them.",
+      "Contracts appear here once a Company Administrator or workspace administrator gives you a role on them.",
     );
   });
 
@@ -234,7 +261,9 @@ describe("ContractsList", () => {
 
     expect(markup).toContain("No contracts match your search or filters.");
     expect(markup).not.toContain("No contracts yet.");
-    expect(markup.match(/>Clear filters</g)).toHaveLength(2);
+    expect(markup.match(/>Clear filters</g)).toHaveLength(1);
+    // The search is shown as an active filter, removable on its own.
+    expect(markup).toContain("Search: “zzz”");
   });
 
   it("shows loading, then errors with a retry, never an empty state", () => {

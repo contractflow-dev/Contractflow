@@ -14,7 +14,7 @@ export interface IHseIncidentEntity {
     rootCause : string
     investigationSummary : string
     lostTimeDays : number
-    estimatedCostMinor : number
+    estimatedCostMinor : string
     currencyCode : ECurrencyCode
     isNotifiable : boolean
     authorityNotifiedAt : Date

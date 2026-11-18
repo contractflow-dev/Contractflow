@@ -31,10 +31,35 @@ export const contractSortOptions = [
     sortOrder: ESortOrder.ASC,
   },
   {
+    value: "reference-desc",
+    label: "Reference (Z–A)",
+    sortBy: EContractSortField.REFERENCE_NUMBER,
+    sortOrder: ESortOrder.DESC,
+  },
+  {
     value: "title",
     label: "Title (A–Z)",
     sortBy: EContractSortField.TITLE,
     sortOrder: ESortOrder.ASC,
+  },
+  {
+    value: "title-desc",
+    label: "Title (Z–A)",
+    sortBy: EContractSortField.TITLE,
+    sortOrder: ESortOrder.DESC,
+  },
+  // The API orders statuses by lifecycle: draft, active, suspended, completed.
+  {
+    value: "status",
+    label: "Status (draft to completed)",
+    sortBy: EContractSortField.STATUS,
+    sortOrder: ESortOrder.ASC,
+  },
+  {
+    value: "status-desc",
+    label: "Status (completed to draft)",
+    sortBy: EContractSortField.STATUS,
+    sortOrder: ESortOrder.DESC,
   },
   {
     value: "start-date",
@@ -63,6 +88,13 @@ export const contractSortOptions = [
 ] as const;
 
 type ContractSortValue = (typeof contractSortOptions)[number]["value"];
+
+/** The sort option for a column and direction, if the API offers it. */
+function sortOptionFor(sortBy: EContractSortField, sortOrder: ESortOrder) {
+  return contractSortOptions.find(
+    (option) => option.sortBy === sortBy && option.sortOrder === sortOrder,
+  );
+}
 
 /**
  * The contract register's server-side query: search, status, archived
@@ -146,6 +178,29 @@ export function useContractsList(
     resetPage();
   }
 
+  function clearSearch() {
+    setSearchInput("");
+    if (search) {
+      setSearch("");
+      resetPage();
+    }
+  }
+
+  /**
+   * For a sortable column header: sorts by that column ascending, or flips
+   * the direction when the table is already sorted by it.
+   */
+  function toggleSort(sortBy: EContractSortField) {
+    const sortOrder =
+      sortOption.sortBy === sortBy && sortOption.sortOrder === ESortOrder.ASC
+        ? ESortOrder.DESC
+        : ESortOrder.ASC;
+    const option = sortOptionFor(sortBy, sortOrder);
+    if (!option) return;
+    setSortValue(option.value);
+    resetPage();
+  }
+
   function setSort(value: string) {
     const option = contractSortOptions.find(
       (candidate) => candidate.value === value,
@@ -165,11 +220,16 @@ export function useContractsList(
     setIncludeDeleted,
     sort,
     setSort,
+    /** The column and direction the results are sorted by. */
+    sortBy: sortOption.sortBy,
+    sortOrder: sortOption.sortOrder,
+    toggleSort,
     page,
     setPage,
     limit,
     setLimit,
     submitSearch,
+    clearSearch,
     /** The search the current results are for (after the typing pause). */
     search,
     hasFilters,

@@ -24,10 +24,10 @@ export class InvoiceAdjustment extends BaseCustomEntity implements IInvoiceAdjus
     rateBps!: number
 
     @Column({name: "base_amount_minor", type: "bigint"})
-    baseAmountMinor!: number
+    baseAmountMinor!: string
 
     @Column({name: "amount_minor", type: "bigint"})
-    amountMinor!: number
+    amountMinor!: string
 
     @Column({name: "currency_code", type: "char", length: 3})
     currencyCode!: ECurrencyCode

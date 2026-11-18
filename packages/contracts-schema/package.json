@@ -21,6 +21,10 @@
       "types": "./dist/common/phone/index.d.ts",
       "default": "./dist/common/phone/index.js"
     },
+    "./money": {
+      "types": "./dist/common/money/index.d.ts",
+      "default": "./dist/common/money/index.js"
+    },
     "./common": {
       "types": "./dist/common/index.d.ts",
       "default": "./dist/common/index.js"

@@ -3,6 +3,7 @@ import type {
   IntegerString,
   TimestampString,
 } from "../../../common/interfaces/workspace-values.interface.js";
+import type { MinorAmount } from "../../../common/money/minor-amount.js";
 import type { ECurrencyCode } from "../../identity/enums/identity.enum.js";
 import type {
   ESiteStatus,
@@ -61,7 +62,7 @@ export interface InventoryTransaction {
   transactionType: ETransactionType;
   /** Thousandths of the item unit of measure. */
   quantityMilli: IntegerString;
-  unitCostMinor: IntegerString;
+  unitCostMinor: MinorAmount;
   currencyCode: ECurrencyCode;
   referenceNumber: string;
   counterPartyName: string;

@@ -69,6 +69,16 @@ describe("ContractSiteManagement", () => {
     expect(markup).toContain("North yard");
     expect(markup).toContain("6.524379, -3.379206");
     expect(markup).toContain("Add site");
+    // One named table at every width: low-priority columns step aside on
+    // narrow screens, and the address moves under the site's name.
+    expect(markup).toContain('aria-label="Contract sites"');
+    expect(markup).toMatch(
+      /<th[^>]*class="[^"]*hidden[^"]*md:table-cell[^"]*"[^>]*>Address<\/th>/,
+    );
+    expect(markup).toMatch(
+      /<th[^>]*class="[^"]*hidden[^"]*lg:table-cell[^"]*"[^>]*>\s*Coordinates\s*<\/th>/,
+    );
+    expect(markup.match(/1 Quay Road/g)).toHaveLength(2);
     expect(mocks.getSites).toHaveBeenCalledWith(
       { companyId: "company-1", contractId: "contract-1" },
       { skip: false },
@@ -102,6 +112,7 @@ describe("ContractSiteManagement", () => {
     );
 
     expect(markup).toContain("No sites have been added to this contract.");
+    expect(markup).not.toContain("<table");
   });
 
   it("converts between decimal degrees and stored micro-degrees", () => {

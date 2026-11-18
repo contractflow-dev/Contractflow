@@ -19,7 +19,7 @@ const contract = {
   title: 'Pipeline integrity',
   contractType: 'service',
   partyType: 'client',
-  originalValueMinor: 100_000,
+  originalValueMinor: '100000',
   currencyCode: 'NGN',
   retentionRateBps: 500,
   paymentTermsDays: 30,

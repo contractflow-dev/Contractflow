@@ -549,7 +549,7 @@ export function DepartmentContracts({
                   ))}
                 </ul>
                 <div className="hidden overflow-x-auto md:block">
-                  <Table>
+                  <Table aria-label="Department contracts">
                     <TableHeader>
                       <TableRow>
                         <TableHead>Contract</TableHead>

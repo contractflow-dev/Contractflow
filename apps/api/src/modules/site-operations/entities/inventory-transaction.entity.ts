@@ -36,7 +36,7 @@ export class InventoryTransaction extends BaseCustomEntity implements IInventory
     quantityMilli!: number
 
     @Column({name: "unit_cost_minor", type: "bigint"})
-    unitCostMinor!: number
+    unitCostMinor!: string
 
     @Column({name: "currency_code", type: "varchar", length: 3})
     currencyCode!: ECurrencyCode

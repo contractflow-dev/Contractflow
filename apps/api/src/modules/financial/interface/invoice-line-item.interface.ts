@@ -7,7 +7,7 @@ export interface IInvoiceLineItemEntity {
     description : string
     quantityMilli : number
     unitOfMeasure : string
-    unitPriceMinor : number
-    amountMinor : number
+    unitPriceMinor : string
+    amountMinor : string
     currencyCode : ECurrencyCode
 }

@@ -34,10 +34,10 @@ export class InvoiceLineItem extends BaseCustomEntity implements IInvoiceLineIte
     unitOfMeasure!: string
 
     @Column({name: "unit_price_minor", type: "bigint"})
-    unitPriceMinor!: number
+    unitPriceMinor!: string
 
     @Column({name: "amount_minor", type: "bigint"})
-    amountMinor!: number
+    amountMinor!: string
 
     @Column({name: "currency_code", type: "char", length: 3})
     currencyCode!: ECurrencyCode

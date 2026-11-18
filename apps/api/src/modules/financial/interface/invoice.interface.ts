@@ -12,10 +12,10 @@ export interface IInvoiceEntity {
     periodStart : Date
     periodEnd : Date
     currencyCode : ECurrencyCode
-    grossAmountMinor : number
-    adjustmentsTotalMinor : number
-    netPayableMinor : number
-    amountPaidMinor : number
+    grossAmountMinor : string
+    adjustmentsTotalMinor : string
+    netPayableMinor : string
+    amountPaidMinor : string
     submittedAt : Date
     submittedById : string
     certifiedAt : Date

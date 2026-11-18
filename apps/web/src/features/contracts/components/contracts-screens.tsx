@@ -5,28 +5,28 @@ import { useId, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { ContractLifecycleManagement } from "./contract-lifecycle-management";
 import {
+  EContractSortField,
   EContractStatus,
+  ESortOrder,
   type ContractActivityTarget,
 } from "@contractflow/contracts-schema";
+import { RiAddLine } from "@remixicon/react";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
-import { Button } from "@workspace/ui/components/button";
+import { Button, buttonVariants } from "@workspace/ui/components/button";
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
 import { Field, FieldLabel } from "@workspace/ui/components/field";
-import { Input } from "@workspace/ui/components/input";
 import {
   NativeSelect,
   NativeSelectOption,
 } from "@workspace/ui/components/native-select";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -34,6 +34,24 @@ import {
   TableRow,
 } from "@workspace/ui/components/table";
 import { DataPagination } from "@/components/pagination/data-pagination";
+import {
+  ActionsTableHead,
+  DataTable,
+  DataTableEmpty,
+  DataTableError,
+  DataTableRowActions,
+  DataTableSkeleton,
+  SortableTableHead,
+} from "@/components/data-table/data-table";
+import {
+  DataTableActiveFilters,
+  DataTableFilterChips,
+  DataTableMoreFilters,
+  DataTableSearch,
+  DataTableToolbar,
+  type ActiveFilter,
+} from "@/components/data-table/data-table-toolbar";
+import { DropdownMenuLinkItem } from "@workspace/ui/components/dropdown-menu";
 import {
   ARCHIVED_STATUS,
   StatusBadge,
@@ -52,15 +70,6 @@ import {
   formatMoneyMinor,
   humanizeEnumValue,
 } from "@/lib/format";
-import { CreateContractWizard } from "./create-contract-form";
-import { useNewContractForm } from "../_hooks/use-new-contract-form";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@workspace/ui/components/dialog";
 import type { Contract, ContractListItem } from "@/services/contractApi";
 import { ContractRoleAssignmentManagement } from "./contract-role-assignment-management";
 import { parseContractWorkspace } from "../contract-workspaces";
@@ -71,6 +80,7 @@ import { useContractDetails } from "../_hooks/use-contract-details";
 import { useContractSectionAccess } from "../_hooks/use-contract-section-access";
 import {
   CONTRACT_UNAVAILABLE_TEXT,
+  NEW_CONTRACT_PATH,
   contractSectionHref,
   isRestrictedContractSection,
   type ContractSection,
@@ -87,8 +97,10 @@ import {
   contractSortOptions,
   useContractsList,
 } from "../_hooks/use-contracts-list";
-
-const contractStatuses = Object.values(EContractStatus);
+import {
+  CONTRACT_STATUS_FILTERS,
+  useContractStatusCounts,
+} from "../_hooks/use-contract-status-counts";
 
 /** What each contract status means, in the terms the lifecycle actions use. */
 const contractStatusLegend: StatusLegendItem[] = [
@@ -176,12 +188,16 @@ export function ContractsList({
   const {
     searchInput,
     setSearchInput,
+    search,
     status,
     setStatus,
     includeDeleted,
     setIncludeDeleted,
     sort,
     setSort,
+    sortBy,
+    sortOrder,
+    toggleSort,
     setPage,
     setLimit,
     currentData,
@@ -190,122 +206,81 @@ export function ContractsList({
     isLoading,
     refetch,
     submitSearch,
+    clearSearch,
     hasFilters,
     clearFilters,
   } = useContractsList(companyId, { canViewArchived });
+  const counts = useContractStatusCounts(companyId, {
+    search,
+    includeDeleted,
+  });
   const includeArchivedId = useId();
+  const sortId = useId();
   const initialLoading = isLoading || (isFetching && !currentData);
   const contracts = currentData?.data ?? [];
-  const showActions = includeDeleted;
-  // "New contract" is for company administrators; the API makes the same
-  // check when the contract is created.
-  const newContract = useNewContractForm();
-  const newContractOpen = canCreateContracts && newContract.open;
+  const sortDirection = (field: EContractSortField) =>
+    sortBy === field ? (sortOrder === ESortOrder.ASC ? "asc" : "desc") : null;
+  const activeFilters: ActiveFilter[] = [
+    ...(search
+      ? [{ key: "search", label: `Search: “${search}”`, onRemove: clearSearch }]
+      : []),
+    ...(includeDeleted
+      ? [
+          {
+            key: "archived",
+            label: "Archived only",
+            onRemove: () => setIncludeDeleted(false),
+          },
+        ]
+      : []),
+  ];
+  const newContractLink = (
+    // For company administrators; the API makes the same check when the
+    // contract is created.
+    <Link href={NEW_CONTRACT_PATH} className={buttonVariants()}>
+      <RiAddLine aria-hidden="true" data-icon="inline-start" />
+      New contract
+    </Link>
+  );
 
   return (
     <div className="space-y-6">
       {/* Company Administrators oversee every contract the company is a
           party to; other members see only those they hold a role on. */}
-      {canCreateContracts ? (
-        <Dialog open={newContractOpen} onOpenChange={newContract.setOpen}>
-          <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>New contract</DialogTitle>
-              <DialogDescription>
-                Create a draft contract for this company.
-              </DialogDescription>
-            </DialogHeader>
-            {/* Mounted only while open, so each new contract starts afresh. */}
-            {newContractOpen ? (
-              <CreateContractWizard
-                formId={newContract.formId}
-                companyId={companyId}
-                onCancel={() => newContract.setOpen(false)}
-              />
-            ) : null}
-          </DialogContent>
-        </Dialog>
-      ) : null}
       <PageHeader
-        title="Contracts"
+        title="Contract register"
         description={
           canCreateContracts
-            ? "Contracts your company is a party to. Open one to see its parties, roles, sites and history."
+            ? "Manage and monitor the contracts your company is a party to. Open one to see its parties, roles, sites and history."
             : "Contracts you hold a role on. Open one to see its parties and history, and your workspaces."
         }
+        actions={canCreateContracts ? newContractLink : undefined}
       />
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            <h2>Contract register</h2>
-          </CardTitle>
-          <CardDescription>
-            Search by title or reference, filter by status, and choose the
-            order. Results update as you type.
-          </CardDescription>
-          {canCreateContracts ? (
-            <CardAction>
-              <Button
-                type="button"
-                aria-haspopup="dialog"
-                onClick={() => newContract.setOpen(true)}
+
+      <DataTableFilterChips
+        label="Filter contracts by status"
+        countNoun="contracts"
+        value={status}
+        onChange={setStatus}
+        options={CONTRACT_STATUS_FILTERS.map((value) => ({
+          value,
+          label: value ? humanizeEnumValue(value) : "All contracts",
+          count: counts[value],
+        }))}
+      />
+
+      <div className="space-y-3">
+        <DataTableToolbar
+          actions={
+            <div className="flex items-center gap-2">
+              <label
+                htmlFor={sortId}
+                className="text-sm whitespace-nowrap text-muted-foreground"
               >
-                New contract
-              </Button>
-            </CardAction>
-          ) : null}
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <form
-            role="search"
-            aria-label="Contracts"
-            onSubmit={submitSearch}
-            className="grid gap-3 sm:grid-cols-2"
-          >
-            <Field className="sm:col-span-2">
-              <FieldLabel htmlFor="contract-search">
-                Search contracts
-              </FieldLabel>
-              <Input
-                id="contract-search"
-                type="search"
-                value={searchInput}
-                maxLength={100}
-                placeholder="Title or reference"
-                autoComplete="off"
-                onChange={(event) => setSearchInput(event.target.value)}
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="contract-status">Status</FieldLabel>
+                Sort by
+              </label>
               <NativeSelect
-                id="contract-status"
-                className="w-full"
-                value={status}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setStatus(
-                    contractStatuses.find((candidate) => candidate === value) ??
-                      "",
-                  );
-                }}
-              >
-                <NativeSelectOption value="">All statuses</NativeSelectOption>
-                {contractStatuses.map((contractStatus) => (
-                  <NativeSelectOption
-                    key={contractStatus}
-                    value={contractStatus}
-                  >
-                    {humanizeEnumValue(contractStatus)}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="contract-sort">Sort by</FieldLabel>
-              <NativeSelect
-                id="contract-sort"
-                className="w-full"
+                id={sortId}
                 value={sort}
                 onChange={(event) => setSort(event.target.value)}
               >
@@ -315,14 +290,27 @@ export function ContractsList({
                   </NativeSelectOption>
                 ))}
               </NativeSelect>
-            </Field>
-          </form>
-
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            {/* The API lists archived contracts only to company administrators,
-                and returns only the archived contracts this company created. */}
-            {canViewArchived ? (
-              <Field orientation="horizontal" className="w-fit">
+            </div>
+          }
+        >
+          <DataTableSearch
+            id="contract-search"
+            label="Search contracts"
+            formLabel="Contracts"
+            placeholder="Search by title or reference"
+            value={searchInput}
+            onChange={setSearchInput}
+            onSubmit={submitSearch}
+            onClear={clearSearch}
+          />
+          {/* The API lists archived contracts only to company administrators,
+              and returns only the archived contracts this company created. */}
+          {canViewArchived ? (
+            <DataTableMoreFilters
+              activeCount={includeDeleted ? 1 : 0}
+              onClear={() => setIncludeDeleted(false)}
+            >
+              <Field orientation="horizontal">
                 <Checkbox
                   id={includeArchivedId}
                   checked={includeDeleted}
@@ -332,194 +320,174 @@ export function ContractsList({
                   Show archived contracts only
                 </FieldLabel>
               </Field>
-            ) : (
-              <span />
-            )}
-            {hasFilters ? (
-              <Button type="button" variant="outline" onClick={clearFilters}>
-                Clear filters
-              </Button>
-            ) : null}
-          </div>
-          <StatusLegendDisclosure
-            label="What do contract statuses mean?"
-            items={
-              includeDeleted
-                ? [...contractStatusLegend, archivedStatusLegend]
-                : contractStatusLegend
-            }
-          />
-
-          {error ? (
-            <Alert variant="destructive">
-              <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
-                <span>
-                  {getApiErrorMessage(error, "Unable to load contracts.")}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => void refetch()}
-                >
-                  Retry
-                </Button>
-              </AlertDescription>
-            </Alert>
+            </DataTableMoreFilters>
           ) : null}
+        </DataTableToolbar>
+        <DataTableActiveFilters
+          filters={activeFilters}
+          onClearAll={() => {
+            clearSearch();
+            setIncludeDeleted(false);
+          }}
+        />
+        <StatusLegendDisclosure
+          label="What do contract statuses mean?"
+          items={
+            includeDeleted
+              ? [...contractStatusLegend, archivedStatusLegend]
+              : contractStatusLegend
+          }
+        />
+      </div>
 
-          {initialLoading ? (
-            <p
-              role="status"
-              className="py-8 text-center text-sm text-muted-foreground"
-            >
-              Loading contracts…
-            </p>
-          ) : contracts.length ? (
-            <>
-              {/* Narrow screens: one card per contract instead of a wide table. */}
-              <ul className="divide-y rounded-2xl border md:hidden">
-                {contracts.map((contract) => (
-                  <li key={contract.id} className="space-y-2 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <ContractTitle contract={contract} />
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {contract.referenceNumber} ·{" "}
-                          {humanizeEnumValue(contract.contractType)}
-                        </p>
-                      </div>
-                      <StatusBadge
-                        status={
-                          contract.deletedAt ? ARCHIVED_STATUS : contract.status
-                        }
-                      />
+      {error ? (
+        <DataTableError
+          message={getApiErrorMessage(error, "Unable to load contracts.")}
+          onRetry={() => void refetch()}
+        />
+      ) : initialLoading ? (
+        <DataTableSkeleton
+          label="Loading contracts…"
+          columns={REGISTER_COLUMNS}
+        />
+      ) : contracts.length ? (
+        <div className="space-y-4">
+          {/* Narrow screens: one card per contract instead of a wide table. */}
+          <ul
+            aria-label="Contracts"
+            className="divide-y rounded-xl border md:hidden"
+          >
+            {contracts.map((contract) => (
+              <li key={contract.id} className="space-y-2 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <ContractTitle contract={contract} />
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {contract.referenceNumber} ·{" "}
+                      {humanizeEnumValue(contract.contractType)}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <StatusBadge
+                      status={
+                        contract.deletedAt ? ARCHIVED_STATUS : contract.status
+                      }
+                    />
+                    <ContractRowActions contract={contract} />
+                  </div>
+                </div>
+                <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
+                  <dt className="text-muted-foreground">Counterparty</dt>
+                  <dd className="min-w-0 text-end">
+                    <Counterparties contract={contract} />
+                  </dd>
+                  <dt className="text-muted-foreground">Value</dt>
+                  <dd className="text-end tabular-nums">
+                    {formatMoneyMinor(
+                      contract.currentValueMinor,
+                      contract.currencyCode,
+                    )}
+                  </dd>
+                  <dt className="text-muted-foreground">Dates</dt>
+                  <dd className="text-end">
+                    {formatCalendarDate(contract.startDate)} –{" "}
+                    {formatCalendarDate(
+                      contract.revisedEndDate || contract.endDate,
+                    )}
+                  </dd>
+                </dl>
+                {contract.deletedAt ? (
+                  <RestoreContractButton
+                    companyId={companyId}
+                    contract={contract}
+                  />
+                ) : null}
+              </li>
+            ))}
+          </ul>
+
+          <DataTable label="Contracts" className="hidden md:block">
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <SortableTableHead
+                  label="Contract"
+                  direction={sortDirection(EContractSortField.TITLE)}
+                  onSort={() => toggleSort(EContractSortField.TITLE)}
+                />
+                <TableHead>Counterparty</TableHead>
+                <TableHead className="text-end">Value</TableHead>
+                <SortableTableHead
+                  label="Status"
+                  direction={sortDirection(EContractSortField.STATUS)}
+                  onSort={() => toggleSort(EContractSortField.STATUS)}
+                />
+                <SortableTableHead
+                  label="Start date"
+                  direction={sortDirection(EContractSortField.START_DATE)}
+                  onSort={() => toggleSort(EContractSortField.START_DATE)}
+                />
+                <SortableTableHead
+                  label="End date"
+                  direction={sortDirection(EContractSortField.END_DATE)}
+                  onSort={() => toggleSort(EContractSortField.END_DATE)}
+                />
+                <ActionsTableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {contracts.map((contract) => (
+                <TableRow key={contract.id}>
+                  <TableCell className="min-w-56 whitespace-normal">
+                    <ContractTitle contract={contract} />
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {contract.referenceNumber} ·{" "}
+                      {humanizeEnumValue(contract.contractType)}
+                    </p>
+                  </TableCell>
+                  <TableCell className="min-w-44 whitespace-normal">
+                    <Counterparties contract={contract} />
+                  </TableCell>
+                  <TableCell className="text-end tabular-nums">
+                    {formatMoneyMinor(
+                      contract.currentValueMinor,
+                      contract.currencyCode,
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge
+                      status={
+                        contract.deletedAt ? ARCHIVED_STATUS : contract.status
+                      }
+                    />
+                  </TableCell>
+                  <TableCell className="tabular-nums">
+                    {formatCalendarDate(contract.startDate)}
+                  </TableCell>
+                  <TableCell className="tabular-nums">
+                    {formatCalendarDate(
+                      contract.revisedEndDate || contract.endDate,
+                    )}
+                  </TableCell>
+                  <TableCell className="text-end">
+                    <div className="flex items-center justify-end gap-2">
+                      {/* Restoring is the archived contract's main action, so
+                          it stays in the row rather than in the menu. */}
+                      {contract.deletedAt ? (
+                        <RestoreContractButton
+                          companyId={companyId}
+                          contract={contract}
+                        />
+                      ) : null}
+                      <ContractRowActions contract={contract} />
                     </div>
-                    <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
-                      <dt className="text-muted-foreground">Counterparty</dt>
-                      <dd className="min-w-0 text-end">
-                        <Counterparties contract={contract} />
-                      </dd>
-                      <dt className="text-muted-foreground">Value</dt>
-                      <dd className="text-end tabular-nums">
-                        {formatMoneyMinor(
-                          contract.currentValueMinor,
-                          contract.currencyCode,
-                        )}
-                      </dd>
-                      <dt className="text-muted-foreground">Dates</dt>
-                      <dd className="text-end">
-                        {formatCalendarDate(contract.startDate)} –{" "}
-                        {formatCalendarDate(
-                          contract.revisedEndDate || contract.endDate,
-                        )}
-                      </dd>
-                    </dl>
-                    {showActions && contract.deletedAt ? (
-                      <RestoreContractButton
-                        companyId={companyId}
-                        contract={contract}
-                      />
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </DataTable>
 
-              <div className="hidden md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Contract</TableHead>
-                      <TableHead>Counterparty</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-end">Value</TableHead>
-                      <TableHead>Start date</TableHead>
-                      <TableHead>End date</TableHead>
-                      {showActions ? <TableHead>Actions</TableHead> : null}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {contracts.map((contract) => (
-                      <TableRow key={contract.id}>
-                        <TableCell className="min-w-56 whitespace-normal">
-                          <ContractTitle contract={contract} />
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {contract.referenceNumber}
-                          </p>
-                        </TableCell>
-                        <TableCell className="min-w-44 whitespace-normal">
-                          <Counterparties contract={contract} />
-                        </TableCell>
-                        <TableCell>
-                          {humanizeEnumValue(contract.contractType)}
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge
-                            status={
-                              contract.deletedAt
-                                ? ARCHIVED_STATUS
-                                : contract.status
-                            }
-                          />
-                        </TableCell>
-                        <TableCell className="text-end whitespace-nowrap tabular-nums">
-                          {formatMoneyMinor(
-                            contract.currentValueMinor,
-                            contract.currencyCode,
-                          )}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap">
-                          {formatCalendarDate(contract.startDate)}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap">
-                          {formatCalendarDate(
-                            contract.revisedEndDate || contract.endDate,
-                          )}
-                        </TableCell>
-                        {showActions ? (
-                          <TableCell>
-                            {contract.deletedAt ? (
-                              <RestoreContractButton
-                                companyId={companyId}
-                                contract={contract}
-                              />
-                            ) : null}
-                          </TableCell>
-                        ) : null}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
-          ) : !error ? (
-            <div className="space-y-3 py-8 text-center">
-              {hasFilters ? (
-                <>
-                  <p className="text-sm text-muted-foreground">
-                    No contracts match your search or filters.
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={clearFilters}
-                  >
-                    Clear filters
-                  </Button>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  {canCreateContracts
-                    ? "No contracts yet. Contracts your company creates, or joins when invited, will appear here."
-                    : "No contracts yet. Contracts appear here once a Company Administrator or workspace administrator gives you a role on them."}
-                </p>
-              )}
-            </div>
-          ) : null}
-
-          {currentData && contracts.length ? (
+          {currentData ? (
             <DataPagination
-              className="border-t pt-4"
               meta={currentData.meta}
               itemLabel="contracts"
               isFetching={isFetching}
@@ -527,9 +495,69 @@ export function ContractsList({
               onPageSizeChange={setLimit}
             />
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      ) : hasFilters ? (
+        <DataTableEmpty
+          title="No contracts match your search or filters."
+          description="Try another search, or clear the filters to see every contract."
+          action={
+            <Button type="button" variant="outline" onClick={clearFilters}>
+              Clear filters
+            </Button>
+          }
+        />
+      ) : (
+        <DataTableEmpty
+          title="No contracts yet."
+          description={
+            canCreateContracts
+              ? "Contracts your company creates, or joins when invited, will appear here."
+              : "Contracts appear here once a Company Administrator or workspace administrator gives you a role on them."
+          }
+          action={canCreateContracts ? newContractLink : undefined}
+        />
+      )}
     </div>
+  );
+}
+
+/** The register's columns, for its loading skeleton. */
+const REGISTER_COLUMNS = [
+  "Contract",
+  "Counterparty",
+  "Value",
+  "Status",
+  "Start date",
+  "End date",
+  "",
+] as const;
+
+/**
+ * A contract's secondary actions: the sections every reader of a listed
+ * contract may open. Restricted sections and lifecycle actions stay on the
+ * contract, where the API's permissions decide what is offered.
+ */
+function ContractRowActions({ contract }: { contract: ContractListItem }) {
+  return (
+    <DataTableRowActions
+      label={`Actions for ${contract.referenceNumber} · ${contract.title}`}
+    >
+      <DropdownMenuLinkItem
+        render={<Link href={contractSectionHref(contract.id, "overview")} />}
+      >
+        View contract
+      </DropdownMenuLinkItem>
+      <DropdownMenuLinkItem
+        render={<Link href={contractSectionHref(contract.id, "parties")} />}
+      >
+        View parties
+      </DropdownMenuLinkItem>
+      <DropdownMenuLinkItem
+        render={<Link href={contractSectionHref(contract.id, "history")} />}
+      >
+        View status history
+      </DropdownMenuLinkItem>
+    </DataTableRowActions>
   );
 }
 
@@ -606,10 +634,12 @@ export function ContractDetail({
     parties,
     partiesError,
     partiesLoading,
+    refetchParties,
     history,
     historyError,
     historyLoading,
     historyFetching,
+    refetchHistory,
     setHistoryPage,
     setHistoryPageSize,
   } = useContractDetails(query);
@@ -798,22 +828,23 @@ export function ContractDetail({
             </CardHeader>
             <CardContent>
               {partiesError ? (
-                <Alert variant="destructive">
-                  <AlertDescription>
-                    {getApiErrorMessage(
-                      partiesError,
-                      "Unable to load contract parties.",
-                    )}
-                  </AlertDescription>
-                </Alert>
+                <DataTableError
+                  message={getApiErrorMessage(
+                    partiesError,
+                    "Unable to load contract parties.",
+                  )}
+                  onRetry={() => void refetchParties()}
+                />
               ) : partiesLoading ? (
-                <p role="status" className="py-4 text-sm text-muted-foreground">
-                  Loading parties…
-                </p>
+                <DataTableSkeleton
+                  label="Loading parties…"
+                  columns={["Company", "Party type", "Signed"]}
+                  rows={3}
+                />
               ) : parties?.length ? (
-                <Table>
+                <DataTable label="Contract parties">
                   <TableHeader>
-                    <TableRow>
+                    <TableRow className="hover:bg-transparent">
                       <TableHead>Company</TableHead>
                       <TableHead>Party type</TableHead>
                       <TableHead>Signed</TableHead>
@@ -822,11 +853,13 @@ export function ContractDetail({
                   <TableBody>
                     {parties.map((party) => (
                       <TableRow key={party.id}>
-                        <TableCell>{party.companyName}</TableCell>
+                        <TableCell className="min-w-40 whitespace-normal break-words">
+                          {party.companyName}
+                        </TableCell>
                         <TableCell>
                           {humanizeEnumValue(party.partyType)}
                         </TableCell>
-                        <TableCell className="whitespace-nowrap">
+                        <TableCell className="tabular-nums">
                           {/* Recorded as a signing date, so shown as one. */}
                           {formatCalendarDate(party.signedAt, {
                             fallback: "Not signed",
@@ -835,11 +868,9 @@ export function ContractDetail({
                       </TableRow>
                     ))}
                   </TableBody>
-                </Table>
+                </DataTable>
               ) : (
-                <p className="py-4 text-sm text-muted-foreground">
-                  No party details are available.
-                </p>
+                <DataTableEmpty title="No party details are available." />
               )}
             </CardContent>
           </Card>
@@ -898,23 +929,24 @@ export function ContractDetail({
           </CardHeader>
           <CardContent>
             {historyError ? (
-              <Alert variant="destructive">
-                <AlertDescription>
-                  {getApiErrorMessage(
-                    historyError,
-                    "Unable to load status history.",
-                  )}
-                </AlertDescription>
-              </Alert>
+              <DataTableError
+                message={getApiErrorMessage(
+                  historyError,
+                  "Unable to load status history.",
+                )}
+                onRetry={() => void refetchHistory()}
+              />
             ) : historyLoading ? (
-              <p role="status" className="py-4 text-sm text-muted-foreground">
-                Loading status history…
-              </p>
+              <DataTableSkeleton
+                label="Loading status history…"
+                columns={["Changed", "From", "To", "Reason"]}
+                rows={3}
+              />
             ) : history?.data.length ? (
               <div className="space-y-4">
-                <Table>
+                <DataTable label="Status history">
                   <TableHeader>
-                    <TableRow>
+                    <TableRow className="hover:bg-transparent">
                       <TableHead>Changed</TableHead>
                       <TableHead>From</TableHead>
                       <TableHead>To</TableHead>
@@ -924,7 +956,7 @@ export function ContractDetail({
                   <TableBody>
                     {history.data.map((entry) => (
                       <TableRow key={entry.id}>
-                        <TableCell className="whitespace-nowrap">
+                        <TableCell className="tabular-nums">
                           <time dateTime={entry.changedAt}>
                             {formatDateTime(entry.changedAt, { timeZone })}
                           </time>
@@ -945,7 +977,7 @@ export function ContractDetail({
                       </TableRow>
                     ))}
                   </TableBody>
-                </Table>
+                </DataTable>
                 <DataPagination
                   meta={history.meta}
                   itemLabel="status changes"
@@ -955,9 +987,7 @@ export function ContractDetail({
                 />
               </div>
             ) : (
-              <p className="py-4 text-sm text-muted-foreground">
-                No status changes have been recorded.
-              </p>
+              <DataTableEmpty title="No status changes have been recorded." />
             )}
           </CardContent>
         </Card>

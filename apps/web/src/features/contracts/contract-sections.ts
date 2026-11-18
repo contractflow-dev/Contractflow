@@ -36,6 +36,12 @@ export const RESTRICTED_CONTRACT_SECTIONS = [
 export type RestrictedContractSection =
   (typeof RESTRICTED_CONTRACT_SECTIONS)[number];
 
+/** The contract register, where every contract the viewer can see is listed. */
+export const CONTRACTS_PATH = "/dashboards/contracts";
+
+/** The page for creating a draft contract, for Company Administrators. */
+export const NEW_CONTRACT_PATH = `${CONTRACTS_PATH}/new`;
+
 export function contractSectionHref(
   contractId: string,
   section: ContractSection,

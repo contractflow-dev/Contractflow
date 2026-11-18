@@ -1,8 +1,8 @@
 import type {
   DateOnlyString,
-  IntegerString,
   TimestampString,
 } from "../../../common/interfaces/workspace-values.interface.js";
+import type { MinorAmount } from "../../../common/money/minor-amount.js";
 import type { ECurrencyCode } from "../../identity/enums/identity.enum.js";
 import type {
   EContractVariationStatus,
@@ -41,7 +41,7 @@ export interface Milestone {
   progressBps: number;
   weightBps: number;
   isPaymentMilestone: boolean;
-  amountMinor: IntegerString;
+  amountMinor: MinorAmount;
   currencyCode: ECurrencyCode;
   dueDate: DateOnlyString;
   revisedDueDate: DateOnlyString | null;
@@ -66,7 +66,7 @@ export interface ContractVariation {
   variationType: EContractVariationType;
   status: EContractVariationStatus;
   /** Change to the contract value; negative for a reduction. */
-  amountDeltaMinor: IntegerString;
+  amountDeltaMinor: MinorAmount;
   currencyCode: ECurrencyCode;
   timeExtensionDays: number;
   submittedAt: TimestampString | null;

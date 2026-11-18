@@ -6,7 +6,7 @@ export interface IInventoryTransactionEntity {
     siteDailyLogId : string
     transactionType : ETransactionType
     quantityMilli : number
-    unitCostMinor : number
+    unitCostMinor : string
     currencyCode : ECurrencyCode
     referenceNumber : string
     counterPartyName : string

@@ -1,6 +1,7 @@
 import type {
   AssignableContractWorkspace,
   CreateContractRequest,
+  MinorAmount,
 } from '@contractflow/contracts-schema';
 import { Type } from 'class-transformer';
 import {
@@ -23,6 +24,7 @@ import {
   ECurrencyCode,
   EPartyType,
 } from '@contractflow/contracts-schema';
+import { IsMinorAmount } from '../../../common/dto/minor-amount.validation';
 
 const workspaces = ['project', 'hse', 'finance'] as const;
 
@@ -54,11 +56,8 @@ export class CreateContractRequestDto implements CreateContractRequest {
   @Matches(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/i)
   parentContractId?: string | null;
 
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(Number.MAX_SAFE_INTEGER)
-  originalValueMinor!: number;
+  @IsMinorAmount('non-negative')
+  originalValueMinor!: MinorAmount;
 
   @IsEnum(ECurrencyCode)
   currencyCode!: ECurrencyCode;
@@ -82,11 +81,8 @@ export class CreateContractRequestDto implements CreateContractRequest {
   paymentTermsDays!: number;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(Number.MAX_SAFE_INTEGER)
-  liquidatedDamagesPerDayMinor?: number | null;
+  @IsMinorAmount('non-negative')
+  liquidatedDamagesPerDayMinor?: MinorAmount | null;
 
   @IsDateString()
   awardDate!: string;

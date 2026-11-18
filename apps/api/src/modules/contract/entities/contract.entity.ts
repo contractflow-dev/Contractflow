@@ -47,11 +47,12 @@ export class Contract extends BaseCustomEntity implements IContractEntity {
   @JoinColumn({ name: 'parent_contract_id', referencedColumnName: 'id' })
   parentContract!: Contract;
 
+  // node-postgres returns `bigint` columns as decimal strings (MinorAmount).
   @Column({ name: 'original_value_minor', type: 'bigint' })
-  originalValueMinor!: string | number;
+  originalValueMinor!: string;
 
   @Column({ name: 'current_value_minor', type: 'bigint' })
-  currentValueMinor!: string | number;
+  currentValueMinor!: string;
 
   @Column({ name: 'currency_code', type: 'char', length: 3 })
   currencyCode!: ECurrencyCode;
@@ -70,7 +71,7 @@ export class Contract extends BaseCustomEntity implements IContractEntity {
     type: 'bigint',
     nullable: true,
   })
-  liquidatedDamagesPerDayMinor!: string | number | null;
+  liquidatedDamagesPerDayMinor!: string | null;
 
   @Column({ name: 'award_date', type: 'date' })
   awardDate!: Date;

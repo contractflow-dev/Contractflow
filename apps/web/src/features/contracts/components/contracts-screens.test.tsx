@@ -69,6 +69,12 @@ vi.mock("../_hooks/use-contracts-list", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../_hooks/use-contracts-list")>()),
   useContractsList: vi.fn(),
 }));
+vi.mock("../_hooks/use-contract-status-counts", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("../_hooks/use-contract-status-counts")
+  >()),
+  useContractStatusCounts: () => ({}),
+}));
 
 vi.mock("./contract-signatory-management", () => ({
   ContractSignatoryManagement: () => <div>Contract signatory management</div>,
@@ -102,13 +108,13 @@ const contractDetail: ContractDetailResponse = {
     contractType: Object.values(EContractType)[0],
     status: Object.values(EContractStatus)[0],
     parentContractId: null,
-    originalValueMinor: 1000,
-    currentValueMinor: 1000,
+    originalValueMinor: "1000",
+    currentValueMinor: "1000",
     currencyCode: ECurrencyCode.USD,
     retentionRateBps: 0,
     advancePaymentRateBps: 0,
     paymentTermsDays: 30,
-    liquidatedDamagesPerDayMinor: 0,
+    liquidatedDamagesPerDayMinor: "0",
     awardDate: "2026-01-01",
     startDate: "2026-01-01",
     endDate: "2026-12-31",
@@ -146,6 +152,8 @@ describe("ContractDetail query states", () => {
       historyFetching: false,
       setHistoryPage: vi.fn(),
       setHistoryPageSize: vi.fn(),
+      refetchParties: vi.fn(),
+      refetchHistory: vi.fn(),
     });
   });
 
@@ -157,6 +165,9 @@ describe("ContractDetail query states", () => {
     expect(parties).not.toContain("No party details are available.");
     expect(history).toContain("Unable to load status history.");
     expect(history).not.toContain("No status changes have been recorded.");
+    // Each failed table offers its own Retry.
+    expect(parties).toContain(">Retry</button>");
+    expect(history).toContain(">Retry</button>");
     // The activity timeline is a separate request and still renders, after
     // the status history.
     expect(history).toContain("Contract activity for contract-1");
@@ -184,6 +195,8 @@ describe("ContractDetail query states", () => {
       historyFetching: true,
       setHistoryPage: vi.fn(),
       setHistoryPageSize: vi.fn(),
+      refetchParties: vi.fn(),
+      refetchHistory: vi.fn(),
     });
 
     const parties = renderSection("parties");
@@ -237,6 +250,8 @@ describe("ContractDetail query states", () => {
       historyFetching: false,
       setHistoryPage: vi.fn(),
       setHistoryPageSize: vi.fn(),
+      refetchParties: vi.fn(),
+      refetchHistory: vi.fn(),
     } as unknown as ReturnType<typeof useContractDetails>);
 
     const markup = renderSection("overview");
@@ -290,6 +305,8 @@ describe("contract screen headings", () => {
       historyFetching: false,
       setHistoryPage: vi.fn(),
       setHistoryPageSize: vi.fn(),
+      refetchParties: vi.fn(),
+      refetchHistory: vi.fn(),
     } as unknown as ReturnType<typeof useContractDetails>);
 
     for (const section of [
@@ -310,7 +327,7 @@ describe("contract screen headings", () => {
     }
   });
 
-  it("gives the contract list one <h1>, Contracts, before its sections", () => {
+  it("gives the contract register one <h1> before its sections", () => {
     vi.mocked(useContractsList).mockReturnValue({
       searchInput: "",
       setSearchInput: vi.fn(),
@@ -320,6 +337,11 @@ describe("contract screen headings", () => {
       setIncludeDeleted: vi.fn(),
       sort: "newest",
       setSort: vi.fn(),
+      sortBy: "createdAt",
+      sortOrder: "DESC",
+      toggleSort: vi.fn(),
+      clearSearch: vi.fn(),
+      search: "",
       page: 1,
       setPage: vi.fn(),
       limit: 20,
@@ -351,16 +373,9 @@ describe("contract screen headings", () => {
       />,
     );
 
-    expect(markup).toMatch(/<h1[^>]*>Contracts<\/h1>/);
+    expect(markup).toMatch(/<h1[^>]*>Contract register<\/h1>/);
     expect(headingProblems(markup)).toEqual([]);
-
-    // "Show archived contracts only" is the shared Checkbox, labelled by a
-    // <label for> on its input, and unchecked by default.
-    expect(markup).toMatch(/role="checkbox"[^>]*aria-checked="false"/);
-    const inputId = /<input id="([^"]+)"[^>]*type="checkbox"/.exec(markup)?.[1];
-    expect(markup).toContain(
-      `for="${inputId}">Show archived contracts only</label>`,
-    );
-    expect(markup).not.toContain("accent-primary");
+    // The archived filter's labelled checkbox is covered, opened, in
+    // contracts-list.form.test.tsx: it lives in the More filters popover.
   });
 });
