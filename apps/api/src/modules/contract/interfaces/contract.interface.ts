@@ -7,13 +7,13 @@ export interface IContractEntity {
     contractType : EContractType
     status : EContractStatus
     parentContractId : string | null
-    originalValueMinor : string | number
-    currentValueMinor : string | number
+    originalValueMinor : string
+    currentValueMinor : string
     currencyCode : ECurrencyCode
     retentionRateBps : number
     advancePaymentRateBps : number | null
     paymentTermsDays : number
-    liquidatedDamagesPerDayMinor : string | number | null
+    liquidatedDamagesPerDayMinor : string | null
     awardDate : Date
     startDate : Date
     endDate : Date

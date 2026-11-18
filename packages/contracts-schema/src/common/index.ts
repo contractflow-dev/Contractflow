@@ -2,3 +2,4 @@ export * from "./constants/pagination.constants.js";
 export * from "./enums/pagination.enum.js";
 export * from "./interfaces/pagination.interface.js";
 export * from "./interfaces/workspace-values.interface.js";
+export * from "./money/index.js";

@@ -16,8 +16,8 @@ describe('ContractService', () => {
     contractType: 'service',
     status: 'draft',
     parentContractId: null,
-    originalValueMinor: 125000,
-    currentValueMinor: 125000,
+    originalValueMinor: '125000',
+    currentValueMinor: '125000',
     currencyCode: 'NGN',
     retentionRateBps: 500,
     advancePaymentRateBps: null,
@@ -186,6 +186,38 @@ describe('ContractService', () => {
       'c-1',
       { includeArchived: true },
     );
+  });
+
+  it('returns monetary amounts as exact integer strings', async () => {
+    access.authorizeContractOversight.mockResolvedValue({
+      scope: { contractId: 'c-1', companyId: 'co-1' },
+      basis: 'assignment',
+      party,
+      contract: {
+        ...contractRecord,
+        originalValueMinor: '9007199254740993',
+        currentValueMinor: '9223372036854775807',
+        liquidatedDamagesPerDayMinor: '500000',
+      },
+    });
+
+    const { contract } = await service.get('u', 'co-1', 'c-1');
+
+    expect(contract).toMatchObject({
+      originalValueMinor: '9007199254740993',
+      currentValueMinor: '9223372036854775807',
+      liquidatedDamagesPerDayMinor: '500000',
+    });
+    // Serialised for the client, amounts stay strings, not JSON numbers.
+    expect(JSON.parse(JSON.stringify(contract))).toMatchObject({
+      originalValueMinor: '9007199254740993',
+    });
+  });
+
+  it('returns no liquidated damages as null', async () => {
+    const { contract } = await service.get('u', 'co-1', 'c-1');
+    expect(contract.liquidatedDamagesPerDayMinor).toBeNull();
+    expect(contract.originalValueMinor).toBe('125000');
   });
 
   it('hides a contract the oversight check refuses from every read', async () => {

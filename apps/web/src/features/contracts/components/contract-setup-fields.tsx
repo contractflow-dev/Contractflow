@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo } from "react";
+import { useId, useMemo, type FocusEvent } from "react";
 import { Controller, useFormContext, useWatch } from "react-hook-form";
 import {
   EContractType,
@@ -25,6 +25,7 @@ import {
   currencyDigits,
   formatBasisPoints,
   formatMoneyMinor,
+  groupDecimalInput,
   humanizeEnumValue,
   parseDecimalToMinor,
   parsePercentToBasisPoints,
@@ -254,6 +255,7 @@ export function ContractCommercialFields() {
   const {
     control: formControl,
     register,
+    setValue,
     formState: { errors },
   } = useCreateContractForm();
   const fieldErrors = errors.commercial;
@@ -282,6 +284,24 @@ export function ContractCommercialFields() {
     return minor === null
       ? `In ${currencyCode}. ${precision}`
       : `${formatMoneyMinor(minor, currencyCode)}. ${precision}`;
+  };
+  // Adds grouping commas when the user leaves an amount field ("1500000.5"
+  // becomes "1,500,000.5"), not while they type, so the caret never jumps.
+  // The amount itself doesn't change.
+  const registerAmount = (
+    name: "commercial.originalValue" | "commercial.liquidatedDamagesPerDay",
+  ) => {
+    const field = register(name);
+    return {
+      ...field,
+      onBlur: (event: FocusEvent<HTMLInputElement>) => {
+        const grouped = groupDecimalInput(event.target.value);
+        if (grouped !== event.target.value) {
+          setValue(name, grouped, { shouldDirty: true });
+        }
+        return field.onBlur(event);
+      },
+    };
   };
   const percentHint = (typed: string, fallback: string) => {
     const basisPoints = typed.trim() ? parsePercentToBasisPoints(typed) : null;
@@ -323,7 +343,7 @@ export function ContractCommercialFields() {
           {(control) => (
             <Input
               {...control}
-              {...register("commercial.originalValue")}
+              {...registerAmount("commercial.originalValue")}
               inputMode="decimal"
               autoComplete="off"
               placeholder="0.00"
@@ -390,7 +410,7 @@ export function ContractCommercialFields() {
           {(control) => (
             <Input
               {...control}
-              {...register("commercial.liquidatedDamagesPerDay")}
+              {...registerAmount("commercial.liquidatedDamagesPerDay")}
               inputMode="decimal"
               autoComplete="off"
             />

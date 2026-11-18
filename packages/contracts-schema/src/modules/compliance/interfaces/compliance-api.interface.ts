@@ -1,8 +1,8 @@
 import type {
   DateOnlyString,
-  IntegerString,
   TimestampString,
 } from "../../../common/interfaces/workspace-values.interface.js";
+import type { MinorAmount } from "../../../common/money/minor-amount.js";
 import type { ECurrencyCode } from "../../identity/enums/identity.enum.js";
 import type {
   EAppliesToParty,
@@ -36,7 +36,7 @@ export interface ComplianceRecord {
   issuingAuthority: string;
   issueDate: DateOnlyString;
   expiryDate: DateOnlyString | null;
-  coveredAmountMinor: IntegerString | null;
+  coveredAmountMinor: MinorAmount | null;
   currencyCode: ECurrencyCode | null;
   status: EComplianceRecordStatus;
   verifiedAt: TimestampString | null;

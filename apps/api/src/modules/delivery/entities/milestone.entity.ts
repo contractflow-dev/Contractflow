@@ -44,7 +44,7 @@ export class Milestone extends BaseCustomEntity implements IMilestoneEntity{
     isPaymentMilestone!: boolean
 
     @Column({name: "amount_minor", type: "bigint"})
-    amountMinor!: number
+    amountMinor!: string
 
     @Column({name: "currency_code", type: "char", length: 3})
     currencyCode!: ECurrencyCode

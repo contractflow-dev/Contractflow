@@ -9,7 +9,7 @@ import {
   type ContractActivityTarget,
 } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
-import { Button } from "@workspace/ui/components/button";
+import { Button, buttonVariants } from "@workspace/ui/components/button";
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import {
   Card,
@@ -52,15 +52,6 @@ import {
   formatMoneyMinor,
   humanizeEnumValue,
 } from "@/lib/format";
-import { CreateContractWizard } from "./create-contract-form";
-import { useNewContractForm } from "../_hooks/use-new-contract-form";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@workspace/ui/components/dialog";
 import type { Contract, ContractListItem } from "@/services/contractApi";
 import { ContractRoleAssignmentManagement } from "./contract-role-assignment-management";
 import { parseContractWorkspace } from "../contract-workspaces";
@@ -71,6 +62,7 @@ import { useContractDetails } from "../_hooks/use-contract-details";
 import { useContractSectionAccess } from "../_hooks/use-contract-section-access";
 import {
   CONTRACT_UNAVAILABLE_TEXT,
+  NEW_CONTRACT_PATH,
   contractSectionHref,
   isRestrictedContractSection,
   type ContractSection,
@@ -197,35 +189,11 @@ export function ContractsList({
   const initialLoading = isLoading || (isFetching && !currentData);
   const contracts = currentData?.data ?? [];
   const showActions = includeDeleted;
-  // "New contract" is for company administrators; the API makes the same
-  // check when the contract is created.
-  const newContract = useNewContractForm();
-  const newContractOpen = canCreateContracts && newContract.open;
 
   return (
     <div className="space-y-6">
       {/* Company Administrators oversee every contract the company is a
           party to; other members see only those they hold a role on. */}
-      {canCreateContracts ? (
-        <Dialog open={newContractOpen} onOpenChange={newContract.setOpen}>
-          <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>New contract</DialogTitle>
-              <DialogDescription>
-                Create a draft contract for this company.
-              </DialogDescription>
-            </DialogHeader>
-            {/* Mounted only while open, so each new contract starts afresh. */}
-            {newContractOpen ? (
-              <CreateContractWizard
-                formId={newContract.formId}
-                companyId={companyId}
-                onCancel={() => newContract.setOpen(false)}
-              />
-            ) : null}
-          </DialogContent>
-        </Dialog>
-      ) : null}
       <PageHeader
         title="Contracts"
         description={
@@ -245,13 +213,11 @@ export function ContractsList({
           </CardDescription>
           {canCreateContracts ? (
             <CardAction>
-              <Button
-                type="button"
-                aria-haspopup="dialog"
-                onClick={() => newContract.setOpen(true)}
-              >
+              {/* For company administrators; the API makes the same check
+                  when the contract is created. */}
+              <Link href={NEW_CONTRACT_PATH} className={buttonVariants()}>
                 New contract
-              </Button>
+              </Link>
             </CardAction>
           ) : null}
         </CardHeader>

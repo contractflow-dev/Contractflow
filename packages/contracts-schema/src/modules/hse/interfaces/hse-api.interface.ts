@@ -1,8 +1,8 @@
 import type {
   DateOnlyString,
-  IntegerString,
   TimestampString,
 } from "../../../common/interfaces/workspace-values.interface.js";
+import type { MinorAmount } from "../../../common/money/minor-amount.js";
 import type { ECurrencyCode } from "../../identity/enums/identity.enum.js";
 import type {
   EHseActionStatus,
@@ -38,7 +38,7 @@ export interface HseIncident {
   rootCause: string | null;
   investigationSummary: string | null;
   lostTimeDays: number;
-  estimatedCostMinor: IntegerString;
+  estimatedCostMinor: MinorAmount;
   currencyCode: ECurrencyCode;
   isNotifiable: boolean;
   authorityNotifiedAt: TimestampString | null;

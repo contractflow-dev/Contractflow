@@ -39,7 +39,7 @@ export class ContractVariation extends BaseCustomEntity implements IContractVari
     status!: EContractVariationStatus
 
     @Column({name: "amount_delta_minor", type: "bigint"})
-    amountDeltaMinor!: number
+    amountDeltaMinor!: string
 
     @Column({name: "currency_code", type: "char", length: 3})
     currencyCode!: ECurrencyCode

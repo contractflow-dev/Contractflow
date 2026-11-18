@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Controller, useForm, useWatch, type FieldPath } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { RiMailLine } from "@remixicon/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -41,6 +40,9 @@ import {
   FormSection,
   RequiredFieldsNote,
 } from "@/components/forms/form-field";
+import { FormStepList } from "@/components/forms/form-step-list";
+import { useFormSteps, type FormStep } from "@/hooks/use-form-steps";
+import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -92,11 +94,9 @@ type CompanyFormValues = z.infer<typeof companySchema>;
  * Company creation in three short steps. The steps only spread the fields
  * out; the API applies the same required and optional rules.
  */
-export const companySetupSteps: Array<{
-  id: "company" | "contact" | "address";
-  title: string;
-  fields: Array<keyof CompanyFormValues>;
-}> = [
+export const companySetupSteps: Array<
+  FormStep<CompanyFormValues> & { id: "company" | "contact" | "address" }
+> = [
   {
     id: "company",
     title: "Company and legal details",
@@ -126,7 +126,6 @@ export const companySetupSteps: Array<{
     ],
   },
 ];
-const lastStep = companySetupSteps.length - 1;
 
 /** The company setup form beside the hero panel, like sign-in and sign-up. */
 function WideOnboardingShell({ children }: { children: React.ReactNode }) {
@@ -221,56 +220,30 @@ export function OnboardingView() {
   });
   const {
     register,
-    handleSubmit,
     setValue,
     control,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = form;
-  const [stepIndex, setStepIndex] = useState(0);
-  const step = companySetupSteps[stepIndex];
-  const formRef = useRef<HTMLFormElement>(null);
-  // Focus moves once the new step has rendered; the counter re-runs it.
-  const focusTarget = useRef<"error" | null>(null);
-  const [focusRequest, setFocusRequest] = useState(0);
-  const requestFocus = (target: "error") => {
-    focusTarget.current = target;
-    setFocusRequest((count) => count + 1);
-  };
-
-  /** Focuses the first invalid control on screen, in reading order. */
-  const focusFirstInvalid = useCallback(() => {
-    const controls =
-      formRef.current?.querySelectorAll<HTMLElement>("[name]") ?? [];
-    for (const element of controls) {
-      const name = element.getAttribute("name") as FieldPath<CompanyFormValues>;
-      if (form.getFieldState(name).invalid) {
-        element.focus();
-        return;
-      }
-    }
-  }, [form]);
-
-  useEffect(() => {
-    const target = focusTarget.current;
-    focusTarget.current = null;
-    if (target === "error") focusFirstInvalid();
-  }, [focusRequest, focusFirstInvalid, stepIndex]);
-
-  // Once a field shows an error, re-check it as it changes, so the error
-  // clears as soon as it is fixed.
-  useEffect(
-    () =>
-      form.subscribe({
-        formState: { values: true },
-        callback: ({ name }) => {
-          const field = name as FieldPath<CompanyFormValues> | undefined;
-          if (field && form.getFieldState(field).invalid) {
-            void form.trigger(field);
-          }
-        },
-      }),
-    [form],
-  );
+  // A reload or closed tab would lose what's been entered; once the company
+  // exists there is nothing left to lose.
+  useUnsavedChangesWarning(isDirty && !createdCompany);
+  const {
+    stepIndex,
+    step,
+    isLastStep,
+    stepStatus,
+    isStepCompleted,
+    formRef,
+    headingRef,
+    back,
+    onSubmit: submitStep,
+    ignoreRepeatClick,
+  } = useFormSteps({
+    form,
+    steps: companySetupSteps,
+    schema: companySchema,
+    onValid: (values) => onSubmit(values),
+  });
 
   const countryCode = useWatch({ control, name: "countryCode" });
   const stateRegion = useWatch({ control, name: "stateRegion" });
@@ -307,36 +280,10 @@ export function OnboardingView() {
     }
   }, [currentUser, router, userError]);
 
-  async function next() {
-    const valid = await form.trigger(step.fields);
-    if (!valid) {
-      focusFirstInvalid();
-      return;
-    }
-    setStepIndex((index) => Math.min(index + 1, lastStep));
-  }
-
-  function back() {
-    setStepIndex((index) => Math.max(index - 1, 0));
-  }
-
-  function submit(event: FormEvent<HTMLFormElement>) {
-    // Enter in a field moves to the next step; only the last step creates.
-    if (stepIndex < lastStep) {
-      event.preventDefault();
-      void next();
-      return;
-    }
-    void handleSubmit(onSubmit, (formErrors) => {
-      const firstWithErrors = companySetupSteps.findIndex((candidate) =>
-        candidate.fields.some((field) => formErrors[field]),
-      );
-      setStepIndex(firstWithErrors === -1 ? lastStep : firstWithErrors);
-      requestFocus("error");
-    })(event);
-  }
-
-  async function onSubmit({ phone, ...values }: CompanyFormValues) {
+  async function onSubmit({
+    phone,
+    ...values
+  }: CompanyFormValues): Promise<boolean> {
     setServerError(null);
     try {
       const response = await createCompany({
@@ -351,10 +298,12 @@ export function OnboardingView() {
         name: response.company.name,
         isAdmin: response.membership.canManageCompany,
       });
+      return true;
     } catch (error) {
       setServerError(
         getApiErrorMessage(error, "Company creation failed. Please try again."),
       );
+      return false;
     }
   }
 
@@ -485,40 +434,25 @@ export function OnboardingView() {
 
       <form
         ref={formRef}
-        onSubmit={submit}
+        onSubmit={submitStep}
         noValidate
         aria-label="Create your company"
         className="space-y-8"
       >
-        <ol
-          aria-label="Steps"
-          className="hidden flex-wrap gap-2 text-sm sm:flex"
-        >
-          {companySetupSteps.map((candidate, index) => (
-            <li
-              key={candidate.id}
-              aria-current={index === stepIndex ? "step" : undefined}
-              className={cn(
-                "flex items-center gap-2 rounded-full border px-3 py-1",
-                index === stepIndex
-                  ? "border-primary bg-primary/10 font-medium text-foreground"
-                  : "text-muted-foreground",
-              )}
-            >
-              <span className="tabular-nums" aria-hidden="true">
-                {index + 1}
-              </span>
-              <span>
-                {candidate.title}
-                {index < stepIndex ? (
-                  <span className="sr-only"> (done)</span>
-                ) : null}
-              </span>
-            </li>
-          ))}
-        </ol>
+        <FormStepList
+          steps={companySetupSteps}
+          stepStatus={stepStatus}
+          isStepCompleted={isStepCompleted}
+        />
 
         <div className="space-y-1">
+          <h2
+            ref={headingRef}
+            tabIndex={-1}
+            className="text-base font-semibold focus-visible:outline-none"
+          >
+            Step {stepIndex + 1} of {companySetupSteps.length}: {step.title}
+          </h2>
           <RequiredFieldsNote />
         </div>
 
@@ -763,15 +697,17 @@ export function OnboardingView() {
                 Back
               </Button>
             ) : null}
-            {stepIndex < lastStep ? (
+            {!isLastStep ? (
               // A submit button, so Enter in any field moves on.
-              <Button type="submit" size="xl">
+              <Button key="next" type="submit" size="xl">
                 Next: {companySetupSteps[stepIndex + 1].title}
               </Button>
             ) : (
               <Button
+                key="create"
                 type="submit"
                 size="xl"
+                onClick={ignoreRepeatClick}
                 disabled={isSubmitting}
                 aria-busy={isSubmitting || undefined}
               >

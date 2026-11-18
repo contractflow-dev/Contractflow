@@ -54,16 +54,16 @@ export class Invoice extends BaseCustomEntity implements IInvoiceEntity{
     currencyCode!: ECurrencyCode
 
     @Column({name: "gross_amount_minor", type: "bigint"})
-    grossAmountMinor!: number
+    grossAmountMinor!: string
 
     @Column({name: "adjustments_total_minor", type: "bigint"})
-    adjustmentsTotalMinor!: number
+    adjustmentsTotalMinor!: string
 
     @Column({name: "net_payable_minor", type: "bigint"})
-    netPayableMinor!: number
+    netPayableMinor!: string
 
     @Column({name: "amount_paid_minor", type: "bigint"})
-    amountPaidMinor!: number
+    amountPaidMinor!: string
 
     @Column({name: "submitted_at", type: "timestamptz"})
     submittedAt!: Date

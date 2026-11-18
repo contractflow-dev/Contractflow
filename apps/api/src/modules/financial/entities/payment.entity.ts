@@ -29,13 +29,13 @@ export class Payment extends BaseCustomEntity implements IPaymentEntity {
     idempotencyKey!: string
 
     @Column({name: "amount_minor", type: "bigint"})
-    amountMinor!: number
+    amountMinor!: string
 
     @Column({name: "currency_code", type: "char", length: 3})
     currencyCode!: ECurrencyCode
 
     @Column({name: "invoice_amount_minor", type: "bigint"})
-    invoiceAmountMinor!: number
+    invoiceAmountMinor!: string
 
     @Column({name: "invoice_currency_code", type: "char", length: 3})
     invoiceCurrencyCode!: string

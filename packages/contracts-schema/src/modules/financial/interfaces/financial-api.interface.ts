@@ -3,6 +3,7 @@ import type {
   IntegerString,
   TimestampString,
 } from "../../../common/interfaces/workspace-values.interface.js";
+import type { MinorAmount } from "../../../common/money/minor-amount.js";
 import type { ECurrencyCode } from "../../identity/enums/identity.enum.js";
 import type {
   EInvoiceStatus,
@@ -25,10 +26,10 @@ export interface Invoice {
   periodStart: DateOnlyString;
   periodEnd: DateOnlyString;
   currencyCode: ECurrencyCode;
-  grossAmountMinor: IntegerString;
-  adjustmentsTotalMinor: IntegerString;
-  netPayableMinor: IntegerString;
-  amountPaidMinor: IntegerString;
+  grossAmountMinor: MinorAmount;
+  adjustmentsTotalMinor: MinorAmount;
+  netPayableMinor: MinorAmount;
+  amountPaidMinor: MinorAmount;
   submittedAt: TimestampString | null;
   submittedById: string | null;
   certifiedAt: TimestampString | null;
@@ -47,10 +48,10 @@ export interface Payment {
   contractId: string;
   invoiceId: string;
   paymentReference: string;
-  amountMinor: IntegerString;
+  amountMinor: MinorAmount;
   currencyCode: ECurrencyCode;
   /** The amount applied to the invoice, in the invoice currency. */
-  invoiceAmountMinor: IntegerString;
+  invoiceAmountMinor: MinorAmount;
   invoiceCurrencyCode: ECurrencyCode;
   /** Set for cross-currency payments. */
   fxBaseCurrencyCode: ECurrencyCode | null;

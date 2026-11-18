@@ -57,7 +57,7 @@ export class HseIncident extends BaseCustomEntity implements IHseIncidentEntity{
     lostTimeDays!: number
 
     @Column({name: "estimated_cost_minor",type:"bigint"})
-    estimatedCostMinor!: number
+    estimatedCostMinor!: string
 
     @Column({name: "currency_code", type:"char", length:3})
     currencyCode!: ECurrencyCode

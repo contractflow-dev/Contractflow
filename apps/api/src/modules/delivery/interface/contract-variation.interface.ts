@@ -8,7 +8,7 @@ export interface IContractVariationEntity {
     description : string
     variationType : EContractVariationType
     status : EContractVariationStatus
-    amountDeltaMinor : number
+    amountDeltaMinor : string
     currencyCode : ECurrencyCode
     timeExtensionDays : number
     submittedAt : Date

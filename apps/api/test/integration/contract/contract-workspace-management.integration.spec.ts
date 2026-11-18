@@ -117,7 +117,7 @@ describe('Contract workspace management (PostgreSQL)', () => {
       contractType: EContractType.SERVICE,
       partyType: EPartyType.CLIENT,
       workspaces: ['project', 'hse'],
-      originalValueMinor: 100_000,
+      originalValueMinor: '100000',
       currencyCode: ECurrencyCode.NGN,
       retentionRateBps: 500,
       paymentTermsDays: 30,

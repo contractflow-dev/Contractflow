@@ -45,7 +45,7 @@ export class ComplianceRecord extends BaseCustomEntity implements IComplianceRec
   expiryDate!: Date;
 
   @Column({ name: 'covered_amount_minor', type: 'bigint' })
-  coveredAmountMinor!: number;
+  coveredAmountMinor!: string;
 
   @Column({ name: 'currency_code', type: 'char', length: 3 })
   currencyCode!: ECurrencyCode;

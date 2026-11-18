@@ -259,7 +259,7 @@ describe('ContractLifecycleService', () => {
       contractType: EContractType.SERVICE,
       partyType: EPartyType.CONTRACTOR,
       workspaces: ['project'],
-      originalValueMinor: 1000,
+      originalValueMinor: '1000',
       currencyCode: ECurrencyCode.NGN,
       retentionRateBps: 500,
       paymentTermsDays: 30,
@@ -293,6 +293,121 @@ describe('ContractLifecycleService', () => {
     );
     expect(unitOfWork.execute).toHaveBeenCalledOnce();
     expect(outcomes).toEqual({ committed: 1, rolledBack: 0 });
+  });
+
+  it('stores the contract value exactly as sent, as the current value too', async () => {
+    context.companies.findActiveForShare.mockResolvedValue({
+      id: actor.companyId,
+    });
+    context.memberships.findActiveForUpdate.mockResolvedValue({
+      ...actor,
+      companyRole: ECompanyRole.COMPANY_ADMIN,
+    });
+    context.contracts.create.mockResolvedValue({ id: 'contract-created' });
+
+    await service.create(actor.userId, actor.companyId, {
+      referenceNumber: 'CTR-003',
+      title: 'Large contract',
+      contractType: EContractType.SERVICE,
+      partyType: EPartyType.CONTRACTOR,
+      workspaces: [],
+      // Beyond Number.MAX_SAFE_INTEGER: a JavaScript number would round it.
+      originalValueMinor: '9007199254740993',
+      liquidatedDamagesPerDayMinor: '500000',
+      currencyCode: ECurrencyCode.NGN,
+      retentionRateBps: 500,
+      paymentTermsDays: 30,
+      awardDate: '2026-01-01',
+      startDate: '2026-01-02',
+      endDate: '2026-12-31',
+      defectsLiabilityDays: 365,
+      timezone: 'Africa/Lagos',
+    });
+
+    expect(context.contracts.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        originalValueMinor: '9007199254740993',
+        currentValueMinor: '9007199254740993',
+        liquidatedDamagesPerDayMinor: '500000',
+      }),
+    );
+  });
+
+  describe('changing the contract value', () => {
+    const owned = (status: EContractStatus) => ({
+      id: contract.id,
+      createdByCompanyId: actor.companyId,
+      deletedAt: null,
+      status,
+      // node-postgres returns bigint columns as strings.
+      originalValueMinor: '9007199254740993',
+      currentValueMinor: '9007199254890993',
+      awardDate: new Date('2026-01-01T00:00:00.000Z'),
+      startDate: new Date('2026-01-02T00:00:00.000Z'),
+      endDate: new Date('2026-12-31T00:00:00.000Z'),
+      revisedEndDate: null,
+      actualCompletionDate: null,
+    });
+
+    beforeEach(() => {
+      context.companies.findActiveForShare.mockResolvedValue({
+        id: actor.companyId,
+      });
+      context.memberships.findActiveForUpdate.mockResolvedValue({
+        ...actor,
+        companyRole: ECompanyRole.COMPANY_ADMIN,
+      });
+    });
+
+    it('compares the value exactly once the contract is active', async () => {
+      context.contracts.findForUpdate.mockResolvedValue(
+        owned(EContractStatus.ACTIVE),
+      );
+
+      // 2^53 and 2^53 + 1 are equal as JavaScript numbers, but not as amounts.
+      await expect(
+        service.update(actor.userId, actor.companyId, contract.id, {
+          originalValueMinor: '9007199254740992',
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(context.contracts.save).not.toHaveBeenCalled();
+    });
+
+    it('accepts the unchanged value on an active contract and keeps its current value', async () => {
+      context.contracts.findForUpdate.mockResolvedValue(
+        owned(EContractStatus.ACTIVE),
+      );
+
+      const saved = await service.update(
+        actor.userId,
+        actor.companyId,
+        contract.id,
+        { originalValueMinor: '9007199254740993' },
+      );
+
+      expect(saved).toMatchObject({
+        originalValueMinor: '9007199254740993',
+        currentValueMinor: '9007199254890993',
+      });
+    });
+
+    it('moves the current value with the original value while the contract is a draft', async () => {
+      context.contracts.findForUpdate.mockResolvedValue(
+        owned(EContractStatus.DRAFT),
+      );
+
+      const saved = await service.update(
+        actor.userId,
+        actor.companyId,
+        contract.id,
+        { originalValueMinor: '9223372036854775807' },
+      );
+
+      expect(saved).toMatchObject({
+        originalValueMinor: '9223372036854775807',
+        currentValueMinor: '9223372036854775807',
+      });
+    });
   });
 
   it('keeps creator administration distinct from project-lead transition access', async () => {

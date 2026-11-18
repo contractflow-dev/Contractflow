@@ -4,9 +4,10 @@
  */
 
 /**
- * A whole number of minor currency units (kobo, cents) or thousandths of a
- * unit of measure, as a decimal string: the database stores these as 64-bit
- * integers, which a JSON number cannot always hold exactly.
+ * A whole number stored as a 64-bit integer, as a decimal string, because a
+ * JSON number cannot always hold it exactly: thousandths of a unit of measure
+ * (`*Milli`) or millionths of an exchange rate (`*Micro`). Money uses
+ * `MinorAmount`, the same format named for amounts of money.
  */
 export type IntegerString = string;
 

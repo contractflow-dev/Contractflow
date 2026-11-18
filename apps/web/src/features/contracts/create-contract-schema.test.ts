@@ -167,7 +167,7 @@ describe("createContractFormSchema", () => {
 });
 
 describe("toCreateContractRequest", () => {
-  it("sends minor units, basis points and trimmed text", () => {
+  it("sends minor units as integer strings, basis points and trimmed text", () => {
     expect(toCreateContractRequest(validValues())).toEqual({
       referenceNumber: "CTR-001",
       title: "Pipeline maintenance",
@@ -176,12 +176,12 @@ describe("toCreateContractRequest", () => {
       partyType: EPartyType.CLIENT,
       workspaces: ["project", "hse", "finance"],
       parentContractId: null,
-      originalValueMinor: 150000050,
+      originalValueMinor: "150000050",
       currencyCode: ECurrencyCode.NGN,
       retentionRateBps: 500,
       advancePaymentRateBps: 1250,
       paymentTermsDays: 30,
-      liquidatedDamagesPerDayMinor: 250000,
+      liquidatedDamagesPerDayMinor: "250000",
       awardDate: "2026-01-01",
       startDate: "2026-02-01",
       endDate: "2026-12-31",
@@ -221,6 +221,37 @@ describe("toCreateContractRequest", () => {
     values.parties.workspaces = [];
 
     expect(toCreateContractRequest(values).workspaces).toEqual([]);
+  });
+
+  it("sends amounts in each currency's own minor units, exactly at any size", () => {
+    const yen = validValues();
+    yen.commercial.currencyCode = ECurrencyCode.JPY;
+    yen.commercial.originalValue = "1,500,000";
+    yen.commercial.liquidatedDamagesPerDay = "";
+    expect(toCreateContractRequest(yen).originalValueMinor).toBe("1500000");
+
+    const dinar = validValues();
+    dinar.commercial.currencyCode = ECurrencyCode.KWD;
+    dinar.commercial.originalValue = "1500.125";
+    dinar.commercial.liquidatedDamagesPerDay = "0.5";
+    const kwd = toCreateContractRequest(dinar);
+    expect(kwd.originalValueMinor).toBe("1500125");
+    expect(kwd.liquidatedDamagesPerDayMinor).toBe("500");
+
+    // Beyond Number.MAX_SAFE_INTEGER minor units, which a number would round.
+    const large = validValues();
+    large.commercial.originalValue = "90071992547409.93";
+    expect(toCreateContractRequest(large).originalValueMinor).toBe(
+      "9007199254740993",
+    );
+  });
+
+  it("sends a JSON body with amounts as strings, not numbers", () => {
+    const body = JSON.parse(
+      JSON.stringify(toCreateContractRequest(validValues())),
+    );
+    expect(typeof body.originalValueMinor).toBe("string");
+    expect(typeof body.liquidatedDamagesPerDayMinor).toBe("string");
   });
 
   it("refuses values that have not passed validation", () => {

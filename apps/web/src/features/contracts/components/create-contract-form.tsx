@@ -1,14 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  FormProvider,
-  useForm,
-  type FieldErrors,
-  type FieldPath,
-} from "react-hook-form";
+import { FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   EContractSortField,
@@ -17,8 +11,9 @@ import {
 } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
-import { cn } from "@/lib/utils";
 import { RequiredFieldsNote } from "@/components/forms/form-field";
+import { FormStepList } from "@/components/forms/form-step-list";
+import { useFormSteps, type FormStep } from "@/hooks/use-form-steps";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { notifySuccess } from "@/lib/notify";
 import {
@@ -34,7 +29,6 @@ import {
   timeZoneOptions,
   toCreateContractRequest,
   type CreateContractFormValues,
-  type CreateContractStepId,
 } from "../create-contract-schema";
 import {
   ContractBasicsFields,
@@ -43,24 +37,22 @@ import {
   ContractPartiesFields,
 } from "./contract-setup-fields";
 
-const lastStep = createContractSteps.length - 1;
-
-/** The first step whose fields have an error. */
-function firstStepWithErrors(
-  errors: FieldErrors<CreateContractFormValues>,
-): number {
-  const index = createContractSteps.findIndex((step) => errors[step.id]);
-  return index === -1 ? 0 : index;
-}
+/** Each step validates its own group of the schema. */
+const formSteps: ReadonlyArray<FormStep<CreateContractFormValues>> =
+  createContractSteps.map((step) => ({ title: step.title, fields: [step.id] }));
 
 export function CreateContractWizard({
   formId,
   companyId,
   onCancel,
+  onDirtyChange,
 }: {
   formId: string;
   companyId: string;
+  /** Leaves the form. The page asks first if anything has been entered. */
   onCancel: () => void;
+  /** Called whenever the form gains or loses unsaved input. */
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const router = useRouter();
   const [defaultValues] = useState(() =>
@@ -75,18 +67,22 @@ export function CreateContractWizard({
     mode: "onSubmit",
     reValidateMode: "onChange",
   });
-  const [stepIndex, setStepIndex] = useState(0);
-  // Where focus goes once the new step has rendered: its heading when moving
-  // between steps, or the first invalid field when a submit fails. The
-  // counter re-runs the effect for each request.
-  const focusTarget = useRef<"heading" | "error" | null>(null);
-  const [focusRequest, setFocusRequest] = useState(0);
-  const requestFocus = (target: "heading" | "error") => {
-    focusTarget.current = target;
-    setFocusRequest((count) => count + 1);
-  };
-  const headingRef = useRef<HTMLHeadingElement>(null);
-  const formRef = useRef<HTMLFormElement>(null);
+  const {
+    stepIndex,
+    isLastStep,
+    stepStatus,
+    isStepCompleted,
+    formRef,
+    headingRef,
+    back,
+    onSubmit: submitStep,
+    ignoreRepeatClick,
+  } = useFormSteps({
+    form,
+    steps: formSteps,
+    schema: createContractFormSchema,
+    onValid: (values) => create(values),
+  });
   const parentContractsQuery = useGetContractsQuery({
     companyId,
     page: 1,
@@ -96,89 +92,24 @@ export function CreateContractWizard({
   });
   const [createContract, createState] = useCreateContractMutation();
   const step = createContractSteps[stepIndex];
-
-  /**
-   * Focuses the first invalid control on screen, in reading order. Reads the
-   * form's own field state, which is current as soon as validation returns,
-   * rather than waiting for the error attributes to render.
-   */
-  const focusFirstInvalid = useCallback(() => {
-    const controls =
-      formRef.current?.querySelectorAll<HTMLElement>("[name]") ?? [];
-    for (const control of controls) {
-      const name = control.getAttribute(
-        "name",
-      ) as FieldPath<CreateContractFormValues>;
-      if (form.getFieldState(name).invalid) {
-        control.focus();
-        return;
-      }
-    }
-  }, [form]);
-
-  // Once a step shows errors, re-check it as values change, so each error
-  // clears as soon as it is fixed (and amounts follow a currency change).
-  useEffect(
-    () =>
-      form.subscribe({
-        formState: { values: true },
-        callback: ({ name }) => {
-          const group = name?.split(".")[0] as CreateContractStepId | undefined;
-          if (group && form.getFieldState(group).invalid) {
-            void form.trigger(group);
-          }
-        },
-      }),
-    [form],
-  );
+  const { isDirty } = form.formState;
 
   useEffect(() => {
-    const target = focusTarget.current;
-    focusTarget.current = null;
-    if (target === "heading") {
-      headingRef.current?.focus();
-    } else if (target === "error") {
-      focusFirstInvalid();
-    }
-  }, [focusRequest, focusFirstInvalid, stepIndex]);
-
-  async function next() {
-    const valid = await form.trigger(step.id);
-    if (!valid) {
-      focusFirstInvalid();
-      return;
-    }
-    setStepIndex((index) => Math.min(index + 1, lastStep));
-    requestFocus("heading");
-  }
-
-  function back() {
-    setStepIndex((index) => Math.max(index - 1, 0));
-    requestFocus("heading");
-  }
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   async function create(values: CreateContractFormValues) {
     const body = toCreateContractRequest(values);
     const result = await createContract({ companyId, body });
-    if ("error" in result) return;
+    if ("error" in result) return false;
     notifySuccess(
       "Draft contract created",
       `${body.referenceNumber} · ${body.title} is ready to set up.`,
     );
-    router.push(contractSectionHref(result.data.id, "overview"));
-  }
-
-  function submit(event: FormEvent<HTMLFormElement>) {
-    // Enter in a field moves to the next step; only the last step creates.
-    if (stepIndex < lastStep) {
-      event.preventDefault();
-      void next();
-      return;
-    }
-    void form.handleSubmit(create, (errors) => {
-      setStepIndex(firstStepWithErrors(errors));
-      requestFocus("error");
-    })(event);
+    // Replaced, not pushed: Back from the new contract returns to the
+    // register rather than to an emptied form.
+    router.replace(contractSectionHref(result.data.id, "overview"));
+    return true;
   }
 
   return (
@@ -188,45 +119,21 @@ export function CreateContractWizard({
         id={formId}
         aria-label="New draft contract"
         noValidate
-        onSubmit={submit}
+        onSubmit={submitStep}
         className="space-y-6"
       >
-        <ol
-          aria-label="Steps"
-          className="hidden flex-wrap gap-2 text-sm sm:flex"
-        >
-          {createContractSteps.map((candidate, index) => (
-            <li
-              key={candidate.id}
-              aria-current={index === stepIndex ? "step" : undefined}
-              className={cn(
-                "flex items-center gap-2 rounded-full border px-3 py-1",
-                index === stepIndex
-                  ? "border-primary bg-primary/10 font-medium text-foreground"
-                  : "text-muted-foreground",
-              )}
-            >
-              <span className="tabular-nums" aria-hidden="true">
-                {index + 1}
-              </span>
-              <span>
-                {candidate.title}
-                {index < stepIndex ? (
-                  <span className="sr-only"> (done)</span>
-                ) : null}
-              </span>
-            </li>
-          ))}
-        </ol>
+        <FormStepList
+          steps={createContractSteps}
+          stepStatus={stepStatus}
+          isStepCompleted={isStepCompleted}
+        />
 
         <div className="space-y-1">
-          <h3
+          <h2
             ref={headingRef}
             tabIndex={-1}
             className="text-base font-semibold focus-visible:outline-none"
-          >
-            Step {stepIndex + 1} of {createContractSteps.length}: {step.title}
-          </h3>
+          ></h2>
           <RequiredFieldsNote />
         </div>
 
@@ -262,16 +169,18 @@ export function CreateContractWizard({
                 Back
               </Button>
             ) : null}
-            {stepIndex < lastStep ? (
+            {!isLastStep ? (
               // A submit button, so Enter in any field moves on: browsers
-              // submit on Enter only when the form has one. `submit` turns
+              // submit on Enter only when the form has one. `onSubmit` turns
               // it into Next on every step but the last.
-              <Button type="submit">
+              <Button key="next" type="submit">
                 Next: {createContractSteps[stepIndex + 1].title}
               </Button>
             ) : (
               <Button
+                key="create"
                 type="submit"
+                onClick={ignoreRepeatClick}
                 disabled={createState.isLoading}
                 aria-busy={createState.isLoading || undefined}
               >

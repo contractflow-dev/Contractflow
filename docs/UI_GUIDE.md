@@ -293,7 +293,7 @@ Users enter values the way they think of them. The form converts them, using `li
 
 | User enters | Stored as | Helper |
 |---|---|---|
-| `1,500,000.50` in the contract's currency | integer minor units | `parseDecimalToMinor` (exact, uses `currencyDigits`) |
+| `1,500,000.50` in the contract's currency | integer minor units, sent as a `MinorAmount` string (`"150000050"`) | `parseDecimalToMinor` (exact, uses `currencyDigits`) |
 | `5` or `2.5` (percent) | basis points | `parsePercentToBasisPoints` |
 | A time zone from a list | IANA name | `timeZoneOptions`, `defaultTimeZone` |
 | A date (`<input type="date">`) | `YYYY-MM-DD` | `todayAsCalendarDate` for `max` or default values |
@@ -319,7 +319,7 @@ Format every value through `src/lib/format.ts`, so the same value reads the same
 | Calendar dates (contract start and end) | `formatCalendarDate` (formatted in UTC, never shifts a day) |
 | Timestamps | `formatDate`, `formatDateTime`, `formatTime`, `formatRelativeTime` |
 | Days until a date | `daysUntilCalendarDate` |
-| Money stored in minor units | `formatMoneyMinor(amount, currencyCode)` (exact, uses the currency's own decimals) |
+| Money stored in minor units | `formatMoneyMinor(amount, currencyCode)` with the API's `MinorAmount` string (exact, uses the currency's own decimals) |
 | Counts, ratios, basis points | `formatNumber`, `formatPercent`, `formatBasisPoints` |
 | Enum values (`under_review`, `contract.deleted`) | `humanizeEnumValue` gives "Under review" or "Contract deleted"; it knows acronyms like EPC |
 | Missing values | `EMPTY_VALUE` ("—") |

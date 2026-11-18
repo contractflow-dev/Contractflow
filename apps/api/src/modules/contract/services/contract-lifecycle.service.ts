@@ -16,6 +16,7 @@ import {
   EFromStatus,
   EPartyType,
   EToStatus,
+  minorAmountToBigInt,
 } from '@contractflow/contracts-schema';
 import type {
   ContractDeletionImpact,
@@ -289,7 +290,9 @@ export class ContractLifecycleService {
       if (
         dto.originalValueMinor !== undefined &&
         contract.status !== EContractStatus.DRAFT &&
-        dto.originalValueMinor !== Number(contract.originalValueMinor)
+        // Compared exactly: amounts are 64-bit integers.
+        minorAmountToBigInt(dto.originalValueMinor) !==
+          minorAmountToBigInt(contract.originalValueMinor)
       ) {
         throw new ConflictException(
           'The original contract value cannot be changed after activation.',

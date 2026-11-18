@@ -5,8 +5,8 @@ export interface IInvoiceAdjustmentEntity {
     adjustmentType : EInvoiceAdjustmentType
     description : string
     rateBps : number
-    baseAmountMinor : number
-    amountMinor : number
+    baseAmountMinor : string
+    amountMinor : string
     currencyCode : ECurrencyCode
 
 }

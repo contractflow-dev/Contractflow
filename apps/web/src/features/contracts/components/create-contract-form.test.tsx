@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CreateContractWizard } from "./create-contract-form";
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ replace: vi.fn() }),
 }));
 vi.mock("@/services/contractApi", () => ({
   useGetContractsQuery: () => ({ currentData: undefined, isFetching: false }),
@@ -25,7 +25,7 @@ describe("CreateContractWizard", () => {
 
     expect(markup).toContain('aria-label="New draft contract"');
     expect(markup).toMatch(
-      /<h3[^>]*tabindex="-1"[^>]*>Step 1 of 4: Basics<\/h3>/,
+      /<h2[^>]*tabindex="-1"[^>]*>Step 1 of 4: Basics<\/h2>/,
     );
     const steps = [...markup.matchAll(/<li[^>]*>[\s\S]*?<\/li>/g)].map(
       (match) => match[0],

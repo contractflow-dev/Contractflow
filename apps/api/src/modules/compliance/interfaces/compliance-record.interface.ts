@@ -8,7 +8,7 @@ export interface IComplianceRecordEntity {
   issuingAuthority: string;
   issueDate: Date;
   expiryDate: Date;
-  coveredAmountMinor: number;
+  coveredAmountMinor: string;
   currencyCode: ECurrencyCode;
   status: EComplianceRecordStatus;
   verifiedAt: Date;

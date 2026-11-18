@@ -6,6 +6,12 @@
  * `locale` only where a fixed locale is required (for example, in tests).
  */
 
+import {
+  MINOR_AMOUNT_MAX,
+  validateMinorAmount,
+  type MinorAmount,
+} from "@contractflow/contracts-schema/money";
+
 /** Shown wherever a value is missing or cannot be read. */
 export const EMPTY_VALUE = "—";
 
@@ -250,26 +256,8 @@ export function currencyDigits(currencyCode: string): number | null {
   }
 }
 
-/** Converts an integer amount of minor units to an exact decimal string. */
-function minorToDecimal(
-  amountMinor: number | string | bigint,
-  digits: number,
-): string | null {
-  let minor: bigint;
-  try {
-    if (typeof amountMinor === "number") {
-      if (!Number.isSafeInteger(amountMinor)) return null;
-      minor = BigInt(amountMinor);
-    } else if (typeof amountMinor === "bigint") {
-      minor = amountMinor;
-    } else {
-      const trimmed = amountMinor.trim();
-      if (!/^-?\d+$/.test(trimmed)) return null;
-      minor = BigInt(trimmed);
-    }
-  } catch {
-    return null;
-  }
+/** Converts a whole number of minor units to an exact decimal string. */
+function minorToDecimal(minor: bigint, digits: number): string {
   const negative = minor < BigInt(0);
   const digitsText = (negative ? -minor : minor)
     .toString()
@@ -280,13 +268,15 @@ function minorToDecimal(
 }
 
 /**
- * Formats an amount stored in minor units (for example kobo or cents) in its
- * own currency. The currency's minor-unit precision comes from Intl, so JPY
- * has no decimals and KWD has three. Large amounts stay exact: they are
- * formatted from a decimal string, never through floating point.
+ * Formats an amount in minor units (for example kobo or cents), as the API
+ * sends it (`MinorAmount`), in its own currency. The currency's minor-unit
+ * precision comes from Intl, so JPY has no decimals and KWD has three. Large
+ * amounts stay exact: they are formatted from a decimal string, never through
+ * floating point. Anything that isn't a valid `MinorAmount`, including a
+ * JavaScript number, shows the fallback rather than a guessed amount.
  */
 export function formatMoneyMinor(
-  amountMinor: number | string | bigint | null | undefined,
+  amountMinor: MinorAmount | null | undefined,
   currencyCode: string | null | undefined,
   { locale, fallback = EMPTY_VALUE }: FormatOptions = {},
 ): string {
@@ -295,8 +285,9 @@ export function formatMoneyMinor(
   }
   const digits = currencyDigits(currencyCode);
   if (digits === null) return fallback;
-  const decimal = minorToDecimal(amountMinor, digits);
-  if (decimal === null) return fallback;
+  const amount = validateMinorAmount(amountMinor);
+  if (!amount.valid) return fallback;
+  const decimal = minorToDecimal(amount.amount, digits);
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency: currencyCode,
@@ -310,30 +301,66 @@ export function formatMoneyMinor(
 const DECIMAL_TEXT = /^(\d+)(?:\.(\d+))?$/;
 
 /**
+ * A typed amount without its grouping commas, or null when a comma might be a
+ * decimal separator. Commas are read as grouping when the amount also has a
+ * decimal point, has more than one comma, or has one comma followed by exactly
+ * three digits. So "1,500,000", Indian "1,50,000" and an edited "1,500,00" or
+ * ",500,000" are all grouped amounts, while "15,00" (perhaps 15.00) and
+ * "1,5000" are refused rather than guessed.
+ */
+function withoutGroupingCommas(text: string): string | null {
+  if (!text.includes(",")) return text;
+  if (!/^[\d,]+(?:\.\d+)?$/.test(text)) return null;
+  const [whole] = text.split(".");
+  const commas = whole.split(",").length - 1;
+  const lastGroup = whole.slice(whole.lastIndexOf(",") + 1);
+  const grouping = text.includes(".") || commas > 1 || lastGroup.length === 3;
+  return grouping ? text.replaceAll(",", "") : null;
+}
+
+/**
  * Converts a typed decimal amount ("1500000.50", "1,500,000.50") to whole
- * minor units of the currency (150000050 for NGN). Exact: it works on the
- * digits, never through floating point. Returns null when the text is not a
- * non-negative amount, has more decimals than the currency allows, or is too
- * large to send as a safe integer.
+ * minor units of the currency, as the API takes them (`"150000050"` for NGN).
+ * Exact: it works on the digits, never through floating point. Returns null
+ * when the text is not a non-negative amount, has more decimals than the
+ * currency allows (it never rounds), or is too large for the database.
  */
 export function parseDecimalToMinor(
   text: string,
   currencyCode: string,
-): number | null {
+): MinorAmount | null {
   const digits = currencyDigits(currencyCode);
   if (digits === null) return null;
-  // Grouping commas are allowed only in their usual places.
-  const trimmed = text.trim();
-  const compact = /^\d{1,3}(,\d{3})+(\.\d+)?$/.test(trimmed)
-    ? trimmed.replaceAll(",", "")
-    : trimmed;
-  const match = DECIMAL_TEXT.exec(compact);
+  const compact = withoutGroupingCommas(text.trim());
+  const match = compact === null ? null : DECIMAL_TEXT.exec(compact);
   if (!match) return null;
   const [, whole, fraction = ""] = match;
   if (fraction.length > digits) return null;
   const minor = BigInt(whole + fraction.padEnd(digits, "0"));
-  if (minor > BigInt(Number.MAX_SAFE_INTEGER)) return null;
-  return Number(minor);
+  if (minor > BigInt(MINOR_AMOUNT_MAX)) return null;
+  // Canonical digits: "0.50" is "50", never "050".
+  return minor.toString();
+}
+
+/**
+ * Adds grouping commas to a typed amount ("1500000.5" becomes "1,500,000.5"),
+ * for an amount field to show when the user leaves it. Commas already in the
+ * text are regrouped, even after an edit moved them ("1,50,000" becomes
+ * "150,000"). It reads commas exactly as `parseDecimalToMinor` does, so the
+ * amount never changes: the decimals stay as typed (never padded or rounded),
+ * and text it can't read, such as "15,00" or "12.", is returned unchanged for
+ * validation to explain. Always "," and ".", whatever the viewer's locale,
+ * because those are the separators the parser accepts.
+ */
+export function groupDecimalInput(text: string): string {
+  const compact = withoutGroupingCommas(text.trim());
+  const match = compact === null ? null : DECIMAL_TEXT.exec(compact);
+  if (!match) return text;
+  const [, whole, fraction] = match;
+  const grouped = whole
+    .replace(/^0+(?=\d)/, "")
+    .replace(/\B(?=(\d{3})+$)/g, ",");
+  return fraction === undefined ? grouped : `${grouped}.${fraction}`;
 }
 
 /**

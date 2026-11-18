@@ -5,9 +5,9 @@ export interface IPaymentEntity {
     invoiceId : string
     paymentReference : string
     idempotencyKey : string
-    amountMinor : number
+    amountMinor : string
     currencyCode : ECurrencyCode
-    invoiceAmountMinor : number
+    invoiceAmountMinor : string
     invoiceCurrencyCode : string
     fxBaseCurrencyCode : string
     fxRateMicro : number

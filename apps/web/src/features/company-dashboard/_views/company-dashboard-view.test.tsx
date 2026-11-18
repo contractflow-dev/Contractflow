@@ -238,7 +238,7 @@ describe("CompanyDashboardView", () => {
     const markup = render();
 
     expect(markup).toMatch(
-      /href="\/dashboards\/contracts#new-contract"[^>]*>Create a contract<\/a>/,
+      /href="\/dashboards\/contracts\/new"[^>]*>Create a contract<\/a>/,
     );
     expect(markup).toContain('href="/dashboards/team"');
     expect(markup).toContain("1 member, 0 pending invitations.");

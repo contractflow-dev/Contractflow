@@ -15,6 +15,7 @@ import type {
   EPartyType,
   EToStatus,
 } from "../enums/contract.enum.js";
+import type { MinorAmount } from "../../../common/money/minor-amount.js";
 import type { ECurrencyCode } from "../../identity/enums/identity.enum.js";
 
 export interface Contract {
@@ -25,13 +26,13 @@ export interface Contract {
   contractType: EContractType;
   status: EContractStatus;
   parentContractId: string | null;
-  originalValueMinor: number | string;
-  currentValueMinor: number | string;
+  originalValueMinor: MinorAmount;
+  currentValueMinor: MinorAmount;
   currencyCode: ECurrencyCode;
   retentionRateBps: number;
   advancePaymentRateBps: number | null;
   paymentTermsDays: number;
-  liquidatedDamagesPerDayMinor: number | string | null;
+  liquidatedDamagesPerDayMinor: MinorAmount | null;
   awardDate: string;
   startDate: string;
   endDate: string;
@@ -196,12 +197,12 @@ export interface CreateContractRequest {
   partyType: EPartyType;
   workspaces: AssignableContractWorkspace[];
   parentContractId?: string | null;
-  originalValueMinor: number;
+  originalValueMinor: MinorAmount;
   currencyCode: ECurrencyCode;
   retentionRateBps: number;
   advancePaymentRateBps?: number | null;
   paymentTermsDays: number;
-  liquidatedDamagesPerDayMinor?: number | null;
+  liquidatedDamagesPerDayMinor?: MinorAmount | null;
   awardDate: string;
   startDate: string;
   endDate: string;

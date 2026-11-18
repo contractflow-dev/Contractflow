@@ -15,6 +15,10 @@ import type {
   IPaginatedResponse,
 } from '@contractflow/contracts-schema';
 import { CompanyScopeService } from '../../identity/services/company/company-scope.service';
+import {
+  toIntegerString,
+  toNullableIntegerString,
+} from '../../../common/dto/response-values';
 import type { Contract } from '../entities/contract.entity';
 import { ContractParty } from '../entities/contract-party.entity';
 import { ContractPartyRepository } from '../repositories/contract-party.repository';
@@ -271,13 +275,15 @@ function toContractResponse(contract: Contract): ContractApiResponse {
     contractType: contract.contractType,
     status: contract.status,
     parentContractId: contract.parentContractId,
-    originalValueMinor: contract.originalValueMinor,
-    currentValueMinor: contract.currentValueMinor,
+    originalValueMinor: toIntegerString(contract.originalValueMinor),
+    currentValueMinor: toIntegerString(contract.currentValueMinor),
     currencyCode: contract.currencyCode,
     retentionRateBps: contract.retentionRateBps,
     advancePaymentRateBps: contract.advancePaymentRateBps,
     paymentTermsDays: contract.paymentTermsDays,
-    liquidatedDamagesPerDayMinor: contract.liquidatedDamagesPerDayMinor,
+    liquidatedDamagesPerDayMinor: toNullableIntegerString(
+      contract.liquidatedDamagesPerDayMinor,
+    ),
     awardDate: toApiDate(contract.awardDate),
     startDate: toApiDate(contract.startDate),
     endDate: toApiDate(contract.endDate),

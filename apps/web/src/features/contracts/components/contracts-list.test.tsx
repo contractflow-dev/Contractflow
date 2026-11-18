@@ -24,9 +24,6 @@ vi.mock("../_hooks/use-contracts-list", async (importOriginal) => ({
 vi.mock("./contract-lifecycle-management", () => ({
   ContractLifecycleManagement: () => null,
 }));
-vi.mock("./create-contract-form", () => ({
-  CreateContractWizard: () => <section>CREATE CONTRACT</section>,
-}));
 vi.mock("@/services/contractApi", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/contractApi")>()),
   useRestoreContractMutation: () => [vi.fn(), { isLoading: false }],
@@ -111,19 +108,21 @@ function render(canViewArchived = true) {
 describe("ContractsList", () => {
   beforeEach(() => setState({}));
 
-  it("puts the page heading first, then the register with its New contract action", () => {
+  it("puts the page heading first, then the register with its New contract link", () => {
     const markup = render();
     const heading = markup.indexOf("<h1");
     const register = markup.indexOf(">Contract register</h2>");
     expect(heading).toBeGreaterThanOrEqual(0);
     expect(heading).toBeLessThan(register);
-    const button = markup.search(
-      /<button[^>]*aria-haspopup="dialog"[^>]*>New contract</,
+    // New contract is its own page, not a dialog over the register.
+    const link = markup.search(
+      /<a[^>]*href="\/dashboards\/contracts\/new"[^>]*>New contract<\/a>/,
     );
-    expect(button).toBeGreaterThan(register);
-    expect(button).toBeLessThan(markup.indexOf('role="search"'));
-    // The form opens, in a dialog, only when asked.
-    expect(markup).not.toContain("CREATE CONTRACT");
+    expect(link).toBeGreaterThan(register);
+    expect(link).toBeLessThan(markup.indexOf('role="search"'));
+    expect(markup).not.toContain('aria-haspopup="dialog"');
+    expect(markup).not.toContain('role="dialog"');
+    expect(markup).not.toContain("New draft contract");
   });
 
   it("offers New contract only to company administrators", () => {
