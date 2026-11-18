@@ -75,7 +75,6 @@ export function NewContractPage({ companyId }: { companyId: string }) {
           Back to contracts
         </Link>
         <PageHeader
-          eyebrow="Contract register"
           title="New contract"
           description="Create a draft contract for this company. You can invite the other parties and assign roles once the draft exists."
         />

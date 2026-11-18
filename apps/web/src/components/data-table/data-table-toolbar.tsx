@@ -1,8 +1,9 @@
 "use client";
 
-import type { FormEvent, ReactNode } from "react";
+import { useId, type FormEvent, type ReactNode } from "react";
 import { RiCloseLine, RiFilter3Line, RiSearchLine } from "@remixicon/react";
 import { Button, buttonVariants } from "@workspace/ui/components/button";
+import { Field, FieldLabel } from "@workspace/ui/components/field";
 import { Input } from "@workspace/ui/components/input";
 import {
   Popover,
@@ -265,5 +266,71 @@ export function DataTableActiveFilters({
         </Button>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * A date range for a table's toolbar: two labelled calendar-day inputs, from
+ * and to. The feature turns the days into the API's instants (for example
+ * with `dayBoundsInTimeZone`) and reports a reversed range as `error`.
+ */
+export function DataTableDateRange({
+  legend,
+  from,
+  to,
+  max,
+  error,
+  onFromChange,
+  onToChange,
+}: {
+  /** Names the pair, such as "Changed between". */
+  legend: string;
+  from: string;
+  to: string;
+  /** The latest selectable day, `YYYY-MM-DD`, such as today. */
+  max?: string;
+  error?: string | null;
+  onFromChange: (day: string) => void;
+  onToChange: (day: string) => void;
+}) {
+  const fromId = useId();
+  const toId = useId();
+  const errorId = useId();
+  return (
+    <fieldset className="min-w-0 space-y-1.5">
+      <legend className="sr-only">{legend}</legend>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+        <Field className="sm:w-44">
+          <FieldLabel htmlFor={fromId}>From</FieldLabel>
+          <Input
+            id={fromId}
+            type="date"
+            value={from}
+            max={to || max}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? errorId : undefined}
+            onChange={(event) => onFromChange(event.target.value)}
+          />
+        </Field>
+        <Field className="sm:w-44">
+          <FieldLabel htmlFor={toId}>To</FieldLabel>
+          <Input
+            id={toId}
+            type="date"
+            value={to}
+            min={from || undefined}
+            max={max}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? errorId : undefined}
+            onChange={(event) => onToChange(event.target.value)}
+          />
+        </Field>
+      </div>
+      {error ? (
+        <p id={errorId} role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+    </fieldset>
   );
 }

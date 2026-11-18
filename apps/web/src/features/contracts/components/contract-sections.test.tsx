@@ -170,6 +170,10 @@ const loadedDetails = {
   historyFetching: false,
   setHistoryPage: vi.fn(),
   setHistoryPageSize: vi.fn(),
+  historyFilters: { status: "", fromDay: "", toDay: "" },
+  historyRangeError: null,
+  setHistoryFilters: vi.fn(),
+  clearHistoryFilters: vi.fn(),
 } as unknown as ReturnType<typeof useContractDetails>;
 
 function render(section: ContractSection) {

@@ -135,15 +135,15 @@ describe("CompanyAdminShell", () => {
     expect(markup).toContain('href="/dashboards/contracts"');
     expect(markup).not.toContain("companyId=");
     expect(markup).toContain('aria-current="page"');
-    expect(markup).toContain(">Contracts</a>");
+    expect(markup).toContain(">Contracts</span></a>");
     expect(markup).toContain("Ari Admin");
     expect(markup).toContain("Open account menu");
     expect(markup).toContain("data-menu-group");
     expect(markup).toContain('aria-label="Sign out of ContractFlow"');
     expect(markup).toContain(">Sign out</button>");
-    expect(markup).not.toContain(">Overview</a>");
-    expect(markup).not.toContain(">Team</a>");
-    expect(markup).not.toContain(">Company profile</a>");
+    expect(markup).not.toContain(">Overview</span></a>");
+    expect(markup).not.toContain(">Team</span></a>");
+    expect(markup).not.toContain(">Company profile</span></a>");
   });
 
   it("denies company-admin routes to a regular company member", () => {
@@ -158,9 +158,38 @@ describe("CompanyAdminShell", () => {
 
     expect(markup).toContain("Company administrator access required");
     expect(markup).not.toContain("Protected profile content");
-    expect(markup).toContain(">Contracts</a>");
-    expect(markup).not.toContain(">Team</a>");
-    expect(markup).not.toContain(">Company profile</a>");
+    expect(markup).toContain(">Contracts</span></a>");
+    expect(markup).not.toContain(">Team</span></a>");
+    expect(markup).not.toContain(">Company profile</span></a>");
+  });
+
+  it("denies New contract to a member who types its address, and doesn't list it in their Contracts pages", () => {
+    mocks.pathname = "/dashboards/contracts/new";
+    mocks.activeCompanyId = "company-2";
+
+    const markup = renderToStaticMarkup(
+      <CompanyAdminShell>{() => <p>New contract form</p>}</CompanyAdminShell>,
+    );
+
+    expect(markup).toContain("Company administrator access required");
+    expect(markup).not.toContain("New contract form");
+    // The member still sees the Contracts pages they may open.
+    expect(markup).toMatch(/<nav aria-label="Contracts pages"/);
+    expect(markup).toContain(">Contract register</span>");
+    expect(markup).not.toContain(">New contract</span>");
+  });
+
+  it("keeps the company context across modules: the same company, content keyed by it", () => {
+    mocks.pathname = "/dashboards/departments/project";
+
+    const markup = renderToStaticMarkup(
+      <CompanyAdminShell>
+        {(access) => <p>Company {access.company.id}</p>}
+      </CompanyAdminShell>,
+    );
+
+    expect(markup).toMatch(/<nav aria-label="Departments pages"/);
+    expect(markup).toContain("Company company-1");
   });
 
   it("denies department pages to a regular company member, who sees them as planned", () => {
@@ -356,14 +385,17 @@ describe("CompanyAdminShell", () => {
     expect(markup).toContain("Acme Works");
   });
 
-  it("renders through the shared shell: one navigation landmark and a mobile menu button", () => {
+  it("renders through the shared shell: the modules, the open module's pages, and a mobile menu button", () => {
     const markup = renderToStaticMarkup(
       <CompanyAdminShell>{() => <p>Company content</p>}</CompanyAdminShell>,
     );
 
-    // The old mobile tab strip duplicated the navigation; the drawer replaces it.
-    expect(markup.match(/<nav /g)).toHaveLength(1);
+    // The old mobile tab strip duplicated the navigation; the drawer replaces
+    // it. On a contracts page, the Contracts module's pages sit beside the
+    // modules, each a named landmark.
+    expect(markup.match(/<nav /g)).toHaveLength(2);
     expect(markup).toContain('<nav aria-label="Company dashboard">');
+    expect(markup).toMatch(/<nav aria-label="Contracts pages"/);
     expect(markup).toContain('aria-label="Open company dashboard menu"');
     expect(markup).toMatch(/<main[^>]*>[\s\S]*Company content/);
   });
@@ -376,7 +408,7 @@ describe("CompanyAdminShell", () => {
     );
 
     expect(markup).toContain("Admin overview");
-    expect(markup).toContain(">Overview</a>");
+    expect(markup).toContain(">Overview</span></a>");
   });
 
   it("opens department pages for a company administrator, marking the one in use", () => {

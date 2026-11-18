@@ -22,19 +22,10 @@ import {
   NativeSelectOption,
 } from "@workspace/ui/components/native-select";
 import {
-  ActionsTableHead,
   DataTable,
   DataTableEmpty,
-  DataTableError,
-  DataTableSkeleton,
+  type DataTableColumn,
 } from "@/components/data-table/data-table";
-import {
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@workspace/ui/components/table";
 import {
   FormField,
   FormGrid,
@@ -68,6 +59,50 @@ export function toMicroDegrees(value: string): number {
 export function fromMicroDegrees(value: number): string {
   return (value / MICRO_DEGREES).toFixed(6);
 }
+
+function siteAddress(site: ContractSite): string {
+  return `${site.addressLine1}, ${site.city}, ${site.stateRegion}, ${countryName(site.countryCode)}`;
+}
+
+/** A contract's sites; lower-priority columns step aside on narrow screens. */
+const SITE_COLUMNS: ReadonlyArray<DataTableColumn<ContractSite>> = [
+  {
+    id: "site",
+    header: "Site",
+    wrap: true,
+    className: "min-w-40",
+    cell: (site) => (
+      <>
+        <span className="block font-medium">{site.name}</span>
+        <span className="text-xs text-muted-foreground">{site.siteCode}</span>
+        <span className="mt-1 block text-xs text-muted-foreground md:hidden">
+          {siteAddress(site)}
+        </span>
+      </>
+    ),
+  },
+  {
+    id: "address",
+    header: "Address",
+    wrap: true,
+    hideBelow: "md",
+    className: "min-w-48",
+    cell: siteAddress,
+  },
+  {
+    id: "coordinates",
+    header: "Coordinates",
+    hideBelow: "lg",
+    className: "font-mono text-xs",
+    cell: (site) =>
+      `${fromMicroDegrees(site.latitudeE6)}, ${fromMicroDegrees(site.longitudeE6)}`,
+  },
+  {
+    id: "status",
+    header: "Status",
+    cell: (site) => <StatusBadge status={site.status} />,
+  },
+];
 
 /**
  * Contract sites are set up by the creating company's Company Administrator
@@ -121,93 +156,54 @@ export function ContractSiteManagement({
           />
         ) : null}
 
-        {sitesQuery.isLoading ? (
-          <DataTableSkeleton
-            label="Loading sites…"
-            columns={["Site", "Address", "Coordinates", "Status", ""]}
-            rows={3}
-          />
-        ) : sitesQuery.error ? (
-          <DataTableError
-            message={getApiErrorMessage(
-              sitesQuery.error,
-              "Unable to load contract sites.",
-            )}
-            onRetry={() => void sitesQuery.refetch()}
-          />
-        ) : sitesQuery.currentData?.length ? (
-          // One table at every width, so deep links keep a single target:
-          // phones show the address under the site, tablets drop coordinates.
-          <DataTable label="Contract sites">
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Site</TableHead>
-                <TableHead className="hidden md:table-cell">Address</TableHead>
-                <TableHead className="hidden lg:table-cell">
-                  Coordinates
-                </TableHead>
-                <TableHead>Status</TableHead>
-                <ActionsTableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sitesQuery.currentData.map((site) => {
-                const address = `${site.addressLine1}, ${site.city}, ${site.stateRegion}, ${countryName(site.countryCode)}`;
-                return (
-                  <TableRow
-                    key={site.id}
-                    id={`activity-target-${site.id}`}
-                    className={
-                      target?.type === "contract_site" && target.id === site.id
-                        ? "bg-primary/10"
-                        : undefined
-                    }
-                  >
-                    <TableCell className="min-w-40 whitespace-normal break-words">
-                      <span className="block font-medium">{site.name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {site.siteCode}
-                      </span>
-                      <span className="mt-1 block text-xs text-muted-foreground md:hidden">
-                        {address}
-                      </span>
-                    </TableCell>
-                    <TableCell className="hidden min-w-48 whitespace-normal break-words md:table-cell">
-                      {address}
-                    </TableCell>
-                    <TableCell className="hidden font-mono text-xs lg:table-cell">
-                      {fromMicroDegrees(site.latitudeE6)},{" "}
-                      {fromMicroDegrees(site.longitudeE6)}
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={site.status} />
-                    </TableCell>
-                    <TableCell className="text-end">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        aria-label={`Edit site ${site.name}`}
-                        onClick={() => setEditing(site)}
-                      >
-                        Edit
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </DataTable>
-        ) : (
-          <DataTableEmpty
-            title="No sites have been added to this contract."
-            description={
-              editing === null
-                ? "Add the locations where work on this contract takes place."
-                : undefined
-            }
-          />
-        )}
+        {/* One table at every width, so deep links keep a single target:
+            phones show the address under the site, tablets drop coordinates. */}
+        <DataTable
+          label="Contract sites"
+          columns={SITE_COLUMNS}
+          rows={sitesQuery.currentData ?? []}
+          getRowKey={(site) => site.id}
+          getRowProps={(site) => ({
+            id: `activity-target-${site.id}`,
+            className:
+              target?.type === "contract_site" && target.id === site.id
+                ? "bg-primary/10"
+                : undefined,
+          })}
+          rowActions={(site) => (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-label={`Edit site ${site.name}`}
+              onClick={() => setEditing(site)}
+            >
+              Edit
+            </Button>
+          )}
+          isLoading={sitesQuery.isLoading}
+          loadingLabel="Loading sites…"
+          skeletonRows={3}
+          error={
+            sitesQuery.error
+              ? getApiErrorMessage(
+                  sitesQuery.error,
+                  "Unable to load contract sites.",
+                )
+              : null
+          }
+          onRetry={() => void sitesQuery.refetch()}
+          empty={
+            <DataTableEmpty
+              title="No sites have been added to this contract."
+              description={
+                editing === null
+                  ? "Add the locations where work on this contract takes place."
+                  : undefined
+              }
+            />
+          }
+        />
       </CardContent>
     </Card>
   );

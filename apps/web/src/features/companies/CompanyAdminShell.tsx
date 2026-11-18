@@ -341,7 +341,9 @@ export function CompanyAdminShell({
       brand={
         <Link href={homePath} className="flex items-center gap-3">
           <LogoMark variant="inverse" className="size-9" />
-          <span className="font-heading text-lg font-semibold text-sidebar-accent-foreground">
+          {/* In the icon rail only the mark shows; the name stays for
+              screen readers. */}
+          <span className="font-heading text-lg font-semibold text-sidebar-accent-foreground group-data-[collapsible=icon]:sr-only">
             ContractFlow
           </span>
         </Link>

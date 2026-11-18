@@ -12,8 +12,8 @@ import {
 } from "@workspace/ui/components/table";
 import {
   ActionsTableHead,
-  DataTable,
   DataTableEmpty,
+  DataTableFrame,
   DataTableError,
   DataTableRowActions,
   DataTableSkeleton,
@@ -22,17 +22,18 @@ import {
 import {
   DataTableActiveFilters,
   DataTableFilterChips,
+  DataTableDateRange,
   DataTableSearch,
 } from "./data-table-toolbar";
 
 afterEach(cleanup);
 
-describe("DataTable", () => {
+describe("DataTableFrame", () => {
   it("is a named, semantic table with sortable and action headers", async () => {
     const onSort = vi.fn();
     const user = userEvent.setup({ delay: null });
     render(
-      <DataTable label="Invoices">
+      <DataTableFrame label="Invoices">
         <TableHeader>
           <TableRow>
             <SortableTableHead label="Due" direction="desc" onSort={onSort} />
@@ -51,7 +52,7 @@ describe("DataTable", () => {
             <TableCell />
           </TableRow>
         </TableBody>
-      </DataTable>,
+      </DataTableFrame>,
     );
 
     const table = screen.getByRole("table", { name: "Invoices" });
@@ -97,6 +98,59 @@ describe("DataTableFilterChips", () => {
 
     await user.click(buttons[2]);
     expect(onChange).toHaveBeenCalledWith("paid");
+  });
+});
+
+describe("DataTableDateRange", () => {
+  it("labels both days in a named group and reports changes", async () => {
+    const onFrom = vi.fn();
+    const onTo = vi.fn();
+    const user = userEvent.setup({ delay: null });
+    render(
+      <DataTableDateRange
+        legend="Changed between"
+        from="2026-03-01"
+        to=""
+        max="2026-12-31"
+        onFromChange={onFrom}
+        onToChange={onTo}
+      />,
+    );
+
+    const group = screen.getByRole("group", { name: "Changed between" });
+    const from = within(group).getByLabelText("From") as HTMLInputElement;
+    const to = within(group).getByLabelText("To") as HTMLInputElement;
+    expect(from.type).toBe("date");
+    expect(from.value).toBe("2026-03-01");
+    // The end can't precede the start, nor pass the latest day.
+    expect(to.min).toBe("2026-03-01");
+    expect(to.max).toBe("2026-12-31");
+
+    await user.type(to, "2026-03-31");
+    expect(onTo).toHaveBeenLastCalledWith("2026-03-31");
+    expect(onFrom).not.toHaveBeenCalled();
+  });
+
+  it("announces a reversed range and marks both days invalid", () => {
+    render(
+      <DataTableDateRange
+        legend="Changed between"
+        from="2026-04-10"
+        to="2026-04-01"
+        error="The end date is before the start date."
+        onFromChange={vi.fn()}
+        onToChange={vi.fn()}
+      />,
+    );
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toBe("The end date is before the start date.");
+    for (const input of [
+      screen.getByLabelText("From"),
+      screen.getByLabelText("To"),
+    ]) {
+      expect(input.getAttribute("aria-invalid")).toBe("true");
+      expect(input.getAttribute("aria-describedby")).toBe(alert.id);
+    }
   });
 });
 

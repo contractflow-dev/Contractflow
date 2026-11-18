@@ -97,68 +97,76 @@ export function CompanyContractRoles({ companyId }: { companyId: string }) {
     <section
       id="contract-roles"
       aria-labelledby="contract-roles-heading"
-      className="scroll-mt-24 space-y-4"
+      className="scroll-mt-24"
     >
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="space-y-1">
-          <h2 id="contract-roles-heading" className="type-section-title">
-            Contract roles
-          </h2>
-          <p className="type-lead">
-            Roles your members hold on your company&apos;s contracts. Company
-            membership alone gives no contract access: each role opens one
-            workspace of one contract.
-          </p>
-        </div>
-        <Button type="button" onClick={() => setAssigning(true)}>
-          Assign a contract role
-        </Button>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:max-w-2xl">
-        <Field>
-          <FieldLabel htmlFor="contract-roles-member">Member</FieldLabel>
-          <NativeSelect
-            id="contract-roles-member"
-            className="w-full"
-            value={member}
-            onChange={(event) => {
-              setMember(event.target.value);
-              setPage(1);
-            }}
-          >
-            <NativeSelectOption value="">All members</NativeSelectOption>
-            {(members.currentData?.data ?? []).map((option) => (
-              <NativeSelectOption key={option.id} value={option.id}>
-                {`${option.firstName} ${option.lastName}`.trim() ||
-                  option.email}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="contract-roles-workspace">Workspace</FieldLabel>
-          <NativeSelect
-            id="contract-roles-workspace"
-            className="w-full"
-            value={workspace}
-            onChange={(event) => {
-              const value = event.target.value;
-              setWorkspace(WORKSPACES.find((w) => w === value) ?? "");
-              setPage(1);
-            }}
-          >
-            <NativeSelectOption value="">All workspaces</NativeSelectOption>
-            {WORKSPACES.map((option) => (
-              <NativeSelectOption key={option} value={option}>
-                {humanizeEnumValue(option)}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </Field>
-      </div>
-
+      {/* One card holds the section: its heading, action and filters sit in
+          the card's header strip, above the list. */}
       <Card className="gap-0 py-0">
+        <div className="space-y-4 border-b p-4 sm:p-5">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div className="space-y-1">
+              <h2
+                id="contract-roles-heading"
+                className="font-heading text-base font-semibold"
+              >
+                Contract roles
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Roles your members hold on your company&apos;s contracts.
+                Company membership alone gives no contract access: each role
+                opens one workspace of one contract.
+              </p>
+            </div>
+            <Button type="button" onClick={() => setAssigning(true)}>
+              Assign a contract role
+            </Button>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:max-w-2xl">
+            <Field>
+              <FieldLabel htmlFor="contract-roles-member">Member</FieldLabel>
+              <NativeSelect
+                id="contract-roles-member"
+                className="w-full"
+                value={member}
+                onChange={(event) => {
+                  setMember(event.target.value);
+                  setPage(1);
+                }}
+              >
+                <NativeSelectOption value="">All members</NativeSelectOption>
+                {(members.currentData?.data ?? []).map((option) => (
+                  <NativeSelectOption key={option.id} value={option.id}>
+                    {`${option.firstName} ${option.lastName}`.trim() ||
+                      option.email}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="contract-roles-workspace">
+                Workspace
+              </FieldLabel>
+              <NativeSelect
+                id="contract-roles-workspace"
+                className="w-full"
+                value={workspace}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setWorkspace(WORKSPACES.find((w) => w === value) ?? "");
+                  setPage(1);
+                }}
+              >
+                <NativeSelectOption value="">All workspaces</NativeSelectOption>
+                {WORKSPACES.map((option) => (
+                  <NativeSelectOption key={option} value={option}>
+                    {humanizeEnumValue(option)}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </Field>
+          </div>
+        </div>
         {roles.isLoading ? (
           <div
             role="status"

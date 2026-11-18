@@ -152,9 +152,49 @@ describe("ContractDetail query states", () => {
       historyFetching: false,
       setHistoryPage: vi.fn(),
       setHistoryPageSize: vi.fn(),
+      historyFilters: { status: "", fromDay: "", toDay: "" },
+      historyRangeError: null,
+      setHistoryFilters: vi.fn(),
+      clearHistoryFilters: vi.fn(),
       refetchParties: vi.fn(),
       refetchHistory: vi.fn(),
     });
+  });
+
+  it("offers the status history's filters, and says when nothing matches them", () => {
+    useContractDetailsMock.mockReturnValue({
+      ...useContractDetailsMock({
+        companyId: "company-1",
+        contractId: "contract-1",
+      }),
+      historyError: undefined,
+      historyLoading: false,
+      history: {
+        data: [],
+        meta: {
+          totalItems: 0,
+          itemCount: 0,
+          itemsPerPage: 10,
+          totalPages: 0,
+          currentPage: 1,
+        },
+      },
+      historyFilters: {
+        status: EContractStatus.SUSPENDED,
+        fromDay: "2026-03-01",
+        toDay: "",
+      },
+    } as unknown as ReturnType<typeof useContractDetails>);
+
+    const markup = renderSection("history");
+
+    expect(markup).toContain('aria-label="Filter status history by status"');
+    expect(markup).toMatch(/aria-pressed="true"[^>]*>Suspended</);
+    expect(markup).toContain("Changed between");
+    expect(markup).toMatch(/>From (Mar 1, 2026|1 Mar 2026)</);
+    expect(markup).toContain("No status changes match these filters.");
+    expect(markup).toContain(">Clear filters<");
+    expect(markup).not.toContain("No status changes have been recorded.");
   });
 
   it("shows independent errors for failed parties and history requests", () => {
@@ -195,6 +235,10 @@ describe("ContractDetail query states", () => {
       historyFetching: true,
       setHistoryPage: vi.fn(),
       setHistoryPageSize: vi.fn(),
+      historyFilters: { status: "", fromDay: "", toDay: "" },
+      historyRangeError: null,
+      setHistoryFilters: vi.fn(),
+      clearHistoryFilters: vi.fn(),
       refetchParties: vi.fn(),
       refetchHistory: vi.fn(),
     });
@@ -250,6 +294,10 @@ describe("ContractDetail query states", () => {
       historyFetching: false,
       setHistoryPage: vi.fn(),
       setHistoryPageSize: vi.fn(),
+      historyFilters: { status: "", fromDay: "", toDay: "" },
+      historyRangeError: null,
+      setHistoryFilters: vi.fn(),
+      clearHistoryFilters: vi.fn(),
       refetchParties: vi.fn(),
       refetchHistory: vi.fn(),
     } as unknown as ReturnType<typeof useContractDetails>);
@@ -305,6 +353,10 @@ describe("contract screen headings", () => {
       historyFetching: false,
       setHistoryPage: vi.fn(),
       setHistoryPageSize: vi.fn(),
+      historyFilters: { status: "", fromDay: "", toDay: "" },
+      historyRangeError: null,
+      setHistoryFilters: vi.fn(),
+      clearHistoryFilters: vi.fn(),
       refetchParties: vi.fn(),
       refetchHistory: vi.fn(),
     } as unknown as ReturnType<typeof useContractDetails>);
@@ -373,7 +425,8 @@ describe("contract screen headings", () => {
       />,
     );
 
-    expect(markup).toMatch(/<h1[^>]*>Contract register<\/h1>/);
+    expect(markup).toMatch(/<h1[^>]*>Contract Register<\/h1>/);
+    expect(markup).toContain("<h2>Contracts</h2>");
     expect(headingProblems(markup)).toEqual([]);
     // The archived filter's labelled checkbox is covered, opened, in
     // contracts-list.form.test.tsx: it lives in the More filters popover.

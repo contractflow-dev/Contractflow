@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { useState } from "react";
 import {
   Controller,
   FormProvider,
@@ -15,7 +15,7 @@ import {
   EDocumentVisibility,
   type ContractActivityTarget,
 } from "@contractflow/contracts-schema";
-import { RiArrowDownSLine, RiArrowUpSLine } from "@remixicon/react";
+import { RiHistoryLine } from "@remixicon/react";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
 import {
@@ -30,6 +30,13 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from "@workspace/ui/components/native-select";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@workspace/ui/components/sheet";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import {
   Table,
@@ -217,7 +224,18 @@ function DocumentLibrary({
   const [form, setForm] = useState<
     { kind: "new" } | { kind: "version"; document: DocumentSummary } | null
   >(null);
-  const [expanded, setExpanded] = useState<string | null>(null);
+  // The document whose versions the side sheet shows. An activity link to a
+  // document opens it there, as the inline history used to; a new link (the
+  // URL's target changing) opens its document again.
+  const targetDocumentId = target?.type === "document" ? target.id : null;
+  const [versionsFor, setVersionsFor] = useState<string | null>(
+    targetDocumentId,
+  );
+  const [shownTarget, setShownTarget] = useState(targetDocumentId);
+  if (shownTarget !== targetDocumentId) {
+    setShownTarget(targetDocumentId);
+    if (targetDocumentId) setVersionsFor(targetDocumentId);
+  }
   const [deleting, setDeleting] = useState<DocumentSummary | null>(null);
   const documents = useGetContractDocumentsQuery({ ...scope, page, limit });
   const targetDocument = useGetContractDocumentQuery(
@@ -306,9 +324,8 @@ function DocumentLibrary({
                 ownerCompanyId={scope.companyId}
                 canChange={canChange}
                 shared={shared}
-                expanded={target.id}
                 target={target}
-                onToggle={() => undefined}
+                onShowVersions={setVersionsFor}
                 onNewVersion={(document) =>
                   setForm({ kind: "version", document })
                 }
@@ -321,11 +338,8 @@ function DocumentLibrary({
               ownerCompanyId={scope.companyId}
               canChange={canChange}
               shared={shared}
-              expanded={expanded}
               target={target}
-              onToggle={(id) =>
-                setExpanded((open) => (open === id ? null : id))
-              }
+              onShowVersions={setVersionsFor}
               onNewVersion={(document) =>
                 setForm({ kind: "version", document })
               }
@@ -359,7 +373,19 @@ function DocumentLibrary({
         document={deleting}
         shared={shared}
         onClose={() => setDeleting(null)}
-        onDeleted={(id) => setExpanded((open) => (open === id ? null : open))}
+        onDeleted={(id) =>
+          setVersionsFor((open) => (open === id ? null : open))
+        }
+      />
+      <VersionHistorySheet
+        scope={scope}
+        documentId={versionsFor}
+        highlightVersionId={
+          target?.type === "document" && target.id === versionsFor
+            ? target.versionId
+            : undefined
+        }
+        onClose={() => setVersionsFor(null)}
       />
     </Card>
   );
@@ -371,8 +397,7 @@ function DocumentList({
   ownerCompanyId,
   canChange,
   shared,
-  expanded,
-  onToggle,
+  onShowVersions,
   onNewVersion,
   onDelete,
   target,
@@ -382,8 +407,8 @@ function DocumentList({
   ownerCompanyId: string;
   canChange: boolean;
   shared: boolean;
-  expanded: string | null;
-  onToggle: (id: string) => void;
+  /** Opens the document's version history in the side sheet. */
+  onShowVersions: (id: string) => void;
   onNewVersion: (document: DocumentSummary) => void;
   onDelete: (document: DocumentSummary) => void;
   target?: ContractActivityTarget | null;
@@ -395,8 +420,7 @@ function DocumentList({
       document={document}
       // Only the uploading company changes a document; the API enforces it.
       owned={document.ownerCompanyId === ownerCompanyId && canChange}
-      expanded={expanded === document.id}
-      onToggle={() => onToggle(document.id)}
+      onShowVersions={() => onShowVersions(document.id)}
       onNewVersion={() => onNewVersion(document)}
       onDelete={() => onDelete(document)}
     />
@@ -434,9 +458,6 @@ function DocumentList({
               <dd>{formatDate(document.updatedAt, { timeZone })}</dd>
             </dl>
             {actions(document)}
-            {expanded === document.id ? (
-              <VersionHistory scope={scope} documentId={document.id} />
-            ) : null}
           </li>
         ))}
       </ul>
@@ -458,45 +479,34 @@ function DocumentList({
           </TableHeader>
           <TableBody>
             {documents.map((document) => (
-              <Fragment key={document.id}>
-                <TableRow
-                  id={`activity-target-${document.id}`}
-                  className={
-                    target?.type === "document" && target.id === document.id
-                      ? "bg-primary/10"
-                      : undefined
-                  }
-                >
-                  <TableCell className="max-w-72 whitespace-normal">
-                    <DocumentTitle document={document} />
-                  </TableCell>
+              <TableRow
+                key={document.id}
+                id={`activity-target-${document.id}`}
+                className={
+                  target?.type === "document" && target.id === document.id
+                    ? "bg-primary/10"
+                    : undefined
+                }
+              >
+                <TableCell className="max-w-72 whitespace-normal">
+                  <DocumentTitle document={document} />
+                </TableCell>
+                <TableCell>
+                  {DOCUMENT_CATEGORY_LABELS[document.category]}
+                </TableCell>
+                {shared ? (
                   <TableCell>
-                    {DOCUMENT_CATEGORY_LABELS[document.category]}
+                    {DOCUMENT_VISIBILITY_LABELS[document.visibility]}
                   </TableCell>
-                  {shared ? (
-                    <TableCell>
-                      {DOCUMENT_VISIBILITY_LABELS[document.visibility]}
-                    </TableCell>
-                  ) : null}
-                  <TableCell className="max-w-64 whitespace-normal">
-                    <CurrentVersion document={document} />
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {formatDate(document.updatedAt, { timeZone })}
-                  </TableCell>
-                  <TableCell>{actions(document)}</TableCell>
-                </TableRow>
-                {expanded === document.id ? (
-                  <TableRow className="hover:bg-transparent">
-                    <TableCell
-                      colSpan={shared ? 6 : 5}
-                      className="bg-muted/30 whitespace-normal"
-                    >
-                      <VersionHistory scope={scope} documentId={document.id} />
-                    </TableCell>
-                  </TableRow>
                 ) : null}
-              </Fragment>
+                <TableCell className="max-w-64 whitespace-normal">
+                  <CurrentVersion document={document} />
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {formatDate(document.updatedAt, { timeZone })}
+                </TableCell>
+                <TableCell>{actions(document)}</TableCell>
+              </TableRow>
             ))}
           </TableBody>
         </Table>
@@ -536,21 +546,18 @@ function DocumentActions({
   scope,
   document,
   owned,
-  expanded,
-  onToggle,
+  onShowVersions,
   onNewVersion,
   onDelete,
 }: {
   scope: Scope;
   document: DocumentSummary;
   owned: boolean;
-  expanded: boolean;
-  onToggle: () => void;
+  onShowVersions: () => void;
   onNewVersion: () => void;
   onDelete: () => void;
 }) {
   const download = useDownload(scope);
-  const historyId = `document-${document.id}-versions`;
   return (
     <div className="flex flex-wrap items-center gap-1.5 md:justify-end">
       {document.currentVersion ? (
@@ -569,13 +576,12 @@ function DocumentActions({
         type="button"
         size="sm"
         variant="ghost"
-        aria-expanded={expanded}
-        aria-controls={expanded ? historyId : undefined}
-        aria-label={`${expanded ? "Hide" : "Show"} versions of ${document.title}`}
-        onClick={onToggle}
+        aria-haspopup="dialog"
+        aria-label={`Show versions of ${document.title}`}
+        onClick={onShowVersions}
       >
+        <RiHistoryLine aria-hidden="true" data-icon="inline-start" />
         Versions
-        {expanded ? <RiArrowUpSLine /> : <RiArrowDownSLine />}
       </Button>
       {owned ? (
         <>
@@ -603,12 +609,55 @@ function DocumentActions({
   );
 }
 
+/**
+ * A document's version history in a side sheet, opened from its Versions
+ * button or an activity link, so the list doesn't push the table apart.
+ */
+function VersionHistorySheet({
+  scope,
+  documentId,
+  highlightVersionId,
+  onClose,
+}: {
+  scope: Scope;
+  /** The document to show; null keeps the sheet closed. */
+  documentId: string | null;
+  /** A version an activity link points at, marked in the list. */
+  highlightVersionId?: string;
+  onClose: () => void;
+}) {
+  return (
+    <Sheet
+      open={documentId !== null}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <SheetContent
+        side="right"
+        className="w-full gap-0 overflow-y-auto sm:max-w-lg"
+      >
+        {documentId ? (
+          <VersionHistory
+            key={documentId}
+            scope={scope}
+            documentId={documentId}
+            highlightVersionId={highlightVersionId}
+          />
+        ) : null}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 function VersionHistory({
   scope,
   documentId,
+  highlightVersionId,
 }: {
   scope: Scope;
   documentId: string;
+  highlightVersionId?: string;
 }) {
   const timeZone = useUserTimeZone();
   const detail = useGetContractDocumentQuery({ ...scope, documentId });
@@ -616,60 +665,74 @@ function VersionHistory({
   const versions = [...(detail.currentData?.versions ?? [])].sort(
     (a, b) => b.versionNumber - a.versionNumber,
   );
+  const title = detail.currentData?.title;
 
   return (
-    <section
-      id={`document-${documentId}-versions`}
-      aria-label="Version history"
-      className="space-y-2"
-    >
-      <h3 className="type-subsection-title">Version history</h3>
-      {detail.isLoading ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          Loading versions…
-        </p>
-      ) : detail.error ? (
-        <p className="text-sm text-destructive">
-          {getApiErrorMessage(detail.error, "Unable to load the versions.")}
-        </p>
-      ) : versions.length ? (
-        <ol className="space-y-2">
-          {versions.map((version) => (
-            <li
-              key={version.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3 text-sm"
-            >
-              <div className="min-w-0">
-                <p className="font-medium break-words">
-                  Version {version.versionNumber} · {version.fileName}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {formatFileSize(version.sizeBytes)} ·{" "}
-                  {formatDateTime(version.uploadedAt, { timeZone })}
-                  {version.changeNote ? ` · ${version.changeNote}` : ""}
-                </p>
-              </div>
-              {version.uploadStatus === EDocumentUploadStatus.AVAILABLE ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={download.isLoading}
-                  aria-label={`Download version ${version.versionNumber}`}
-                  onClick={() => void download.start(documentId, version.id)}
-                >
-                  Download
-                </Button>
-              ) : (
-                <StatusBadge status={version.uploadStatus} />
-              )}
-            </li>
-          ))}
-        </ol>
-      ) : (
-        <p className="text-sm text-muted-foreground">No versions yet.</p>
-      )}
-    </section>
+    <>
+      <SheetHeader className="border-b">
+        <SheetTitle>
+          {title ? `Versions of ${title}` : "Version history"}
+        </SheetTitle>
+        <SheetDescription>
+          Every version uploaded, newest first. Download any of them.
+        </SheetDescription>
+      </SheetHeader>
+      <div className="space-y-2 p-4">
+        {detail.isLoading ? (
+          <p role="status" className="text-sm text-muted-foreground">
+            Loading versions…
+          </p>
+        ) : detail.error ? (
+          <p className="text-sm text-destructive">
+            {getApiErrorMessage(detail.error, "Unable to load the versions.")}
+          </p>
+        ) : versions.length ? (
+          <ol className="space-y-2">
+            {versions.map((version) => (
+              <li
+                key={version.id}
+                // The version an activity link points at.
+                aria-current={
+                  version.id === highlightVersionId ? "true" : undefined
+                }
+                className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3 text-sm ${
+                  version.id === highlightVersionId
+                    ? "border-primary/40 bg-primary/10"
+                    : "bg-card"
+                }`}
+              >
+                <div className="min-w-0">
+                  <p className="font-medium break-words">
+                    Version {version.versionNumber} · {version.fileName}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatFileSize(version.sizeBytes)} ·{" "}
+                    {formatDateTime(version.uploadedAt, { timeZone })}
+                    {version.changeNote ? ` · ${version.changeNote}` : ""}
+                  </p>
+                </div>
+                {version.uploadStatus === EDocumentUploadStatus.AVAILABLE ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={download.isLoading}
+                    aria-label={`Download version ${version.versionNumber}`}
+                    onClick={() => void download.start(documentId, version.id)}
+                  >
+                    Download
+                  </Button>
+                ) : (
+                  <StatusBadge status={version.uploadStatus} />
+                )}
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="text-sm text-muted-foreground">No versions yet.</p>
+        )}
+      </div>
+    </>
   );
 }
 

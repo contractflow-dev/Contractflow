@@ -1,23 +1,28 @@
 import {
+  RiAddCircleLine,
   RiBuilding4Line,
   RiCalendarLine,
   RiFileList3Line,
   RiFolderShield2Line,
   RiGroupLine,
+  RiOrganizationChart,
   RiQuestionLine,
   RiSettings3Line,
   RiTaskLine,
 } from "@remixicon/react";
-import type {
-  AppNavGroup,
-  AppNavItem,
+import {
+  flattenNavItems,
+  type AppNavGroup,
+  type AppNavItem,
 } from "@/components/app-shell/navigation";
 import { FinanceDot, HseDot, ProjectDot } from "./department-dots";
 
-export type CompanyNavItem = AppNavItem & {
+export type CompanyNavItem = Omit<AppNavItem, "children"> & {
   adminOnly: boolean;
   /** Shown only to members who aren't Company Administrators. */
   membersOnly?: boolean;
+  /** The module's pages, each with its own visibility. */
+  children?: readonly CompanyNavItem[];
 };
 
 /** The department page that looks at one contract workspace. */
@@ -92,6 +97,25 @@ export const COMPANY_NAVIGATION_GROUPS: ReadonlyArray<{
         label: "Contracts",
         icon: RiFileList3Line,
         adminOnly: false,
+        description: "Contracts your company is a party to.",
+        // A contract's own pages (/dashboards/contracts/:id/...) stay under
+        // the register; they have their own section tabs.
+        children: [
+          {
+            href: "/dashboards/contracts",
+            label: "Contract register",
+            icon: RiFileList3Line,
+            adminOnly: false,
+          },
+          {
+            // The API also allows only Company Administrators to create.
+            href: "/dashboards/contracts/new",
+            label: "New contract",
+            icon: RiAddCircleLine,
+            match: "exact",
+            adminOnly: true,
+          },
+        ],
       },
       {
         // Members read the company's documents; administrators manage them.
@@ -112,9 +136,18 @@ export const COMPANY_NAVIGATION_GROUPS: ReadonlyArray<{
   {
     label: "Department workspaces",
     items: [
-      department(departmentHref("project"), "Project", ProjectDot),
-      department(departmentHref("hse"), "HSE", HseDot),
-      department(departmentHref("finance"), "Finance", FinanceDot),
+      {
+        href: departmentHref("project"),
+        label: "Departments",
+        icon: RiOrganizationChart,
+        adminOnly: true,
+        description: "Read-only oversight of each contract workspace.",
+        children: [
+          department(departmentHref("project"), "Project", ProjectDot),
+          department(departmentHref("hse"), "HSE", HseDot),
+          department(departmentHref("finance"), "Finance", FinanceDot),
+        ],
+      },
       plannedDepartment(
         "project",
         "Project",
@@ -154,19 +187,29 @@ export const COMPANY_NAVIGATION_GROUPS: ReadonlyArray<{
   },
 ];
 
-/** Every navigation item, for checks that don't care about grouping. */
-export const COMPANY_NAVIGATION: readonly CompanyNavItem[] =
-  COMPANY_NAVIGATION_GROUPS.flatMap(({ items }) => items);
+/**
+ * Every destination, modules' pages included, for checks that don't care
+ * about grouping, such as which routes are for administrators only.
+ */
+export const COMPANY_NAVIGATION: readonly CompanyNavItem[] = flattenNavItems(
+  COMPANY_NAVIGATION_GROUPS.flatMap(({ items }) => items),
+) as readonly CompanyNavItem[];
 
 /**
  * The groups a member sees: administrator-only items need canManageCompany,
  * and members-only items (the planned departments) are for everyone else.
+ * A module's pages are filtered the same way, so a module never lists a page
+ * its reader can't open. The API enforces access either way.
  */
 export function companyNavigationFor(canManageCompany: boolean): AppNavGroup[] {
+  const visible = ({ adminOnly, membersOnly }: CompanyNavItem) =>
+    canManageCompany ? !membersOnly : !adminOnly;
   return COMPANY_NAVIGATION_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter(({ adminOnly, membersOnly }) =>
-      canManageCompany ? !membersOnly : !adminOnly,
-    ),
+    items: group.items
+      .filter(visible)
+      .map(({ children, ...item }) =>
+        children ? { ...item, children: children.filter(visible) } : item,
+      ),
   })).filter(({ items }) => items.length > 0);
 }

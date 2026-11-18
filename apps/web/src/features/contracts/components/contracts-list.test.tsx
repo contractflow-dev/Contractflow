@@ -124,17 +124,23 @@ describe("ContractsList", () => {
     list.counts = {};
   });
 
-  it("puts the page heading, its New contract action, the status filters, then the toolbar, in that order", () => {
+  it("puts only the page title above the register card, then the card's title, New contract, filters and toolbar, in that order", () => {
     const markup = render();
-    const heading = markup.search(/<h1[^>]*>Contract register<\/h1>/);
+    const heading = markup.search(/<h1[^>]*>Contract Register<\/h1>/);
     expect(heading).toBeGreaterThanOrEqual(0);
+    // Everything else is inside the register's card, after the page title.
+    const card = markup.indexOf('data-slot="card"');
+    const cardTitle = markup.search(/<h2>Contracts<\/h2>/);
+    expect(card).toBeGreaterThan(heading);
+    expect(cardTitle).toBeGreaterThan(card);
+    expect(markup.slice(heading, card)).not.toContain("Manage and monitor");
     // New contract is its own page, not a dialog over the register.
     const link = markup.search(
       /<a[^>]*href="\/dashboards\/contracts\/new"[^>]*>(?:<svg[\s\S]*?<\/svg>)?New contract<\/a>/,
     );
     const filters = markup.indexOf('aria-label="Filter contracts by status"');
     const search = markup.indexOf('role="search"');
-    expect(link).toBeGreaterThan(heading);
+    expect(link).toBeGreaterThan(cardTitle);
     expect(filters).toBeGreaterThan(link);
     expect(search).toBeGreaterThan(filters);
     const linkTag = /<a[^>]*href="\/dashboards\/contracts\/new"[^>]*>/.exec(
@@ -255,15 +261,47 @@ describe("ContractsList", () => {
     );
   });
 
-  it("tells a filtered search that nothing matches and offers to clear it", () => {
+  it("tells a search that nothing matches it, and offers to clear the search", () => {
     setState({ hasFilters: true, search: "zzz", searchInput: "zzz" });
     const markup = render();
 
-    expect(markup).toContain("No contracts match your search or filters.");
+    expect(markup).toContain("No contracts match “zzz”.");
     expect(markup).not.toContain("No contracts yet.");
-    expect(markup.match(/>Clear filters</g)).toHaveLength(1);
+    expect(markup.match(/>Clear search</g)).toHaveLength(1);
     // The search is shown as an active filter, removable on its own.
     expect(markup).toContain("Search: “zzz”");
+  });
+
+  it("offers to clear every filter when a search also has others", () => {
+    setState({
+      hasFilters: true,
+      search: "zzz",
+      searchInput: "zzz",
+      status: EContractStatus.DRAFT,
+    });
+    const markup = render();
+
+    expect(markup).toContain(
+      "Nothing matches this search with the filters you",
+    );
+    expect(markup.match(/>Clear filters</g)).toHaveLength(1);
+  });
+
+  it("says which status has no contracts, and offers all contracts", () => {
+    setState({ hasFilters: true, status: EContractStatus.SUSPENDED });
+    const markup = render();
+
+    expect(markup).toContain("No suspended contracts.");
+    expect(markup).toContain(">Show all contracts<");
+    expect(markup).not.toContain("No contracts match");
+  });
+
+  it("says when there are no archived contracts, and offers those in use", () => {
+    setState({ hasFilters: true, includeDeleted: true });
+    const markup = render();
+
+    expect(markup).toContain("No archived contracts.");
+    expect(markup).toContain(">Show contracts in use<");
   });
 
   it("shows loading, then errors with a retry, never an empty state", () => {

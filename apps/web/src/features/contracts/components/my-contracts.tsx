@@ -5,6 +5,13 @@ import { EContractStatus } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button, buttonVariants } from "@workspace/ui/components/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
 import { Field, FieldLabel } from "@workspace/ui/components/field";
 import { Input } from "@workspace/ui/components/input";
 import {
@@ -71,17 +78,23 @@ export function MyContracts({
         description="View and manage the contracts assigned to you."
       />
 
-      <section aria-labelledby="my-contracts-heading" className="space-y-5">
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <h2 id="my-contracts-heading" className="text-base font-semibold">
-            Your contract roles in {companyName}
-          </h2>
-          {currentData && !hasFilters && total > 0 ? (
-            <p className="text-sm text-muted-foreground">
-              You hold a role on {total} contract{total === 1 ? "" : "s"}.
-            </p>
-          ) : null}
-        </div>
+      <section aria-labelledby="my-contracts-heading">
+        {/* One card holds the section: its heading and count in the header,
+            then search, filters, the contracts and pagination. */}
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <h2 id="my-contracts-heading">
+                Your contract roles in {companyName}
+              </h2>
+            </CardTitle>
+            {currentData && !hasFilters && total > 0 ? (
+              <CardDescription>
+                You hold a role on {total} contract{total === 1 ? "" : "s"}.
+              </CardDescription>
+            ) : null}
+          </CardHeader>
+          <CardContent className="space-y-5">
 
         <form
           role="search"
@@ -198,6 +211,8 @@ export function MyContracts({
             onPageSizeChange={setLimit}
           />
         ) : null}
+          </CardContent>
+        </Card>
       </section>
     </div>
   );
