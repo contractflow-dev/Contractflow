@@ -213,7 +213,7 @@ export function CompanyContractRoles({ companyId }: { companyId: string }) {
             </ul>
             {/* From md: a table. */}
             <div className="hidden overflow-x-auto md:block">
-              <Table>
+              <Table aria-label="Contract roles">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Member</TableHead>

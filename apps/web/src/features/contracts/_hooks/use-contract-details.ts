@@ -33,11 +33,13 @@ export function useContractDetails(query: ContractDetailsQuery) {
     parties: parties.currentData,
     partiesError: parties.error,
     partiesLoading: parties.isLoading,
+    refetchParties: parties.refetch,
     history: history.currentData,
     historyError: history.error,
     historyLoading:
       history.isLoading || (history.isFetching && !history.currentData),
     historyFetching: history.isFetching,
+    refetchHistory: history.refetch,
     setHistoryPage: historyPagination.setPage,
     setHistoryPageSize: historyPagination.setLimit,
   };

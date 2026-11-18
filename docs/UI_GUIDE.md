@@ -354,6 +354,35 @@ Every list handles four states separately:
    - with filters, say nothing matched and offer **Clear filters**.
 4. **Data.** Show a table from `md` and cards below it, then `DataPagination` (sizes 10, 20, 50, 100, with an `itemLabel` such as "contracts").
 
+#### Table anatomy
+
+The shared pieces live in `src/components/data-table/`. The contract register (`ContractsList` in `contracts-screens.tsx`) is the reference implementation. Features keep their own columns, queries, filter meanings, permissions and row actions; the shared components hold no business logic.
+
+1. **Page header.** `PageHeader` with a title, a one-line description, and the page's primary action in `actions` (top right; wraps below the title on phones). Pass the action only to users allowed to use it.
+2. **Predefined filters.** `DataTableFilterChips`: toggle buttons (`aria-pressed`) for the module's real statuses or categories, with "All" first. Show a count only when it comes from the API (for example `meta.totalItems` of a one-row query with the list's own search and scope); leave it out rather than estimate.
+3. **Toolbar.** `DataTableToolbar`: `DataTableSearch` and `DataTableMoreFilters` on the left, table-level controls (such as Sort by) on the right. Below it, `DataTableActiveFilters` lists the other active filters, each removable, with Clear all once there are two.
+4. **Table.** `DataTable` with a `label` (its accessible name). `SortableTableHead` only for columns the API sorts by; it sets `aria-sort`. End with `ActionsTableHead` and a `DataTableRowActions` menu per row.
+5. **Pagination.** `DataPagination`, from the API's `meta`.
+
+Standards, set in the `Table` primitive or the shared components:
+
+| Element | Standard |
+|---|---|
+| Header | 44px, 12px semibold, subtle `bg-muted/50` surface |
+| Cells | 12px horizontal and vertical padding, 14px text; rows about 56–64px with a secondary line |
+| Frame | `rounded-xl` border; subtle row separators and hover |
+| Alignment | Text, references, parties and dates left; money, percentages and counts right with `tabular-nums`; actions right |
+| Long text | `whitespace-normal break-words` on the cells that need it (names, emails, addresses); the primitive doesn't wrap by default |
+
+Row actions:
+
+- **Secondary actions go in the three-dot menu** (`DataTableRowActions`). Keep at most one frequent primary action visible in the row (for example Restore on an archived contract, Edit on a site, Resend on an invitation).
+- **Offer only what the user's permissions allow.** The API still decides.
+- **Destructive items open the existing confirmation** (`ConfirmDialog`). End their label with "…".
+- **Rows are not clickable as a whole.** The record's name is the link, so an action menu never triggers navigation.
+
+Narrow screens: either show cards below `md` and the table from `md`, or keep one table and hide lower-priority columns (`hidden md:table-cell`), moving their text under the first cell. Use the single table when rows are deep-link targets (`id="activity-target-…"`), so each record has one element.
+
 Searching, filtering and sorting:
 
 - **Search** is server-side and runs as the user types, debounced by 300ms with `useDebouncedValue`. Pressing Enter in the box submits straight away.

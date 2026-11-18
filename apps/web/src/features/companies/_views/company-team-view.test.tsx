@@ -288,6 +288,27 @@ describe("CompanyTeamView", () => {
       'aria-label="View details and contract roles for Ada Obi"',
     );
     expect(markup).toContain("TEAM SUMMARY");
+    // The members table is named, and a row's actions sit in one menu.
+    expect(markup).toContain('aria-label="Company members"');
+    expect(markup).toContain('aria-label="Actions for Ada Obi"');
+  });
+
+  it("offers Retry when members or invitations fail to load", () => {
+    const failed = {
+      currentData: undefined,
+      isFetching: false,
+      error: { status: 500, data: {} },
+      isLoading: false,
+      refetch: vi.fn(),
+    };
+    mocks.getMembers.mockReturnValue(failed);
+    mocks.getInvitations.mockReturnValue(failed);
+
+    const markup = renderToStaticMarkup(<CompanyTeamView />);
+
+    expect(markup).toContain("Company members could not be loaded.");
+    expect(markup).toContain("Invitations could not be loaded.");
+    expect(markup.match(/>Retry<\/button>/g)).toHaveLength(2);
   });
 
   it("gives the page one <h1> and its sections <h2> headings", () => {

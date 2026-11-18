@@ -443,7 +443,7 @@ function DocumentList({
 
       {/* From md: a table. */}
       <div className="hidden overflow-x-auto md:block">
-        <Table>
+        <Table aria-label="Documents">
           <TableHeader>
             <TableRow>
               <TableHead>Document</TableHead>

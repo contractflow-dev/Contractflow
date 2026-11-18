@@ -50,6 +50,12 @@ import type { ICompanyMember } from "@contractflow/contracts-schema";
 import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
 import { DataPagination } from "@/components/pagination/data-pagination";
 import {
+  DataTableEmpty,
+  DataTableRowActions,
+  DataTableSkeleton,
+} from "@/components/data-table/data-table";
+import { DropdownMenuItem } from "@workspace/ui/components/dropdown-menu";
+import {
   StatusBadge,
   effectiveInvitationStatus,
 } from "@/components/status-badge/status-badge";
@@ -188,6 +194,7 @@ function TeamContent({ companyId }: { companyId: string }) {
     error: membersError,
     isLoading: membersInitialLoading,
     isFetching: membersFetching,
+    refetch: refetchMembers,
   } = useGetCompanyMembersQuery({
     companyId,
     page: memberPages.page,
@@ -205,6 +212,7 @@ function TeamContent({ companyId }: { companyId: string }) {
     error: invitationsError,
     isLoading: invitationsInitialLoading,
     isFetching: invitationsFetching,
+    refetch: refetchInvitations,
   } = useGetCompanyInvitationsQuery({
     companyId,
     page: invitationPages.page,
@@ -574,24 +582,22 @@ function TeamContent({ companyId }: { companyId: string }) {
           <CardContent className="p-0">
             {membersLoading ? (
               <div className="p-4">
-                <Alert role="status">
-                  <AlertDescription>Loading company members…</AlertDescription>
-                </Alert>
+                <DataTableSkeleton
+                  label="Loading company members…"
+                  columns={["Member", "Role", "Status", "Joined", ""]}
+                />
               </div>
             ) : membersError ? (
               <div className="p-4">
                 <ErrorPanel
                   error={membersError}
                   message="Company members could not be loaded."
+                  onRetry={() => void refetchMembers()}
                 />
               </div>
             ) : !members?.data.length ? (
               <div className="p-4">
-                <Alert role="status">
-                  <AlertDescription>
-                    No members match this search.
-                  </AlertDescription>
-                </Alert>
+                <DataTableEmpty title="No members match this search." />
               </div>
             ) : (
               <>
@@ -612,14 +618,14 @@ function TeamContent({ companyId }: { companyId: string }) {
 
                 {/* Desktop members table */}
                 <div className="hidden md:block">
-                  <Table>
-                    <TableHeader className="bg-muted/50 text-xs uppercase tracking-wide">
-                      <TableRow>
+                  <Table aria-label="Company members">
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
                         <TableHead className="px-4">Member</TableHead>
                         <TableHead className="px-4">Role</TableHead>
                         <TableHead className="px-4">Status</TableHead>
                         <TableHead className="px-4">Joined</TableHead>
-                        <TableHead className="px-4">
+                        <TableHead className="w-0 px-4 text-end">
                           <span className="sr-only">Actions</span>
                         </TableHead>
                       </TableRow>
@@ -628,7 +634,7 @@ function TeamContent({ companyId }: { companyId: string }) {
                     <TableBody>
                       {members.data.map((member) => (
                         <TableRow key={member.id}>
-                          <TableCell className="px-4 py-3">
+                          <TableCell className="min-w-44 px-4 py-3 whitespace-normal break-words">
                             <p className="font-medium">
                               {member.firstName} {member.lastName}
                             </p>
@@ -651,33 +657,30 @@ function TeamContent({ companyId }: { companyId: string }) {
                             <StatusBadge status={member.status} />
                           </TableCell>
 
-                          <TableCell className="px-4 py-3">
+                          <TableCell className="px-4 py-3 tabular-nums">
                             {formatDate(member.joinedAt, { timeZone })}
                           </TableCell>
 
-                          <TableCell className="px-4 py-3 text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
+                          <TableCell className="px-4 py-3 text-end">
+                            <DataTableRowActions
+                              label={`Actions for ${member.firstName} ${member.lastName}`}
+                            >
+                              <DropdownMenuItem
                                 onClick={() => setSelectedMember(member)}
-                                aria-label={`View details and contract roles for ${member.firstName} ${member.lastName}`}
                               >
-                                Details
-                              </Button>
-                              {member.status === ECompanyUserStatus.ACTIVE && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
+                                View details and contract roles
+                              </DropdownMenuItem>
+                              {/* Removing asks for confirmation first. */}
+                              {member.status === ECompanyUserStatus.ACTIVE ? (
+                                <DropdownMenuItem
+                                  variant="destructive"
                                   disabled={busyMemberId === member.id}
                                   onClick={() => requestRemoval(member)}
                                 >
-                                  {busyMemberId === member.id
-                                    ? "Saving…"
-                                    : "Remove"}
-                                </Button>
-                              )}
-                            </div>
+                                  Remove from company…
+                                </DropdownMenuItem>
+                              ) : null}
+                            </DataTableRowActions>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -728,28 +731,33 @@ function TeamContent({ companyId }: { companyId: string }) {
           />
         </div>
         {invitationsLoading ? (
-          <Alert role="status">
-            <AlertDescription>Loading invitations…</AlertDescription>
-          </Alert>
+          <DataTableSkeleton
+            label="Loading invitations…"
+            columns={["Recipient", "Role", "Status", "Expires", ""]}
+            rows={3}
+          />
         ) : invitationsError ? (
           <ErrorPanel
             error={invitationsError}
             message="Invitations could not be loaded."
+            onRetry={() => void refetchInvitations()}
           />
         ) : !invitations?.data.length ? (
-          <Alert role="status">
-            <AlertDescription>No invitations have been sent.</AlertDescription>
-          </Alert>
+          <DataTableEmpty title="No invitations have been sent." />
         ) : (
           <Card className="py-0">
-            <Table>
-              <TableHeader className="bg-muted/50 text-xs uppercase tracking-wide">
-                <TableRow>
+            <Table aria-label="Invitations">
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
                   <TableHead className="px-4">Recipient</TableHead>
-                  <TableHead className="px-4">Role</TableHead>
+                  <TableHead className="hidden px-4 sm:table-cell">
+                    Role
+                  </TableHead>
                   <TableHead className="px-4">Status</TableHead>
-                  <TableHead className="px-4">Expires</TableHead>
-                  <TableHead className="px-4">
+                  <TableHead className="hidden px-4 md:table-cell">
+                    Expires
+                  </TableHead>
+                  <TableHead className="w-0 px-4 text-end">
                     <span className="sr-only">Actions</span>
                   </TableHead>
                 </TableRow>
@@ -757,7 +765,7 @@ function TeamContent({ companyId }: { companyId: string }) {
               <TableBody>
                 {invitations.data.map((invitation) => (
                   <TableRow key={invitation.id}>
-                    <TableCell className="px-4 py-3">
+                    <TableCell className="min-w-40 px-4 py-3 whitespace-normal break-words">
                       {invitation.firstName || invitation.lastName
                         ? [invitation.firstName, invitation.lastName]
                             .filter(Boolean)
@@ -766,8 +774,14 @@ function TeamContent({ companyId }: { companyId: string }) {
                       <p className="text-xs text-muted-foreground">
                         {invitation.email}
                       </p>
+                      <p className="text-xs text-muted-foreground sm:hidden">
+                        {invitation.companyRole}
+                      </p>
+                      <p className="text-xs text-muted-foreground md:hidden">
+                        Expires {formatDate(invitation.expiresAt, { timeZone })}
+                      </p>
                     </TableCell>
-                    <TableCell className="px-4 py-3">
+                    <TableCell className="hidden px-4 py-3 sm:table-cell">
                       {invitation.companyRole}
                     </TableCell>
                     <TableCell className="px-4 py-3">
@@ -778,11 +792,11 @@ function TeamContent({ companyId }: { companyId: string }) {
                         )}
                       />
                     </TableCell>
-                    <TableCell className="px-4 py-3">
+                    <TableCell className="hidden px-4 py-3 tabular-nums md:table-cell">
                       {formatDate(invitation.expiresAt, { timeZone })}
                     </TableCell>
-                    <TableCell className="px-4 py-3 text-right">
-                      <div className="flex justify-end gap-2">
+                    <TableCell className="px-4 py-3 text-end">
+                      <div className="flex flex-wrap justify-end gap-2">
                         {(invitation.status === EInvitationStatus.PENDING ||
                           invitation.status === EInvitationStatus.EXPIRED) && (
                           <Button
@@ -997,12 +1011,23 @@ function MemberCard({
   );
 }
 
-function ErrorPanel({ error, message }: { error: unknown; message: string }) {
+function ErrorPanel({
+  error,
+  message,
+  onRetry,
+}: {
+  error: unknown;
+  message: string;
+  onRetry: () => void;
+}) {
   return (
     <Alert variant="destructive">
       <AlertTitle>{message}</AlertTitle>
-      <AlertDescription>
-        {getApiErrorMessage(error, "Please try again.")}
+      <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+        <span>{getApiErrorMessage(error, "Please try again.")}</span>
+        <Button type="button" variant="outline" onClick={onRetry}>
+          Retry
+        </Button>
       </AlertDescription>
     </Alert>
   );

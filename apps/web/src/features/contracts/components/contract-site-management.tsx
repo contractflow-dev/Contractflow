@@ -22,7 +22,13 @@ import {
   NativeSelectOption,
 } from "@workspace/ui/components/native-select";
 import {
-  Table,
+  ActionsTableHead,
+  DataTable,
+  DataTableEmpty,
+  DataTableError,
+  DataTableSkeleton,
+} from "@/components/data-table/data-table";
+import {
   TableBody,
   TableCell,
   TableHead,
@@ -116,43 +122,38 @@ export function ContractSiteManagement({
         ) : null}
 
         {sitesQuery.isLoading ? (
-          <p role="status" className="text-sm text-muted-foreground">
-            Loading sites…
-          </p>
+          <DataTableSkeleton
+            label="Loading sites…"
+            columns={["Site", "Address", "Coordinates", "Status", ""]}
+            rows={3}
+          />
         ) : sitesQuery.error ? (
-          <Alert variant="destructive">
-            <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
-              <span>
-                {getApiErrorMessage(
-                  sitesQuery.error,
-                  "Unable to load contract sites.",
-                )}
-              </span>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => void sitesQuery.refetch()}
-              >
-                Retry
-              </Button>
-            </AlertDescription>
-          </Alert>
+          <DataTableError
+            message={getApiErrorMessage(
+              sitesQuery.error,
+              "Unable to load contract sites.",
+            )}
+            onRetry={() => void sitesQuery.refetch()}
+          />
         ) : sitesQuery.currentData?.length ? (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Site</TableHead>
-                  <TableHead>Address</TableHead>
-                  <TableHead>Coordinates</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sitesQuery.currentData.map((site) => (
+          // One table at every width, so deep links keep a single target:
+          // phones show the address under the site, tablets drop coordinates.
+          <DataTable label="Contract sites">
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Site</TableHead>
+                <TableHead className="hidden md:table-cell">Address</TableHead>
+                <TableHead className="hidden lg:table-cell">
+                  Coordinates
+                </TableHead>
+                <TableHead>Status</TableHead>
+                <ActionsTableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sitesQuery.currentData.map((site) => {
+                const address = `${site.addressLine1}, ${site.city}, ${site.stateRegion}, ${countryName(site.countryCode)}`;
+                return (
                   <TableRow
                     key={site.id}
                     id={`activity-target-${site.id}`}
@@ -162,24 +163,26 @@ export function ContractSiteManagement({
                         : undefined
                     }
                   >
-                    <TableCell>
+                    <TableCell className="min-w-40 whitespace-normal break-words">
                       <span className="block font-medium">{site.name}</span>
                       <span className="text-xs text-muted-foreground">
                         {site.siteCode}
                       </span>
+                      <span className="mt-1 block text-xs text-muted-foreground md:hidden">
+                        {address}
+                      </span>
                     </TableCell>
-                    <TableCell>
-                      {site.addressLine1}, {site.city}, {site.stateRegion},{" "}
-                      {countryName(site.countryCode)}
+                    <TableCell className="hidden min-w-48 whitespace-normal break-words md:table-cell">
+                      {address}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap font-mono text-xs">
+                    <TableCell className="hidden font-mono text-xs lg:table-cell">
                       {fromMicroDegrees(site.latitudeE6)},{" "}
                       {fromMicroDegrees(site.longitudeE6)}
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={site.status} />
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-end">
                       <Button
                         type="button"
                         variant="outline"
@@ -191,14 +194,19 @@ export function ContractSiteManagement({
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                );
+              })}
+            </TableBody>
+          </DataTable>
         ) : (
-          <p className="text-sm text-muted-foreground">
-            No sites have been added to this contract.
-          </p>
+          <DataTableEmpty
+            title="No sites have been added to this contract."
+            description={
+              editing === null
+                ? "Add the locations where work on this contract takes place."
+                : undefined
+            }
+          />
         )}
       </CardContent>
     </Card>

@@ -24,7 +24,6 @@ import {
   NativeSelectOption,
 } from "@workspace/ui/components/native-select";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -32,6 +31,15 @@ import {
   TableRow,
 } from "@workspace/ui/components/table";
 import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
+import {
+  ActionsTableHead,
+  DataTable,
+  DataTableEmpty,
+  DataTableError,
+  DataTableRowActions,
+  DataTableSkeleton,
+} from "@/components/data-table/data-table";
+import { DropdownMenuItem } from "@workspace/ui/components/dropdown-menu";
 import {
   StatusBadge,
   effectiveInvitationStatus,
@@ -484,28 +492,31 @@ export function ContractRoleAssignmentManagement({
             </p>
           ) : null}
           {assignmentsQuery.error ? (
-            <Alert variant="destructive">
-              <AlertDescription>
-                {getApiErrorMessage(
-                  assignmentsQuery.error,
-                  "Unable to load contract role assignments.",
-                )}
-              </AlertDescription>
-            </Alert>
+            <DataTableError
+              message={getApiErrorMessage(
+                assignmentsQuery.error,
+                "Unable to load contract role assignments.",
+              )}
+              onRetry={() => void assignmentsQuery.refetch()}
+            />
           ) : null}
 
           {!fixedWorkspace ? null : assignmentsQuery.isLoading ? (
-            <p role="status" className="py-4 text-sm text-muted-foreground">
-              Loading role assignments…
-            </p>
+            <DataTableSkeleton
+              label="Loading role assignments…"
+              columns={["Member", "Role", "Assigned", ""]}
+              rows={3}
+            />
           ) : assignmentsQuery.data?.length ? (
-            <Table>
+            // Narrow enough for phones once the actions sit in a menu, so one
+            // table serves every width and deep links keep a single target.
+            <DataTable label="Role assignments">
               <TableHeader>
-                <TableRow>
+                <TableRow className="hover:bg-transparent">
                   <TableHead>Member</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Assigned</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <ActionsTableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -520,13 +531,13 @@ export function ContractRoleAssignmentManagement({
                         : undefined
                     }
                   >
-                    <TableCell>
+                    <TableCell className="min-w-40 whitespace-normal break-words">
                       <p className="font-medium">{memberName(assignment)}</p>
                       <p className="text-sm text-muted-foreground">
                         {assignment.email}
                       </p>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="whitespace-normal">
                       <p>{assignment.role}</p>
                       {assignment.isWorkspaceAdmin ? (
                         <p className="text-xs font-medium text-primary">
@@ -534,30 +545,28 @@ export function ContractRoleAssignmentManagement({
                         </p>
                       ) : null}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap">
+                    <TableCell className="tabular-nums">
                       {formatDate(assignment.assignedAt, { timeZone })}
                     </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-2">
+                    <TableCell className="text-end">
+                      <DataTableRowActions
+                        label={`Actions for ${memberName(assignment)}, ${assignment.role}`}
+                      >
                         {permissions.canGrantWorkspaceAdmin ? (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
+                          <DropdownMenuItem
                             disabled={workspaceAdminState.isLoading}
                             onClick={() =>
                               void changeWorkspaceAdmin(assignment, workspace)
                             }
                           >
                             {assignment.isWorkspaceAdmin
-                              ? "Remove admin"
+                              ? "Remove workspace admin"
                               : "Make workspace admin"}
-                          </Button>
+                          </DropdownMenuItem>
                         ) : null}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
+                        {/* Revoking asks for confirmation first. */}
+                        <DropdownMenuItem
+                          variant="destructive"
                           disabled={revokeState.isLoading}
                           onClick={() => {
                             setDialogError("");
@@ -565,18 +574,16 @@ export function ContractRoleAssignmentManagement({
                             setAssignmentToRevoke(assignment);
                           }}
                         >
-                          Revoke
-                        </Button>
-                      </div>
+                          Revoke role…
+                        </DropdownMenuItem>
+                      </DataTableRowActions>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </DataTable>
           ) : !assignmentsQuery.error ? (
-            <p className="py-4 text-sm text-muted-foreground">
-              No active roles are assigned in this workspace.
-            </p>
+            <DataTableEmpty title="No active roles are assigned in this workspace." />
           ) : null}
 
           <div className="space-y-4 border-t pt-5">
