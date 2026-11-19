@@ -372,242 +372,254 @@ export function DepartmentContracts({
             </ul>
           </section>
 
-          <section
-            aria-labelledby="department-contracts-heading"
-            className="space-y-4"
-          >
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <h2
-                id="department-contracts-heading"
-                className="type-section-title"
-              >
-                Contracts
-              </h2>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={exporting || data.meta.totalItems === 0}
-                aria-busy={exporting || undefined}
-                onClick={() => void exportCsv()}
-              >
-                <RiDownloadLine className="size-4" aria-hidden="true" />
-                {exporting ? "Exporting…" : "Export CSV"}
-              </Button>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.5fr)_repeat(4,minmax(0,1fr))] lg:items-end">
-              <form
-                role="search"
-                onSubmit={submitSearch}
-                className="sm:col-span-2 lg:col-span-1"
-              >
-                <Field>
-                  <FieldLabel htmlFor="department-search">Search</FieldLabel>
-                  <div className="flex gap-2">
-                    <Input
-                      id="department-search"
-                      type="search"
-                      maxLength={100}
-                      placeholder="Contract name or reference"
-                      value={searchInput}
-                      onChange={(event) => setSearchInput(event.target.value)}
-                    />
-                    <Button type="submit" variant="outline">
-                      Search
-                    </Button>
-                  </div>
-                </Field>
-              </form>
-              <FilterSelect
-                id="department-status"
-                label="Status"
-                value={filters.status ?? ""}
-                options={Object.values(EContractStatus).map((value) => ({
-                  value,
-                  label: humanizeEnumValue(value),
-                }))}
-                allLabel="All statuses"
-                onChange={(value) =>
-                  update({
-                    status: oneOf(Object.values(EContractStatus), value),
-                  })
-                }
-              />
-              <FilterSelect
-                id="department-party"
-                label="Our party type"
-                value={filters.partyType ?? ""}
-                options={Object.values(EPartyType).map((value) => ({
-                  value,
-                  label: PARTY_TYPE_LABELS[value],
-                }))}
-                allLabel="All party types"
-                onChange={(value) =>
-                  update({ partyType: oneOf(Object.values(EPartyType), value) })
-                }
-              />
-              <FilterSelect
-                id="department-waiting"
-                label="Waiting on"
-                value={filters.waitingOn ?? ""}
-                options={(["us", "others"] as const).map((value) => ({
-                  value,
-                  label: WAITING_LABELS[value],
-                }))}
-                allLabel="Anyone or nobody"
-                onChange={(value) =>
-                  update({ waitingOn: oneOf(["us", "others"] as const, value) })
-                }
-              />
-              <Field>
-                <FieldLabel htmlFor="department-sort">Sort</FieldLabel>
-                <NativeSelect
-                  id="department-sort"
-                  className="w-full"
-                  value={filters.sort}
-                  onChange={(event) =>
-                    update({
-                      sort:
-                        oneOf(
-                          Object.values(EDepartmentContractSort),
-                          event.target.value,
-                        ) ?? EDepartmentContractSort.WAITING_ON_US,
-                    })
-                  }
-                >
-                  {Object.values(EDepartmentContractSort).map((value) => (
-                    <NativeSelectOption key={value} value={value}>
-                      {SORT_LABELS[value]}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              </Field>
-            </div>
-            <Field orientation="horizontal" className="w-fit">
-              <Checkbox
-                id="department-archived"
-                checked={filters.includeArchived}
-                onCheckedChange={(checked) =>
-                  update({ includeArchived: checked === true })
-                }
-              />
-              <FieldLabel htmlFor="department-archived" className="font-normal">
-                Include archived contracts (read-only)
-              </FieldLabel>
-            </Field>
-
-            {data.data.length ? (
-              <Card className="gap-0 py-0">
-                <ul
-                  className="divide-y md:hidden"
-                  aria-label={`${label} contracts`}
-                >
-                  {data.data.map((row) => (
-                    <li key={row.contractId} className="space-y-3 p-4">
-                      <ContractCell row={row} />
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <PartyTypeBadge partyType={row.partyType} />
-                        <ContractStatus row={row} />
-                      </div>
-                      <dl className="grid gap-2 text-sm">
-                        <div>
-                          <dt className="text-xs text-muted-foreground">
-                            Our members
-                          </dt>
-                          <dd>
-                            <MembersCell row={row} department={department} />
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="text-xs text-muted-foreground">
-                            Workspace admin
-                          </dt>
-                          <dd>
-                            <AdminCell row={row} />
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="text-xs text-muted-foreground">
-                            Holding progress
-                          </dt>
-                          <dd>
-                            <BlockerCell row={row} />
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="text-xs text-muted-foreground">
-                            Last movement
-                          </dt>
-                          <dd>
-                            <MovementCell row={row} />
-                          </dd>
-                        </div>
-                      </dl>
-                      <RowActions row={row} department={department} />
-                    </li>
-                  ))}
-                </ul>
-                <div className="hidden overflow-x-auto md:block">
-                  <Table aria-label="Department contracts">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Contract</TableHead>
-                        <TableHead>Our party</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Our members</TableHead>
-                        <TableHead>Workspace admin</TableHead>
-                        <TableHead>Holding progress</TableHead>
-                        <TableHead>Last movement</TableHead>
-                        <TableHead>
-                          <span className="sr-only">Actions</span>
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {data.data.map((row) => (
-                        <TableRow key={row.contractId}>
-                          <TableCell className="max-w-64 whitespace-normal">
-                            <ContractCell row={row} />
-                          </TableCell>
-                          <TableCell>
-                            <PartyTypeBadge partyType={row.partyType} />
-                          </TableCell>
-                          <TableCell>
-                            <ContractStatus row={row} />
-                          </TableCell>
-                          <TableCell className="whitespace-normal">
-                            <MembersCell row={row} department={department} />
-                          </TableCell>
-                          <TableCell className="max-w-44 whitespace-normal">
-                            <AdminCell row={row} />
-                          </TableCell>
-                          <TableCell className="max-w-64 whitespace-normal">
-                            <BlockerCell row={row} />
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap">
-                            <MovementCell row={row} />
-                          </TableCell>
-                          <TableCell className="text-end">
-                            <RowActions row={row} department={department} />
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+          <section aria-labelledby="department-contracts-heading">
+            {/* One card holds the section: heading, export and filters in
+                its header strip, then the contracts. */}
+            <Card className="gap-0 py-0">
+              <div className="space-y-4 border-b p-4 sm:p-5">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <h2
+                    id="department-contracts-heading"
+                    className="font-heading text-base font-semibold"
+                  >
+                    Contracts
+                  </h2>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={exporting || data.meta.totalItems === 0}
+                    aria-busy={exporting || undefined}
+                    onClick={() => void exportCsv()}
+                  >
+                    <RiDownloadLine className="size-4" aria-hidden="true" />
+                    {exporting ? "Exporting…" : "Export CSV"}
+                  </Button>
                 </div>
-                <DataPagination
-                  className="border-t p-4"
-                  meta={data.meta}
-                  itemLabel="contracts"
-                  isFetching={contracts.isFetching}
-                  onPageChange={(page) => update({ page })}
-                  onPageSizeChange={(limit) => update({ limit })}
-                />
-              </Card>
-            ) : filtered ? (
-              <Card>
-                <CardContent className="space-y-3 text-center">
+
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.5fr)_repeat(4,minmax(0,1fr))] lg:items-end">
+                  <form
+                    role="search"
+                    onSubmit={submitSearch}
+                    className="sm:col-span-2 lg:col-span-1"
+                  >
+                    <Field>
+                      <FieldLabel htmlFor="department-search">
+                        Search
+                      </FieldLabel>
+                      <div className="flex gap-2">
+                        <Input
+                          id="department-search"
+                          type="search"
+                          maxLength={100}
+                          placeholder="Contract name or reference"
+                          value={searchInput}
+                          onChange={(event) =>
+                            setSearchInput(event.target.value)
+                          }
+                        />
+                        <Button type="submit" variant="outline">
+                          Search
+                        </Button>
+                      </div>
+                    </Field>
+                  </form>
+                  <FilterSelect
+                    id="department-status"
+                    label="Status"
+                    value={filters.status ?? ""}
+                    options={Object.values(EContractStatus).map((value) => ({
+                      value,
+                      label: humanizeEnumValue(value),
+                    }))}
+                    allLabel="All statuses"
+                    onChange={(value) =>
+                      update({
+                        status: oneOf(Object.values(EContractStatus), value),
+                      })
+                    }
+                  />
+                  <FilterSelect
+                    id="department-party"
+                    label="Our party type"
+                    value={filters.partyType ?? ""}
+                    options={Object.values(EPartyType).map((value) => ({
+                      value,
+                      label: PARTY_TYPE_LABELS[value],
+                    }))}
+                    allLabel="All party types"
+                    onChange={(value) =>
+                      update({
+                        partyType: oneOf(Object.values(EPartyType), value),
+                      })
+                    }
+                  />
+                  <FilterSelect
+                    id="department-waiting"
+                    label="Waiting on"
+                    value={filters.waitingOn ?? ""}
+                    options={(["us", "others"] as const).map((value) => ({
+                      value,
+                      label: WAITING_LABELS[value],
+                    }))}
+                    allLabel="Anyone or nobody"
+                    onChange={(value) =>
+                      update({
+                        waitingOn: oneOf(["us", "others"] as const, value),
+                      })
+                    }
+                  />
+                  <Field>
+                    <FieldLabel htmlFor="department-sort">Sort</FieldLabel>
+                    <NativeSelect
+                      id="department-sort"
+                      className="w-full"
+                      value={filters.sort}
+                      onChange={(event) =>
+                        update({
+                          sort:
+                            oneOf(
+                              Object.values(EDepartmentContractSort),
+                              event.target.value,
+                            ) ?? EDepartmentContractSort.WAITING_ON_US,
+                        })
+                      }
+                    >
+                      {Object.values(EDepartmentContractSort).map((value) => (
+                        <NativeSelectOption key={value} value={value}>
+                          {SORT_LABELS[value]}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                  </Field>
+                </div>
+                <Field orientation="horizontal" className="w-fit">
+                  <Checkbox
+                    id="department-archived"
+                    checked={filters.includeArchived}
+                    onCheckedChange={(checked) =>
+                      update({ includeArchived: checked === true })
+                    }
+                  />
+                  <FieldLabel
+                    htmlFor="department-archived"
+                    className="font-normal"
+                  >
+                    Include archived contracts (read-only)
+                  </FieldLabel>
+                </Field>
+              </div>
+
+              {data.data.length ? (
+                <>
+                  <ul
+                    className="divide-y md:hidden"
+                    aria-label={`${label} contracts`}
+                  >
+                    {data.data.map((row) => (
+                      <li key={row.contractId} className="space-y-3 p-4">
+                        <ContractCell row={row} />
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <PartyTypeBadge partyType={row.partyType} />
+                          <ContractStatus row={row} />
+                        </div>
+                        <dl className="grid gap-2 text-sm">
+                          <div>
+                            <dt className="text-xs text-muted-foreground">
+                              Our members
+                            </dt>
+                            <dd>
+                              <MembersCell row={row} department={department} />
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs text-muted-foreground">
+                              Workspace admin
+                            </dt>
+                            <dd>
+                              <AdminCell row={row} />
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs text-muted-foreground">
+                              Holding progress
+                            </dt>
+                            <dd>
+                              <BlockerCell row={row} />
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs text-muted-foreground">
+                              Last movement
+                            </dt>
+                            <dd>
+                              <MovementCell row={row} />
+                            </dd>
+                          </div>
+                        </dl>
+                        <RowActions row={row} department={department} />
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="hidden overflow-x-auto md:block">
+                    <Table aria-label="Department contracts">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Contract</TableHead>
+                          <TableHead>Our party</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Our members</TableHead>
+                          <TableHead>Workspace admin</TableHead>
+                          <TableHead>Holding progress</TableHead>
+                          <TableHead>Last movement</TableHead>
+                          <TableHead>
+                            <span className="sr-only">Actions</span>
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {data.data.map((row) => (
+                          <TableRow key={row.contractId}>
+                            <TableCell className="max-w-64 whitespace-normal">
+                              <ContractCell row={row} />
+                            </TableCell>
+                            <TableCell>
+                              <PartyTypeBadge partyType={row.partyType} />
+                            </TableCell>
+                            <TableCell>
+                              <ContractStatus row={row} />
+                            </TableCell>
+                            <TableCell className="whitespace-normal">
+                              <MembersCell row={row} department={department} />
+                            </TableCell>
+                            <TableCell className="max-w-44 whitespace-normal">
+                              <AdminCell row={row} />
+                            </TableCell>
+                            <TableCell className="max-w-64 whitespace-normal">
+                              <BlockerCell row={row} />
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              <MovementCell row={row} />
+                            </TableCell>
+                            <TableCell className="text-end">
+                              <RowActions row={row} department={department} />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <DataPagination
+                    className="border-t p-4"
+                    meta={data.meta}
+                    itemLabel="contracts"
+                    isFetching={contracts.isFetching}
+                    onPageChange={(page) => update({ page })}
+                    onPageSizeChange={(limit) => update({ limit })}
+                  />
+                </>
+              ) : filtered ? (
+                <div className="space-y-3 p-6 text-center">
                   <p className="text-sm text-muted-foreground">
                     No contracts match these filters.
                   </p>
@@ -617,11 +629,9 @@ export function DepartmentContracts({
                   >
                     Clear filters
                   </Link>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardContent className="space-y-3 text-center">
+                </div>
+              ) : (
+                <div className="space-y-3 p-6 text-center">
                   <h3 className="font-semibold">
                     No contracts have the {label} workspace yet
                   </h3>
@@ -635,9 +645,9 @@ export function DepartmentContracts({
                   >
                     Open contracts
                   </Link>
-                </CardContent>
-              </Card>
-            )}
+                </div>
+              )}
+            </Card>
           </section>
         </>
       ) : null}

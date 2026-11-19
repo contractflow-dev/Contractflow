@@ -22,7 +22,7 @@ describe("company navigation", () => {
       },
       {
         label: "Department workspaces",
-        items: ["Project", "HSE", "Finance"],
+        items: ["Departments"],
       },
       {
         label: undefined,
@@ -31,14 +31,34 @@ describe("company navigation", () => {
     ]);
   });
 
-  it("gives administrators live department pages, and members the planned items", () => {
+  it("gives Contracts its pages, with New contract only for administrators", () => {
+    const contracts = (canManage: boolean) =>
+      companyNavigationFor(canManage)
+        .flatMap(({ items }) => items)
+        .find(({ label }) => label === "Contracts")!;
+
+    expect(
+      contracts(true).children!.map(({ label, href }) => ({ label, href })),
+    ).toEqual([
+      { label: "Contract register", href: "/dashboards/contracts" },
+      { label: "New contract", href: "/dashboards/contracts/new" },
+    ]);
+    expect(contracts(false).children!.map(({ label }) => label)).toEqual([
+      "Contract register",
+    ]);
+  });
+
+  it("gives administrators a Departments module of live pages, and members the planned items", () => {
     const department = (canManage: boolean) =>
       companyNavigationFor(canManage).find(
         ({ label }) => label === "Department workspaces",
       )!.items;
 
+    const [module] = department(true);
+    expect(module.label).toBe("Departments");
+    expect(module.href).toBe("/dashboards/departments/project");
     expect(
-      department(true).map(({ label, href, plannedNote }) => ({
+      module.children!.map(({ label, href, plannedNote }) => ({
         label,
         href,
         planned: Boolean(plannedNote),
@@ -66,11 +86,25 @@ describe("company navigation", () => {
     ]);
   });
 
-  it("hides administrator pages from members", () => {
-    const items = companyNavigationFor(false).flatMap((group) => group.items);
-    expect(items.map((item) => item.label)).not.toContain("Overview");
-    expect(items.map((item) => item.label)).not.toContain("Team");
-    expect(items.map((item) => item.label)).toContain("Contracts");
+  it("hides administrator pages from members, in modules too", () => {
+    const items = companyNavigationFor(false).flatMap((group) =>
+      group.items.flatMap((item) => [item, ...(item.children ?? [])]),
+    );
+    const labels = items.map((item) => item.label);
+    expect(labels).not.toContain("Overview");
+    expect(labels).not.toContain("Team");
+    expect(labels).not.toContain("Departments");
+    expect(labels).not.toContain("New contract");
+    expect(labels).toContain("Contracts");
+  });
+
+  it("treats every module page an administrator may open as an administrator route", () => {
+    const adminOnly = COMPANY_NAVIGATION.filter(
+      (item) => item.adminOnly && !item.plannedNote,
+    ).map((item) => item.href);
+    expect(adminOnly).toContain("/dashboards/contracts/new");
+    expect(adminOnly).toContain("/dashboards/departments/hse");
+    expect(adminOnly).not.toContain("/dashboards/contracts");
   });
 
   it("marks every unbuilt destination as planned, so none links anywhere", () => {

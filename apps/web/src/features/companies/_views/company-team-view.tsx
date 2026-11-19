@@ -718,140 +718,157 @@ function TeamContent({ companyId }: { companyId: string }) {
 
       <CompanyContractRoles companyId={companyId} />
 
-      <section className="space-y-4">
-        <div>
-          <h2 className="type-section-title">Invitations</h2>
-          <p className="type-lead">
-            Invitations sent from this company and where each one stands.
-          </p>
-          <StatusLegendDisclosure
-            className="mt-1"
-            label="What do invitation statuses mean?"
-            items={invitationStatusLegend}
-          />
-        </div>
-        {invitationsLoading ? (
-          <DataTableSkeleton
-            label="Loading invitations…"
-            columns={["Recipient", "Role", "Status", "Expires", ""]}
-            rows={3}
-          />
-        ) : invitationsError ? (
-          <ErrorPanel
-            error={invitationsError}
-            message="Invitations could not be loaded."
-            onRetry={() => void refetchInvitations()}
-          />
-        ) : !invitations?.data.length ? (
-          <DataTableEmpty title="No invitations have been sent." />
-        ) : (
-          <Card className="py-0">
-            <Table aria-label="Invitations">
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="px-4">Recipient</TableHead>
-                  <TableHead className="hidden px-4 sm:table-cell">
-                    Role
-                  </TableHead>
-                  <TableHead className="px-4">Status</TableHead>
-                  <TableHead className="hidden px-4 md:table-cell">
-                    Expires
-                  </TableHead>
-                  <TableHead className="w-0 px-4 text-end">
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {invitations.data.map((invitation) => (
-                  <TableRow key={invitation.id}>
-                    <TableCell className="min-w-40 px-4 py-3 whitespace-normal break-words">
-                      {invitation.firstName || invitation.lastName
-                        ? [invitation.firstName, invitation.lastName]
-                            .filter(Boolean)
-                            .join(" ")
-                        : "Invitee"}
-                      <p className="text-xs text-muted-foreground">
-                        {invitation.email}
-                      </p>
-                      <p className="text-xs text-muted-foreground sm:hidden">
+      <section aria-labelledby="invitations-heading">
+        {/* One card holds the section: heading, description and status
+            legend in its header strip, then the invitations. */}
+        <Card className="gap-0 py-0">
+          <div className="space-y-1 border-b p-4 sm:p-5">
+            <h2
+              id="invitations-heading"
+              className="font-heading text-base font-semibold"
+            >
+              Invitations
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Invitations sent from this company and where each one stands.
+            </p>
+            <StatusLegendDisclosure
+              className="mt-1"
+              label="What do invitation statuses mean?"
+              items={invitationStatusLegend}
+            />
+          </div>
+          {invitationsLoading ? (
+            <div className="p-4">
+              <DataTableSkeleton
+                label="Loading invitations…"
+                columns={["Recipient", "Role", "Status", "Expires", ""]}
+                rows={3}
+              />
+            </div>
+          ) : invitationsError ? (
+            <div className="p-4">
+              <ErrorPanel
+                error={invitationsError}
+                message="Invitations could not be loaded."
+                onRetry={() => void refetchInvitations()}
+              />
+            </div>
+          ) : !invitations?.data.length ? (
+            <div className="p-4">
+              <DataTableEmpty title="No invitations have been sent." />
+            </div>
+          ) : (
+            <>
+              <Table aria-label="Invitations">
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="px-4">Recipient</TableHead>
+                    <TableHead className="hidden px-4 sm:table-cell">
+                      Role
+                    </TableHead>
+                    <TableHead className="px-4">Status</TableHead>
+                    <TableHead className="hidden px-4 md:table-cell">
+                      Expires
+                    </TableHead>
+                    <TableHead className="w-0 px-4 text-end">
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invitations.data.map((invitation) => (
+                    <TableRow key={invitation.id}>
+                      <TableCell className="min-w-40 px-4 py-3 whitespace-normal break-words">
+                        {invitation.firstName || invitation.lastName
+                          ? [invitation.firstName, invitation.lastName]
+                              .filter(Boolean)
+                              .join(" ")
+                          : "Invitee"}
+                        <p className="text-xs text-muted-foreground">
+                          {invitation.email}
+                        </p>
+                        <p className="text-xs text-muted-foreground sm:hidden">
+                          {invitation.companyRole}
+                        </p>
+                        <p className="text-xs text-muted-foreground md:hidden">
+                          Expires{" "}
+                          {formatDate(invitation.expiresAt, { timeZone })}
+                        </p>
+                      </TableCell>
+                      <TableCell className="hidden px-4 py-3 sm:table-cell">
                         {invitation.companyRole}
-                      </p>
-                      <p className="text-xs text-muted-foreground md:hidden">
-                        Expires {formatDate(invitation.expiresAt, { timeZone })}
-                      </p>
-                    </TableCell>
-                    <TableCell className="hidden px-4 py-3 sm:table-cell">
-                      {invitation.companyRole}
-                    </TableCell>
-                    <TableCell className="px-4 py-3">
-                      <StatusBadge
-                        status={effectiveInvitationStatus(
-                          invitation.status,
-                          invitation.expiresAt,
-                        )}
-                      />
-                    </TableCell>
-                    <TableCell className="hidden px-4 py-3 tabular-nums md:table-cell">
-                      {formatDate(invitation.expiresAt, { timeZone })}
-                    </TableCell>
-                    <TableCell className="px-4 py-3 text-end">
-                      <div className="flex flex-wrap justify-end gap-2">
-                        {(invitation.status === EInvitationStatus.PENDING ||
-                          invitation.status === EInvitationStatus.EXPIRED) && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={
-                              Boolean(resendingInvitationId) ||
-                              busyInvitationId === invitation.id
-                            }
-                            onClick={() =>
-                              void resend(invitation.id, invitation.email)
-                            }
-                            aria-label={`Send the invitation to ${invitation.email} again`}
-                          >
-                            {resendingInvitationId === invitation.id
-                              ? "Sending…"
-                              : "Resend"}
-                          </Button>
-                        )}
-                        {invitation.status === EInvitationStatus.PENDING &&
-                          new Date(invitation.expiresAt) > new Date() && (
+                      </TableCell>
+                      <TableCell className="px-4 py-3">
+                        <StatusBadge
+                          status={effectiveInvitationStatus(
+                            invitation.status,
+                            invitation.expiresAt,
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell className="hidden px-4 py-3 tabular-nums md:table-cell">
+                        {formatDate(invitation.expiresAt, { timeZone })}
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-end">
+                        <div className="flex flex-wrap justify-end gap-2">
+                          {(invitation.status === EInvitationStatus.PENDING ||
+                            invitation.status ===
+                              EInvitationStatus.EXPIRED) && (
                             <Button
-                              variant="outline"
+                              variant="ghost"
                               size="sm"
-                              disabled={busyInvitationId === invitation.id}
-                              onClick={() =>
-                                requestRevocation(
-                                  invitation.id,
-                                  invitation.email,
-                                )
+                              disabled={
+                                Boolean(resendingInvitationId) ||
+                                busyInvitationId === invitation.id
                               }
+                              onClick={() =>
+                                void resend(invitation.id, invitation.email)
+                              }
+                              aria-label={`Send the invitation to ${invitation.email} again`}
                             >
-                              {busyInvitationId === invitation.id
-                                ? "Revoking…"
-                                : "Revoke"}
+                              {resendingInvitationId === invitation.id
+                                ? "Sending…"
+                                : "Resend"}
                             </Button>
                           )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            <CardFooter className="border-t py-3">
-              <DataPagination
-                className="w-full"
-                meta={invitations.meta}
-                itemLabel="invitations"
-                isFetching={invitationsFetching}
-                onPageChange={invitationPages.setPage}
-                onPageSizeChange={invitationPages.setLimit}
-              />
-            </CardFooter>
-          </Card>
-        )}
+                          {invitation.status === EInvitationStatus.PENDING &&
+                            new Date(invitation.expiresAt) > new Date() && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={busyInvitationId === invitation.id}
+                                onClick={() =>
+                                  requestRevocation(
+                                    invitation.id,
+                                    invitation.email,
+                                  )
+                                }
+                              >
+                                {busyInvitationId === invitation.id
+                                  ? "Revoking…"
+                                  : "Revoke"}
+                              </Button>
+                            )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <CardFooter className="border-t py-3">
+                <DataPagination
+                  className="w-full"
+                  meta={invitations.meta}
+                  itemLabel="invitations"
+                  isFetching={invitationsFetching}
+                  onPageChange={invitationPages.setPage}
+                  onPageSizeChange={invitationPages.setLimit}
+                />
+              </CardFooter>
+            </>
+          )}
+        </Card>
       </section>
 
       <ConfirmDialog

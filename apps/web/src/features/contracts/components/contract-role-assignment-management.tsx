@@ -23,21 +23,12 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from "@workspace/ui/components/native-select";
-import {
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@workspace/ui/components/table";
 import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
 import {
-  ActionsTableHead,
   DataTable,
   DataTableEmpty,
-  DataTableError,
   DataTableRowActions,
-  DataTableSkeleton,
+  type DataTableColumn,
 } from "@/components/data-table/data-table";
 import { DropdownMenuItem } from "@workspace/ui/components/dropdown-menu";
 import {
@@ -68,6 +59,45 @@ const workspaceOptions: AssignableContractWorkspace[] = [
   "hse",
   "finance",
 ];
+
+/** A workspace's role assignments, with dates in the viewer's time zone. */
+function assignmentColumns(
+  timeZone: string | undefined,
+): ReadonlyArray<DataTableColumn<ContractRoleAssignment>> {
+  return [
+    {
+      id: "member",
+      header: "Member",
+      wrap: true,
+      className: "min-w-40",
+      cell: (assignment) => (
+        <>
+          <p className="font-medium">{memberName(assignment)}</p>
+          <p className="text-sm text-muted-foreground">{assignment.email}</p>
+        </>
+      ),
+    },
+    {
+      id: "role",
+      header: "Role",
+      wrap: true,
+      cell: (assignment) => (
+        <>
+          <p>{assignment.role}</p>
+          {assignment.isWorkspaceAdmin ? (
+            <p className="text-xs font-medium text-primary">Workspace Admin</p>
+          ) : null}
+        </>
+      ),
+    },
+    {
+      id: "assigned",
+      header: "Assigned",
+      className: "tabular-nums",
+      cell: (assignment) => formatDate(assignment.assignedAt, { timeZone }),
+    },
+  ];
+}
 
 const memberName = (assignment: ContractRoleAssignment) =>
   `${assignment.firstName} ${assignment.lastName}`.trim() || assignment.email;
@@ -491,99 +521,68 @@ export function ContractRoleAssignmentManagement({
               No active company members are available to assign.
             </p>
           ) : null}
-          {assignmentsQuery.error ? (
-            <DataTableError
-              message={getApiErrorMessage(
-                assignmentsQuery.error,
-                "Unable to load contract role assignments.",
-              )}
-              onRetry={() => void assignmentsQuery.refetch()}
-            />
-          ) : null}
-
-          {!fixedWorkspace ? null : assignmentsQuery.isLoading ? (
-            <DataTableSkeleton
-              label="Loading role assignments…"
-              columns={["Member", "Role", "Assigned", ""]}
-              rows={3}
-            />
-          ) : assignmentsQuery.data?.length ? (
+          {fixedWorkspace ? (
             // Narrow enough for phones once the actions sit in a menu, so one
             // table serves every width and deep links keep a single target.
-            <DataTable label="Role assignments">
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>Member</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Assigned</TableHead>
-                  <ActionsTableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {assignmentsQuery.data.map((assignment) => (
-                  <TableRow
-                    key={assignment.id}
-                    id={`activity-target-${assignment.id}`}
-                    className={
-                      target?.type === "contract_role_assignment" &&
-                      target.id === assignment.id
-                        ? "bg-primary/10"
-                        : undefined
-                    }
+            <DataTable
+              label="Role assignments"
+              columns={assignmentColumns(timeZone)}
+              rows={assignmentsQuery.data ?? []}
+              getRowKey={(assignment) => assignment.id}
+              getRowProps={(assignment) => ({
+                id: `activity-target-${assignment.id}`,
+                className:
+                  target?.type === "contract_role_assignment" &&
+                  target.id === assignment.id
+                    ? "bg-primary/10"
+                    : undefined,
+              })}
+              rowActions={(assignment) => (
+                <DataTableRowActions
+                  label={`Actions for ${memberName(assignment)}, ${assignment.role}`}
+                >
+                  {permissions.canGrantWorkspaceAdmin ? (
+                    <DropdownMenuItem
+                      disabled={workspaceAdminState.isLoading}
+                      onClick={() =>
+                        void changeWorkspaceAdmin(assignment, workspace)
+                      }
+                    >
+                      {assignment.isWorkspaceAdmin
+                        ? "Remove workspace admin"
+                        : "Make workspace admin"}
+                    </DropdownMenuItem>
+                  ) : null}
+                  {/* Revoking asks for confirmation first. */}
+                  <DropdownMenuItem
+                    variant="destructive"
+                    disabled={revokeState.isLoading}
+                    onClick={() => {
+                      setDialogError("");
+                      setRevokeWorkspace(workspace);
+                      setAssignmentToRevoke(assignment);
+                    }}
                   >
-                    <TableCell className="min-w-40 whitespace-normal break-words">
-                      <p className="font-medium">{memberName(assignment)}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {assignment.email}
-                      </p>
-                    </TableCell>
-                    <TableCell className="whitespace-normal">
-                      <p>{assignment.role}</p>
-                      {assignment.isWorkspaceAdmin ? (
-                        <p className="text-xs font-medium text-primary">
-                          Workspace Admin
-                        </p>
-                      ) : null}
-                    </TableCell>
-                    <TableCell className="tabular-nums">
-                      {formatDate(assignment.assignedAt, { timeZone })}
-                    </TableCell>
-                    <TableCell className="text-end">
-                      <DataTableRowActions
-                        label={`Actions for ${memberName(assignment)}, ${assignment.role}`}
-                      >
-                        {permissions.canGrantWorkspaceAdmin ? (
-                          <DropdownMenuItem
-                            disabled={workspaceAdminState.isLoading}
-                            onClick={() =>
-                              void changeWorkspaceAdmin(assignment, workspace)
-                            }
-                          >
-                            {assignment.isWorkspaceAdmin
-                              ? "Remove workspace admin"
-                              : "Make workspace admin"}
-                          </DropdownMenuItem>
-                        ) : null}
-                        {/* Revoking asks for confirmation first. */}
-                        <DropdownMenuItem
-                          variant="destructive"
-                          disabled={revokeState.isLoading}
-                          onClick={() => {
-                            setDialogError("");
-                            setRevokeWorkspace(workspace);
-                            setAssignmentToRevoke(assignment);
-                          }}
-                        >
-                          Revoke role…
-                        </DropdownMenuItem>
-                      </DataTableRowActions>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </DataTable>
-          ) : !assignmentsQuery.error ? (
-            <DataTableEmpty title="No active roles are assigned in this workspace." />
+                    Revoke role…
+                  </DropdownMenuItem>
+                </DataTableRowActions>
+              )}
+              isLoading={assignmentsQuery.isLoading}
+              loadingLabel="Loading role assignments…"
+              skeletonRows={3}
+              error={
+                assignmentsQuery.error
+                  ? getApiErrorMessage(
+                      assignmentsQuery.error,
+                      "Unable to load contract role assignments.",
+                    )
+                  : null
+              }
+              onRetry={() => void assignmentsQuery.refetch()}
+              empty={
+                <DataTableEmpty title="No active roles are assigned in this workspace." />
+              }
+            />
           ) : null}
 
           <div className="space-y-4 border-t pt-5">

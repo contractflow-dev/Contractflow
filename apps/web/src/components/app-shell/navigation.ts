@@ -16,6 +16,14 @@ export interface AppNavItem {
    * note as its description, and never links anywhere.
    */
   plannedNote?: string;
+  /**
+   * The module's own pages, shown in the secondary sidebar while one of them
+   * is open. `href` is then the module's landing page, normally its first
+   * page. Only real, built routes belong here.
+   */
+  children?: readonly AppNavItem[];
+  /** A line under the module's name in the secondary sidebar. */
+  description?: string;
 }
 
 export interface AppNavGroup {
@@ -24,8 +32,68 @@ export interface AppNavGroup {
   items: readonly AppNavItem[];
 }
 
-export function isNavItemActive(pathname: string, item: AppNavItem): boolean {
+/** Whether the path is the item's own page or, for `section`, below it. */
+function matchesHref(pathname: string, item: AppNavItem): boolean {
   if (item.plannedNote) return false;
   if (pathname === item.href) return true;
   return item.match !== "exact" && pathname.startsWith(`${item.href}/`);
+}
+
+/**
+ * The page of a module the path belongs to. When several match, as
+ * `/dashboards/contracts` and `/dashboards/contracts/new` both do for the new
+ * contract page, the most specific one wins, so only one is ever active.
+ */
+export function activeNavChild(
+  pathname: string,
+  children: readonly AppNavItem[],
+): AppNavItem | null {
+  let best: AppNavItem | null = null;
+  for (const child of children) {
+    if (
+      matchesHref(pathname, child) &&
+      (!best || child.href.length > best.href.length)
+    ) {
+      best = child;
+    }
+  }
+  return best;
+}
+
+/** Whether the path is this item's page, or one of its module's pages. */
+export function isNavItemActive(pathname: string, item: AppNavItem): boolean {
+  if (item.plannedNote) return false;
+  if (item.children?.length) {
+    return (
+      activeNavChild(pathname, item.children) !== null ||
+      matchesHref(pathname, item)
+    );
+  }
+  return matchesHref(pathname, item);
+}
+
+/**
+ * The module whose secondary sidebar belongs to this path: the first item
+ * with pages of its own that the path is in. Null on pages that stand alone,
+ * such as the overview, so the primary sidebar shows in full there.
+ */
+export function activeNavModule(
+  pathname: string,
+  groups: readonly AppNavGroup[],
+): AppNavItem | null {
+  for (const group of groups) {
+    for (const item of group.items) {
+      if (item.children?.length && isNavItemActive(pathname, item)) {
+        return item;
+      }
+    }
+  }
+  return null;
+}
+
+/** Every destination, modules' pages included, for route-wide checks. */
+export function flattenNavItems(
+  items: readonly AppNavItem[],
+): readonly AppNavItem[] {
+  return items.flatMap((item) => [item, ...(item.children ?? [])]);
 }
