@@ -24,6 +24,12 @@ export interface AppNavItem {
   children?: readonly AppNavItem[];
   /** A line under the module's name in the secondary sidebar. */
   description?: string;
+  /**
+   * A module entry that opens a dialog on the page already open instead of
+   * going to a page of its own: it links to that page with `?dialog=<name>`,
+   * and the page opens the dialog from the URL. It is never the active page.
+   */
+  dialog?: string;
 }
 
 export interface AppNavGroup {
@@ -34,7 +40,7 @@ export interface AppNavGroup {
 
 /** Whether the path is the item's own page or, for `section`, below it. */
 function matchesHref(pathname: string, item: AppNavItem): boolean {
-  if (item.plannedNote) return false;
+  if (item.plannedNote || item.dialog) return false;
   if (pathname === item.href) return true;
   return item.match !== "exact" && pathname.startsWith(`${item.href}/`);
 }

@@ -297,6 +297,23 @@ export function formatMoneyMinor(
   }).format(decimal as unknown as number);
 }
 
+/**
+ * A stored amount as an amount field shows it for editing: the currency's
+ * decimals, with grouping commas ("150000050" in NGN is "1,500,000.50").
+ * `parseDecimalToMinor` reads it back to the same amount. Null for an amount
+ * the fields can't hold (negative, malformed) or an unknown currency.
+ */
+export function minorToDecimalInput(
+  amountMinor: MinorAmount,
+  currencyCode: string,
+): string | null {
+  const digits = currencyDigits(currencyCode);
+  if (digits === null) return null;
+  const amount = validateMinorAmount(amountMinor);
+  if (!amount.valid || amount.amount < BigInt(0)) return null;
+  return groupDecimalInput(minorToDecimal(amount.amount, digits));
+}
+
 /** A plain decimal number as typed: digits, then optionally "." and digits. */
 const DECIMAL_TEXT = /^(\d+)(?:\.(\d+))?$/;
 
@@ -375,6 +392,19 @@ export function parsePercentToBasisPoints(text: string): number | null {
   if (fraction.length > 2 || whole.length > 3) return null;
   const basisPoints = Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
   return basisPoints <= 10_000 ? basisPoints : null;
+}
+
+/**
+ * Basis points as a percentage field shows them for editing (500 is "5",
+ * 1250 is "12.5", 1225 is "12.25"), exactly: `parsePercentToBasisPoints`
+ * reads it back to the same number.
+ */
+export function basisPointsToPercentInput(basisPoints: number): string {
+  const whole = Math.trunc(basisPoints / 100);
+  const fraction = String(basisPoints % 100)
+    .padStart(2, "0")
+    .replace(/0$/, "");
+  return basisPoints % 100 ? `${whole}.${fraction}` : String(whole);
 }
 
 /** Formats a count or quantity with locale grouping. */

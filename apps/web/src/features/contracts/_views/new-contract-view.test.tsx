@@ -70,9 +70,12 @@ describe("NewContractView", () => {
         "listitem",
       ),
     ).toHaveLength(4);
-    expect(screen.getByRole("heading", { level: 2 }).textContent).toBe(
-      "Step 1 of 4: Basics",
-    );
+    // The step list names the current step.
+    expect(
+      screen
+        .getByRole("list", { name: "Steps" })
+        .querySelector('[aria-current="step"]')?.textContent,
+    ).toContain("Basics");
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 

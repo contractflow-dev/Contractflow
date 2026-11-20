@@ -426,7 +426,7 @@ describe("contract screen headings", () => {
     );
 
     expect(markup).toMatch(/<h1[^>]*>Contract Register<\/h1>/);
-    expect(markup).toContain("<h2>Contracts</h2>");
+    expect(markup).toMatch(/<h2[^>]*>Contracts<\/h2>/);
     expect(headingProblems(markup)).toEqual([]);
     // The archived filter's labelled checkbox is covered, opened, in
     // contracts-list.form.test.tsx: it lives in the More filters popover.

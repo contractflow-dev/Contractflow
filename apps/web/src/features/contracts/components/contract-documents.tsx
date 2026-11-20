@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Controller,
   FormProvider,
@@ -19,12 +19,13 @@ import { RiHistoryLine } from "@remixicon/react";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@workspace/ui/components/card";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@workspace/ui/components/dialog";
 import { Input } from "@workspace/ui/components/input";
 import {
   NativeSelect,
@@ -47,6 +48,7 @@ import {
   TableRow,
 } from "@workspace/ui/components/table";
 import { Textarea } from "@workspace/ui/components/textarea";
+import { ListCard } from "@/components/data-table/list-card";
 import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
 import {
   FormField,
@@ -247,36 +249,22 @@ function DocumentLibrary({
   const canUpload = canAdd && !noAccess && !documents.isLoading;
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4">
-        <div>
-          <CardTitle>
-            <h2>Documents</h2>
-          </CardTitle>
-          <CardDescription>{description}</CardDescription>
-        </div>
-        {canUpload && form === null ? (
-          <Button type="button" onClick={() => setForm({ kind: "new" })}>
-            Upload document
-          </Button>
-        ) : null}
-      </CardHeader>
-      <CardContent className="space-y-5">
-        {form?.kind === "new" ? (
-          <NewDocumentForm
-            scope={scope}
-            shared={shared}
-            onDone={() => setForm(null)}
-          />
-        ) : form?.kind === "version" ? (
-          <NewVersionForm
-            key={form.document.id}
-            scope={scope}
-            document={form.document}
-            onDone={() => setForm(null)}
-          />
-        ) : null}
-
+    <>
+      <ListCard
+        title="Documents"
+        description={description}
+        action={
+          canUpload ? (
+            <Button
+              type="button"
+              aria-haspopup="dialog"
+              onClick={() => setForm({ kind: "new" })}
+            >
+              Upload document
+            </Button>
+          ) : null
+        }
+      >
         {documents.isLoading ? (
           <div
             role="status"
@@ -367,7 +355,7 @@ function DocumentLibrary({
             </p>
           </div>
         )}
-      </CardContent>
+      </ListCard>
       <DeleteDocumentDialog
         scope={scope}
         document={deleting}
@@ -387,7 +375,65 @@ function DocumentLibrary({
         }
         onClose={() => setVersionsFor(null)}
       />
-    </Card>
+      <DocumentFormDialog
+        scope={scope}
+        shared={shared}
+        form={form}
+        onClose={() => setForm(null)}
+      />
+    </>
+  );
+}
+
+/**
+ * Uploading a document or a new version, in a dialog over the list. While a
+ * file is uploading the dialog can't be closed (Escape, an outside click or
+ * its close button), so an upload is never cut off half-way.
+ */
+function DocumentFormDialog({
+  scope,
+  shared,
+  form,
+  onClose,
+}: {
+  scope: Scope;
+  shared: boolean;
+  form: { kind: "new" } | { kind: "version"; document: DocumentSummary } | null;
+  onClose: () => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const close = () => {
+    setUploading(false);
+    onClose();
+  };
+  return (
+    <Dialog
+      open={form !== null}
+      disablePointerDismissal={uploading}
+      onOpenChange={(open) => {
+        if (!open && !uploading) close();
+      }}
+    >
+      <DialogContent className="sm:max-w-xl" showCloseButton={!uploading}>
+        {/* Remounted on every open, so each starts empty. */}
+        {form?.kind === "new" ? (
+          <NewDocumentForm
+            scope={scope}
+            shared={shared}
+            onBusyChange={setUploading}
+            onDone={close}
+          />
+        ) : form?.kind === "version" ? (
+          <NewVersionForm
+            key={form.document.id}
+            scope={scope}
+            document={form.document}
+            onBusyChange={setUploading}
+            onDone={close}
+          />
+        ) : null}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -590,6 +636,7 @@ function DocumentActions({
             size="sm"
             variant="ghost"
             aria-label={`Upload a new version of ${document.title}`}
+            aria-haspopup="dialog"
             onClick={onNewVersion}
           >
             New version
@@ -859,13 +906,17 @@ function useDocumentUpload(scope: Scope) {
 function NewDocumentForm({
   scope,
   shared,
+  onBusyChange,
   onDone,
 }: {
   scope: Scope;
   shared: boolean;
+  /** Told whether a file is uploading, so the dialog stays open meanwhile. */
+  onBusyChange: (busy: boolean) => void;
   onDone: () => void;
 }) {
   const { upload, step, label, error } = useDocumentUpload(scope);
+  useEffect(() => onBusyChange(step !== null), [step, onBusyChange]);
   const methods = useForm<NewDocumentValues>({
     resolver: zodResolver(newDocumentSchema),
     mode: "onSubmit",
@@ -899,12 +950,17 @@ function NewDocumentForm({
         noValidate
         onSubmit={handleSubmit(onSubmit)}
         aria-label="Upload a document"
-        className="space-y-5 rounded-2xl border p-4 sm:p-5"
+        className="space-y-5"
       >
-        <div className="space-y-1">
-          <h3 className="type-subsection-title">Upload a document</h3>
-          <RequiredFieldsNote />
-        </div>
+        <DialogHeader>
+          <DialogTitle>Upload a document</DialogTitle>
+          <DialogDescription>
+            {shared
+              ? "Choose who it's shared with. You can upload new versions later; earlier ones stay in its history."
+              : "Kept private from the companies you work with. You can upload new versions later."}
+          </DialogDescription>
+        </DialogHeader>
+        <RequiredFieldsNote />
         <FormGrid columns={2}>
           <FormField
             id="document-title"
@@ -990,13 +1046,17 @@ function NewDocumentForm({
 function NewVersionForm({
   scope,
   document,
+  onBusyChange,
   onDone,
 }: {
   scope: Scope;
   document: DocumentSummary;
+  /** Told whether a file is uploading, so the dialog stays open meanwhile. */
+  onBusyChange: (busy: boolean) => void;
   onDone: () => void;
 }) {
   const { upload, step, label, error } = useDocumentUpload(scope);
+  useEffect(() => onBusyChange(step !== null), [step, onBusyChange]);
   const methods = useForm<NewVersionValues>({
     resolver: zodResolver(newVersionSchema),
     mode: "onSubmit",
@@ -1024,16 +1084,16 @@ function NewVersionForm({
         noValidate
         onSubmit={methods.handleSubmit(onSubmit)}
         aria-label={`Upload a new version of ${document.title}`}
-        className="space-y-5 rounded-2xl border p-4 sm:p-5"
+        className="space-y-5"
       >
-        <div className="space-y-1">
-          <h3 className="type-subsection-title break-words">
+        <DialogHeader>
+          <DialogTitle className="break-words">
             New version of {document.title}
-          </h3>
-          <p className="text-xs text-muted-foreground">
+          </DialogTitle>
+          <DialogDescription>
             The current file stays in the version history.
-          </p>
-        </div>
+          </DialogDescription>
+        </DialogHeader>
         <FileFields idPrefix="version" />
         <UploadFooter
           step={step}
@@ -1127,14 +1187,7 @@ function UploadFooter({
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="submit"
-          disabled={step !== null}
-          aria-busy={step !== null || undefined}
-        >
-          {label ?? submitLabel}
-        </Button>
+      <DialogFooter>
         <Button
           type="button"
           variant="outline"
@@ -1143,7 +1196,14 @@ function UploadFooter({
         >
           Cancel
         </Button>
-      </div>
+        <Button
+          type="submit"
+          disabled={step !== null}
+          aria-busy={step !== null || undefined}
+        >
+          {label ?? submitLabel}
+        </Button>
+      </DialogFooter>
     </>
   );
 }

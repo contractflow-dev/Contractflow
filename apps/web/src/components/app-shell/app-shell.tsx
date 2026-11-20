@@ -420,10 +420,14 @@ function ModulePages({
         const Icon = page.icon;
         const active = page === current;
         return (
-          <li key={page.href}>
+          <li key={page.dialog ?? page.href}>
             <Link
-              href={page.href}
+              // A dialog entry opens over the page already open.
+              href={
+                page.dialog ? `${pathname}?dialog=${page.dialog}` : page.href
+              }
               aria-current={active ? "page" : undefined}
+              aria-haspopup={page.dialog ? "dialog" : undefined}
               onClick={onNavigate}
               className={cn(
                 "relative flex min-h-9 items-center gap-2.5 rounded-xl px-2.5 text-sm outline-none transition-colors focus-visible:ring-3 focus-visible:ring-sidebar-ring motion-reduce:transition-none",

@@ -24,9 +24,8 @@ describe("CreateContractWizard", () => {
     const markup = wizard();
 
     expect(markup).toContain('aria-label="New draft contract"');
-    expect(markup).toMatch(
-      /<h2[^>]*tabindex="-1"[^>]*>Step 1 of 4: Basics<\/h2>/,
-    );
+    // The step list names the step; no "Step 1 of 4" heading repeats it.
+    expect(markup).not.toContain("Step 1 of 4");
     const steps = [...markup.matchAll(/<li[^>]*>[\s\S]*?<\/li>/g)].map(
       (match) => match[0],
     );

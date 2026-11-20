@@ -42,6 +42,11 @@ export const CONTRACTS_PATH = "/dashboards/contracts";
 /** The page for creating a draft contract, for Company Administrators. */
 export const NEW_CONTRACT_PATH = `${CONTRACTS_PATH}/new`;
 
+/** The page for editing a contract's details, for its managing company. */
+export function contractEditHref(contractId: string): string {
+  return `${CONTRACTS_PATH}/${encodeURIComponent(contractId)}/edit`;
+}
+
 export function contractSectionHref(
   contractId: string,
   section: ContractSection,

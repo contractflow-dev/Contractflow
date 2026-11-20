@@ -4,25 +4,15 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { ECompanyUserStatus } from "@contractflow/contracts-schema";
-import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
-import { Card } from "@workspace/ui/components/card";
 import { Field, FieldLabel } from "@workspace/ui/components/field";
 import {
   NativeSelect,
   NativeSelectOption,
 } from "@workspace/ui/components/native-select";
-import { Skeleton } from "@workspace/ui/components/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@workspace/ui/components/table";
-import { DataPagination } from "@/components/pagination/data-pagination";
+import { DataTable, DataTableEmpty } from "@/components/data-table/data-table";
+import { ListCard } from "@/components/data-table/list-card";
 import { contractSectionHref } from "@/features/contracts/contract-sections";
 import { useUserTimeZone } from "@/hooks/use-user-time-zone";
 import { getApiErrorMessage } from "@/lib/apiError";
@@ -63,7 +53,7 @@ export function CompanyContractRoles({ companyId }: { companyId: string }) {
     if (next) params.set("workspace", next);
     else params.delete("workspace");
     const query = params.toString();
-    router.replace(`${pathname}${query ? `?${query}` : ""}#contract-roles`, {
+    router.replace(`${pathname}${query ? `?${query}` : ""}`, {
       scroll: false,
     });
   };
@@ -94,213 +84,185 @@ export function CompanyContractRoles({ companyId }: { companyId: string }) {
   };
 
   return (
-    <section
-      id="contract-roles"
-      aria-labelledby="contract-roles-heading"
-      className="scroll-mt-24"
-    >
-      {/* One card holds the section: its heading, action and filters sit in
-          the card's header strip, above the list. */}
-      <Card className="gap-0 py-0">
-        <div className="space-y-4 border-b p-4 sm:p-5">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div className="space-y-1">
-              <h2
-                id="contract-roles-heading"
-                className="font-heading text-base font-semibold"
-              >
-                Contract roles
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Roles your members hold on your company&apos;s contracts.
-                Company membership alone gives no contract access: each role
-                opens one workspace of one contract.
-              </p>
-            </div>
-            <Button type="button" onClick={() => setAssigning(true)}>
-              Assign a contract role
-            </Button>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 lg:max-w-2xl">
-            <Field>
-              <FieldLabel htmlFor="contract-roles-member">Member</FieldLabel>
-              <NativeSelect
-                id="contract-roles-member"
-                className="w-full"
-                value={member}
-                onChange={(event) => {
-                  setMember(event.target.value);
-                  setPage(1);
-                }}
-              >
-                <NativeSelectOption value="">All members</NativeSelectOption>
-                {(members.currentData?.data ?? []).map((option) => (
-                  <NativeSelectOption key={option.id} value={option.id}>
-                    {`${option.firstName} ${option.lastName}`.trim() ||
-                      option.email}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="contract-roles-workspace">
-                Workspace
-              </FieldLabel>
-              <NativeSelect
-                id="contract-roles-workspace"
-                className="w-full"
-                value={workspace}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setWorkspace(WORKSPACES.find((w) => w === value) ?? "");
-                  setPage(1);
-                }}
-              >
-                <NativeSelectOption value="">All workspaces</NativeSelectOption>
-                {WORKSPACES.map((option) => (
-                  <NativeSelectOption key={option} value={option}>
-                    {humanizeEnumValue(option)}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
-            </Field>
-          </div>
-        </div>
-        {roles.isLoading ? (
-          <div
-            role="status"
-            aria-label="Loading contract roles"
-            className="space-y-3 p-4"
-          >
-            {[0, 1, 2].map((row) => (
-              <Skeleton key={row} className="h-12 w-full" />
-            ))}
-            <span className="sr-only">Loading contract roles…</span>
-          </div>
-        ) : roles.error ? (
-          <div className="p-4">
-            <Alert variant="destructive">
-              <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
-                <span>
-                  {getApiErrorMessage(
-                    roles.error,
-                    "Contract roles could not be loaded.",
-                  )}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => void roles.refetch()}
-                >
-                  Retry
-                </Button>
-              </AlertDescription>
-            </Alert>
-          </div>
-        ) : data?.data.length ? (
+    <>
+      <ListCard
+        id="contract-roles"
+        headingId="contract-roles-heading"
+        title="Role assignments"
+        description={
           <>
-            {/* Phones: one card per role. */}
-            <ul className="divide-y md:hidden">
-              {data.data.map((row) => (
-                <li key={row.id} className="space-y-2 p-4">
-                  <RoleMember row={row} />
-                  <RoleContract row={row} />
-                  <p className="flex flex-wrap items-center gap-1.5 text-sm">
-                    {row.role} · {humanizeEnumValue(row.workspace)}
+            Roles your members hold on your company&apos;s contracts. Company
+            membership alone gives no contract access: each role opens one
+            workspace of one contract.
+          </>
+        }
+        action={
+          <Button type="button" onClick={() => setAssigning(true)}>
+            Assign a contract role
+          </Button>
+        }
+      >
+        <div className="grid gap-3 sm:grid-cols-2 lg:max-w-2xl">
+          <Field>
+            <FieldLabel htmlFor="contract-roles-member">Member</FieldLabel>
+            <NativeSelect
+              id="contract-roles-member"
+              className="w-full"
+              value={member}
+              onChange={(event) => {
+                setMember(event.target.value);
+                setPage(1);
+              }}
+            >
+              <NativeSelectOption value="">All members</NativeSelectOption>
+              {(members.currentData?.data ?? []).map((option) => (
+                <NativeSelectOption key={option.id} value={option.id}>
+                  {`${option.firstName} ${option.lastName}`.trim() ||
+                    option.email}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="contract-roles-workspace">
+              Workspace
+            </FieldLabel>
+            <NativeSelect
+              id="contract-roles-workspace"
+              className="w-full"
+              value={workspace}
+              onChange={(event) => {
+                const value = event.target.value;
+                setWorkspace(WORKSPACES.find((w) => w === value) ?? "");
+                setPage(1);
+              }}
+            >
+              <NativeSelectOption value="">All workspaces</NativeSelectOption>
+              {WORKSPACES.map((option) => (
+                <NativeSelectOption key={option} value={option}>
+                  {humanizeEnumValue(option)}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </Field>
+        </div>
+
+        <DataTable
+          label="Contract roles"
+          columns={[
+            {
+              id: "member",
+              header: "Member",
+              wrap: true,
+              cell: (row) => <RoleMember row={row} />,
+            },
+            {
+              id: "contract",
+              header: "Contract",
+              wrap: true,
+              className: "max-w-72",
+              cell: (row) => <RoleContract row={row} />,
+            },
+            {
+              id: "role",
+              header: "Role",
+              wrap: true,
+              cell: (row) => (
+                <>
+                  <p>{row.role}</p>
+                  <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                    {humanizeEnumValue(row.workspace)}
                     {row.isWorkspaceAdmin ? (
                       <Badge variant="info">Workspace admin</Badge>
                     ) : null}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    Assigned {formatDate(row.assignedAt, { timeZone })}
-                  </p>
-                  <ContractRoleActions companyId={companyId} row={row} />
-                </li>
-              ))}
-            </ul>
-            {/* From md: a table. */}
-            <div className="hidden overflow-x-auto md:block">
-              <Table aria-label="Contract roles">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Member</TableHead>
-                    <TableHead>Contract</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Assigned</TableHead>
-                    <TableHead>
-                      <span className="sr-only">Actions</span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.data.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell className="whitespace-normal">
-                        <RoleMember row={row} />
-                      </TableCell>
-                      <TableCell className="max-w-72 whitespace-normal">
-                        <RoleContract row={row} />
-                      </TableCell>
-                      <TableCell className="whitespace-normal">
-                        <p>{row.role}</p>
-                        <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                          {humanizeEnumValue(row.workspace)}
-                          {row.isWorkspaceAdmin ? (
-                            <Badge variant="info">Workspace admin</Badge>
-                          ) : null}
-                        </p>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        {formatDate(row.assignedAt, { timeZone })}
-                      </TableCell>
-                      <TableCell className="text-end">
-                        <ContractRoleActions companyId={companyId} row={row} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            <DataPagination
-              className="border-t p-4"
-              meta={data.meta}
-              itemLabel="roles"
-              isFetching={roles.isFetching}
-              onPageChange={setPage}
-              onPageSizeChange={(size) => {
-                setLimit(size);
-                setPage(1);
-              }}
-            />
-          </>
-        ) : filtered ? (
-          <div className="space-y-3 p-6 text-center">
-            <p className="text-sm text-muted-foreground">
-              No contract roles match these filters.
-            </p>
-            <Button type="button" variant="outline" onClick={clearFilters}>
-              Clear filters
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-2 p-6 text-center">
-            <h3 className="font-semibold">No contract roles yet</h3>
-            <p className="mx-auto max-w-prose text-sm leading-6 text-muted-foreground">
-              Members get access to a contract&apos;s workspace when you assign
-              them a role there. Use “Assign a contract role” to give the first
-              one.
-            </p>
-          </div>
-        )}
-      </Card>
+                </>
+              ),
+            },
+            {
+              id: "assigned",
+              header: "Assigned",
+              className: "tabular-nums",
+              cell: (row) => formatDate(row.assignedAt, { timeZone }),
+            },
+          ]}
+          rows={data?.data ?? []}
+          getRowKey={(row) => row.id}
+          rowActions={(row) => (
+            <ContractRoleActions companyId={companyId} row={row} />
+          )}
+          renderCard={(row) => (
+            <>
+              <RoleMember row={row} />
+              <RoleContract row={row} />
+              <p className="flex flex-wrap items-center gap-1.5 text-sm">
+                {row.role} · {humanizeEnumValue(row.workspace)}
+                {row.isWorkspaceAdmin ? (
+                  <Badge variant="info">Workspace admin</Badge>
+                ) : null}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Assigned {formatDate(row.assignedAt, { timeZone })}
+              </p>
+              <ContractRoleActions companyId={companyId} row={row} />
+            </>
+          )}
+          isLoading={roles.isLoading}
+          loadingLabel="Loading contract roles…"
+          skeletonRows={3}
+          error={
+            roles.error
+              ? getApiErrorMessage(
+                  roles.error,
+                  "Contract roles could not be loaded.",
+                )
+              : null
+          }
+          onRetry={() => void roles.refetch()}
+          empty={
+            filtered ? (
+              <DataTableEmpty
+                title="No contract roles match these filters."
+                action={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={clearFilters}
+                  >
+                    Clear filters
+                  </Button>
+                }
+              />
+            ) : (
+              <DataTableEmpty
+                title="No contract roles yet"
+                description="Members get access to a contract’s workspace when you assign them a role there. Use “Assign a contract role” to give the first one."
+              />
+            )
+          }
+          pagination={
+            data
+              ? {
+                  meta: data.meta,
+                  itemLabel: "roles",
+                  isFetching: roles.isFetching,
+                  onPageChange: setPage,
+                  onPageSizeChange: (size) => {
+                    setLimit(size);
+                    setPage(1);
+                  },
+                }
+              : undefined
+          }
+        />
+      </ListCard>
 
       <AssignContractRoleDialog
         companyId={companyId}
         open={assigning}
         onOpenChange={setAssigning}
       />
-    </section>
+    </>
   );
 }
 

@@ -44,7 +44,12 @@ function useCreateContractForm() {
 }
 
 /** Step 1: what the contract is. */
-export function ContractBasicsFields() {
+export function ContractBasicsFields({
+  referenceLocked = false,
+}: {
+  /** Editing: the reference is fixed once the contract exists. */
+  referenceLocked?: boolean;
+} = {}) {
   const {
     register,
     formState: { errors },
@@ -58,7 +63,11 @@ export function ContractBasicsFields() {
           id={fieldId("referenceNumber")}
           label="Reference number"
           required
-          description="Your organization's reference for this contract, up to 40 characters."
+          description={
+            referenceLocked
+              ? "The reference can't change once the contract exists."
+              : "Your organization's reference for this contract, up to 40 characters."
+          }
           error={fieldErrors?.referenceNumber?.message}
         >
           {(control) => (
@@ -67,6 +76,7 @@ export function ContractBasicsFields() {
               {...register("basics.referenceNumber")}
               maxLength={40}
               autoComplete="off"
+              readOnly={referenceLocked}
             />
           )}
         </FormField>
@@ -125,10 +135,17 @@ export function ContractPartiesFields({
   parentContracts,
   parentContractsLoading,
   parentContractsError,
+  editing = false,
 }: {
   parentContracts: Array<Pick<Contract, "id" | "referenceNumber" | "title">>;
   parentContractsLoading: boolean;
   parentContractsError?: unknown;
+  /**
+   * Editing an existing contract: only the parent contract changes here.
+   * The party type is set at creation and workspaces have their own
+   * controls on the contract's Overview.
+   */
+  editing?: boolean;
 }) {
   const {
     control: formControl,
@@ -141,31 +158,37 @@ export function ContractPartiesFields({
   return (
     <>
       <FormSection
-        legend="Contract parties"
-        description="Other companies are invited to the contract after the draft is created."
+        legend={editing ? "Parent contract" : "Contract parties"}
+        description={
+          editing
+            ? "Your company's party type is set when the contract is created. Workspaces are managed on the contract's Overview."
+            : "Other companies are invited to the contract after the draft is created."
+        }
       >
         <FormGrid columns={2}>
-          <FormField
-            id={fieldId("partyType")}
-            label="Your company's party type"
-            required
-            description="The role your company has in this contract."
-            error={fieldErrors?.partyType?.message}
-          >
-            {(control) => (
-              <NativeSelect
-                {...control}
-                {...register("parties.partyType")}
-                className="w-full"
-              >
-                {Object.values(EPartyType).map((value) => (
-                  <NativeSelectOption key={value} value={value}>
-                    {humanizeEnumValue(value)}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
-            )}
-          </FormField>
+          {editing ? null : (
+            <FormField
+              id={fieldId("partyType")}
+              label="Your company's party type"
+              required
+              description="The role your company has in this contract."
+              error={fieldErrors?.partyType?.message}
+            >
+              {(control) => (
+                <NativeSelect
+                  {...control}
+                  {...register("parties.partyType")}
+                  className="w-full"
+                >
+                  {Object.values(EPartyType).map((value) => (
+                    <NativeSelectOption key={value} value={value}>
+                      {humanizeEnumValue(value)}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              )}
+            </FormField>
+          )}
           <FormField
             id={fieldId("parentContractId")}
             label="Parent contract"
@@ -202,56 +225,66 @@ export function ContractPartiesFields({
         </FormGrid>
       </FormSection>
 
-      <FormSection
-        legend="Workspaces"
-        description="Choose the workspaces this contract uses. You can change them later on the contract page."
-      >
-        <Controller
-          control={formControl}
-          name="parties.workspaces"
-          render={({ field }) => (
-            <div className="flex flex-wrap gap-x-6 gap-y-3">
-              {contractWorkspaces.map((workspace) => {
-                const id = `${workspaceFieldId}-${workspace}`;
-                return (
-                  <Field
-                    orientation="horizontal"
-                    className="w-fit"
-                    key={workspace}
-                  >
-                    <Checkbox
-                      id={id}
-                      checked={field.value.includes(workspace)}
-                      onCheckedChange={(checked) =>
-                        field.onChange(
-                          checked
-                            ? contractWorkspaces.filter(
-                                (candidate) =>
-                                  candidate === workspace ||
-                                  field.value.includes(candidate),
-                              )
-                            : field.value.filter(
-                                (candidate) => candidate !== workspace,
-                              ),
-                        )
-                      }
-                    />
-                    <FieldLabel htmlFor={id} className="font-normal">
-                      {humanizeEnumValue(workspace)}
-                    </FieldLabel>
-                  </Field>
-                );
-              })}
-            </div>
-          )}
-        />
-      </FormSection>
+      {editing ? null : (
+        <FormSection
+          legend="Workspaces"
+          description="Choose the workspaces this contract uses. You can change them later on the contract page."
+        >
+          <Controller
+            control={formControl}
+            name="parties.workspaces"
+            render={({ field }) => (
+              <div className="flex flex-wrap gap-x-6 gap-y-3">
+                {contractWorkspaces.map((workspace) => {
+                  const id = `${workspaceFieldId}-${workspace}`;
+                  return (
+                    <Field
+                      orientation="horizontal"
+                      className="w-fit"
+                      key={workspace}
+                    >
+                      <Checkbox
+                        id={id}
+                        checked={field.value.includes(workspace)}
+                        onCheckedChange={(checked) =>
+                          field.onChange(
+                            checked
+                              ? contractWorkspaces.filter(
+                                  (candidate) =>
+                                    candidate === workspace ||
+                                    field.value.includes(candidate),
+                                )
+                              : field.value.filter(
+                                  (candidate) => candidate !== workspace,
+                                ),
+                          )
+                        }
+                      />
+                      <FieldLabel htmlFor={id} className="font-normal">
+                        {humanizeEnumValue(workspace)}
+                      </FieldLabel>
+                    </Field>
+                  );
+                })}
+              </div>
+            )}
+          />
+        </FormSection>
+      )}
     </>
   );
 }
 
 /** Step 3: value, currency, payment terms and rates. */
-export function ContractCommercialFields() {
+export function ContractCommercialFields({
+  valueLocked = false,
+}: {
+  /**
+   * Editing a contract past draft: its original value and currency are
+   * fixed (the API refuses to change the value; the currency stays with it).
+   */
+  valueLocked?: boolean;
+} = {}) {
   const {
     control: formControl,
     register,
@@ -317,27 +350,42 @@ export function ContractCommercialFields() {
           id={fieldId("currencyCode")}
           label="Currency"
           required
+          description={
+            valueLocked
+              ? "Fixed with the original value once the contract left draft."
+              : undefined
+          }
           error={fieldErrors?.currencyCode?.message}
         >
-          {(control) => (
-            <NativeSelect
-              {...control}
-              {...register("commercial.currencyCode")}
-              className="w-full"
-            >
-              {Object.values(ECurrencyCode).map((value) => (
-                <NativeSelectOption key={value} value={value}>
-                  {value}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          )}
+          {(control) =>
+            valueLocked ? (
+              // Shown, not registered: the form keeps the contract's
+              // currency, which the update request then leaves out.
+              <Input {...control} value={currencyCode} readOnly />
+            ) : (
+              <NativeSelect
+                {...control}
+                {...register("commercial.currencyCode")}
+                className="w-full"
+              >
+                {Object.values(ECurrencyCode).map((value) => (
+                  <NativeSelectOption key={value} value={value}>
+                    {value}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            )
+          }
         </FormField>
         <FormField
           id={fieldId("originalValue")}
           label="Original contract value"
           required
-          description={amountHint(originalValue)}
+          description={
+            valueLocked
+              ? `${amountHint(originalValue)} It can't change once the contract has left draft; approved variations change its current value.`
+              : amountHint(originalValue)
+          }
           error={fieldErrors?.originalValue?.message}
         >
           {(control) => (
@@ -347,6 +395,7 @@ export function ContractCommercialFields() {
               inputMode="decimal"
               autoComplete="off"
               placeholder="0.00"
+              readOnly={valueLocked}
             />
           )}
         </FormField>
