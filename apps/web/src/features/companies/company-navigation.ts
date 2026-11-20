@@ -5,10 +5,14 @@ import {
   RiFileList3Line,
   RiFolderShield2Line,
   RiGroupLine,
+  RiMailSendLine,
   RiOrganizationChart,
   RiQuestionLine,
   RiSettings3Line,
+  RiShieldUserLine,
   RiTaskLine,
+  RiTeamLine,
+  RiUserAddLine,
 } from "@remixicon/react";
 import {
   flattenNavItems,
@@ -24,6 +28,14 @@ export type CompanyNavItem = Omit<AppNavItem, "children"> & {
   /** The module's pages, each with its own visibility. */
   children?: readonly CompanyNavItem[];
 };
+
+/** The Team module's pages. */
+export const TEAM_PATH = "/dashboards/team";
+export const TEAM_CONTRACT_ROLES_PATH = "/dashboards/team/contract-roles";
+
+/** The dialogs the Team pages open from `?dialog=`. */
+export const TEAM_DIALOGS = ["invitations", "invite"] as const;
+export type TeamDialog = (typeof TEAM_DIALOGS)[number];
 
 /** The department page that looks at one contract workspace. */
 export function departmentHref(
@@ -166,10 +178,41 @@ export const COMPANY_NAVIGATION_GROUPS: ReadonlyArray<{
   {
     items: [
       {
-        href: "/dashboards/team",
+        href: TEAM_PATH,
         label: "Team",
         icon: RiGroupLine,
         adminOnly: true,
+        description: "Company members, their contract roles and invitations.",
+        children: [
+          {
+            href: TEAM_PATH,
+            label: "Company members",
+            icon: RiTeamLine,
+            match: "exact",
+            adminOnly: true,
+          },
+          {
+            href: TEAM_CONTRACT_ROLES_PATH,
+            label: "Contract roles",
+            icon: RiShieldUserLine,
+            adminOnly: true,
+          },
+          // Dialogs over the Team page that is open; see teamDialogs.
+          {
+            href: TEAM_PATH,
+            label: "Invitations",
+            icon: RiMailSendLine,
+            dialog: "invitations",
+            adminOnly: true,
+          },
+          {
+            href: TEAM_PATH,
+            label: "Invite member",
+            icon: RiUserAddLine,
+            dialog: "invite",
+            adminOnly: true,
+          },
+        ],
       },
       {
         href: "/dashboards/profile",

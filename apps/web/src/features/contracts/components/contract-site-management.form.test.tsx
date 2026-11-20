@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   EContractSiteStatus,
@@ -59,6 +65,90 @@ beforeEach(() => {
   mocks.updateSite.mockResolvedValue({ data: {} });
 });
 afterEach(cleanup);
+
+describe("site form side sheet", () => {
+  function setup() {
+    const user = userEvent.setup({ delay: null });
+    render(
+      <ContractSiteManagement companyId="company-1" contract={contract} />,
+    );
+    return user;
+  }
+
+  it("adds a site in a side sheet, leaving the table where it is", async () => {
+    const user = setup();
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    const add = screen.getByRole("button", { name: "Add site" });
+    expect(add.getAttribute("aria-haspopup")).toBe("dialog");
+    await user.click(add);
+
+    const sheet = await screen.findByRole("dialog", { name: "Add a site" });
+    expect(
+      within(sheet).getByRole("form", { name: "Add a site" }),
+    ).toBeTruthy();
+    expect(within(sheet).getByLabelText(/Site name/)).toBeTruthy();
+    // The table keeps its rows; nothing opened inside the card.
+    const table = screen.getByRole("table", {
+      name: "Contract sites",
+      hidden: true,
+    });
+    expect(within(table).getAllByRole("row", { hidden: true })).toHaveLength(2);
+  });
+
+  it("edits a site in the sheet, filled in from the site", async () => {
+    const user = setup();
+    await user.click(
+      screen.getByRole("button", { name: "Edit site North yard" }),
+    );
+    const sheet = await screen.findByRole("dialog", {
+      name: "Edit North yard",
+    });
+    expect(
+      (within(sheet).getByLabelText(/Site name/) as HTMLInputElement).value,
+    ).toBe("North yard");
+  });
+
+  it("isn't closed by a click outside, so a half-filled form isn't lost", async () => {
+    const user = setup();
+    await user.click(screen.getByRole("button", { name: "Add site" }));
+    const sheet = await screen.findByRole("dialog", { name: "Add a site" });
+    await user.type(within(sheet).getByLabelText(/Site name/), "South yard");
+
+    const overlay = document.querySelector<HTMLElement>(
+      '[data-slot="sheet-overlay"]',
+    )!;
+    await user.click(overlay);
+    expect(screen.getByRole("dialog", { name: "Add a site" })).toBeTruthy();
+    expect((screen.getByLabelText(/Site name/) as HTMLInputElement).value).toBe(
+      "South yard",
+    );
+  });
+
+  it("closes with Escape or Cancel", async () => {
+    const user = setup();
+    await user.click(screen.getByRole("button", { name: "Add site" }));
+    await screen.findByRole("dialog");
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    await user.click(screen.getByRole("button", { name: "Add site" }));
+    const sheet = await screen.findByRole("dialog");
+    await user.click(within(sheet).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("closes once the site is saved", async () => {
+    const user = setup();
+    await user.click(
+      screen.getByRole("button", { name: "Edit site North yard" }),
+    );
+    await screen.findByRole("dialog");
+    await user.click(screen.getByRole("button", { name: "Save site" }));
+    await waitFor(() => expect(mocks.updateSite).toHaveBeenCalledOnce());
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+});
 
 describe("Contract site address", () => {
   it("edits a site's state and sends the canonical name with the ISO code", async () => {

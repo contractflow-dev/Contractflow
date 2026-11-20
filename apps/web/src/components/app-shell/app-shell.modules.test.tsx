@@ -93,6 +93,12 @@ const navigation: AppNavGroup[] = [
             href: "/dashboards/departments/hse",
             label: "HSE",
             icon: RiOrganizationChart,
+          }, // Opens a dialog over the page that is open.
+          {
+            href: "/dashboards/departments/project",
+            label: "Staffing",
+            icon: RiOrganizationChart,
+            dialog: "staffing",
           },
         ],
       },
@@ -193,6 +199,23 @@ describe("desktop navigation", () => {
       .getAllByRole("link")
       .filter((link) => link.getAttribute("aria-current") === "page");
     expect(current.map((link) => link.textContent)).toEqual(["New contract"]);
+  });
+
+  it("links a dialog entry to the open page with ?dialog=, never as the current page", () => {
+    setup("/dashboards/departments/hse");
+    const staffing = within(pagesNav("Departments")!).getByRole("link", {
+      name: "Staffing",
+    });
+    expect(staffing.getAttribute("href")).toBe(
+      "/dashboards/departments/hse?dialog=staffing",
+    );
+    expect(staffing.getAttribute("aria-haspopup")).toBe("dialog");
+    expect(staffing.getAttribute("aria-current")).toBeNull();
+    expect(
+      within(pagesNav("Departments")!)
+        .getByRole("link", { name: "HSE" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
   });
 
   it("swaps the module sidebar when the route moves to another module, and closes it on the overview", () => {

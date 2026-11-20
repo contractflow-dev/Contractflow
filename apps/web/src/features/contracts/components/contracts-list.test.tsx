@@ -130,7 +130,7 @@ describe("ContractsList", () => {
     expect(heading).toBeGreaterThanOrEqual(0);
     // Everything else is inside the register's card, after the page title.
     const card = markup.indexOf('data-slot="card"');
-    const cardTitle = markup.search(/<h2>Contracts<\/h2>/);
+    const cardTitle = markup.search(/<h2[^>]*>Contracts<\/h2>/);
     expect(card).toBeGreaterThan(heading);
     expect(cardTitle).toBeGreaterThan(card);
     expect(markup.slice(heading, card)).not.toContain("Manage and monitor");

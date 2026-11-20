@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest";
+import {
+  activeNavChild,
+  activeNavModule,
+} from "@/components/app-shell/navigation";
 import { COMPANY_NAVIGATION, companyNavigationFor } from "./company-navigation";
 
 const labels = (groups: ReturnType<typeof companyNavigationFor>) =>
@@ -46,6 +50,39 @@ describe("company navigation", () => {
     expect(contracts(false).children!.map(({ label }) => label)).toEqual([
       "Contract register",
     ]);
+  });
+
+  it("gives Team two pages and two dialogs, and a dialog is never the open page", () => {
+    const groups = companyNavigationFor(true);
+    const team = groups
+      .flatMap(({ items }) => items)
+      .find(({ label }) => label === "Team")!;
+    expect(
+      team.children!.map(({ label, href, dialog }) => ({
+        label,
+        href,
+        dialog,
+      })),
+    ).toEqual([
+      { label: "Company members", href: "/dashboards/team", dialog: undefined },
+      {
+        label: "Contract roles",
+        href: "/dashboards/team/contract-roles",
+        dialog: undefined,
+      },
+      { label: "Invitations", href: "/dashboards/team", dialog: "invitations" },
+      { label: "Invite member", href: "/dashboards/team", dialog: "invite" },
+    ]);
+
+    expect(activeNavModule("/dashboards/team/contract-roles", groups)).toBe(
+      team,
+    );
+    expect(activeNavChild("/dashboards/team", team.children!)?.label).toBe(
+      "Company members",
+    );
+    expect(
+      activeNavChild("/dashboards/team/contract-roles", team.children!)?.label,
+    ).toBe("Contract roles");
   });
 
   it("gives administrators a Departments module of live pages, and members the planned items", () => {
@@ -104,6 +141,7 @@ describe("company navigation", () => {
     ).map((item) => item.href);
     expect(adminOnly).toContain("/dashboards/contracts/new");
     expect(adminOnly).toContain("/dashboards/departments/hse");
+    expect(adminOnly).toContain("/dashboards/team/contract-roles");
     expect(adminOnly).not.toContain("/dashboards/contracts");
   });
 

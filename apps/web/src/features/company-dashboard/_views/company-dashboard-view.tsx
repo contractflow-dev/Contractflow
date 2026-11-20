@@ -48,9 +48,13 @@ import { useGetCurrentUserQuery } from "@/services/authApi";
 import { CompanyAdminShell } from "@/features/companies/CompanyAdminShell";
 import { CompanyVerificationNotice } from "@/features/companies/company-verification-notice";
 import { departmentHref } from "@/features/companies/company-navigation";
+import { TEAM_PATH } from "@/features/companies/company-navigation";
 import { departmentStaffingHref } from "@/features/companies/departments";
 import { NEW_CONTRACT_PATH } from "@/features/contracts/contract-sections";
 import { IncomingContractInvitations } from "@/features/contracts/components/incoming-contract-invitations";
+
+/** The Team page with its Invite member dialog open. */
+const TEAM_INVITE_HREF = `${TEAM_PATH}?dialog=invite`;
 
 export function CompanyDashboardView() {
   return (
@@ -416,7 +420,7 @@ function QuickActions({ data }: { data: ICompanyDashboardResponse }) {
               {pendingInvitationCount === 1 ? "" : "s"}.
             </p>
             <Link
-              href="/dashboards/team"
+              href={TEAM_INVITE_HREF}
               className="mt-auto inline-flex items-center gap-1.5 self-start text-sm font-medium text-primary underline-offset-4 group-hover/card:text-card-foreground group-hover/card:underline hover:underline"
             >
               Invite members
@@ -483,7 +487,7 @@ function RecentActivity({
                 Create a contract
               </Link>
               <Link
-                href="/dashboards/team"
+                href={TEAM_INVITE_HREF}
                 className={buttonVariants({ variant: "outline" })}
               >
                 Invite your team

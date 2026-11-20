@@ -209,14 +209,14 @@ describe("CompanyDashboardView", () => {
     expect(markup).not.toContain("Workspace planned");
     expect(markup).not.toContain('href="#planned');
     expect(
-      markup.split('href="/dashboards/team?workspace=project#contract-roles"')
+      markup.split('href="/dashboards/team/contract-roles?workspace=project"')
         .length - 1,
     ).toBe(1);
     expect(markup).toContain(
-      'href="/dashboards/team?workspace=hse#contract-roles"',
+      'href="/dashboards/team/contract-roles?workspace=hse"',
     );
     expect(markup).toContain(
-      'href="/dashboards/team?workspace=finance#contract-roles"',
+      'href="/dashboards/team/contract-roles?workspace=finance"',
     );
     for (const href of [
       "/dashboards/departments/project",
@@ -240,7 +240,7 @@ describe("CompanyDashboardView", () => {
     expect(markup).toMatch(
       /href="\/dashboards\/contracts\/new"[^>]*>Create a contract<\/a>/,
     );
-    expect(markup).toContain('href="/dashboards/team"');
+    expect(markup).toContain('href="/dashboards/team?dialog=invite"');
     expect(markup).toContain("1 member, 0 pending invitations.");
     expect(markup).toContain("Configure contract stages");
     expect(markup).toMatch(/>Planned<\/span>/);

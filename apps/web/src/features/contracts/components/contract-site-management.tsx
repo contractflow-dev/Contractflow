@@ -9,18 +9,20 @@ import {
 } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@workspace/ui/components/card";
 import { Input } from "@workspace/ui/components/input";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@workspace/ui/components/sheet";
 import {
   NativeSelect,
   NativeSelectOption,
 } from "@workspace/ui/components/native-select";
+import { ListCard } from "@/components/data-table/list-card";
 import {
   DataTable,
   DataTableEmpty,
@@ -128,34 +130,20 @@ export function ContractSiteManagement({
   if (!canManage) return null;
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4">
-        <div>
-          <CardTitle>
-            <h2>Contract sites</h2>
-          </CardTitle>
-          <CardDescription>
-            Sites must exist before site logs, inspections, or incidents can
-            reference them.
-          </CardDescription>
-        </div>
-        {editing === null ? (
-          <Button type="button" onClick={() => setEditing("new")}>
+    <>
+      <ListCard
+        title="Contract sites"
+        description="Sites must exist before site logs, inspections, or incidents can reference them."
+        action={
+          <Button
+            type="button"
+            aria-haspopup="dialog"
+            onClick={() => setEditing("new")}
+          >
             Add site
           </Button>
-        ) : null}
-      </CardHeader>
-      <CardContent className="space-y-5">
-        {editing !== null ? (
-          <SiteForm
-            key={editing === "new" ? "new" : editing.id}
-            companyId={companyId}
-            contractId={contract.id}
-            site={editing === "new" ? null : editing}
-            onDone={() => setEditing(null)}
-          />
-        ) : null}
-
+        }
+      >
         {/* One table at every width, so deep links keep a single target:
             phones show the address under the site, tablets drop coordinates. */}
         <DataTable
@@ -176,6 +164,7 @@ export function ContractSiteManagement({
               variant="outline"
               size="sm"
               aria-label={`Edit site ${site.name}`}
+              aria-haspopup="dialog"
               onClick={() => setEditing(site)}
             >
               Edit
@@ -196,16 +185,61 @@ export function ContractSiteManagement({
           empty={
             <DataTableEmpty
               title="No sites have been added to this contract."
-              description={
-                editing === null
-                  ? "Add the locations where work on this contract takes place."
-                  : undefined
-              }
+              description="Add the locations where work on this contract takes place."
             />
           }
         />
-      </CardContent>
-    </Card>
+      </ListCard>
+      <SiteFormSheet
+        companyId={companyId}
+        contractId={contract.id}
+        editing={editing}
+        onClose={() => setEditing(null)}
+      />
+    </>
+  );
+}
+
+/**
+ * Adding or editing a site, in a side sheet over the sites table, so the
+ * table doesn't move. A click outside doesn't close it, so a half-filled
+ * form isn't lost by accident; Escape, Cancel and the close button do.
+ */
+function SiteFormSheet({
+  companyId,
+  contractId,
+  editing,
+  onClose,
+}: {
+  companyId: string;
+  contractId: string;
+  /** The site to edit, "new" to add one, or null for a closed sheet. */
+  editing: ContractSite | "new" | null;
+  onClose: () => void;
+}) {
+  return (
+    <Sheet
+      open={editing !== null}
+      disablePointerDismissal
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <SheetContent
+        side="right"
+        className="w-full gap-0 overflow-y-auto sm:max-w-xl"
+      >
+        {editing !== null ? (
+          <SiteForm
+            key={editing === "new" ? "new" : editing.id}
+            companyId={companyId}
+            contractId={contractId}
+            site={editing === "new" ? null : editing}
+            onDone={onClose}
+          />
+        ) : null}
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -275,132 +309,142 @@ function SiteForm({
   return (
     <form
       onSubmit={submit}
-      className="space-y-6 rounded-2xl border p-4 sm:p-5"
+      className="flex min-h-full flex-col"
       aria-label={site ? `Edit site ${site.name}` : "Add a site"}
     >
-      <div className="space-y-1">
-        <h3 className="type-subsection-title">
-          {site ? `Edit ${site.name}` : "New site"}
-        </h3>
+      <SheetHeader className="border-b">
+        <SheetTitle>{site ? `Edit ${site.name}` : "Add a site"}</SheetTitle>
+        <SheetDescription>
+          {site
+            ? "Changes apply wherever this site is referenced."
+            : "Sites must exist before site logs, inspections or incidents can reference them."}
+        </SheetDescription>
+      </SheetHeader>
+      <div className="flex-1 space-y-6 p-4">
         <RequiredFieldsNote />
+
+        <FormSection legend="Site details">
+          <FormGrid columns={2}>
+            <SiteInput
+              id={`${idPrefix}-name`}
+              name="name"
+              label="Site name"
+              defaultValue={site?.name}
+              maxLength={255}
+              className="sm:col-span-2"
+            />
+            <SiteInput
+              id={`${idPrefix}-code`}
+              name="siteCode"
+              label="Site code"
+              description="Up to 40 characters. Saved in capital letters."
+              defaultValue={site?.siteCode}
+              maxLength={40}
+              autoCapitalize="characters"
+            />
+            <FormField id={`${idPrefix}-status`} label="Status" required>
+              {(control) => (
+                <NativeSelect
+                  {...control}
+                  name="status"
+                  className="w-full"
+                  defaultValue={site?.status ?? EContractSiteStatus.PLANNED}
+                >
+                  {siteStatuses.map((status) => (
+                    <NativeSelectOption key={status} value={status}>
+                      {humanizeEnumValue(status)}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              )}
+            </FormField>
+          </FormGrid>
+        </FormSection>
+
+        <FormSection legend="Address">
+          <FormGrid columns={2}>
+            <SiteInput
+              id={`${idPrefix}-address`}
+              name="addressLine1"
+              label="Street address"
+              defaultValue={site?.addressLine1}
+              maxLength={255}
+              className="sm:col-span-2"
+            />
+            <SiteInput
+              id={`${idPrefix}-city`}
+              name="city"
+              label="City"
+              defaultValue={site?.city}
+              maxLength={100}
+            />
+            <CountryRegionFields
+              countryId={`${idPrefix}-country`}
+              stateRegionId={`${idPrefix}-region`}
+              countryName="countryCode"
+              stateRegionName="stateRegion"
+              countryCode={countryCode}
+              stateRegion={stateRegion}
+              onCountryCodeChange={changeCountryCode}
+              onStateRegionChange={changeStateRegion}
+              countryError={countryError}
+              stateRegionError={regionError}
+            />
+          </FormGrid>
+        </FormSection>
+
+        <FormSection
+          legend="Map coordinates"
+          description="Decimal degrees with up to six decimal places, for example 6.524379 and 3.379206."
+        >
+          <FormGrid columns={2}>
+            <SiteInput
+              id={`${idPrefix}-latitude`}
+              name="latitude"
+              label="Latitude"
+              description="Between -90 and 90. Negative values are south of the equator."
+              type="number"
+              inputMode="decimal"
+              step="0.000001"
+              min="-90"
+              max="90"
+              defaultValue={
+                site ? fromMicroDegrees(site.latitudeE6) : undefined
+              }
+            />
+            <SiteInput
+              id={`${idPrefix}-longitude`}
+              name="longitude"
+              label="Longitude"
+              description="Between -180 and 180. Negative values are west of Greenwich."
+              type="number"
+              inputMode="decimal"
+              step="0.000001"
+              min="-180"
+              max="180"
+              defaultValue={
+                site ? fromMicroDegrees(site.longitudeE6) : undefined
+              }
+            />
+          </FormGrid>
+        </FormSection>
+        {error ? (
+          <Alert variant="destructive">
+            <AlertDescription>
+              {getApiErrorMessage(error, "Unable to save the site.")}
+            </AlertDescription>
+          </Alert>
+        ) : null}
       </div>
-
-      <FormSection legend="Site details">
-        <FormGrid columns={2}>
-          <SiteInput
-            id={`${idPrefix}-name`}
-            name="name"
-            label="Site name"
-            defaultValue={site?.name}
-            maxLength={255}
-            className="sm:col-span-2"
-          />
-          <SiteInput
-            id={`${idPrefix}-code`}
-            name="siteCode"
-            label="Site code"
-            description="Up to 40 characters. Saved in capital letters."
-            defaultValue={site?.siteCode}
-            maxLength={40}
-            autoCapitalize="characters"
-          />
-          <FormField id={`${idPrefix}-status`} label="Status" required>
-            {(control) => (
-              <NativeSelect
-                {...control}
-                name="status"
-                className="w-full"
-                defaultValue={site?.status ?? EContractSiteStatus.PLANNED}
-              >
-                {siteStatuses.map((status) => (
-                  <NativeSelectOption key={status} value={status}>
-                    {humanizeEnumValue(status)}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
-            )}
-          </FormField>
-        </FormGrid>
-      </FormSection>
-
-      <FormSection legend="Address">
-        <FormGrid columns={2}>
-          <SiteInput
-            id={`${idPrefix}-address`}
-            name="addressLine1"
-            label="Street address"
-            defaultValue={site?.addressLine1}
-            maxLength={255}
-            className="sm:col-span-2"
-          />
-          <SiteInput
-            id={`${idPrefix}-city`}
-            name="city"
-            label="City"
-            defaultValue={site?.city}
-            maxLength={100}
-          />
-          <CountryRegionFields
-            countryId={`${idPrefix}-country`}
-            stateRegionId={`${idPrefix}-region`}
-            countryName="countryCode"
-            stateRegionName="stateRegion"
-            countryCode={countryCode}
-            stateRegion={stateRegion}
-            onCountryCodeChange={changeCountryCode}
-            onStateRegionChange={changeStateRegion}
-            countryError={countryError}
-            stateRegionError={regionError}
-          />
-        </FormGrid>
-      </FormSection>
-
-      <FormSection
-        legend="Map coordinates"
-        description="Decimal degrees with up to six decimal places, for example 6.524379 and 3.379206."
-      >
-        <FormGrid columns={2}>
-          <SiteInput
-            id={`${idPrefix}-latitude`}
-            name="latitude"
-            label="Latitude"
-            description="Between -90 and 90. Negative values are south of the equator."
-            type="number"
-            inputMode="decimal"
-            step="0.000001"
-            min="-90"
-            max="90"
-            defaultValue={site ? fromMicroDegrees(site.latitudeE6) : undefined}
-          />
-          <SiteInput
-            id={`${idPrefix}-longitude`}
-            name="longitude"
-            label="Longitude"
-            description="Between -180 and 180. Negative values are west of Greenwich."
-            type="number"
-            inputMode="decimal"
-            step="0.000001"
-            min="-180"
-            max="180"
-            defaultValue={site ? fromMicroDegrees(site.longitudeE6) : undefined}
-          />
-        </FormGrid>
-      </FormSection>
-      {error ? (
-        <Alert variant="destructive">
-          <AlertDescription>
-            {getApiErrorMessage(error, "Unable to save the site.")}
-          </AlertDescription>
-        </Alert>
-      ) : null}
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={saving}>
-          {saving ? "Saving…" : site ? "Save site" : "Add site"}
-        </Button>
+      {/* Kept in view at the foot of the sheet while the form scrolls. */}
+      <SheetFooter className="sticky bottom-0 flex-row justify-end gap-2 border-t bg-popover">
         <Button type="button" variant="outline" onClick={onDone}>
           Cancel
         </Button>
-      </div>
+        <Button type="submit" disabled={saving} aria-busy={saving || undefined}>
+          {saving ? "Saving…" : site ? "Save site" : "Add site"}
+        </Button>
+      </SheetFooter>
     </form>
   );
 }

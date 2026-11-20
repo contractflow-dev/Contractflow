@@ -52,13 +52,20 @@ function setup() {
   return user;
 }
 
-const heading = () => screen.getByRole("heading", { level: 2 });
+// The step list names the current step; the step heading it once
+// repeated is empty, kept only as where focus goes between steps.
+const currentStep = () =>
+  screen
+    .getByRole("list", { name: "Steps" })
+    .querySelector<HTMLElement>('[aria-current="step"]')!;
+const stepFocusTarget = () =>
+  document.querySelector<HTMLElement>('h2[tabindex="-1"]')!;
 const stepItem = (title: string) =>
   screen.getByText(title, { selector: "li span" }).closest("li")!;
 
 async function next(user: ReturnType<typeof userEvent.setup>, to: string) {
   await user.click(screen.getByRole("button", { name: /^Next:/ }));
-  await waitFor(() => expect(heading().textContent).toContain(to));
+  await waitFor(() => expect(currentStep().textContent).toContain(to));
 }
 
 async function fillBasics(user: ReturnType<typeof userEvent.setup>) {
@@ -72,7 +79,7 @@ describe("CreateContractWizard steps", () => {
     await user.click(screen.getByRole("button", { name: /^Next:/ }));
 
     expect(await screen.findByText("Enter a reference number.")).toBeTruthy();
-    expect(heading().textContent).toBe("Step 1 of 4: Basics");
+    expect(currentStep().textContent).toContain("Basics");
     expect(document.activeElement).toBe(
       screen.getByLabelText(/Reference number/),
     );
@@ -84,7 +91,7 @@ describe("CreateContractWizard steps", () => {
     await fillBasics(user);
     await next(user, "Parties & workspaces");
 
-    await waitFor(() => expect(document.activeElement).toBe(heading()));
+    await waitFor(() => expect(document.activeElement).toBe(stepFocusTarget()));
     expect(stepItem("Basics").dataset.status).toBe("completed");
     expect(
       stepItem("Basics").querySelector("[data-slot=step-completed-icon]"),
@@ -102,11 +109,11 @@ describe("CreateContractWizard steps", () => {
       screen.getByLabelText(/Description/),
       "Phase 1{Enter}Phase 2",
     );
-    expect(heading().textContent).toBe("Step 1 of 4: Basics");
+    expect(currentStep().textContent).toContain("Basics");
 
     await next(user, "Parties & workspaces");
     await user.click(screen.getByRole("button", { name: "Back" }));
-    await waitFor(() => expect(heading().textContent).toContain("Basics"));
+    await waitFor(() => expect(currentStep().textContent).toContain("Basics"));
 
     expect(screen.getByLabelText(/Reference number/)).toHaveProperty(
       "value",
@@ -123,7 +130,7 @@ describe("CreateContractWizard steps", () => {
     await fillBasics(user);
     await next(user, "Parties & workspaces");
     await user.click(screen.getByRole("button", { name: "Back" }));
-    await waitFor(() => expect(heading().textContent).toContain("Basics"));
+    await waitFor(() => expect(currentStep().textContent).toContain("Basics"));
     expect(stepItem("Basics").textContent).toContain("(completed)");
 
     await user.clear(screen.getByLabelText(/Contract title/));
@@ -131,20 +138,20 @@ describe("CreateContractWizard steps", () => {
     // Next can't move past it now.
     await user.click(screen.getByRole("button", { name: /^Next:/ }));
     expect(await screen.findByText("Enter a contract title.")).toBeTruthy();
-    expect(heading().textContent).toContain("Basics");
+    expect(currentStep().textContent).toContain("Basics");
   });
 
   it("moves on with Enter, checks the dates on create, then creates once", async () => {
     const user = setup();
     await fillBasics(user);
     await user.type(screen.getByLabelText(/Contract title/), "{Enter}");
-    await waitFor(() => expect(heading().textContent).toContain("Parties"));
+    await waitFor(() => expect(currentStep().textContent).toContain("Parties"));
     await next(user, "Commercial terms");
     await user.type(
       screen.getByLabelText(/Original contract value/),
       "1500{Enter}",
     );
-    await waitFor(() => expect(heading().textContent).toContain("Dates"));
+    await waitFor(() => expect(currentStep().textContent).toContain("Dates"));
     expect(stepItem("Commercial terms").dataset.status).toBe("completed");
 
     // The last step is checked as a whole form.

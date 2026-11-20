@@ -1,4 +1,5 @@
 import { ECompanyDepartment } from "@contractflow/contracts-schema";
+import { TEAM_CONTRACT_ROLES_PATH } from "./company-navigation";
 
 /**
  * The Company Administrator's department pages. Each looks at one contract
@@ -35,7 +36,7 @@ export function parseDepartment(segment: string): ECompanyDepartment | null {
 
 /** Team → Contract roles, filtered to the department's workspace (D1). */
 export function departmentStaffingHref(department: ECompanyDepartment): string {
-  return `/dashboards/team?workspace=${department}#contract-roles`;
+  return `${TEAM_CONTRACT_ROLES_PATH}?workspace=${department}`;
 }
 
 /** A contract's Roles section, opened on one workspace. */

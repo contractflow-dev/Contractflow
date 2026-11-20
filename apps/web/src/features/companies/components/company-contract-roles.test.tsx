@@ -123,7 +123,7 @@ describe("CompanyContractRoles", () => {
   it("lists each role with its member, contract, workspace and admin flag", () => {
     mocks.roles.mockReturnValue({ currentData: page([row]) });
     const markup = render();
-    expect(markup).toContain(">Contract roles</h2>");
+    expect(markup).toContain(">Role assignments</h2>");
     expect(markup).toContain("casey@acme.test");
     expect(markup).toContain('href="/dashboards/contracts/contract-1/roles"');
     expect(markup).toContain("CF-2026-0142");

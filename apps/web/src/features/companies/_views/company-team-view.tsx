@@ -1,78 +1,44 @@
 "use client";
 
 import { useState } from "react";
-import type { FormEvent } from "react";
 import {
   ECompanyMemberSortField,
   ECompanyRole,
   ECompanyUserStatus,
-  EInvitationStatus,
   ESortOrder,
 } from "@contractflow/contracts-schema";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@workspace/ui/components/alert";
+import { RiUserAddLine } from "@remixicon/react";
 import { Button } from "@workspace/ui/components/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@workspace/ui/components/card";
 import { Input } from "@workspace/ui/components/input";
-import { FormField, FormGrid } from "@/components/forms/form-field";
 import {
   NativeSelect,
   NativeSelectOption,
 } from "@workspace/ui/components/native-select";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@workspace/ui/components/table";
-import {
   useChangeCompanyMemberRoleMutation,
-  useGetCompanyInvitationsQuery,
   useGetCompanyMembersQuery,
-  useInviteCompanyMemberMutation,
   useRemoveCompanyMemberMutation,
-  useRevokeCompanyInvitationMutation,
-  useResendCompanyInvitationMutation,
 } from "@/features/companies";
 import type { ICompanyMember } from "@contractflow/contracts-schema";
 import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
-import { DataPagination } from "@/components/pagination/data-pagination";
 import {
+  DataTable,
   DataTableEmpty,
   DataTableRowActions,
-  DataTableSkeleton,
 } from "@/components/data-table/data-table";
+import { ListCard } from "@/components/data-table/list-card";
 import { DropdownMenuItem } from "@workspace/ui/components/dropdown-menu";
-import {
-  StatusBadge,
-  effectiveInvitationStatus,
-} from "@/components/status-badge/status-badge";
-import {
-  StatusLegendDisclosure,
-  type StatusLegendItem,
-} from "@/components/status-badge/status-legend";
+import { StatusBadge } from "@/components/status-badge/status-badge";
 import { PageHeader } from "@/components/page-header/page-header";
-import { CompanyContractRoles } from "../components/company-contract-roles";
 import { MemberDetailsSheet } from "../components/member-details-sheet";
+import { TeamDialogs, useTeamDialog } from "../components/team-dialogs";
 import { TeamSummary } from "../components/team-summary";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useKeepPageInRange, usePagination } from "@/hooks/use-pagination";
 import { useUserTimeZone } from "@/hooks/use-user-time-zone";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { formatDate } from "@/lib/format";
-import { notifyError, notifySuccess } from "@/lib/notify";
+import { notifySuccess } from "@/lib/notify";
 import { CompanyAdminShell } from "../CompanyAdminShell";
 
 const memberRoles = Object.values(ECompanyRole);
@@ -106,39 +72,6 @@ const memberSorts = [
 ] as const;
 type MemberSort = (typeof memberSorts)[number]["value"];
 
-/**
- * A company invitation grants company membership only. Contract roles are
- * assigned per contract, from the contract's role management, after joining.
- */
-const invitationRoles: ReadonlyArray<{ value: ECompanyRole; label: string }> = [
-  { value: ECompanyRole.MEMBER, label: "Member" },
-  { value: ECompanyRole.COMPANY_ADMIN, label: "Company Administrator" },
-];
-
-/** What each company invitation status means for the person invited. */
-const invitationStatusLegend: StatusLegendItem[] = [
-  {
-    status: EInvitationStatus.PENDING,
-    description: "Sent and waiting for a response. It can still be revoked.",
-  },
-  {
-    status: EInvitationStatus.ACCEPTED,
-    description: "The recipient accepted and joined the company.",
-  },
-  {
-    status: EInvitationStatus.DECLINED,
-    description: "The recipient declined the invitation.",
-  },
-  {
-    status: EInvitationStatus.EXPIRED,
-    description: "Not accepted within seven days. The link no longer works.",
-  },
-  {
-    status: EInvitationStatus.REVOKED,
-    description: "Cancelled by an administrator. The link no longer works.",
-  },
-];
-
 export function CompanyTeamView() {
   return (
     <CompanyAdminShell>
@@ -158,7 +91,6 @@ function TeamContent({ companyId }: { companyId: string }) {
     null,
   );
   const memberPages = usePagination();
-  const invitationPages = usePagination(10);
   const debouncedSearch = useDebouncedValue(search.trim());
   const [appliedSearch, setAppliedSearch] = useState(debouncedSearch);
   // A new search term restarts at page 1 in the same render that applies it,
@@ -168,7 +100,9 @@ function TeamContent({ companyId }: { companyId: string }) {
     memberPages.resetPage();
   }
   const timeZone = useUserTimeZone();
-  const [inviteError, setInviteError] = useState("");
+  // Invite member and Invitations open from the URL (?dialog=), as the
+  // Team sub-navigation does.
+  const teamDialog = useTeamDialog();
   // Each confirmation keeps its target open with the last failure, so a
   // failed request stays in the dialog until it succeeds or is cancelled.
   const [pendingRoleChange, setPendingRoleChange] = useState<{
@@ -178,17 +112,8 @@ function TeamContent({ companyId }: { companyId: string }) {
   const [memberToRemove, setMemberToRemove] = useState<ICompanyMember | null>(
     null,
   );
-  const [invitationToRevoke, setInvitationToRevoke] = useState<{
-    id: string;
-    email: string;
-  } | null>(null);
   const [dialogError, setDialogError] = useState("");
   const [busyMemberId, setBusyMemberId] = useState("");
-  const [busyInvitationId, setBusyInvitationId] = useState("");
-  const [email, setEmail] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [role, setRole] = useState<ECompanyRole>(ECompanyRole.MEMBER);
   const {
     currentData: members,
     error: membersError,
@@ -207,54 +132,8 @@ function TeamContent({ companyId }: { companyId: string }) {
   });
   const membersLoading = membersInitialLoading || (membersFetching && !members);
   useKeepPageInRange(members?.meta, memberPages.setPage);
-  const {
-    currentData: invitations,
-    error: invitationsError,
-    isLoading: invitationsInitialLoading,
-    isFetching: invitationsFetching,
-    refetch: refetchInvitations,
-  } = useGetCompanyInvitationsQuery({
-    companyId,
-    page: invitationPages.page,
-    limit: invitationPages.limit,
-  });
-  const invitationsLoading =
-    invitationsInitialLoading || (invitationsFetching && !invitations);
-  useKeepPageInRange(invitations?.meta, invitationPages.setPage);
-  const [inviteMember, inviteState] = useInviteCompanyMemberMutation();
   const [changeRole, changeRoleState] = useChangeCompanyMemberRoleMutation();
   const [removeMember, removeMemberState] = useRemoveCompanyMemberMutation();
-  const [revokeInvitation, revokeInvitationState] =
-    useRevokeCompanyInvitationMutation();
-  const [resendInvitation] = useResendCompanyInvitationMutation();
-  const [resendingInvitationId, setResendingInvitationId] = useState("");
-
-  async function submitInvitation(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setInviteError("");
-    try {
-      await inviteMember({
-        companyId,
-        data: {
-          email: email.trim().toLowerCase(),
-          ...(firstName.trim() ? { firstName: firstName.trim() } : {}),
-          ...(lastName.trim() ? { lastName: lastName.trim() } : {}),
-          companyRole: role,
-        },
-      }).unwrap();
-      notifySuccess(
-        "Invitation sent",
-        `${email.trim()} can now join the team.`,
-      );
-      setEmail("");
-      setFirstName("");
-      setLastName("");
-    } catch (error) {
-      setInviteError(
-        getApiErrorMessage(error, "The invitation could not be sent."),
-      );
-    }
-  }
 
   // The role select stays on the saved role until the change is confirmed,
   // so cancelling leaves it unchanged.
@@ -316,399 +195,220 @@ function TeamContent({ companyId }: { companyId: string }) {
     }
   }
 
-  // A new link replaces the old one, which stops working.
-  async function resend(invitationId: string, invitedEmail: string) {
-    if (resendingInvitationId) return;
-    setResendingInvitationId(invitationId);
-    try {
-      await resendInvitation({ companyId, invitationId }).unwrap();
-      notifySuccess(
-        "Invitation sent again",
-        `${invitedEmail} has a new link, valid for 7 days. The previous link no longer works.`,
-      );
-    } catch (error) {
-      notifyError(
-        error,
-        "Please try again in a moment.",
-        "The invitation could not be sent again",
-      );
-    } finally {
-      setResendingInvitationId("");
-    }
-  }
-
-  function requestRevocation(invitationId: string, invitedEmail: string) {
-    setDialogError("");
-    setInvitationToRevoke({ id: invitationId, email: invitedEmail });
-  }
-
-  async function confirmRevocation() {
-    if (!invitationToRevoke || revokeInvitationState.isLoading) return;
-    const invitation = invitationToRevoke;
-    setDialogError("");
-    setBusyInvitationId(invitation.id);
-    try {
-      await revokeInvitation({
-        companyId,
-        invitationId: invitation.id,
-      }).unwrap();
-      setInvitationToRevoke(null);
-      notifySuccess(
-        "Invitation revoked",
-        `The invitation for ${invitation.email} no longer works.`,
-      );
-    } catch (error) {
-      setDialogError(
-        getApiErrorMessage(error, "The invitation could not be revoked."),
-      );
-    } finally {
-      setBusyInvitationId("");
-    }
-  }
-
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Company administration"
-        title="Team & invitations"
+        eyebrow="Team"
+        title="Company members"
         description="Manage company memberships and invite colleagues. Removing a member does not delete their account."
       />
 
       <TeamSummary companyId={companyId} />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            <h2>Invite a team member</h2>
-          </CardTitle>
-          <CardDescription>
-            We&apos;ll email a single-use invitation link that expires after
-            seven days. This adds them to the company only: contract roles are
-            assigned on each contract after they join.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <form
-            onSubmit={(event) => void submitInvitation(event)}
-            aria-label="Invite a team member"
+      <ListCard
+        title="Members"
+        description={`${members?.meta.totalItems ?? 0} membership${
+          members?.meta.totalItems === 1 ? "" : "s"
+        }`}
+        action={
+          <Button
+            type="button"
+            aria-haspopup="dialog"
+            onClick={() => teamDialog.open("invite")}
           >
-            <FormGrid columns={2} className="items-end">
-              <FormField id="invite-email" label="Email">
-                {(control) => (
-                  <Input
-                    {...control}
-                    required
-                    type="email"
-                    maxLength={254}
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    autoComplete="off"
-                  />
-                )}
-              </FormField>
-              <FormField id="invite-first-name" label="First name (optional)">
-                {(control) => (
-                  <Input
-                    {...control}
-                    maxLength={100}
-                    value={firstName}
-                    onChange={(event) => setFirstName(event.target.value)}
-                    autoComplete="off"
-                  />
-                )}
-              </FormField>
-              <FormField id="invite-last-name" label="Last name (optional)">
-                {(control) => (
-                  <Input
-                    {...control}
-                    maxLength={100}
-                    value={lastName}
-                    onChange={(event) => setLastName(event.target.value)}
-                    autoComplete="off"
-                  />
-                )}
-              </FormField>
-              <FormField id="invite-role" label="Company role">
-                {(control) => (
-                  <NativeSelect
-                    {...control}
-                    className="w-full"
-                    value={role}
-                    onChange={(event) => {
-                      const next = invitationRoles.find(
-                        (option) => option.value === event.target.value,
-                      );
-                      if (next) setRole(next.value);
-                    }}
-                  >
-                    {invitationRoles.map((option) => (
-                      <NativeSelectOption
-                        key={option.value}
-                        value={option.value}
-                      >
-                        {option.label}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                )}
-              </FormField>
-              <Button
-                type="submit"
-                disabled={inviteState.isLoading}
-                aria-busy={inviteState.isLoading || undefined}
-                className="w-full sm:w-auto lg:w-full"
-              >
-                {inviteState.isLoading ? "Sending…" : "Send invitation"}
-              </Button>
-            </FormGrid>
-          </form>
-          {inviteError && (
-            <Alert variant="destructive">
-              <AlertDescription>{inviteError}</AlertDescription>
-            </Alert>
+            <RiUserAddLine aria-hidden="true" data-icon="inline-start" />
+            Invite member
+          </Button>
+        }
+      >
+        {/* Member filters */}
+        <div className="grid gap-3 sm:grid-cols-2 sm:items-end lg:grid-cols-4">
+          <div className="space-y-1.5">
+            <label htmlFor="member-search" className="text-sm font-medium">
+              Search members
+            </label>
+            <Input
+              id="member-search"
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search name or email"
+              aria-label="Search members by name or email"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="member-status" className="text-sm font-medium">
+              Membership status
+            </label>
+            <NativeSelect
+              id="member-status"
+              className="w-full"
+              value={status}
+              onChange={(event) => {
+                setStatus(event.target.value as ECompanyUserStatus | "");
+                memberPages.resetPage();
+              }}
+            >
+              <NativeSelectOption value="">All statuses</NativeSelectOption>
+              <NativeSelectOption value={ECompanyUserStatus.ACTIVE}>
+                Active
+              </NativeSelectOption>
+              <NativeSelectOption value={ECompanyUserStatus.INACTIVE}>
+                Inactive
+              </NativeSelectOption>
+            </NativeSelect>
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="member-role" className="text-sm font-medium">
+              Company role
+            </label>
+            <NativeSelect
+              id="member-role"
+              className="w-full"
+              value={roleFilter}
+              onChange={(event) => {
+                setRoleFilter(
+                  memberRoles.find((option) => option === event.target.value) ??
+                    "",
+                );
+                memberPages.resetPage();
+              }}
+            >
+              <NativeSelectOption value="">All roles</NativeSelectOption>
+              {memberRoles.map((option) => (
+                <NativeSelectOption key={option} value={option}>
+                  {option}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="member-sort" className="text-sm font-medium">
+              Sort by
+            </label>
+            <NativeSelect
+              id="member-sort"
+              className="w-full"
+              value={sort}
+              onChange={(event) => {
+                const next = memberSorts.find(
+                  (option) => option.value === event.target.value,
+                );
+                if (!next) return;
+                setSort(next.value);
+                memberPages.resetPage();
+              }}
+            >
+              {memberSorts.map((option) => (
+                <NativeSelectOption key={option.value} value={option.value}>
+                  {option.label}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </div>
+        </div>
+
+        <DataTable
+          label="Company members"
+          columns={[
+            {
+              id: "member",
+              header: "Member",
+              wrap: true,
+              className: "min-w-44",
+              cell: (member) => (
+                <>
+                  <p className="font-medium">
+                    {member.firstName} {member.lastName}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {member.email}
+                  </p>
+                </>
+              ),
+            },
+            {
+              id: "role",
+              header: "Role",
+              cell: (member) => (
+                <MemberRoleSelect
+                  member={member}
+                  busy={busyMemberId === member.id}
+                  onChange={(value) => requestRoleChange(member, value)}
+                />
+              ),
+            },
+            {
+              id: "status",
+              header: "Status",
+              cell: (member) => <StatusBadge status={member.status} />,
+            },
+            {
+              id: "joined",
+              header: "Joined",
+              className: "tabular-nums",
+              cell: (member) => formatDate(member.joinedAt, { timeZone }),
+            },
+          ]}
+          rows={members?.data ?? []}
+          getRowKey={(member) => member.id}
+          rowActions={(member) => (
+            <DataTableRowActions
+              label={`Actions for ${member.firstName} ${member.lastName}`}
+            >
+              <DropdownMenuItem onClick={() => setSelectedMember(member)}>
+                View details and contract roles
+              </DropdownMenuItem>
+              {/* Removing asks for confirmation first. */}
+              {member.status === ECompanyUserStatus.ACTIVE ? (
+                <DropdownMenuItem
+                  variant="destructive"
+                  disabled={busyMemberId === member.id}
+                  onClick={() => requestRemoval(member)}
+                >
+                  Remove from company…
+                </DropdownMenuItem>
+              ) : null}
+            </DataTableRowActions>
           )}
-        </CardContent>
-      </Card>
-
-      <section>
-        <Card className="gap-0 py-0">
-          <CardHeader className="gap-4">
-            {/* Section heading and membership count */}
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <CardTitle>
-                  <h2 className="type-section-title">Company members</h2>
-                </CardTitle>
-                <CardDescription>
-                  {members?.meta.totalItems ?? 0} membership
-                  {members?.meta.totalItems === 1 ? "" : "s"}
-                </CardDescription>
-              </div>
-            </div>
-
-            {/* Member filters */}
-            <div className="grid gap-3 border-t pt-4 sm:grid-cols-2 sm:items-end">
-              <div className="space-y-1.5">
-                <label htmlFor="member-search" className="text-sm font-medium">
-                  Search members
-                </label>
-                <Input
-                  id="member-search"
-                  type="search"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search name or email"
-                  aria-label="Search members by name or email"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label htmlFor="member-status" className="text-sm font-medium">
-                  Membership status
-                </label>
-                <NativeSelect
-                  id="member-status"
-                  className="w-full"
-                  value={status}
-                  onChange={(event) => {
-                    setStatus(event.target.value as ECompanyUserStatus | "");
-                    memberPages.resetPage();
-                  }}
-                >
-                  <NativeSelectOption value="">All statuses</NativeSelectOption>
-                  <NativeSelectOption value={ECompanyUserStatus.ACTIVE}>
-                    Active
-                  </NativeSelectOption>
-                  <NativeSelectOption value={ECompanyUserStatus.INACTIVE}>
-                    Inactive
-                  </NativeSelectOption>
-                </NativeSelect>
-              </div>
-
-              <div className="space-y-1.5">
-                <label htmlFor="member-role" className="text-sm font-medium">
-                  Company role
-                </label>
-                <NativeSelect
-                  id="member-role"
-                  className="w-full"
-                  value={roleFilter}
-                  onChange={(event) => {
-                    setRoleFilter(
-                      memberRoles.find(
-                        (option) => option === event.target.value,
-                      ) ?? "",
-                    );
-                    memberPages.resetPage();
-                  }}
-                >
-                  <NativeSelectOption value="">All roles</NativeSelectOption>
-                  {memberRoles.map((option) => (
-                    <NativeSelectOption key={option} value={option}>
-                      {option}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              </div>
-
-              <div className="space-y-1.5">
-                <label htmlFor="member-sort" className="text-sm font-medium">
-                  Sort by
-                </label>
-                <NativeSelect
-                  id="member-sort"
-                  className="w-full"
-                  value={sort}
-                  onChange={(event) => {
-                    const next = memberSorts.find(
-                      (option) => option.value === event.target.value,
-                    );
-                    if (!next) return;
-                    setSort(next.value);
-                    memberPages.resetPage();
-                  }}
-                >
-                  {memberSorts.map((option) => (
-                    <NativeSelectOption key={option.value} value={option.value}>
-                      {option.label}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              </div>
-            </div>
-          </CardHeader>
-
-          {/* Members content */}
-          <CardContent className="p-0">
-            {membersLoading ? (
-              <div className="p-4">
-                <DataTableSkeleton
-                  label="Loading company members…"
-                  columns={["Member", "Role", "Status", "Joined", ""]}
-                />
-              </div>
-            ) : membersError ? (
-              <div className="p-4">
-                <ErrorPanel
-                  error={membersError}
-                  message="Company members could not be loaded."
-                  onRetry={() => void refetchMembers()}
-                />
-              </div>
-            ) : !members?.data.length ? (
-              <div className="p-4">
-                <DataTableEmpty title="No members match this search." />
-              </div>
-            ) : (
-              <>
-                {/* Mobile member cards */}
-                <div className="divide-y md:hidden">
-                  {members.data.map((member) => (
-                    <MemberCard
-                      key={member.id}
-                      member={member}
-                      busy={busyMemberId === member.id}
-                      onRoleChange={(value) => requestRoleChange(member, value)}
-                      timeZone={timeZone}
-                      onRemove={() => requestRemoval(member)}
-                      onDetails={() => setSelectedMember(member)}
-                    />
-                  ))}
-                </div>
-
-                {/* Desktop members table */}
-                <div className="hidden md:block">
-                  <Table aria-label="Company members">
-                    <TableHeader>
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead className="px-4">Member</TableHead>
-                        <TableHead className="px-4">Role</TableHead>
-                        <TableHead className="px-4">Status</TableHead>
-                        <TableHead className="px-4">Joined</TableHead>
-                        <TableHead className="w-0 px-4 text-end">
-                          <span className="sr-only">Actions</span>
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-
-                    <TableBody>
-                      {members.data.map((member) => (
-                        <TableRow key={member.id}>
-                          <TableCell className="min-w-44 px-4 py-3 whitespace-normal break-words">
-                            <p className="font-medium">
-                              {member.firstName} {member.lastName}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {member.email}
-                            </p>
-                          </TableCell>
-
-                          <TableCell className="px-4 py-3">
-                            <MemberRoleSelect
-                              member={member}
-                              busy={busyMemberId === member.id}
-                              onChange={(value) =>
-                                requestRoleChange(member, value)
-                              }
-                            />
-                          </TableCell>
-
-                          <TableCell className="px-4 py-3">
-                            <StatusBadge status={member.status} />
-                          </TableCell>
-
-                          <TableCell className="px-4 py-3 tabular-nums">
-                            {formatDate(member.joinedAt, { timeZone })}
-                          </TableCell>
-
-                          <TableCell className="px-4 py-3 text-end">
-                            <DataTableRowActions
-                              label={`Actions for ${member.firstName} ${member.lastName}`}
-                            >
-                              <DropdownMenuItem
-                                onClick={() => setSelectedMember(member)}
-                              >
-                                View details and contract roles
-                              </DropdownMenuItem>
-                              {/* Removing asks for confirmation first. */}
-                              {member.status === ECompanyUserStatus.ACTIVE ? (
-                                <DropdownMenuItem
-                                  variant="destructive"
-                                  disabled={busyMemberId === member.id}
-                                  onClick={() => requestRemoval(member)}
-                                >
-                                  Remove from company…
-                                </DropdownMenuItem>
-                              ) : null}
-                            </DataTableRowActions>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </>
-            )}
-          </CardContent>
-
-          {/* Pagination */}
-          {members &&
-            !membersLoading &&
-            !membersError &&
-            members.data.length > 0 && (
-              <CardFooter className="border-t py-3">
-                <DataPagination
-                  className="w-full"
-                  meta={members.meta}
-                  itemLabel="members"
-                  isFetching={membersFetching}
-                  onPageChange={memberPages.setPage}
-                  onPageSizeChange={memberPages.setLimit}
-                />
-              </CardFooter>
-            )}
-        </Card>
-      </section>
+          renderCard={(member) => (
+            <MemberCard
+              member={member}
+              busy={busyMemberId === member.id}
+              onRoleChange={(value) => requestRoleChange(member, value)}
+              timeZone={timeZone}
+              onRemove={() => requestRemoval(member)}
+              onDetails={() => setSelectedMember(member)}
+            />
+          )}
+          isLoading={membersLoading}
+          loadingLabel="Loading company members…"
+          error={
+            membersError
+              ? `Company members could not be loaded. ${getApiErrorMessage(
+                  membersError,
+                  "Please try again.",
+                )}`
+              : null
+          }
+          onRetry={() => void refetchMembers()}
+          empty={<DataTableEmpty title="No members match this search." />}
+          pagination={
+            members
+              ? {
+                  meta: members.meta,
+                  itemLabel: "members",
+                  isFetching: membersFetching,
+                  onPageChange: memberPages.setPage,
+                  onPageSizeChange: memberPages.setLimit,
+                }
+              : undefined
+          }
+        />
+      </ListCard>
 
       <MemberDetailsSheet
         companyId={companyId}
@@ -716,160 +416,7 @@ function TeamContent({ companyId }: { companyId: string }) {
         onClose={() => setSelectedMember(null)}
       />
 
-      <CompanyContractRoles companyId={companyId} />
-
-      <section aria-labelledby="invitations-heading">
-        {/* One card holds the section: heading, description and status
-            legend in its header strip, then the invitations. */}
-        <Card className="gap-0 py-0">
-          <div className="space-y-1 border-b p-4 sm:p-5">
-            <h2
-              id="invitations-heading"
-              className="font-heading text-base font-semibold"
-            >
-              Invitations
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Invitations sent from this company and where each one stands.
-            </p>
-            <StatusLegendDisclosure
-              className="mt-1"
-              label="What do invitation statuses mean?"
-              items={invitationStatusLegend}
-            />
-          </div>
-          {invitationsLoading ? (
-            <div className="p-4">
-              <DataTableSkeleton
-                label="Loading invitations…"
-                columns={["Recipient", "Role", "Status", "Expires", ""]}
-                rows={3}
-              />
-            </div>
-          ) : invitationsError ? (
-            <div className="p-4">
-              <ErrorPanel
-                error={invitationsError}
-                message="Invitations could not be loaded."
-                onRetry={() => void refetchInvitations()}
-              />
-            </div>
-          ) : !invitations?.data.length ? (
-            <div className="p-4">
-              <DataTableEmpty title="No invitations have been sent." />
-            </div>
-          ) : (
-            <>
-              <Table aria-label="Invitations">
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="px-4">Recipient</TableHead>
-                    <TableHead className="hidden px-4 sm:table-cell">
-                      Role
-                    </TableHead>
-                    <TableHead className="px-4">Status</TableHead>
-                    <TableHead className="hidden px-4 md:table-cell">
-                      Expires
-                    </TableHead>
-                    <TableHead className="w-0 px-4 text-end">
-                      <span className="sr-only">Actions</span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {invitations.data.map((invitation) => (
-                    <TableRow key={invitation.id}>
-                      <TableCell className="min-w-40 px-4 py-3 whitespace-normal break-words">
-                        {invitation.firstName || invitation.lastName
-                          ? [invitation.firstName, invitation.lastName]
-                              .filter(Boolean)
-                              .join(" ")
-                          : "Invitee"}
-                        <p className="text-xs text-muted-foreground">
-                          {invitation.email}
-                        </p>
-                        <p className="text-xs text-muted-foreground sm:hidden">
-                          {invitation.companyRole}
-                        </p>
-                        <p className="text-xs text-muted-foreground md:hidden">
-                          Expires{" "}
-                          {formatDate(invitation.expiresAt, { timeZone })}
-                        </p>
-                      </TableCell>
-                      <TableCell className="hidden px-4 py-3 sm:table-cell">
-                        {invitation.companyRole}
-                      </TableCell>
-                      <TableCell className="px-4 py-3">
-                        <StatusBadge
-                          status={effectiveInvitationStatus(
-                            invitation.status,
-                            invitation.expiresAt,
-                          )}
-                        />
-                      </TableCell>
-                      <TableCell className="hidden px-4 py-3 tabular-nums md:table-cell">
-                        {formatDate(invitation.expiresAt, { timeZone })}
-                      </TableCell>
-                      <TableCell className="px-4 py-3 text-end">
-                        <div className="flex flex-wrap justify-end gap-2">
-                          {(invitation.status === EInvitationStatus.PENDING ||
-                            invitation.status ===
-                              EInvitationStatus.EXPIRED) && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={
-                                Boolean(resendingInvitationId) ||
-                                busyInvitationId === invitation.id
-                              }
-                              onClick={() =>
-                                void resend(invitation.id, invitation.email)
-                              }
-                              aria-label={`Send the invitation to ${invitation.email} again`}
-                            >
-                              {resendingInvitationId === invitation.id
-                                ? "Sending…"
-                                : "Resend"}
-                            </Button>
-                          )}
-                          {invitation.status === EInvitationStatus.PENDING &&
-                            new Date(invitation.expiresAt) > new Date() && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={busyInvitationId === invitation.id}
-                                onClick={() =>
-                                  requestRevocation(
-                                    invitation.id,
-                                    invitation.email,
-                                  )
-                                }
-                              >
-                                {busyInvitationId === invitation.id
-                                  ? "Revoking…"
-                                  : "Revoke"}
-                              </Button>
-                            )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              <CardFooter className="border-t py-3">
-                <DataPagination
-                  className="w-full"
-                  meta={invitations.meta}
-                  itemLabel="invitations"
-                  isFetching={invitationsFetching}
-                  onPageChange={invitationPages.setPage}
-                  onPageSizeChange={invitationPages.setLimit}
-                />
-              </CardFooter>
-            </>
-          )}
-        </Card>
-      </section>
+      <TeamDialogs companyId={companyId} />
 
       <ConfirmDialog
         open={pendingRoleChange !== null}
@@ -908,23 +455,6 @@ function TeamContent({ companyId }: { companyId: string }) {
         destructive
         onConfirm={() => void confirmRemoval()}
         onCancel={() => setMemberToRemove(null)}
-      />
-
-      <ConfirmDialog
-        open={invitationToRevoke !== null}
-        title="Revoke this invitation?"
-        description={
-          invitationToRevoke
-            ? `The invitation sent to ${invitationToRevoke.email} will stop working. This can't be undone, but you can send a new invitation.`
-            : ""
-        }
-        confirmLabel="Revoke invitation"
-        pendingLabel="Revoking…"
-        isPending={revokeInvitationState.isLoading}
-        error={invitationToRevoke ? dialogError : undefined}
-        destructive
-        onConfirm={() => void confirmRevocation()}
-        onCancel={() => setInvitationToRevoke(null)}
       />
     </div>
   );
@@ -990,7 +520,7 @@ function MemberCard({
   onDetails: () => void;
 }) {
   return (
-    <article className="space-y-3 p-4">
+    <div className="space-y-3">
       <div>
         <p className="font-medium">
           {member.firstName} {member.lastName}
@@ -1024,28 +554,6 @@ function MemberCard({
           )}
         </div>
       </div>
-    </article>
-  );
-}
-
-function ErrorPanel({
-  error,
-  message,
-  onRetry,
-}: {
-  error: unknown;
-  message: string;
-  onRetry: () => void;
-}) {
-  return (
-    <Alert variant="destructive">
-      <AlertTitle>{message}</AlertTitle>
-      <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
-        <span>{getApiErrorMessage(error, "Please try again.")}</span>
-        <Button type="button" variant="outline" onClick={onRetry}>
-          Retry
-        </Button>
-      </AlertDescription>
-    </Alert>
+    </div>
   );
 }

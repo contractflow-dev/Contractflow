@@ -154,7 +154,7 @@ describe("DepartmentContracts", () => {
 
     expect(markup).toContain(">HSE</h1>");
     expect(markup).toMatch(
-      /href="\/dashboards\/team\?workspace=hse#contract-roles"[^>]*>.*Manage staffing/,
+      /href="\/dashboards\/team\/contract-roles\?workspace=hse"[^>]*>.*Manage staffing/,
     );
   });
 

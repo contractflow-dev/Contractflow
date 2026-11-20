@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -9,7 +10,7 @@ import {
   type ContractActivityTarget,
 } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
-import { Button } from "@workspace/ui/components/button";
+import { Button, buttonVariants } from "@workspace/ui/components/button";
 import {
   Card,
   CardContent,
@@ -25,6 +26,7 @@ import {
 import { Textarea } from "@workspace/ui/components/textarea";
 import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
 import { ArchiveContractDialog } from "./contract-archive";
+import { contractEditHref } from "../contract-sections";
 import { FormField } from "@/components/forms/form-field";
 import {
   StatusBadge,
@@ -39,7 +41,6 @@ import {
   useGetContractPartyInvitationsQuery,
   useRevokeContractPartyInvitationMutation,
   useTransitionContractMutation,
-  useUpdateContractMutation,
   type Contract,
   type ContractTransition,
 } from "@/services/contractApi";
@@ -105,15 +106,12 @@ export function ContractLifecycleManagement({
   const invitationsQuery = useGetContractPartyInvitationsQuery(query, {
     skip: !permissions?.canManage,
   });
-  const [updateContract, updateState] = useUpdateContractMutation();
   const [transitionContract, transitionState] = useTransitionContractMutation();
   const [createInvitation, invitationState] =
     useCreateContractPartyInvitationMutation();
   const [revokeInvitation, revokeInvitationState] =
     useRevokeContractPartyInvitationMutation();
   const router = useRouter();
-  const [title, setTitle] = useState(contract.title);
-  const [description, setDescription] = useState(contract.description ?? "");
   const [reason, setReason] = useState("");
   const [pendingTransition, setPendingTransition] = useState<{
     transition: ContractTransition;
@@ -146,15 +144,6 @@ export function ContractLifecycleManagement({
   }
   if (!permissions || (!permissions.canManage && !permissions.canTransition)) {
     return null;
-  }
-
-  async function saveDetails(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const result = await updateContract({
-      ...query,
-      body: { title: title.trim(), description: description.trim() || null },
-    });
-    if (!("error" in result)) notifySuccess("Contract details saved");
   }
 
   function requestTransition(
@@ -237,58 +226,21 @@ export function ContractLifecycleManagement({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {permissions.canManage ? (
-              <>
-                <form
-                  onSubmit={saveDetails}
-                  aria-label="Contract details"
-                  className="grid items-start gap-4 sm:grid-cols-2"
+            {permissions.canManage && !contract.deletedAt ? (
+              // The contract's details are edited on their own page, in the
+              // same steps as creating one.
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="max-w-prose text-sm text-muted-foreground">
+                  Change the title, type, parent contract, commercial terms and
+                  dates.
+                </p>
+                <Link
+                  href={contractEditHref(contract.id)}
+                  className={buttonVariants({ variant: "outline" })}
                 >
-                  <FormField
-                    id="contract-title"
-                    label="Contract title"
-                    required
-                  >
-                    {(control) => (
-                      <Input
-                        {...control}
-                        value={title}
-                        maxLength={255}
-                        onChange={(event) => setTitle(event.target.value)}
-                        required
-                      />
-                    )}
-                  </FormField>
-                  <FormField
-                    id="contract-description"
-                    label="Description"
-                    optional
-                  >
-                    {(control) => (
-                      <Textarea
-                        {...control}
-                        value={description}
-                        onChange={(event) => setDescription(event.target.value)}
-                      />
-                    )}
-                  </FormField>
-                  <div className="sm:col-span-2">
-                    <Button
-                      type="submit"
-                      disabled={updateState.isLoading}
-                      aria-busy={updateState.isLoading || undefined}
-                    >
-                      {updateState.isLoading ? "Saving…" : "Save details"}
-                    </Button>
-                  </div>
-                </form>
-                {updateState.error ? (
-                  <ErrorAlert
-                    error={updateState.error}
-                    fallback="Unable to update contract details."
-                  />
-                ) : null}
-              </>
+                  Edit contract
+                </Link>
+              </div>
             ) : null}
 
             {permissions.canTransition &&
