@@ -6,12 +6,16 @@ import { useState } from "react";
 import { ECompanyUserStatus } from "@contractflow/contracts-schema";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
-import { Field, FieldLabel } from "@workspace/ui/components/field";
 import {
   NativeSelect,
   NativeSelectOption,
 } from "@workspace/ui/components/native-select";
 import { DataTable, DataTableEmpty } from "@/components/data-table/data-table";
+import {
+  DataTableActiveFilters,
+  DataTableFilterChips,
+  DataTableToolbar,
+} from "@/components/data-table/data-table-toolbar";
 import { ListCard } from "@/components/data-table/list-card";
 import { contractSectionHref } from "@/features/contracts/contract-sections";
 import { useUserTimeZone } from "@/hooks/use-user-time-zone";
@@ -76,6 +80,9 @@ export function CompanyContractRoles({ companyId }: { companyId: string }) {
     status: ECompanyUserStatus.ACTIVE,
   });
   const data = roles.currentData;
+  const selectedMember = (members.currentData?.data ?? []).find(
+    (option) => option.id === member,
+  );
   const filtered = Boolean(member || workspace);
   const clearFilters = () => {
     setMember("");
@@ -102,49 +109,67 @@ export function CompanyContractRoles({ companyId }: { companyId: string }) {
           </Button>
         }
       >
-        <div className="grid gap-3 sm:grid-cols-2 lg:max-w-2xl">
-          <Field>
-            <FieldLabel htmlFor="contract-roles-member">Member</FieldLabel>
-            <NativeSelect
-              id="contract-roles-member"
-              className="w-full"
-              value={member}
-              onChange={(event) => {
-                setMember(event.target.value);
-                setPage(1);
-              }}
-            >
-              <NativeSelectOption value="">All members</NativeSelectOption>
-              {(members.currentData?.data ?? []).map((option) => (
-                <NativeSelectOption key={option.id} value={option.id}>
-                  {`${option.firstName} ${option.lastName}`.trim() ||
-                    option.email}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="contract-roles-workspace">
-              Workspace
-            </FieldLabel>
-            <NativeSelect
-              id="contract-roles-workspace"
-              className="w-full"
-              value={workspace}
-              onChange={(event) => {
-                const value = event.target.value;
-                setWorkspace(WORKSPACES.find((w) => w === value) ?? "");
-                setPage(1);
-              }}
-            >
-              <NativeSelectOption value="">All workspaces</NativeSelectOption>
-              {WORKSPACES.map((option) => (
-                <NativeSelectOption key={option} value={option}>
-                  {humanizeEnumValue(option)}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          </Field>
+        {/* Predefined views: the workspace a role opens. */}
+        <DataTableFilterChips
+          label="Filter contract roles by workspace"
+          countNoun="roles"
+          value={workspace}
+          onChange={(next) => {
+            setWorkspace(next);
+            setPage(1);
+          }}
+          options={[
+            { value: "" as const, label: "All workspaces" },
+            ...WORKSPACES.map((option) => ({
+              value: option,
+              label: humanizeEnumValue(option),
+            })),
+          ]}
+        />
+
+        <div className="space-y-3">
+          <DataTableToolbar>
+            <div className="flex items-center gap-2">
+              <label
+                htmlFor="contract-roles-member"
+                className="text-sm whitespace-nowrap text-muted-foreground"
+              >
+                Member
+              </label>
+              <NativeSelect
+                id="contract-roles-member"
+                value={member}
+                onChange={(event) => {
+                  setMember(event.target.value);
+                  setPage(1);
+                }}
+              >
+                <NativeSelectOption value="">All members</NativeSelectOption>
+                {(members.currentData?.data ?? []).map((option) => (
+                  <NativeSelectOption key={option.id} value={option.id}>
+                    {memberName(option)}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </div>
+          </DataTableToolbar>
+          <DataTableActiveFilters
+            filters={
+              selectedMember
+                ? [
+                    {
+                      key: "member",
+                      label: memberName(selectedMember),
+                      onRemove: () => {
+                        setMember("");
+                        setPage(1);
+                      },
+                    },
+                  ]
+                : []
+            }
+            onClearAll={clearFilters}
+          />
         </div>
 
         <DataTable
@@ -264,6 +289,14 @@ export function CompanyContractRoles({ companyId }: { companyId: string }) {
       />
     </>
   );
+}
+
+function memberName(member: {
+  firstName: string;
+  lastName: string;
+  email: string;
+}): string {
+  return `${member.firstName} ${member.lastName}`.trim() || member.email;
 }
 
 function RoleMember({ row }: { row: CompanyRoleAssignment }) {

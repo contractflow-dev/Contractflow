@@ -122,7 +122,8 @@ describe("document version history sheet", () => {
     const user = setup();
     expect(screen.queryByRole("dialog")).toBeNull();
 
-    const [, tableButton] = screen.getAllByRole("button", {
+    // One table at every width, so each action appears once.
+    const tableButton = screen.getByRole("button", {
       name: "Show versions of Hydrotest procedure",
     });
     expect(tableButton.getAttribute("aria-haspopup")).toBe("dialog");
@@ -152,9 +153,9 @@ describe("document version history sheet", () => {
   it("closes with Escape", async () => {
     const user = setup();
     await user.click(
-      screen.getAllByRole("button", {
+      screen.getByRole("button", {
         name: "Show versions of Hydrotest procedure",
-      })[1],
+      }),
     );
     await screen.findByRole("dialog");
     await user.keyboard("{Escape}");

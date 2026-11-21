@@ -181,6 +181,35 @@ describe("CompanyTeamView", () => {
     expect(markup).toContain('aria-label="Actions for Ada Obi"');
   });
 
+  it("lays out the members toolbar like the register: status views, search, role, sort", () => {
+    const markup = renderToStaticMarkup(<CompanyTeamView />);
+
+    // Membership status is the predefined view, with All members selected.
+    const chips = markup.slice(
+      markup.indexOf('aria-label="Filter members by membership status"'),
+    );
+    expect(chips).toMatch(
+      /<button[^>]*aria-pressed="true"[^>]*>All members<\/button>/,
+    );
+    expect(chips).toMatch(
+      /<button[^>]*aria-pressed="false"[^>]*>Active<\/button>/,
+    );
+    expect(chips).toMatch(
+      /<button[^>]*aria-pressed="false"[^>]*>Inactive<\/button>/,
+    );
+    // Search is the shared search landmark; sort follows it in the toolbar.
+    const search = markup.indexOf('role="search"');
+    expect(search).toBeGreaterThan(0);
+    expect(markup.indexOf('id="member-role"')).toBeGreaterThan(search);
+    expect(markup.indexOf('id="member-sort"')).toBeGreaterThan(search);
+    expect(mocks.getMembers).toHaveBeenCalledWith(
+      expect.objectContaining({ status: undefined, search: undefined }),
+    );
+    // With no filters the empty list says nothing exists yet.
+    expect(markup).toContain("No members yet.");
+    expect(markup).not.toContain("Clear filters");
+  });
+
   it("offers Retry when members fail to load", () => {
     const failed = {
       currentData: undefined,
