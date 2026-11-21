@@ -1,4 +1,4 @@
-﻿import { randomUUID } from 'node:crypto';
+﻿import { buildActivityEntry } from '../../../common/application/activity-entry';
 import {
   ECompanyStatus,
   ECompanyUserStatus,
@@ -454,22 +454,23 @@ export class ContractLifecycleContextFactory implements ITransactionContextFacto
       },
       activity: {
         record: async (data) => {
+          // Lifecycle actions concern the contract itself; a site,
+          // party or invitation id stays in `changes.after`, where the
+          // feed's links read it.
           await activity.save(
-            activity.create({
-              contractId: data.contractId,
-              companyId: data.companyId,
-              actorUserId: data.actorUserId,
-              action: data.action,
-              entityType: 'contract',
-              entityId: randomUUID(),
-              summary: data.summary,
-              changes: { before: null, after: data.changes },
-              metadata: {},
-              ipAddress: null,
-              userAgent: null,
-              requestId: null,
-              occurredAt: data.occurredAt,
-            }),
+            activity.create(
+              buildActivityEntry({
+                contractId: data.contractId,
+                companyId: data.companyId,
+                actorUserId: data.actorUserId,
+                action: data.action,
+                entityType: 'contract',
+                entityId: data.contractId,
+                summary: data.summary,
+                changes: { before: null, after: data.changes },
+                occurredAt: data.occurredAt,
+              }),
+            ),
           );
         },
       },

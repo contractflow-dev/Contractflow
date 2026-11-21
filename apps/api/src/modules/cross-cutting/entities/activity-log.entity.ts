@@ -34,8 +34,17 @@ export class ActivityLog
   @Column({ name: 'entity_type', type: 'varchar', length: 60 })
   entityType!: string;
 
-  @Column({ name: 'entity_id', type: 'uuid' })
+  /** The affected record's id (a ULID); older entries hold a generated UUID. */
+  @Column({ name: 'entity_id', type: 'varchar', length: 36 })
   entityId!: string;
+
+  /** The workspace whose content changed; null for contract-wide entries. */
+  @Column({ name: 'workspace', type: 'varchar', length: 20, nullable: true })
+  workspace!: 'project' | 'hse' | 'finance' | null;
+
+  /** The explanation given for the action, where one was asked for. */
+  @Column({ name: 'reason', type: 'varchar', length: 2000, nullable: true })
+  reason!: string | null;
 
   @Column({ name: 'summary', type: 'varchar', length: 500 })
   summary!: string;

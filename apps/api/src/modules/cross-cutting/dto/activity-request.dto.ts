@@ -3,7 +3,9 @@ import {
   CONTRACT_ACTIVITY_ACTIONS,
   type ContractActivityAction,
   type ContractActivityFilters,
+  type ContractActivityWorkspace,
 } from '@contractflow/contracts-schema';
+import { ACTIVITY_WORKSPACES } from '../../../common/application/activity-entry';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
 /**
@@ -39,4 +41,23 @@ export class ListContractActivityRequestDto
   @IsOptional()
   @IsIn([...CONTRACT_ACTIVITY_ACTIONS])
   action?: ContractActivityAction;
+
+  /** A record kind as entries name it, such as `document`. */
+  @IsOptional()
+  @Matches(/^[a-z][a-z0-9_]{0,59}$/, {
+    message: 'entityType must be a snake_case record type',
+  })
+  entityType?: string;
+
+  /** A record's id: a ULID, or the UUID of an older entry. */
+  @IsOptional()
+  @Matches(
+    /^(?:[0-7][0-9A-HJKMNP-TV-Z]{25}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
+    { message: 'entityId must be a ULID or UUID' },
+  )
+  entityId?: string;
+
+  @IsOptional()
+  @IsIn([...ACTIVITY_WORKSPACES])
+  workspace?: ContractActivityWorkspace;
 }

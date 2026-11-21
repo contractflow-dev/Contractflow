@@ -1,5 +1,8 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
-import { ECompanyRole, EContractorContractRole } from '@contractflow/contracts-schema';
+import {
+  ECompanyRole,
+  EContractorContractRole,
+} from '@contractflow/contracts-schema';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ContractAccessService } from './contract-access.service';
 import { ContractResourceReader } from './contract-resource-reader';
@@ -107,6 +110,55 @@ describe('ContractAccessService', () => {
         service.authorizeCompanyOversight('u1', ''),
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(users.findActiveMember).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('authorizeWithWorkspaces', () => {
+    it("lists only the workspaces the reader's own roles open", async () => {
+      roleAssignments.findActiveByCompanyUser.mockResolvedValue([
+        {
+          contractPartyId: 'p1',
+          role: EContractorContractRole.FINANCE_OFFICER,
+        },
+        {
+          contractPartyId: 'p1',
+          role: EContractorContractRole.CONTRACTOR_PROJECT_LEAD,
+        },
+        // A role on another party of the same company doesn't count.
+        { contractPartyId: 'p2', role: EContractorContractRole.HSE_OFFICER },
+      ]);
+
+      await expect(
+        service.authorizeWithWorkspaces('u1', 'co1', 'c1'),
+      ).resolves.toEqual({
+        scope: { contractId: 'c1', companyId: 'co1' },
+        workspaces: ['project', 'finance'],
+      });
+    });
+
+    it('opens no workspace through Company Administrator oversight', async () => {
+      users.findActiveMember.mockResolvedValue({
+        id: 'admin-1',
+        companyRole: ECompanyRole.COMPANY_ADMIN,
+      });
+      roleAssignments.findActiveByCompanyUser.mockResolvedValue([
+        { contractPartyId: 'p1', role: EContractorContractRole.HSE_OFFICER },
+      ]);
+
+      const { workspaces } = await service.authorizeWithWorkspaces(
+        'u1',
+        'co1',
+        'c1',
+      );
+      // Only the role held counts, not the administrator's company role.
+      expect(workspaces).toEqual(['hse']);
+    });
+
+    it('fails exactly as authorize does when the contract is hidden', async () => {
+      roleAssignments.findActiveByCompanyUser.mockResolvedValue([]);
+      await expect(
+        service.authorizeWithWorkspaces('u1', 'co1', 'c1'),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 

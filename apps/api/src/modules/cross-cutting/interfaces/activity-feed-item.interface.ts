@@ -1,4 +1,7 @@
-import type { ContractActivityTarget } from '@contractflow/contracts-schema';
+import type {
+  ContractActivityTarget,
+  ContractActivityWorkspace,
+} from '@contractflow/contracts-schema';
 
 /** Validated activity filters, as the repository applies them. */
 export interface ActivityLogFilter {
@@ -9,6 +12,17 @@ export interface ActivityLogFilter {
   /** The acting company membership. */
   actorUserId?: string;
   action?: string;
+  entityType?: string;
+  entityId?: string;
+  workspace?: ContractActivityWorkspace;
+}
+
+/**
+ * The workspaces whose entries the reader may see: those their contract
+ * roles open. Contract-wide entries (no workspace) are always visible.
+ */
+export interface ActivityVisibility {
+  workspaces: readonly ContractActivityWorkspace[];
 }
 
 /** A member of the caller's company with activity on a contract. */
@@ -23,6 +37,8 @@ export interface ActivityFeedItem {
   action: string;
   entityType: string;
   entityId: string;
+  workspace: ContractActivityWorkspace | null;
+  reason: string | null;
   summary: string;
   actorUserId: string;
   /** "First Last" of the acting member of the caller's company; null if unresolved. */

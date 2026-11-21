@@ -37,17 +37,18 @@ export class ActivityService {
     query: IPageQuery & ContractActivityFilters,
   ): Promise<IPaginatedResponse<ActivityFeedItem>> {
     const filter = toFilter(query);
-    const scope = await this.access.authorize(
+    // Contract-wide entries are visible to every reader of the contract;
+    // an entry of a workspace only to those holding a role in it.
+    const { scope, workspaces } = await this.access.authorizeWithWorkspaces(
       userId,
       companyId,
       contractId,
-      'general',
     );
-    const rows = await this.activityLogs.findPageWithActorNames(scope, {
-      ...filter,
-      skip: pageOffset(query),
-      take: query.limit,
-    });
+    const rows = await this.activityLogs.findPageWithActorNames(
+      scope,
+      { workspaces },
+      { ...filter, skip: pageOffset(query), take: query.limit },
+    );
 
     // IP address, user agent, request id and raw change sets stay internal;
     // of the actor, only the name is returned.
@@ -56,6 +57,8 @@ export class ActivityService {
       action: row.action,
       entityType: row.entityType,
       entityId: row.entityId,
+      workspace: row.workspace ?? null,
+      reason: row.reason ?? null,
       summary: row.summary,
       actorUserId: row.actorUserId,
       actorName: actorName(row.actorUser?.user),
@@ -244,7 +247,9 @@ export class ActivityService {
   ): Record<string, unknown> | undefined {
     if (!value || typeof value !== 'object') return undefined;
     const candidate = (value as Record<string, unknown>)[key];
-    return candidate && typeof candidate === 'object' && !Array.isArray(candidate)
+    return candidate &&
+      typeof candidate === 'object' &&
+      !Array.isArray(candidate)
       ? (candidate as Record<string, unknown>)
       : undefined;
   }
@@ -272,13 +277,12 @@ export class ActivityService {
     companyId: string,
     contractId: string,
   ): Promise<ContractActivityActor[]> {
-    const scope = await this.access.authorize(
+    const { scope, workspaces } = await this.access.authorizeWithWorkspaces(
       userId,
       companyId,
       contractId,
-      'general',
     );
-    const actors = await this.activityLogs.findActors(scope);
+    const actors = await this.activityLogs.findActors(scope, { workspaces });
     return actors.map((actor) => ({
       actorUserId: actor.actorUserId,
       actorName: actorName(actor),
@@ -306,6 +310,9 @@ function toFilter(query: ContractActivityFilters): ActivityLogFilter {
     toDate,
     actorUserId: query.actorUserId,
     action: query.action,
+    entityType: query.entityType,
+    entityId: query.entityId,
+    workspace: query.workspace,
   };
 }
 

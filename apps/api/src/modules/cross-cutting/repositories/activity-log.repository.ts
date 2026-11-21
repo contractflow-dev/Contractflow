@@ -1,12 +1,13 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import type { Repository } from 'typeorm';
+import type { Repository, SelectQueryBuilder } from 'typeorm';
 import { ContractScopedRepository } from '../../../common/database/repositories/contract-scoped.repository';
 import type { IContractCompanyScope } from '../../../common/database/repositories/contract-scope.interface';
 import { ActivityLog } from '../entities/activity-log.entity';
 import type {
   ActivityActorRecord,
   ActivityLogFilter,
+  ActivityVisibility,
 } from '../interfaces/activity-feed-item.interface';
 
 /** Append-only; each entry belongs to a contract and the company that acted. */
@@ -41,12 +42,27 @@ export class ActivityLogRepository extends ContractScopedRepository<
    */
   async findPageWithActorNames(
     scope: IContractCompanyScope,
+    visibility: ActivityVisibility,
     options: ActivityLogFilter & { skip: number; take: number },
   ): Promise<{ items: ActivityLog[]; total: number }> {
     // The filters only add conditions to the scoped query, so they can
     // narrow the company's entries but never reach another company's; the
     // count comes from the same filtered query as the page.
     const query = await this.createScopedQueryBuilder(scope, 'e');
+    whereVisible(query, visibility);
+    if (options.entityType) {
+      query.andWhere('e.entityType = :entityType', {
+        entityType: options.entityType,
+      });
+    }
+    if (options.entityId) {
+      query.andWhere('e.entityId = :entityId', { entityId: options.entityId });
+    }
+    if (options.workspace) {
+      query.andWhere('e.workspace = :workspace', {
+        workspace: options.workspace,
+      });
+    }
     if (options.fromDate) {
       query.andWhere('e.occurredAt >= :fromDate', {
         fromDate: options.fromDate,
@@ -87,8 +103,10 @@ export class ActivityLogRepository extends ContractScopedRepository<
    */
   async findActors(
     scope: IContractCompanyScope,
+    visibility: ActivityVisibility,
   ): Promise<ActivityActorRecord[]> {
     const query = await this.createScopedQueryBuilder(scope, 'e');
+    whereVisible(query, visibility);
     return query
       .innerJoin('e.actorUser', 'actor', 'actor.companyId = e.companyId')
       .innerJoin('actor.user', 'actorPerson')
@@ -157,4 +175,22 @@ export class ActivityLogRepository extends ContractScopedRepository<
       .take(limit)
       .getMany();
   }
+}
+
+/**
+ * Hides entries of workspaces the reader holds no role in. Contract-wide
+ * entries (no workspace) stay visible to everyone who can read the feed.
+ */
+function whereVisible(
+  query: SelectQueryBuilder<ActivityLog>,
+  visibility: ActivityVisibility,
+): void {
+  if (visibility.workspaces.length === 0) {
+    query.andWhere('e.workspace IS NULL');
+    return;
+  }
+  query.andWhere(
+    '(e.workspace IS NULL OR e.workspace IN (:...visibleWorkspaces))',
+    { visibleWorkspaces: [...visibility.workspaces] },
+  );
 }
