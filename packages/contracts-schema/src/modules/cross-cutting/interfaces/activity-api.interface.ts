@@ -9,6 +9,9 @@ export type ContractActivityTargetType =
 export type ContractActivityTargetSection =
   "parties" | "roles" | "sites" | "signatories" | "documents";
 
+/** A contract workspace an activity entry can belong to. */
+export type ContractActivityWorkspace = "project" | "hse" | "finance";
+
 export interface ContractActivityTarget {
   type: ContractActivityTargetType;
   id: string;
@@ -28,10 +31,14 @@ export interface ContractActivityItem {
   action: string;
   entityType: string;
   /**
-   * A generated identifier for the log entry, not the changed record's id:
-   * `activity_log.entity_id` is a uuid column and records use ULIDs.
+   * The affected record's id. Entries written before record ids were stored
+   * hold a generated UUID here instead.
    */
   entityId: string;
+  /** The workspace whose content changed; null for contract-wide entries. */
+  workspace: ContractActivityWorkspace | null;
+  /** The explanation given for the action, where one was asked for. */
+  reason: string | null;
   /** A sentence the API wrote when the action happened. */
   summary: string;
   /** The acting company membership (`company_user.id`), not the user id. */
@@ -97,6 +104,15 @@ export interface ContractActivityFilters {
   /** An actor's company membership id, as `actorUserId` in the entries. */
   actorUserId?: string;
   action?: ContractActivityAction;
+  /** One kind of record, such as `document`; usually with `entityId`. */
+  entityType?: string;
+  /** One record's history: its id, as `entityId` in the entries. */
+  entityId?: string;
+  /**
+   * Entries of one workspace. Entries of a workspace the caller holds no role
+   * in are never returned, with or without this filter.
+   */
+  workspace?: ContractActivityWorkspace;
 }
 
 /**

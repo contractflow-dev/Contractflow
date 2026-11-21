@@ -14,7 +14,17 @@ import { ContractRepository } from '../repositories/contract.repository';
 import { ContractPartyRepository } from '../repositories/contract-party.repository';
 import { ContractRoleAssignmentRepository } from '../repositories/contract-role-assignment.repository';
 import { ContractWorkspaceRepository } from '../repositories/contract-workspace.repository';
-import { WORKSPACE_ROLES, type ContractWorkspace } from './contract-workspace';
+import {
+  WORKSPACE_ROLES,
+  type AssignableContractWorkspace,
+  type ContractWorkspace,
+} from './contract-workspace';
+
+const ASSIGNABLE_WORKSPACES: readonly AssignableContractWorkspace[] = [
+  'project',
+  'hse',
+  'finance',
+];
 
 /**
  * Why a contract is visible to its reader:
@@ -90,10 +100,16 @@ export class ContractAccessService {
     contractId: string,
     options: { includeArchived?: boolean } = {},
   ): Promise<IContractOversightAuthorization> {
-    const { membership, party, assignments, contractId: id, companyId: co } =
-      await this.resolveReader(userId, companyId, contractId);
+    const {
+      membership,
+      party,
+      assignments,
+      contractId: id,
+      companyId: co,
+    } = await this.resolveReader(userId, companyId, contractId);
     const hasAssignment = assignments.length > 0;
-    const isCompanyAdmin = membership.companyRole === ECompanyRole.COMPANY_ADMIN;
+    const isCompanyAdmin =
+      membership.companyRole === ECompanyRole.COMPANY_ADMIN;
     if (!hasAssignment && !isCompanyAdmin) {
       throw contractNotFound();
     }
@@ -162,6 +178,38 @@ export class ContractAccessService {
   }
 
   /**
+   * `authorize` for the contract as a whole ('general'), plus the workspaces
+   * the reader's own roles open. Readers of contract-wide records, such as
+   * the activity log, use it to hide what belongs to a workspace they hold no
+   * role in. Holding a role is what counts: Company Administrator oversight
+   * opens no workspace.
+   */
+  async authorizeWithWorkspaces(
+    userId: string,
+    companyId: string,
+    contractId: string,
+  ): Promise<{
+    scope: IContractCompanyScope;
+    workspaces: AssignableContractWorkspace[];
+  }> {
+    const scope = await this.authorize(
+      userId,
+      companyId,
+      contractId,
+      'general',
+    );
+    const { assignments } = await this.resolveReader(
+      userId,
+      companyId,
+      contractId,
+    );
+    const workspaces = ASSIGNABLE_WORKSPACES.filter((workspace) =>
+      assignments.some(({ role }) => WORKSPACE_ROLES[workspace].includes(role)),
+    );
+    return { scope, workspaces };
+  }
+
+  /**
    * The same checks as `authorize`, but an archived contract is allowed and
    * reported, so a caller can keep its records readable while refusing
    * changes. Only callers that enforce that read-only rule may use this.
@@ -182,9 +230,14 @@ export class ContractAccessService {
     workspace: ContractWorkspace,
     includeArchived: boolean,
   ): Promise<{ scope: IContractCompanyScope; archived: boolean }> {
-    const { membership, assignments, contractId: id, companyId: co } =
-      await this.resolveReader(userId, companyId, contractId);
-    const isCompanyAdmin = membership.companyRole === ECompanyRole.COMPANY_ADMIN;
+    const {
+      membership,
+      assignments,
+      contractId: id,
+      companyId: co,
+    } = await this.resolveReader(userId, companyId, contractId);
+    const isCompanyAdmin =
+      membership.companyRole === ECompanyRole.COMPANY_ADMIN;
     // No role on this contract at all: an ordinary member can't even see it.
     // A Company Administrator can (oversight), so they get the 403 below.
     if (assignments.length === 0 && !isCompanyAdmin) {

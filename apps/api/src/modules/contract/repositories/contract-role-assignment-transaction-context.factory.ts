@@ -2,6 +2,7 @@ import type { EntityManager } from 'typeorm';
 import { IsNull, LessThanOrEqual } from 'typeorm';
 import { ECompanyUserStatus } from '@contractflow/contracts-schema';
 import type { ITransactionContextFactory } from '../../../common/database/transaction-context.factory.interface';
+import { buildActivityEntry } from '../../../common/application/activity-entry';
 import { ActivityLog } from '../../cross-cutting/entities/activity-log.entity';
 import { Company } from '../../identity/entities/company.entity';
 import { CompanyUser } from '../../identity/entities/company-user.entity';
@@ -458,7 +459,7 @@ export class TypeOrmContractRoleAssignmentContext implements IContractRoleAssign
       >[0],
     ) => {
       const repository = this.manager.getRepository(ActivityLog);
-      await repository.save(repository.create(data));
+      await repository.save(repository.create(buildActivityEntry(data)));
     },
   };
 }

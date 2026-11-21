@@ -6,12 +6,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 describe('ActivityService', () => {
   const scope = { contractId: 'c1', companyId: 'co1' };
-  let access: { authorize: ReturnType<typeof vi.fn> };
+  let access: { authorizeWithWorkspaces: ReturnType<typeof vi.fn> };
   let activityLogs: { findPageWithActorNames: ReturnType<typeof vi.fn> };
   let service: ActivityService;
 
   beforeEach(() => {
-    access = { authorize: vi.fn().mockResolvedValue(scope) };
+    access = {
+      authorizeWithWorkspaces: vi
+        .fn()
+        .mockResolvedValue({ scope, workspaces: ['project'] }),
+    };
     activityLogs = { findPageWithActorNames: vi.fn() };
     service = new ActivityService(
       access as unknown as ContractAccessService,
@@ -61,11 +65,16 @@ describe('ActivityService', () => {
       limit: 20,
     });
 
-    expect(access.authorize).toHaveBeenCalledWith('u1', 'co1', 'c1', 'general');
-    expect(activityLogs.findPageWithActorNames).toHaveBeenCalledWith(scope, {
-      skip: 40,
-      take: 20,
-    });
+    expect(access.authorizeWithWorkspaces).toHaveBeenCalledWith(
+      'u1',
+      'co1',
+      'c1',
+    );
+    expect(activityLogs.findPageWithActorNames).toHaveBeenCalledWith(
+      scope,
+      { workspaces: ['project'] },
+      { skip: 40, take: 20 },
+    );
     expect(result.meta).toEqual({
       totalItems: 41,
       itemCount: 2,
@@ -82,7 +91,7 @@ describe('ActivityService', () => {
   });
 
   it('does not query or count records when access is denied', async () => {
-    access.authorize.mockRejectedValue(new ForbiddenException());
+    access.authorizeWithWorkspaces.mockRejectedValue(new ForbiddenException());
 
     await expect(
       service.listForContract('u1', 'co1', 'c1', { page: 1, limit: 20 }),
@@ -91,11 +100,7 @@ describe('ActivityService', () => {
   });
 
   it('reads change-set targets from the stored `after` object, taking only the named id', async () => {
-    const row = (
-      id: string,
-      action: string,
-      changes: unknown,
-    ) => ({
+    const row = (id: string, action: string, changes: unknown) => ({
       id,
       action,
       entityType: 'contract',
@@ -140,7 +145,11 @@ describe('ActivityService', () => {
 
     expect(targets).toEqual({
       site: { type: 'contract_site', id: 'site-1', section: 'sites' },
-      signatory: { type: 'contract_party', id: 'party-1', section: 'signatories' },
+      signatory: {
+        type: 'contract_party',
+        id: 'party-1',
+        section: 'signatories',
+      },
       invitation: {
         type: 'contract_party_invitation',
         id: 'inv-1',
@@ -152,7 +161,12 @@ describe('ActivityService', () => {
       'numeric-id': null,
     });
     const raw = JSON.stringify(result.data);
-    for (const hidden of ['SECRET-CODE', 'private@example.com', 'site-2', 'site-3']) {
+    for (const hidden of [
+      'SECRET-CODE',
+      'private@example.com',
+      'site-2',
+      'site-3',
+    ]) {
       expect(raw).not.toContain(hidden);
     }
   });
@@ -160,7 +174,7 @@ describe('ActivityService', () => {
 
 describe('ActivityService filters', () => {
   const scope = { contractId: 'c1', companyId: 'co1' };
-  let access: { authorize: ReturnType<typeof vi.fn> };
+  let access: { authorizeWithWorkspaces: ReturnType<typeof vi.fn> };
   let activityLogs: {
     findPageWithActorNames: ReturnType<typeof vi.fn>;
     findActors: ReturnType<typeof vi.fn>;
@@ -169,7 +183,11 @@ describe('ActivityService filters', () => {
   const page = { page: 1, limit: 20 };
 
   beforeEach(() => {
-    access = { authorize: vi.fn().mockResolvedValue(scope) };
+    access = {
+      authorizeWithWorkspaces: vi
+        .fn()
+        .mockResolvedValue({ scope, workspaces: ['project'] }),
+    };
     activityLogs = {
       findPageWithActorNames: vi
         .fn()
@@ -182,7 +200,7 @@ describe('ActivityService filters', () => {
     );
   });
 
-  const filterSent = () => activityLogs.findPageWithActorNames.mock.calls[0][1];
+  const filterSent = () => activityLogs.findPageWithActorNames.mock.calls[0][2];
 
   it('reads calendar days as whole UTC days, both ends inclusive', async () => {
     await service.listForContract('u1', 'co1', 'c1', {
@@ -242,16 +260,90 @@ describe('ActivityService filters', () => {
 
     const actors = await service.listActors('u1', 'co1', 'c1');
 
-    expect(access.authorize).toHaveBeenCalledWith('u1', 'co1', 'c1', 'general');
-    expect(activityLogs.findActors).toHaveBeenCalledWith(scope);
+    expect(access.authorizeWithWorkspaces).toHaveBeenCalledWith(
+      'u1',
+      'co1',
+      'c1',
+    );
+    expect(activityLogs.findActors).toHaveBeenCalledWith(scope, {
+      workspaces: ['project'],
+    });
     expect(actors).toEqual([
       { actorUserId: 'm1', actorName: 'Ada Okafor' },
       { actorUserId: 'm2', actorName: null },
     ]);
   });
 
+  it('passes record and workspace filters through, within the reader’s workspaces', async () => {
+    access.authorizeWithWorkspaces.mockResolvedValue({
+      scope,
+      workspaces: ['hse'],
+    });
+    await service.listForContract('u1', 'co1', 'c1', {
+      ...page,
+      entityType: 'contract_role_assignment',
+      entityId: '01JASSIGNMENT0000000000000',
+      workspace: 'project',
+    });
+
+    const [, visibility, filter] =
+      activityLogs.findPageWithActorNames.mock.calls[0];
+    // The visibility comes from the reader's roles, never from the query: a
+    // workspace filter for one they can't see only narrows to nothing.
+    expect(visibility).toEqual({ workspaces: ['hse'] });
+    expect(filter).toMatchObject({
+      entityType: 'contract_role_assignment',
+      entityId: '01JASSIGNMENT0000000000000',
+      workspace: 'project',
+    });
+  });
+
+  it('returns each entry’s workspace and reason, and nothing more of the change set', async () => {
+    activityLogs.findPageWithActorNames.mockResolvedValue({
+      items: [
+        {
+          id: 'a1',
+          action: 'contract.role_revoked',
+          entityType: 'contract_role_assignment',
+          entityId: '01JASSIGNMENT0000000000000',
+          workspace: 'hse',
+          reason: 'Left the project.',
+          summary: 'Revoked',
+          actorUserId: 'm1',
+          occurredAt: new Date('2026-01-01T00:00:00.000Z'),
+          changes: { before: { role: 'HSE Officer' }, after: null },
+          metadata: { targetCompanyUserId: 'm2' },
+          actorUser: null,
+        },
+        {
+          id: 'a2',
+          action: 'contract.restored',
+          entityType: 'contract',
+          entityId: 'c1',
+          summary: 'Restored',
+          actorUserId: 'm1',
+          occurredAt: new Date('2026-01-01T00:00:00.000Z'),
+          actorUser: null,
+        },
+      ],
+      total: 2,
+    });
+
+    const result = await service.listForContract('u1', 'co1', 'c1', page);
+
+    expect(result.data[0]).toMatchObject({
+      entityId: '01JASSIGNMENT0000000000000',
+      workspace: 'hse',
+      reason: 'Left the project.',
+    });
+    // Older entries have neither.
+    expect(result.data[1]).toMatchObject({ workspace: null, reason: null });
+    expect(result.data[0]).not.toHaveProperty('changes');
+    expect(result.data[0]).not.toHaveProperty('metadata');
+  });
+
   it('lists no actors when access is denied', async () => {
-    access.authorize.mockRejectedValue(new ForbiddenException());
+    access.authorizeWithWorkspaces.mockRejectedValue(new ForbiddenException());
 
     await expect(service.listActors('u1', 'co1', 'c1')).rejects.toBeInstanceOf(
       ForbiddenException,

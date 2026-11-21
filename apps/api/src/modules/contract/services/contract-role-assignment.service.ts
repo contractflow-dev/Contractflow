@@ -14,7 +14,7 @@ import {
   type CompanyRoleAssignment,
   type IPaginatedResponse,
 } from '@contractflow/contracts-schema';
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import {
   pageOffset,
   toPaginatedResponse,
@@ -1027,7 +1027,7 @@ export class ContractRoleAssignmentService {
       actorUserId: actorCompanyUserId,
       action,
       entityType: 'contract_role_assignment',
-      entityId: randomUUID(),
+      entityId: assignment.id,
       summary:
         action === 'contract.role_assigned'
           ? `Assigned ${assignment.role} to a company member in the ${workspace} workspace.`
@@ -1061,7 +1061,7 @@ export class ContractRoleAssignmentService {
       actorUserId: actorCompanyUserId,
       action,
       entityType: 'contract_role_invitation',
-      entityId: randomUUID(),
+      entityId: invitation.id,
       summary: `Created or revoked a ${invitation.workspace} role invitation for ${invitation.email}.`,
       changes: {
         before: null,

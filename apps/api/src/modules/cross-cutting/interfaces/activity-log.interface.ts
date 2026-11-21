@@ -5,6 +5,8 @@ export interface IActivityLogEntity {
   action: string;
   entityType: string;
   entityId: string;
+  workspace: 'project' | 'hse' | 'finance' | null;
+  reason: string | null;
   summary: string;
   changes: Record<string, any>;
   metadata: Record<string, any>;

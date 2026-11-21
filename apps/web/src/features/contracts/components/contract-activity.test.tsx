@@ -119,6 +119,8 @@ function entry(
     action: "contract.site_created",
     entityType: "contract",
     entityId: "6f1c2a4e-0000-4000-8000-000000000001",
+    workspace: null,
+    reason: null,
     summary: "Added site SITE-01 to CTR-001.",
     actorUserId: "member-self",
     actorName: "Max Verifier",

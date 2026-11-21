@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { buildActivityEntry } from '../../../common/application/activity-entry';
 import {
   ECompanyUserStatus,
   EDocumentUploadStatus,
@@ -163,27 +163,26 @@ export class TypeOrmDocumentContext implements IDocumentContext {
 
     this.activity = {
       record: async (data) => {
-        // activity_log.entity_id is a uuid column, so ULID document ids are
-        // kept in metadata (the same convention as contract activity).
+        // The document is the entity; its id also stays in metadata, where
+        // the feed's links read it.
         await activity.save(
-          activity.create({
-            contractId: data.contractId,
-            companyId: data.companyId,
-            actorUserId: data.actorCompanyUserId,
-            action: data.action,
-            entityType: 'document',
-            entityId: randomUUID(),
-            summary: data.summary.slice(0, 500),
-            changes: { before: null, after: data.details ?? {} },
-            metadata: {
-              documentId: data.documentId,
-              ...(data.versionId ? { versionId: data.versionId } : {}),
-            },
-            ipAddress: null,
-            userAgent: null,
-            requestId: null,
-            occurredAt: data.occurredAt,
-          }),
+          activity.create(
+            buildActivityEntry({
+              contractId: data.contractId,
+              companyId: data.companyId,
+              actorUserId: data.actorCompanyUserId,
+              action: data.action,
+              entityType: 'document',
+              entityId: data.documentId,
+              summary: data.summary,
+              changes: { before: null, after: data.details ?? {} },
+              metadata: {
+                documentId: data.documentId,
+                ...(data.versionId ? { versionId: data.versionId } : {}),
+              },
+              occurredAt: data.occurredAt,
+            }),
+          ),
         );
       },
     };

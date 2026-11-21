@@ -522,8 +522,12 @@ describe('Contract activity access PostgreSQL integration', () => {
           'entityType',
           'id',
           'occurredAt',
+          // Decision reason and workspace (ActivityLogAuditFields migration);
+          // null on contract-wide entries.
+          'reason',
           'summary',
           'target',
+          'workspace',
         ]);
         // These rows carry no approved record id (only a secret token), so
         // no target is derived from them.
@@ -1549,6 +1553,130 @@ describe('Contract activity access PostgreSQL integration', () => {
       await getActors(await signIn(adminO), companyO.id, contract.id).expect(
         404,
       );
+    });
+  });
+
+  describe('workspace isolation and record history', () => {
+    /** An entry of one workspace's content, naming its record. */
+    async function writeWorkspaceEntry(
+      workspace: 'project' | 'hse' | 'finance',
+      entityId: string,
+      minutesAgo: number,
+    ): Promise<ActivityLog> {
+      const logs = dataSource.getRepository(ActivityLog);
+      return logs.save(
+        logs.create({
+          contractId: contract.id,
+          companyId: companyA.id,
+          actorUserId: memberA.id,
+          action: 'contract.role_assigned',
+          entityType: 'milestone',
+          entityId,
+          workspace,
+          reason: `Reason for ${workspace}`,
+          summary: `${workspace} entry`,
+          changes: { before: null, after: null },
+          metadata: {},
+          ipAddress: null,
+          userAgent: null,
+          requestId: null,
+          occurredAt: new Date(Date.now() - minutesAgo * 60_000),
+        }),
+      );
+    }
+
+    it('shows a workspace’s entries only to readers holding a role in it', async () => {
+      // memberA holds Contractor Project Lead: the Project workspace only.
+      const project = await writeWorkspaceEntry(
+        'project',
+        '01J00000000000000000000P01',
+        1,
+      );
+      const hse = await writeWorkspaceEntry(
+        'hse',
+        '01J00000000000000000000H01',
+        2,
+      );
+      const cookie = await signIn(memberA);
+
+      const all = body(
+        await getActivity(cookie, companyA.id, contract.id).expect(200),
+      );
+      const seen = all.data.map(({ id }) => id);
+      expect(seen).toContain(project.id);
+      expect(seen).not.toContain(hse.id);
+      // Contract-wide entries stay visible, and the count leaves HSE out.
+      expect(seen).toEqual(expect.arrayContaining(ids(activityA)));
+      expect(all.meta.totalItems).toBe(activityA.length + 1);
+      expect(all.data.find(({ id }) => id === project.id)).toMatchObject({
+        workspace: 'project',
+        reason: 'Reason for project',
+        entityId: '01J00000000000000000000P01',
+      });
+
+      // Asking for the HSE workspace by name only narrows to nothing.
+      const asked = body(
+        await getActivity(cookie, companyA.id, contract.id, {
+          workspace: 'hse',
+        }).expect(200),
+      );
+      expect(asked.data).toEqual([]);
+      expect(asked.meta.totalItems).toBe(0);
+    });
+
+    it('gives HSE entries to an HSE role holder of the same company', async () => {
+      const hse = await writeWorkspaceEntry(
+        'hse',
+        '01J00000000000000000000H01',
+        2,
+      );
+      const hseOfficer = await factory.createAdditionalMember(companyA);
+      const partyA = await dataSource
+        .getRepository(ContractParty)
+        .findOneByOrFail({ contractId: contract.id, companyId: companyA.id });
+      await grantRole(partyA, hseOfficer, EContractorContractRole.HSE_OFFICER);
+
+      const response = body(
+        await getActivity(await signIn(hseOfficer), companyA.id, contract.id, {
+          workspace: 'hse',
+        }).expect(200),
+      );
+      expect(response.data.map(({ id }) => id)).toEqual([hse.id]);
+    });
+
+    it('filters to one record’s history by its type and id', async () => {
+      const first = await writeWorkspaceEntry(
+        'project',
+        '01J00000000000000000000M01',
+        1,
+      );
+      const second = await writeWorkspaceEntry(
+        'project',
+        '01J00000000000000000000M01',
+        3,
+      );
+      await writeWorkspaceEntry('project', '01J00000000000000000000M02', 2);
+
+      const response = body(
+        await getActivity(await signIn(memberA), companyA.id, contract.id, {
+          entityType: 'milestone',
+          entityId: '01J00000000000000000000M01',
+        }).expect(200),
+      );
+      expect(response.data.map(({ id }) => id)).toEqual([first.id, second.id]);
+    });
+
+    it('refuses malformed record and workspace filters', async () => {
+      const cookie = await signIn(memberA);
+      await getActivity(cookie, companyA.id, contract.id, {
+        entityId: 'not-an-id',
+      }).expect(400);
+      await getActivity(cookie, companyA.id, contract.id, {
+        entityType: 'Milestone; DROP TABLE',
+      }).expect(400);
+      await getActivity(cookie, companyA.id, contract.id, {
+        workspace: 'payroll',
+      }).expect(400);
     });
   });
 });
