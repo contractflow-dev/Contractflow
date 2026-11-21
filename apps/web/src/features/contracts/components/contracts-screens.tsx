@@ -17,7 +17,6 @@ import { Checkbox } from "@workspace/ui/components/checkbox";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
@@ -955,39 +954,30 @@ export function ContractDetail({
 
       {section === "parties" ? (
         <>
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                <h2>Contract parties</h2>
-              </CardTitle>
-              <CardDescription>
-                Companies recorded as parties to this contract.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <DataTable
-                label="Contract parties"
-                columns={PARTY_COLUMNS}
-                rows={parties ?? []}
-                getRowKey={(party) => party.id}
-                isLoading={partiesLoading}
-                loadingLabel="Loading parties…"
-                skeletonRows={3}
-                error={
-                  partiesError
-                    ? getApiErrorMessage(
-                        partiesError,
-                        "Unable to load contract parties.",
-                      )
-                    : null
-                }
-                onRetry={() => void refetchParties()}
-                empty={
-                  <DataTableEmpty title="No party details are available." />
-                }
-              />
-            </CardContent>
-          </Card>
+          <ListCard
+            title="Contract parties"
+            description="Companies recorded as parties to this contract."
+          >
+            <DataTable
+              label="Contract parties"
+              columns={PARTY_COLUMNS}
+              rows={parties ?? []}
+              getRowKey={(party) => party.id}
+              isLoading={partiesLoading}
+              loadingLabel="Loading parties…"
+              skeletonRows={3}
+              error={
+                partiesError
+                  ? getApiErrorMessage(
+                      partiesError,
+                      "Unable to load contract parties.",
+                    )
+                  : null
+              }
+              onRetry={() => void refetchParties()}
+              empty={<DataTableEmpty title="No party details are available." />}
+            />
+          </ListCard>
           <ContractLifecycleManagement
             companyId={companyId}
             contract={contract}
@@ -1034,109 +1024,101 @@ export function ContractDetail({
       ) : null}
 
       {section === "history" ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              <h2>Status history</h2>
-            </CardTitle>
-            <CardDescription>
-              Recorded status changes, newest first. Filter by a status the
-              contract moved to or from, or by when it changed.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <DataTableFilterChips
-              label="Filter status history by status"
-              countNoun="status changes"
-              value={historyFilters.status}
-              onChange={(status) => setHistoryFilters({ status })}
-              options={STATUS_HISTORY_FILTERS.map((value) => ({
-                value,
-                label: value ? humanizeEnumValue(value) : "All changes",
-              }))}
-            />
-            <DataTableDateRange
-              legend="Changed between"
-              from={historyFilters.fromDay}
-              to={historyFilters.toDay}
-              max={todayAsCalendarDate()}
-              error={historyRangeError}
-              onFromChange={(fromDay) => setHistoryFilters({ fromDay })}
-              onToChange={(toDay) => setHistoryFilters({ toDay })}
-            />
-            <DataTableActiveFilters
-              filters={[
-                ...(historyFilters.fromDay
-                  ? [
-                      {
-                        key: "from",
-                        label: `From ${formatCalendarDate(historyFilters.fromDay)}`,
-                        onRemove: () => setHistoryFilters({ fromDay: "" }),
-                      },
-                    ]
-                  : []),
-                ...(historyFilters.toDay
-                  ? [
-                      {
-                        key: "to",
-                        label: `To ${formatCalendarDate(historyFilters.toDay)}`,
-                        onRemove: () => setHistoryFilters({ toDay: "" }),
-                      },
-                    ]
-                  : []),
-              ]}
-              onClearAll={() => setHistoryFilters({ fromDay: "", toDay: "" })}
-            />
-            <DataTable
-              label="Status history"
-              columns={historyColumns(timeZone)}
-              rows={history?.data ?? []}
-              getRowKey={(entry) => entry.id}
-              isLoading={historyLoading}
-              loadingLabel="Loading status history…"
-              skeletonRows={3}
-              error={
-                historyError
-                  ? getApiErrorMessage(
-                      historyError,
-                      "Unable to load status history.",
-                    )
-                  : null
-              }
-              onRetry={() => void refetchHistory()}
-              empty={
-                historyFiltered ? (
-                  <DataTableEmpty
-                    title="No status changes match these filters."
-                    description="Try another status or dates, or clear the filters to see every change."
-                    action={
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={clearHistoryFilters}
-                      >
-                        Clear filters
-                      </Button>
-                    }
-                  />
-                ) : (
-                  <DataTableEmpty title="No status changes have been recorded." />
-                )
-              }
-              pagination={
-                history
-                  ? {
-                      meta: history.meta,
-                      itemLabel: "status changes",
-                      isFetching: historyFetching,
-                      onPageChange: setHistoryPage,
-                      onPageSizeChange: setHistoryPageSize,
-                    }
-                  : undefined
-              }
-            />
-          </CardContent>
-        </Card>
+        <ListCard
+          title="Status history"
+          description="Recorded status changes, newest first. Filter by a status the contract moved to or from, or by when it changed."
+        >
+          <DataTableFilterChips
+            label="Filter status history by status"
+            countNoun="status changes"
+            value={historyFilters.status}
+            onChange={(status) => setHistoryFilters({ status })}
+            options={STATUS_HISTORY_FILTERS.map((value) => ({
+              value,
+              label: value ? humanizeEnumValue(value) : "All changes",
+            }))}
+          />
+          <DataTableDateRange
+            legend="Changed between"
+            from={historyFilters.fromDay}
+            to={historyFilters.toDay}
+            max={todayAsCalendarDate()}
+            error={historyRangeError}
+            onFromChange={(fromDay) => setHistoryFilters({ fromDay })}
+            onToChange={(toDay) => setHistoryFilters({ toDay })}
+          />
+          <DataTableActiveFilters
+            filters={[
+              ...(historyFilters.fromDay
+                ? [
+                    {
+                      key: "from",
+                      label: `From ${formatCalendarDate(historyFilters.fromDay)}`,
+                      onRemove: () => setHistoryFilters({ fromDay: "" }),
+                    },
+                  ]
+                : []),
+              ...(historyFilters.toDay
+                ? [
+                    {
+                      key: "to",
+                      label: `To ${formatCalendarDate(historyFilters.toDay)}`,
+                      onRemove: () => setHistoryFilters({ toDay: "" }),
+                    },
+                  ]
+                : []),
+            ]}
+            onClearAll={() => setHistoryFilters({ fromDay: "", toDay: "" })}
+          />
+          <DataTable
+            label="Status history"
+            columns={historyColumns(timeZone)}
+            rows={history?.data ?? []}
+            getRowKey={(entry) => entry.id}
+            isLoading={historyLoading}
+            loadingLabel="Loading status history…"
+            skeletonRows={3}
+            error={
+              historyError
+                ? getApiErrorMessage(
+                    historyError,
+                    "Unable to load status history.",
+                  )
+                : null
+            }
+            onRetry={() => void refetchHistory()}
+            empty={
+              historyFiltered ? (
+                <DataTableEmpty
+                  title="No status changes match these filters."
+                  description="Try another status or dates, or clear the filters to see every change."
+                  action={
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={clearHistoryFilters}
+                    >
+                      Clear filters
+                    </Button>
+                  }
+                />
+              ) : (
+                <DataTableEmpty title="No status changes have been recorded." />
+              )
+            }
+            pagination={
+              history
+                ? {
+                    meta: history.meta,
+                    itemLabel: "status changes",
+                    isFetching: historyFetching,
+                    onPageChange: setHistoryPage,
+                    onPageSizeChange: setHistoryPageSize,
+                  }
+                : undefined
+            }
+          />
+        </ListCard>
       ) : null}
 
       {/* A separate request: each section still works if the other fails. */}

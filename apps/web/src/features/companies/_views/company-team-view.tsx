@@ -9,7 +9,6 @@ import {
 } from "@contractflow/contracts-schema";
 import { RiUserAddLine } from "@remixicon/react";
 import { Button } from "@workspace/ui/components/button";
-import { Input } from "@workspace/ui/components/input";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -26,6 +25,12 @@ import {
   DataTableEmpty,
   DataTableRowActions,
 } from "@/components/data-table/data-table";
+import {
+  DataTableActiveFilters,
+  DataTableFilterChips,
+  DataTableSearch,
+  DataTableToolbar,
+} from "@/components/data-table/data-table-toolbar";
 import { ListCard } from "@/components/data-table/list-card";
 import { DropdownMenuItem } from "@workspace/ui/components/dropdown-menu";
 import { StatusBadge } from "@/components/status-badge/status-badge";
@@ -221,94 +226,123 @@ function TeamContent({ companyId }: { companyId: string }) {
           </Button>
         }
       >
-        {/* Member filters */}
-        <div className="grid gap-3 sm:grid-cols-2 sm:items-end lg:grid-cols-4">
-          <div className="space-y-1.5">
-            <label htmlFor="member-search" className="text-sm font-medium">
-              Search members
-            </label>
-            <Input
+        {/* Predefined views: membership status. */}
+        <DataTableFilterChips
+          label="Filter members by membership status"
+          countNoun="members"
+          value={status}
+          onChange={(next) => {
+            setStatus(next);
+            memberPages.resetPage();
+          }}
+          options={[
+            { value: "", label: "All members" },
+            { value: ECompanyUserStatus.ACTIVE, label: "Active" },
+            { value: ECompanyUserStatus.INACTIVE, label: "Inactive" },
+          ]}
+        />
+
+        <div className="space-y-3">
+          <DataTableToolbar
+            actions={
+              <div className="flex items-center gap-2">
+                <label
+                  htmlFor="member-sort"
+                  className="text-sm whitespace-nowrap text-muted-foreground"
+                >
+                  Sort by
+                </label>
+                <NativeSelect
+                  id="member-sort"
+                  value={sort}
+                  onChange={(event) => {
+                    const next = memberSorts.find(
+                      (option) => option.value === event.target.value,
+                    );
+                    if (!next) return;
+                    setSort(next.value);
+                    memberPages.resetPage();
+                  }}
+                >
+                  {memberSorts.map((option) => (
+                    <NativeSelectOption key={option.value} value={option.value}>
+                      {option.label}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              </div>
+            }
+          >
+            {/* Typing searches after a short pause; Enter needs no extra
+                step. */}
+            <DataTableSearch
               id="member-search"
-              type="search"
+              label="Search members by name or email"
+              formLabel="Company members"
+              placeholder="Search by name or email"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search name or email"
-              aria-label="Search members by name or email"
+              onChange={setSearch}
+              onSubmit={(event) => event.preventDefault()}
+              onClear={() => setSearch("")}
             />
-          </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor="member-status" className="text-sm font-medium">
-              Membership status
-            </label>
-            <NativeSelect
-              id="member-status"
-              className="w-full"
-              value={status}
-              onChange={(event) => {
-                setStatus(event.target.value as ECompanyUserStatus | "");
-                memberPages.resetPage();
-              }}
-            >
-              <NativeSelectOption value="">All statuses</NativeSelectOption>
-              <NativeSelectOption value={ECompanyUserStatus.ACTIVE}>
-                Active
-              </NativeSelectOption>
-              <NativeSelectOption value={ECompanyUserStatus.INACTIVE}>
-                Inactive
-              </NativeSelectOption>
-            </NativeSelect>
-          </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor="member-role" className="text-sm font-medium">
-              Company role
-            </label>
-            <NativeSelect
-              id="member-role"
-              className="w-full"
-              value={roleFilter}
-              onChange={(event) => {
-                setRoleFilter(
-                  memberRoles.find((option) => option === event.target.value) ??
-                    "",
-                );
-                memberPages.resetPage();
-              }}
-            >
-              <NativeSelectOption value="">All roles</NativeSelectOption>
-              {memberRoles.map((option) => (
-                <NativeSelectOption key={option} value={option}>
-                  {option}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor="member-sort" className="text-sm font-medium">
-              Sort by
-            </label>
-            <NativeSelect
-              id="member-sort"
-              className="w-full"
-              value={sort}
-              onChange={(event) => {
-                const next = memberSorts.find(
-                  (option) => option.value === event.target.value,
-                );
-                if (!next) return;
-                setSort(next.value);
-                memberPages.resetPage();
-              }}
-            >
-              {memberSorts.map((option) => (
-                <NativeSelectOption key={option.value} value={option.value}>
-                  {option.label}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          </div>
+            <div className="flex items-center gap-2">
+              <label
+                htmlFor="member-role"
+                className="text-sm whitespace-nowrap text-muted-foreground"
+              >
+                Company role
+              </label>
+              <NativeSelect
+                id="member-role"
+                value={roleFilter}
+                onChange={(event) => {
+                  setRoleFilter(
+                    memberRoles.find(
+                      (option) => option === event.target.value,
+                    ) ?? "",
+                  );
+                  memberPages.resetPage();
+                }}
+              >
+                <NativeSelectOption value="">All roles</NativeSelectOption>
+                {memberRoles.map((option) => (
+                  <NativeSelectOption key={option} value={option}>
+                    {option}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </div>
+          </DataTableToolbar>
+          <DataTableActiveFilters
+            filters={[
+              ...(appliedSearch
+                ? [
+                    {
+                      key: "search",
+                      label: `Search: ${appliedSearch}`,
+                      onRemove: () => setSearch(""),
+                    },
+                  ]
+                : []),
+              ...(roleFilter
+                ? [
+                    {
+                      key: "role",
+                      label: roleFilter,
+                      onRemove: () => {
+                        setRoleFilter("");
+                        memberPages.resetPage();
+                      },
+                    },
+                  ]
+                : []),
+            ]}
+            onClearAll={() => {
+              setSearch("");
+              setRoleFilter("");
+              memberPages.resetPage();
+            }}
+          />
         </div>
 
         <DataTable
@@ -395,7 +429,32 @@ function TeamContent({ companyId }: { companyId: string }) {
               : null
           }
           onRetry={() => void refetchMembers()}
-          empty={<DataTableEmpty title="No members match this search." />}
+          empty={
+            appliedSearch || status || roleFilter ? (
+              <DataTableEmpty
+                title="No members match these filters."
+                action={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setSearch("");
+                      setStatus("");
+                      setRoleFilter("");
+                      memberPages.resetPage();
+                    }}
+                  >
+                    Clear filters
+                  </Button>
+                }
+              />
+            ) : (
+              <DataTableEmpty
+                title="No members yet."
+                description="Invite colleagues with Invite member. They appear here once they accept."
+              />
+            )
+          }
           pagination={
             members
               ? {

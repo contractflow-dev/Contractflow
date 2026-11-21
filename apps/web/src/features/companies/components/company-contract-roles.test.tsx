@@ -94,8 +94,12 @@ describe("CompanyContractRoles", () => {
       { refetchOnMountOrArgChange: true },
     );
     expect(markup).toContain('id="contract-roles"');
+    // The HSE chip is the selected view.
     expect(markup).toMatch(
-      /<option(?=[^>]*value="hse")(?=[^>]*selected="")[^>]*>/,
+      /<button[^>]*aria-pressed="true"[^>]*>HSE<\/button>/,
+    );
+    expect(markup).toMatch(
+      /<button[^>]*aria-pressed="false"[^>]*>All workspaces<\/button>/,
     );
   });
 

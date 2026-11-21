@@ -185,6 +185,27 @@ describe("ContractDocuments", () => {
     expect(markup).toContain("documents");
   });
 
+  it("shows the documents in the shared table: one framed table, each row once", () => {
+    listReturns({
+      currentData: page([document({}), document({ id: "doc-2" })]),
+    });
+    const markup = render();
+
+    // The shared DataTable's frame, named for assistive technology.
+    expect(markup.match(/data-slot="data-table"/g)).toHaveLength(1);
+    expect(markup.match(/<table[^>]*aria-label="Documents"/g)).toHaveLength(1);
+    // Rows are deep-link targets, so each id appears once (no phone copy).
+    expect(markup.match(/id="activity-target-doc-1"/g)).toHaveLength(1);
+    expect(markup.match(/id="activity-target-doc-2"/g)).toHaveLength(1);
+    // Lower-priority columns give way on narrow screens.
+    expect(markup).toMatch(
+      /<th[^>]*class="[^"]*hidden sm:table-cell[^"]*"[^>]*>Category</,
+    );
+    expect(markup).toMatch(
+      /<th[^>]*class="[^"]*hidden md:table-cell[^"]*"[^>]*>Updated</,
+    );
+  });
+
   it("lets only the uploading company replace or delete a document", () => {
     listReturns({
       currentData: page([

@@ -134,7 +134,8 @@ describe("document upload dialogs", () => {
 
   it("uploads a new version of a document from its own dialog", async () => {
     const user = setup();
-    const [, tableButton] = screen.getAllByRole("button", {
+    // One table at every width, so each action appears once.
+    const tableButton = screen.getByRole("button", {
       name: "Upload a new version of Hydrotest procedure",
     });
     expect(tableButton.getAttribute("aria-haspopup")).toBe("dialog");
@@ -153,9 +154,9 @@ describe("document upload dialogs", () => {
   it("can't be closed while a file is uploading", async () => {
     const user = setup();
     await user.click(
-      screen.getAllByRole("button", {
+      screen.getByRole("button", {
         name: "Upload a new version of Hydrotest procedure",
-      })[1],
+      }),
     );
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByRole("button", { name: "Close" })).toBeTruthy();

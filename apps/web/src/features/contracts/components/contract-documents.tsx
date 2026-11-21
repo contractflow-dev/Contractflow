@@ -38,16 +38,12 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@workspace/ui/components/sheet";
-import { Skeleton } from "@workspace/ui/components/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@workspace/ui/components/table";
 import { Textarea } from "@workspace/ui/components/textarea";
+import {
+  DataTable,
+  DataTableEmpty,
+  type DataTableColumn,
+} from "@/components/data-table/data-table";
 import { ListCard } from "@/components/data-table/list-card";
 import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
 import {
@@ -55,7 +51,6 @@ import {
   FormGrid,
   RequiredFieldsNote,
 } from "@/components/forms/form-field";
-import { DataPagination } from "@/components/pagination/data-pagination";
 import { StatusBadge } from "@/components/status-badge/status-badge";
 import { useUserTimeZone } from "@/hooks/use-user-time-zone";
 import { getApiErrorMessage, getApiErrorStatus } from "@/lib/apiError";
@@ -247,6 +242,15 @@ function DocumentLibrary({
   const noAccess = getApiErrorStatus(documents.error) === 403;
   const data = documents.currentData;
   const canUpload = canAdd && !noAccess && !documents.isLoading;
+  const timeZone = useUserTimeZone();
+  const pageRows = data?.data ?? [];
+  const offPageTarget =
+    target?.type === "document" &&
+    targetDocument.currentData &&
+    !pageRows.some((document) => document.id === target.id)
+      ? targetDocument.currentData
+      : null;
+  const rows = offPageTarget ? [offPageTarget, ...pageRows] : pageRows;
 
   return (
     <>
@@ -265,95 +269,69 @@ function DocumentLibrary({
           ) : null
         }
       >
-        {documents.isLoading ? (
-          <div
-            role="status"
-            aria-label="Loading documents"
-            className="space-y-3"
-          >
-            {[0, 1, 2].map((row) => (
-              <Skeleton key={row} className="h-12 w-full" />
-            ))}
-            <span className="sr-only">Loading documents…</span>
-          </div>
-        ) : noAccess ? (
-          <div className="space-y-2 rounded-2xl border border-dashed p-6 text-center">
-            <h3 className="font-semibold">{noAccessCopy.title}</h3>
-            <p className="mx-auto max-w-prose text-sm leading-6 text-muted-foreground">
-              {noAccessCopy.text}
-            </p>
-          </div>
-        ) : documents.error ? (
-          <Alert variant="destructive">
-            <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
-              <span>
-                {getApiErrorMessage(
-                  documents.error,
-                  "Unable to load documents.",
-                )}
-              </span>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => void documents.refetch()}
-              >
-                Retry
-              </Button>
-            </AlertDescription>
-          </Alert>
-        ) : data?.data.length || targetDocument.currentData ? (
-          <>
-            {target?.type === "document" &&
-            targetDocument.currentData &&
-            !data?.data.some((document) => document.id === target.id) ? (
-              <DocumentList
-                scope={scope}
-                documents={[targetDocument.currentData]}
-                ownerCompanyId={scope.companyId}
-                canChange={canChange}
-                shared={shared}
-                target={target}
-                onShowVersions={setVersionsFor}
-                onNewVersion={(document) =>
-                  setForm({ kind: "version", document })
-                }
-                onDelete={setDeleting}
-              />
-            ) : null}
-            <DocumentList
-              scope={scope}
-              documents={data?.data ?? []}
-              ownerCompanyId={scope.companyId}
-              canChange={canChange}
-              shared={shared}
-              target={target}
-              onShowVersions={setVersionsFor}
-              onNewVersion={(document) =>
-                setForm({ kind: "version", document })
-              }
-              onDelete={setDeleting}
-            />
-            {data ? (
-              <DataPagination
-                className="border-t pt-4"
-                meta={data.meta}
-                itemLabel="documents"
-                isFetching={documents.isFetching}
-                onPageChange={setPage}
-                onPageSizeChange={(size) => {
-                  setLimit(size);
-                  setPage(1);
-                }}
-              />
-            ) : null}
-          </>
+        {noAccess ? (
+          <DataTableEmpty
+            title={noAccessCopy.title}
+            description={noAccessCopy.text}
+          />
         ) : (
-          <div className="space-y-2 rounded-2xl border border-dashed p-6 text-center">
-            <h3 className="font-semibold">No documents yet</h3>
-            <p className="mx-auto max-w-prose text-sm leading-6 text-muted-foreground">
-              {emptyText}
-            </p>
-          </div>
+          <DataTable
+            label="Documents"
+            columns={documentColumns(shared, timeZone)}
+            rows={rows}
+            getRowKey={(document) => document.id}
+            getRowProps={(document) => ({
+              id: `activity-target-${document.id}`,
+              className:
+                target?.type === "document" && target.id === document.id
+                  ? "bg-primary/10"
+                  : undefined,
+            })}
+            rowActions={(document) => (
+              <DocumentActions
+                scope={scope}
+                document={document}
+                // Only the uploading company changes a document; the API
+                // enforces it.
+                owned={document.ownerCompanyId === scope.companyId && canChange}
+                onShowVersions={() => setVersionsFor(document.id)}
+                onNewVersion={() => setForm({ kind: "version", document })}
+                onDelete={() => setDeleting(document)}
+              />
+            )}
+            isLoading={documents.isLoading}
+            loadingLabel="Loading documents"
+            skeletonRows={3}
+            error={
+              documents.error
+                ? getApiErrorMessage(
+                    documents.error,
+                    "Unable to load documents.",
+                  )
+                : null
+            }
+            onRetry={() => void documents.refetch()}
+            empty={
+              <DataTableEmpty
+                title="No documents yet"
+                description={emptyText}
+              />
+            }
+            pagination={
+              data
+                ? {
+                    meta: data.meta,
+                    itemLabel: "documents",
+                    isFetching: documents.isFetching,
+                    onPageChange: setPage,
+                    onPageSizeChange: (size) => {
+                      setLimit(size);
+                      setPage(1);
+                    },
+                  }
+                : undefined
+            }
+          />
         )}
       </ListCard>
       <DeleteDocumentDialog
@@ -437,128 +415,62 @@ function DocumentFormDialog({
   );
 }
 
-function DocumentList({
-  scope,
-  documents,
-  ownerCompanyId,
-  canChange,
-  shared,
-  onShowVersions,
-  onNewVersion,
-  onDelete,
-  target,
-}: {
-  scope: Scope;
-  documents: DocumentSummary[];
-  ownerCompanyId: string;
-  canChange: boolean;
-  shared: boolean;
-  /** Opens the document's version history in the side sheet. */
-  onShowVersions: (id: string) => void;
-  onNewVersion: (document: DocumentSummary) => void;
-  onDelete: (document: DocumentSummary) => void;
-  target?: ContractActivityTarget | null;
-}) {
-  const timeZone = useUserTimeZone();
-  const actions = (document: DocumentSummary) => (
-    <DocumentActions
-      scope={scope}
-      document={document}
-      // Only the uploading company changes a document; the API enforces it.
-      owned={document.ownerCompanyId === ownerCompanyId && canChange}
-      onShowVersions={() => onShowVersions(document.id)}
-      onNewVersion={() => onNewVersion(document)}
-      onDelete={() => onDelete(document)}
-    />
-  );
-
-  return (
-    <>
-      {/* Phones: one card per document. */}
-      <ul className="divide-y rounded-2xl border md:hidden">
-        {documents.map((document) => (
-          <li
-            key={document.id}
-            id={`activity-target-${document.id}`}
-            className={`space-y-3 p-4 ${
-              target?.type === "document" && target.id === document.id
-                ? "bg-primary/10"
-                : ""
-            }`}
-          >
-            <DocumentTitle document={document} />
-            <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
-              <dt className="text-muted-foreground">Category</dt>
-              <dd>{DOCUMENT_CATEGORY_LABELS[document.category]}</dd>
-              {shared ? (
-                <>
-                  <dt className="text-muted-foreground">Shared with</dt>
-                  <dd>{DOCUMENT_VISIBILITY_LABELS[document.visibility]}</dd>
-                </>
-              ) : null}
-              <dt className="text-muted-foreground">File</dt>
-              <dd className="min-w-0">
-                <CurrentVersion document={document} />
-              </dd>
-              <dt className="text-muted-foreground">Updated</dt>
-              <dd>{formatDate(document.updatedAt, { timeZone })}</dd>
-            </dl>
-            {actions(document)}
-          </li>
-        ))}
-      </ul>
-
-      {/* From md: a table. */}
-      <div className="hidden overflow-x-auto md:block">
-        <Table aria-label="Documents">
-          <TableHeader>
-            <TableRow>
-              <TableHead>Document</TableHead>
-              <TableHead>Category</TableHead>
-              {shared ? <TableHead>Shared with</TableHead> : null}
-              <TableHead>Current file</TableHead>
-              <TableHead>Updated</TableHead>
-              <TableHead>
-                <span className="sr-only">Actions</span>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {documents.map((document) => (
-              <TableRow
-                key={document.id}
-                id={`activity-target-${document.id}`}
-                className={
-                  target?.type === "document" && target.id === document.id
-                    ? "bg-primary/10"
-                    : undefined
-                }
-              >
-                <TableCell className="max-w-72 whitespace-normal">
-                  <DocumentTitle document={document} />
-                </TableCell>
-                <TableCell>
-                  {DOCUMENT_CATEGORY_LABELS[document.category]}
-                </TableCell>
-                {shared ? (
-                  <TableCell>
-                    {DOCUMENT_VISIBILITY_LABELS[document.visibility]}
-                  </TableCell>
-                ) : null}
-                <TableCell className="max-w-64 whitespace-normal">
-                  <CurrentVersion document={document} />
-                </TableCell>
-                <TableCell className="whitespace-nowrap">
-                  {formatDate(document.updatedAt, { timeZone })}
-                </TableCell>
-                <TableCell>{actions(document)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    </>
-  );
+function documentColumns(
+  shared: boolean,
+  timeZone: string | undefined,
+): ReadonlyArray<DataTableColumn<DocumentSummary>> {
+  return [
+    {
+      id: "document",
+      header: "Document",
+      wrap: true,
+      className: "min-w-48 max-w-72",
+      cell: (document) => (
+        <div className="space-y-1">
+          <DocumentTitle document={document} />
+          {/* What the hidden columns say, on narrower screens. */}
+          <p className="text-xs text-muted-foreground sm:hidden">
+            {DOCUMENT_CATEGORY_LABELS[document.category]}
+          </p>
+          <div className="md:hidden">
+            <CurrentVersion document={document} />
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "category",
+      header: "Category",
+      hideBelow: "sm",
+      cell: (document) => DOCUMENT_CATEGORY_LABELS[document.category],
+    },
+    ...(shared
+      ? [
+          {
+            id: "visibility",
+            header: "Shared with",
+            hideBelow: "lg" as const,
+            cell: (document: DocumentSummary) =>
+              DOCUMENT_VISIBILITY_LABELS[document.visibility],
+          },
+        ]
+      : []),
+    {
+      id: "file",
+      header: "Current file",
+      wrap: true,
+      hideBelow: "md",
+      className: "max-w-64",
+      cell: (document) => <CurrentVersion document={document} />,
+    },
+    {
+      id: "updated",
+      header: "Updated",
+      hideBelow: "md",
+      className: "whitespace-nowrap tabular-nums",
+      cell: (document) => formatDate(document.updatedAt, { timeZone }),
+    },
+  ];
 }
 
 function DocumentTitle({ document }: { document: DocumentSummary }) {
