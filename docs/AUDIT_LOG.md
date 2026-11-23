@@ -6,10 +6,10 @@ How ContractFlow records who did what, and how to add auditing to a new operatio
 
 | Record | Holds | Written by |
 |---|---|---|
-| `activity_log` | Significant actions on a contract, by any module: one row per action, with the actor, the affected record and what changed. | Contract lifecycle, sites, signatories, party invitations, role assignments and invitations, documents. |
+| `activity_log` | Significant actions on a contract, by any module: one row per action, with the actor, the affected record and what changed. | Contract lifecycle, sites, signatories, party invitations, role assignments and invitations, documents, stages and milestones. |
 | `company_audit_log` | Company-level actions that concern no contract, such as company invitations. | Company administration (`company-admin.service.ts`). |
 | `contract_status_history` | Every contract status transition. A domain history, not an audit log. | Contract lifecycle. |
-| Future domain histories, such as milestone submissions and decisions | The lifecycle of one kind of record. | Their module. |
+| `milestone_submission`, `milestone_submission_evidence`, `milestone_decision`, `milestone_outstanding_item`, `milestone_submission_item` | Every milestone submission with the document versions submitted, every decision with its reason and approved work, and the outstanding work each partial approval left. A domain history, not an audit log. | Stages and Milestones (`milestone-workflow.service.ts`). |
 
 Keep these separate. A domain history is the source of truth for its record's lifecycle; the audit log says who acted and when. An operation that needs both writes both, in the same transaction.
 
@@ -47,7 +47,8 @@ Also leave out document contents, storage keys, and anything a reader of the con
 
 - The application can only add entries: `ActivityLogRepository.update` and `delete` throw, and no endpoint changes or removes them.
 - A refused entry throws `InvalidActivityEntryError`, which fails the whole operation. This is a defect in the calling code, so it surfaces as a server error, not a validation message.
-- The database itself doesn't prevent `UPDATE` or `DELETE` by a privileged connection. If that is needed, the options are a trigger that rejects both, a database role without those privileges for the application, or hash-chaining entries. None is in place yet.
+- For `activity_log`, the database itself doesn't prevent `UPDATE` or `DELETE` by a privileged connection. If that is needed, the options are a trigger that rejects both, a database role without those privileges for the application, or hash-chaining entries. None is in place yet.
+- The milestone history tables go further: their repositories extend `AppendOnlyContractScopedRepository`, and database triggers refuse any `UPDATE` of a submission, decision, evidence row or covered item, and allow an outstanding item only to be accepted, once. A contract's deletion still cascades to them.
 
 ## Reading the log
 
@@ -72,13 +73,23 @@ These operations exist but write no audit entry. Each should adopt the pattern a
 - **Identity and security:** sign-in, sign-out, password change and reset, email verification, account profile changes. These are user-level and concern no contract or company, so they need a user-scoped log, or `company_audit_log` if company-scoped.
 - **Company administration:** member role changes and removals, company profile changes, company document actions that concern no contract.
 - **Contract:** contract creation and detail edits (`PATCH contract`).
-- **Workspace modules:** Stages and Milestones, Variations, Daily logs, Inventory, HSE, Compliance, Invoices and Payments. They are read-only in the API today; each write operation should record entries with its `workspace` set when it is built.
+- **Workspace modules:** Variations, Daily logs, Inventory, HSE, Compliance, Invoices and Payments. They are read-only in the API today; each write operation should record entries with its `workspace` set when it is built, as Stages and Milestones do.
 
-## Planned: Stages and Milestones
+## Stages and Milestones
 
-The API can only read stages and milestones today, so there is nothing to audit yet. When the workflow is built:
+Every Stages and Milestones change records an entry with `workspace: 'project'`, in the same transaction as the change and its history rows. Stage entries name the stage (`entityType: 'contract_stage'`); milestone entries name the milestone (`entityType: 'milestone'`), so `entityType=milestone&entityId=<id>` gives one milestone's whole audit trail.
 
-- Record an entry, with `workspace: 'project'`, for each of: stage created, updated, status changed, put on hold, resumed and closed; milestone created, updated, dates or planned values changed, submitted, evidence added or replaced, approved, partially approved, rejected and resubmitted.
-- Put the decision-maker's explanation in `reason`, and the previous and resulting status in `changes`.
-- Keep submissions and decisions in their own history table. The `milestone` table holds only the latest `submitted_*`, `approved_*` and `rejection_reason`, which can't keep earlier submissions or link a resubmission to the one it replaces. The ERD has no such table yet.
-- Decide first who may create stages and milestones, who submits and who approves, and what a partial approval records.
+| Action | When | Also recorded |
+|---|---|---|
+| `stage.created`, `stage.updated` | The Client Project Manager plans or changes a stage | The changed planning fields |
+| `stage.status_changed` | Started, put on hold, resumed | `reason` (required to hold and to resume) |
+| `stage.completed` | Completed, once all its milestones are approved | The actual end date |
+| `milestone.created`, `milestone.updated` | Planned or changed by the Client Project Manager | The changed fields only |
+| `milestone.started` | The Contractor Project Lead starts work | The actual start date |
+| `milestone.submitted`, `milestone.resubmitted` | A submission, the first or a later one | `metadata.submissionId`, the decision it answers, the outstanding items it covers |
+| `milestone.evidence_attached` | With every submission | The document and version ids submitted |
+| `milestone.approved`, `milestone.partially_approved`, `milestone.rejected` | The Client Project Manager's decision | `reason`; the status and accepted share before and after; the decision and raised or accepted item ids |
+| `milestone.outstanding_items_updated` | A partial approval of outstanding work accepts some items | Which items were accepted and which stay open |
+| `milestone.completed` | The milestone is fully approved | The completion date |
+
+The decision itself, the submission it answers, the evidence versions and the outstanding items live in the milestone history tables above. The activity entry says who acted and when; it doesn't replace them.

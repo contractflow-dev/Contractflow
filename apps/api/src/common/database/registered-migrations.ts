@@ -16,6 +16,7 @@ import { CompanyLevelDocuments1793500000000 } from './migrations/1793500000000-c
 import { CompanyRoleAssignmentIndex1793500000001 } from './migrations/1793500000001-company-role-assignment-index';
 import { CompanyMembershipRoles1793600000000 } from './migrations/1793600000000-company-membership-roles';
 import { ActivityLogAuditFields1793700000000 } from './migrations/1793700000000-activity-log-audit-fields';
+import { MilestoneWorkflow1793800000000 } from './migrations/1793800000000-milestone-workflow';
 
 export const registeredMigrations = [
   IdentitySchemaBootstrap1749000000000,
@@ -36,4 +37,5 @@ export const registeredMigrations = [
   CompanyRoleAssignmentIndex1793500000001,
   CompanyMembershipRoles1793600000000,
   ActivityLogAuditFields1793700000000,
+  MilestoneWorkflow1793800000000,
 ];

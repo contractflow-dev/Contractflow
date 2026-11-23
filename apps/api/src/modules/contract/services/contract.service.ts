@@ -20,14 +20,14 @@ import {
   toNullableIntegerString,
 } from '../../../common/dto/response-values';
 import type { Contract } from '../entities/contract.entity';
-import { ContractParty } from '../entities/contract-party.entity';
+import type { ContractParty } from '../entities/contract-party.entity';
 import { ContractPartyRepository } from '../repositories/contract-party.repository';
 import { ContractRepository } from '../repositories/contract.repository';
 import {
   ContractStatusHistoryRepository,
   type ContractStatusHistoryFilter,
 } from '../repositories/contract-status-history.repository';
-import { ContractStatusHistory } from '../entities/contract-status-history.entity';
+import type { ContractStatusHistory } from '../entities/contract-status-history.entity';
 import { CompanyUserRepository } from '../../identity/repositories/company-user.respository';
 import { ContractWorkspaceRepository } from '../repositories/contract-workspace.repository';
 import { ContractRoleAssignmentRepository } from '../repositories/contract-role-assignment.repository';

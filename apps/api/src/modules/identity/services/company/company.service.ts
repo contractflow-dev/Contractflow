@@ -13,7 +13,7 @@ import {
   EUserStatus,
 } from '@contractflow/contracts-schema';
 import { resolveStateRegion } from '../../../../common/application/state-region';
-import { CompanyUser } from '../../entities/company-user.entity';
+import type { CompanyUser } from '../../entities/company-user.entity';
 import { CompanyInvitationRepository } from '../../repositories/company-invitation.repository';
 import { ContractPartyRepository } from '../../../contract/repositories/contract-party.repository';
 import type { DashboardContractRow } from '../../../contract/interfaces/dashboard-contract-row.interface';

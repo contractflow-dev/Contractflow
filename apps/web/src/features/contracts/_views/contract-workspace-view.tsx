@@ -9,10 +9,13 @@ export function ContractWorkspaceView({
   contractId,
   workspace,
   view,
+  milestoneId,
 }: {
   contractId: string;
   workspace: AssignableContractWorkspace;
   view: WorkspaceView;
+  /** One milestone's page, within the milestones view. */
+  milestoneId?: string;
 }) {
   return (
     <CompanyAdminShell>
@@ -22,6 +25,11 @@ export function ContractWorkspaceView({
           contractId={contractId}
           workspace={workspace}
           view={view}
+          milestoneId={milestoneId}
+          viewer={{
+            membershipId: access.membership.id,
+            companyName: access.company.name,
+          }}
         />
       )}
     </CompanyAdminShell>

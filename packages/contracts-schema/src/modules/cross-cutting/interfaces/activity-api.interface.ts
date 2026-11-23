@@ -84,9 +84,61 @@ export const CONTRACT_ACTIVITY_ACTIONS = [
   "document.version_added",
   "document.downloaded",
   "document.deleted",
+  "stage.created",
+  "stage.updated",
+  "stage.status_changed",
+  "stage.completed",
+  "milestone.created",
+  "milestone.updated",
+  "milestone.started",
+  "milestone.submitted",
+  "milestone.resubmitted",
+  "milestone.evidence_attached",
+  "milestone.approved",
+  "milestone.partially_approved",
+  "milestone.rejected",
+  "milestone.outstanding_items_updated",
+  "milestone.completed",
 ] as const;
 
 export type ContractActivityAction = (typeof CONTRACT_ACTIVITY_ACTIONS)[number];
+
+/**
+ * Project workspace stage actions (`entityType: "contract_stage"`, the
+ * stage's id). Recorded with `workspace: "project"`.
+ */
+export const STAGE_ACTIVITY_ACTIONS = [
+  "stage.created",
+  "stage.updated",
+  "stage.status_changed",
+  "stage.completed",
+] as const satisfies readonly ContractActivityAction[];
+
+/**
+ * Project workspace milestone actions (`entityType: "milestone"`, the
+ * milestone's id; submission and decision ids are kept with the entry).
+ * Recorded with `workspace: "project"`.
+ */
+export const MILESTONE_ACTIVITY_ACTIONS = [
+  "milestone.created",
+  "milestone.updated",
+  "milestone.started",
+  "milestone.submitted",
+  "milestone.resubmitted",
+  "milestone.evidence_attached",
+  "milestone.approved",
+  "milestone.partially_approved",
+  "milestone.rejected",
+  "milestone.outstanding_items_updated",
+  "milestone.completed",
+] as const satisfies readonly ContractActivityAction[];
+
+/** Milestone actions that are the Client Project Manager's decision on a submission. */
+export const MILESTONE_DECISION_ACTIONS = [
+  "milestone.approved",
+  "milestone.partially_approved",
+  "milestone.rejected",
+] as const satisfies readonly ContractActivityAction[];
 
 /**
  * Optional filters of `GET /contract/activity`, sent as query parameters

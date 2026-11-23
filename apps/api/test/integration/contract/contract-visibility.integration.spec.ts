@@ -47,6 +47,16 @@ import { ContractStageRepository } from '../../../src/modules/delivery/repositor
 import { ContractVariationRepository } from '../../../src/modules/delivery/repositories/contract-variation.repository';
 import { MilestoneRepository } from '../../../src/modules/delivery/repositories/milestone.repository';
 import { DeliveryService } from '../../../src/modules/delivery/services/delivery.service';
+import { MilestoneReadService } from '../../../src/modules/delivery/services/milestone-read.service';
+import { MilestoneWorkflowService } from '../../../src/modules/delivery/services/milestone-workflow.service';
+import {
+  MILESTONE_WORKFLOW_READER,
+  MILESTONE_WORKFLOW_UNIT_OF_WORK,
+} from '../../../src/modules/delivery/interface/milestone-workflow-persistence.interface';
+import {
+  MilestoneWorkflowContextFactory,
+  TypeOrmMilestoneWorkflowReader,
+} from '../../../src/modules/delivery/repositories/milestone-workflow-context.factory';
 import { FinancialController } from '../../../src/modules/financial/controllers/financial.controller';
 import { InvoiceRepository } from '../../../src/modules/financial/repositories/invoice.repository';
 import { PaymentRepository } from '../../../src/modules/financial/repositories/payment.repository';
@@ -207,6 +217,19 @@ describe('Contract visibility (PostgreSQL)', () => {
         ContractService,
         ActivityService,
         DeliveryService,
+        MilestoneReadService,
+        MilestoneWorkflowService,
+        {
+          provide: MILESTONE_WORKFLOW_READER,
+          useValue: new TypeOrmMilestoneWorkflowReader(dataSource.manager),
+        },
+        {
+          provide: MILESTONE_WORKFLOW_UNIT_OF_WORK,
+          useValue: new TypeOrmUnitOfWork(
+            dataSource,
+            new MilestoneWorkflowContextFactory(),
+          ),
+        },
         FinancialService,
         HseService,
         SiteOperationsService,
@@ -345,7 +368,9 @@ describe('Contract visibility (PostgreSQL)', () => {
     await dataSource
       .getRepository(ContractRoleAssignment)
       .update(
-        role ? { companyUserId: member.id, role } : { companyUserId: member.id },
+        role
+          ? { companyUserId: member.id, role }
+          : { companyUserId: member.id },
         { revokedAt: new Date(), revokedById: member.id },
       );
   }
@@ -436,7 +461,11 @@ describe('Contract visibility (PostgreSQL)', () => {
    */
   const PROBES: Array<{
     label: string;
-    call: (cookie: string, companyId: string, contractId: string) => request.Test;
+    call: (
+      cookie: string,
+      companyId: string,
+      contractId: string,
+    ) => request.Test;
   }> = [
     ...OVERSIGHT_PATHS.map((path) => ({
       label: `GET ${path || '/'}`,
@@ -456,13 +485,16 @@ describe('Contract visibility (PostgreSQL)', () => {
       label: `GET ${path}`,
       call: (c: string, co: string, id: string) => getContract(path, c, co, id),
     })),
-    ...['/role-management', '/role-assignments', '/role-assignment-members', '/role-invitations'].map(
-      (path) => ({
-        label: `GET ${path}?workspace=finance`,
-        call: (c: string, co: string, id: string) =>
-          getContract(path, c, co, id, { workspace: 'finance' }),
-      }),
-    ),
+    ...[
+      '/role-management',
+      '/role-assignments',
+      '/role-assignment-members',
+      '/role-invitations',
+    ].map((path) => ({
+      label: `GET ${path}?workspace=finance`,
+      call: (c: string, co: string, id: string) =>
+        getContract(path, c, co, id, { workspace: 'finance' }),
+    })),
     {
       label: 'POST /transitions',
       call: (c, co, id) =>
@@ -499,7 +531,8 @@ describe('Contract visibility (PostgreSQL)', () => {
     },
     {
       label: 'DELETE /role-assignments/:id',
-      call: (c, co, id) => send('delete', `/role-assignments/${ulid()}`, c, co, id),
+      call: (c, co, id) =>
+        send('delete', `/role-assignments/${ulid()}`, c, co, id),
     },
     {
       label: 'POST /role-invitations',
@@ -582,21 +615,62 @@ describe('Contract visibility (PostgreSQL)', () => {
     it('lets a Company Administrator with a role open only that role’s workspace', async () => {
       await grant(partyA, adminA, EContractorContractRole.FINANCE_OFFICER);
       const cookie = await signIn(adminA);
-      await getContract('/workspaces/finance', cookie, companyA.id, contract.id).expect(200);
-      await getContract('/invoices', cookie, companyA.id, contract.id).expect(200);
-      await getContract('/activity', cookie, companyA.id, contract.id).expect(200);
-      await getContract('/workspaces/hse', cookie, companyA.id, contract.id).expect(403);
-      await getContract('/hse/incidents', cookie, companyA.id, contract.id).expect(403);
-      await getContract('/workspaces/project', cookie, companyA.id, contract.id).expect(403);
-      await getContract('/stages', cookie, companyA.id, contract.id).expect(403);
+      await getContract(
+        '/workspaces/finance',
+        cookie,
+        companyA.id,
+        contract.id,
+      ).expect(200);
+      await getContract('/invoices', cookie, companyA.id, contract.id).expect(
+        200,
+      );
+      await getContract('/activity', cookie, companyA.id, contract.id).expect(
+        200,
+      );
+      await getContract(
+        '/workspaces/hse',
+        cookie,
+        companyA.id,
+        contract.id,
+      ).expect(403);
+      await getContract(
+        '/hse/incidents',
+        cookie,
+        companyA.id,
+        contract.id,
+      ).expect(403);
+      await getContract(
+        '/workspaces/project',
+        cookie,
+        companyA.id,
+        contract.id,
+      ).expect(403);
+      await getContract('/stages', cookie, companyA.id, contract.id).expect(
+        403,
+      );
     });
 
     it('opens exactly the workspaces of a member’s several roles, and lists the contract once', async () => {
       await grant(partyA, financeMember, EContractorContractRole.HSE_OFFICER);
       const cookie = await signIn(financeMember);
-      await getContract('/workspaces/finance', cookie, companyA.id, contract.id).expect(200);
-      await getContract('/workspaces/hse', cookie, companyA.id, contract.id).expect(200);
-      await getContract('/workspaces/project', cookie, companyA.id, contract.id).expect(403);
+      await getContract(
+        '/workspaces/finance',
+        cookie,
+        companyA.id,
+        contract.id,
+      ).expect(200);
+      await getContract(
+        '/workspaces/hse',
+        cookie,
+        companyA.id,
+        contract.id,
+      ).expect(200);
+      await getContract(
+        '/workspaces/project',
+        cookie,
+        companyA.id,
+        contract.id,
+      ).expect(403);
       await expect(listedIds(financeMember)).resolves.toEqual({
         ids: [contract.id],
         total: 1,
@@ -605,7 +679,12 @@ describe('Contract visibility (PostgreSQL)', () => {
 
     it('rejects an unknown workspace identifier (400)', async () => {
       const cookie = await signIn(projectLead);
-      await getContract('/workspaces/payroll', cookie, companyA.id, contract.id).expect(400);
+      await getContract(
+        '/workspaces/payroll',
+        cookie,
+        companyA.id,
+        contract.id,
+      ).expect(400);
       await getContract('/role-management', cookie, companyA.id, contract.id, {
         workspace: 'payroll',
       }).expect(400);
@@ -613,9 +692,21 @@ describe('Contract visibility (PostgreSQL)', () => {
 
     it('keeps admin-only management closed to visible members who aren’t administrators (403)', async () => {
       const cookie = await signIn(projectLead);
-      for (const path of ['/site-management', '/parties/signatory', '/party-invitations']) {
-        const response = await getContract(path, cookie, companyA.id, contract.id);
-        expect({ path, status: response.status }).toEqual({ path, status: 403 });
+      for (const path of [
+        '/site-management',
+        '/parties/signatory',
+        '/party-invitations',
+      ]) {
+        const response = await getContract(
+          path,
+          cookie,
+          companyA.id,
+          contract.id,
+        );
+        expect({ path, status: response.status }).toEqual({
+          path,
+          status: 403,
+        });
       }
       await getContract('/role-assignments', cookie, companyA.id, contract.id, {
         workspace: 'finance',
@@ -627,8 +718,17 @@ describe('Contract visibility (PostgreSQL)', () => {
         .set('X-Company-Id', companyA.id)
         .expect(403);
       // The lifecycle flags say so too.
-      const flags = await getContract('/lifecycle-permissions', cookie, companyA.id, contract.id).expect(200);
-      expect(flags.body).toEqual({ canManage: false, canTransition: true, canRestore: false });
+      const flags = await getContract(
+        '/lifecycle-permissions',
+        cookie,
+        companyA.id,
+        contract.id,
+      ).expect(200);
+      expect(flags.body).toEqual({
+        canManage: false,
+        canTransition: true,
+        canRestore: false,
+      });
     });
 
     it('keeps company-wide role assignments open to the Company Administrator', async () => {
@@ -638,9 +738,15 @@ describe('Contract visibility (PostgreSQL)', () => {
         .set('Cookie', await signIn(adminA))
         .set('X-Company-Id', companyA.id)
         .expect(200);
-      const rows = (response.body as { data: Array<{ companyUserId: string }> }).data;
+      const rows = (response.body as { data: Array<{ companyUserId: string }> })
+        .data;
       expect(rows.map(({ companyUserId }) => companyUserId).sort()).toEqual(
-        [projectLead.id, financeMember.id, hseAdmin.id, otherContractMember.id].sort(),
+        [
+          projectLead.id,
+          financeMember.id,
+          hseAdmin.id,
+          otherContractMember.id,
+        ].sort(),
       );
     });
 
@@ -653,10 +759,16 @@ describe('Contract visibility (PostgreSQL)', () => {
         .set('X-Company-Id', companyA.id)
         .expect(200);
       const body = response.body as {
-        data: Array<{ contractId: string; memberCount: number; workspaceAdmins: Array<{ companyUserId: string }> }>;
+        data: Array<{
+          contractId: string;
+          memberCount: number;
+          workspaceAdmins: Array<{ companyUserId: string }>;
+        }>;
         summary: { contractCount: number };
       };
-      expect(body.data.map(({ contractId }) => contractId)).toEqual([contract.id]);
+      expect(body.data.map(({ contractId }) => contractId)).toEqual([
+        contract.id,
+      ]);
       expect(body.data[0]).toMatchObject({
         memberCount: 1,
         workspaceAdmins: [{ companyUserId: hseAdmin.id }],
@@ -674,7 +786,11 @@ describe('Contract visibility (PostgreSQL)', () => {
           .query(query)
           .set('Cookie', cookie)
           .set('X-Company-Id', companyA.id);
-        expect({ path, query, status: refused.status }).toEqual({ path, query, status: 400 });
+        expect({ path, query, status: refused.status }).toEqual({
+          path,
+          query,
+          status: 400,
+        });
       }
     });
 
@@ -703,12 +819,21 @@ describe('Contract visibility (PostgreSQL)', () => {
         reason: 'Starting',
       }).expect(403);
       // The project lead may transition; an impossible transition conflicts.
-      await send('post', '/transitions', await signIn(projectLead), companyA.id, contract.id, {
-        transition: 'resume',
-        reason: 'Not on hold',
-      }).expect(409);
+      await send(
+        'post',
+        '/transitions',
+        await signIn(projectLead),
+        companyA.id,
+        contract.id,
+        {
+          transition: 'resume',
+          reason: 'Not on hold',
+        },
+      ).expect(409);
       // Restoring a contract that isn't archived conflicts as before.
-      await send('post', '/restore', admin, companyA.id, contract.id).expect(409);
+      await send('post', '/restore', admin, companyA.id, contract.id).expect(
+        409,
+      );
     });
   });
 
@@ -799,9 +924,12 @@ describe('Contract visibility (PostgreSQL)', () => {
         total: 0,
       });
       // The B-party role does not open C1 under A's header either.
-      await getContract('', await signIn(alsoInA), companyA.id, contract.id).expect(
-        404,
-      );
+      await getContract(
+        '',
+        await signIn(alsoInA),
+        companyA.id,
+        contract.id,
+      ).expect(404);
     });
 
     it('shows an unrelated company none of these contracts', async () => {
@@ -867,8 +995,18 @@ describe('Contract visibility (PostgreSQL)', () => {
       await getContract('', cookie, companyO.id, contract.id).expect(404);
       await getContract('', cookie, companyA.id, contract.id).expect(403);
       // A real contract id and a made-up one look the same.
-      const real = await getContract('', await signIn(plainA), companyA.id, contract.id);
-      const fake = await getContract('', await signIn(plainA), companyA.id, ulid());
+      const real = await getContract(
+        '',
+        await signIn(plainA),
+        companyA.id,
+        contract.id,
+      );
+      const fake = await getContract(
+        '',
+        await signIn(plainA),
+        companyA.id,
+        ulid(),
+      );
       expect(real.status).toBe(404);
       expect(fake.status).toBe(404);
       expect(real.body).toEqual(fake.body);
@@ -882,9 +1020,12 @@ describe('Contract visibility (PostgreSQL)', () => {
         [projectLead, companyA.id],
         [memberB, companyB.id],
       ] as const) {
-        await getContract('', await signIn(member), companyId, contract.id).expect(
-          404,
-        );
+        await getContract(
+          '',
+          await signIn(member),
+          companyId,
+          contract.id,
+        ).expect(404);
       }
     });
 
@@ -894,22 +1035,40 @@ describe('Contract visibility (PostgreSQL)', () => {
         .update({ id: contract.id }, { deletedAt: new Date() });
       const cookie = await signIn(adminA);
 
-      const detail = await getContract('', cookie, companyA.id, contract.id).expect(
-        200,
-      );
+      const detail = await getContract(
+        '',
+        cookie,
+        companyA.id,
+        contract.id,
+      ).expect(200);
       expect(detail.body.contract).toMatchObject({
         id: contract.id,
         deletedAt: expect.any(String),
       });
-      await getContract('/parties', cookie, companyA.id, contract.id).expect(200);
-      await getContract('/status-history', cookie, companyA.id, contract.id).expect(
+      await getContract('/parties', cookie, companyA.id, contract.id).expect(
         200,
       );
-      await getContract('/workspaces', cookie, companyA.id, contract.id).expect(200);
+      await getContract(
+        '/status-history',
+        cookie,
+        companyA.id,
+        contract.id,
+      ).expect(200);
+      await getContract('/workspaces', cookie, companyA.id, contract.id).expect(
+        200,
+      );
       // Read-only history opens no protected record or workspace.
       for (const path of PROTECTED_PATHS) {
-        const response = await getContract(path, cookie, companyA.id, contract.id);
-        expect({ path, ok: response.status < 300 }).toEqual({ path, ok: false });
+        const response = await getContract(
+          path,
+          cookie,
+          companyA.id,
+          contract.id,
+        );
+        expect({ path, ok: response.status < 300 }).toEqual({
+          path,
+          ok: false,
+        });
       }
     });
   });
@@ -918,16 +1077,32 @@ describe('Contract visibility (PostgreSQL)', () => {
     it('refuses a Company Administrator without a role (403) on every protected route', async () => {
       const cookie = await signIn(adminA);
       for (const path of PROTECTED_PATHS) {
-        const response = await getContract(path, cookie, companyA.id, contract.id);
-        expect({ path, status: response.status }).toEqual({ path, status: 403 });
+        const response = await getContract(
+          path,
+          cookie,
+          companyA.id,
+          contract.id,
+        );
+        expect({ path, status: response.status }).toEqual({
+          path,
+          status: 403,
+        });
       }
     });
 
     it('hides the contract (404) on every protected route from a member without a role', async () => {
       const cookie = await signIn(plainA);
       for (const path of PROTECTED_PATHS) {
-        const response = await getContract(path, cookie, companyA.id, contract.id);
-        expect({ path, status: response.status }).toEqual({ path, status: 404 });
+        const response = await getContract(
+          path,
+          cookie,
+          companyA.id,
+          contract.id,
+        );
+        expect({ path, status: response.status }).toEqual({
+          path,
+          status: 404,
+        });
       }
     });
 
@@ -956,29 +1131,80 @@ describe('Contract visibility (PostgreSQL)', () => {
 
     it('opens only the workspace a role belongs to', async () => {
       const finance = await signIn(financeMember);
-      await getContract('/workspaces/finance', finance, companyA.id, contract.id).expect(200);
-      await getContract('/invoices', finance, companyA.id, contract.id).expect(200);
-      await getContract('/workspaces/hse', finance, companyA.id, contract.id).expect(403);
-      await getContract('/hse/incidents', finance, companyA.id, contract.id).expect(403);
-      await getContract('/workspaces/project', finance, companyA.id, contract.id).expect(403);
-      await getContract('/stages', finance, companyA.id, contract.id).expect(403);
+      await getContract(
+        '/workspaces/finance',
+        finance,
+        companyA.id,
+        contract.id,
+      ).expect(200);
+      await getContract('/invoices', finance, companyA.id, contract.id).expect(
+        200,
+      );
+      await getContract(
+        '/workspaces/hse',
+        finance,
+        companyA.id,
+        contract.id,
+      ).expect(403);
+      await getContract(
+        '/hse/incidents',
+        finance,
+        companyA.id,
+        contract.id,
+      ).expect(403);
+      await getContract(
+        '/workspaces/project',
+        finance,
+        companyA.id,
+        contract.id,
+      ).expect(403);
+      await getContract('/stages', finance, companyA.id, contract.id).expect(
+        403,
+      );
 
       const lead = await signIn(projectLead);
       await getContract('/stages', lead, companyA.id, contract.id).expect(200);
-      await getContract('/invoices', lead, companyA.id, contract.id).expect(403);
+      await getContract('/invoices', lead, companyA.id, contract.id).expect(
+        403,
+      );
     });
 
     it('keeps Workspace Admin rights to their own workspace', async () => {
       const cookie = await signIn(hseAdmin);
-      await getContract('/workspaces/hse', cookie, companyA.id, contract.id).expect(200);
-      await getContract('/workspaces/finance', cookie, companyA.id, contract.id).expect(403);
-      const hse = await getContract('/role-management', cookie, companyA.id, contract.id, {
-        workspace: 'hse',
-      }).expect(200);
-      expect(hse.body).toMatchObject({ canManage: true, canGrantWorkspaceAdmin: false });
-      const finance = await getContract('/role-management', cookie, companyA.id, contract.id, {
-        workspace: 'finance',
-      }).expect(200);
+      await getContract(
+        '/workspaces/hse',
+        cookie,
+        companyA.id,
+        contract.id,
+      ).expect(200);
+      await getContract(
+        '/workspaces/finance',
+        cookie,
+        companyA.id,
+        contract.id,
+      ).expect(403);
+      const hse = await getContract(
+        '/role-management',
+        cookie,
+        companyA.id,
+        contract.id,
+        {
+          workspace: 'hse',
+        },
+      ).expect(200);
+      expect(hse.body).toMatchObject({
+        canManage: true,
+        canGrantWorkspaceAdmin: false,
+      });
+      const finance = await getContract(
+        '/role-management',
+        cookie,
+        companyA.id,
+        contract.id,
+        {
+          workspace: 'finance',
+        },
+      ).expect(200);
       expect(finance.body).toMatchObject({ canManage: false });
       await getContract('/role-assignments', cookie, companyA.id, contract.id, {
         workspace: 'finance',
@@ -1016,22 +1242,47 @@ describe('Contract visibility (PostgreSQL)', () => {
         canTransition: false,
         canRestore: false,
       });
-      const roles = await getContract('/role-management', cookie, companyA.id, contract.id, {
-        workspace: 'finance',
-      }).expect(200);
-      expect(roles.body).toMatchObject({ canManage: true, canGrantWorkspaceAdmin: true });
+      const roles = await getContract(
+        '/role-management',
+        cookie,
+        companyA.id,
+        contract.id,
+        {
+          workspace: 'finance',
+        },
+      ).expect(200);
+      expect(roles.body).toMatchObject({
+        canManage: true,
+        canGrantWorkspaceAdmin: true,
+      });
       await getContract('/role-assignments', cookie, companyA.id, contract.id, {
         workspace: 'finance',
       }).expect(200);
-      await getContract('/role-assignment-members', cookie, companyA.id, contract.id, {
-        workspace: 'finance',
-      }).expect(200);
-      await getContract('/site-management', cookie, companyA.id, contract.id).expect(200);
+      await getContract(
+        '/role-assignment-members',
+        cookie,
+        companyA.id,
+        contract.id,
+        {
+          workspace: 'finance',
+        },
+      ).expect(200);
+      await getContract(
+        '/site-management',
+        cookie,
+        companyA.id,
+        contract.id,
+      ).expect(200);
     });
 
     it('hides lifecycle and role-management permissions (404) from a member without a role', async () => {
       const cookie = await signIn(plainA);
-      await getContract('/lifecycle-permissions', cookie, companyA.id, contract.id).expect(404);
+      await getContract(
+        '/lifecycle-permissions',
+        cookie,
+        companyA.id,
+        contract.id,
+      ).expect(404);
       await getContract('/role-management', cookie, companyA.id, contract.id, {
         workspace: 'finance',
       }).expect(404);
@@ -1058,11 +1309,26 @@ describe('Contract visibility (PostgreSQL)', () => {
         total: 1,
       });
       await getContract('', member, companyA.id, contract.id).expect(200);
-      await getContract('/workspaces/finance', member, companyA.id, contract.id).expect(200);
-      await getContract('/workspaces/project', member, companyA.id, contract.id).expect(403);
+      await getContract(
+        '/workspaces/finance',
+        member,
+        companyA.id,
+        contract.id,
+      ).expect(200);
+      await getContract(
+        '/workspaces/project',
+        member,
+        companyA.id,
+        contract.id,
+      ).expect(403);
 
       // The administrator still has no workspace of their own.
-      await getContract('/workspaces/finance', admin, companyA.id, contract.id).expect(403);
+      await getContract(
+        '/workspaces/finance',
+        admin,
+        companyA.id,
+        contract.id,
+      ).expect(403);
 
       await request(app.getHttpServer())
         .delete(`/api/contract/role-assignments/${assignmentId}`)

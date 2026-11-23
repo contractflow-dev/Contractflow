@@ -1,13 +1,17 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EDocumentVisibility } from '@contractflow/contracts-schema';
-import { IsNull } from 'typeorm';
+import {
+  EDocumentUploadStatus,
+  EDocumentVisibility,
+} from '@contractflow/contracts-schema';
+import { In, IsNull } from 'typeorm';
 import type {
   DeepPartial,
   FindOptionsOrder,
   FindOptionsWhere,
   Repository,
 } from 'typeorm';
+import { DocumentVersion } from '../entities/document-version.entity';
 import { Document } from '../entities/document.entity';
 import {
   CompanyScopedRepository,
@@ -92,6 +96,43 @@ export class DocumentRepository extends CompanyScopedRepository<Document> {
     return this.visibleInContract(scope)
       .andWhere('document.id = :documentId', { documentId })
       .getOne();
+  }
+
+  /**
+   * Documents of the scoped contract the scope company can see (its own, or
+   * shared with all parties), share-locked so they aren't deleted meanwhile.
+   */
+  findManyVisibleInContractForShare(
+    scope: IContractCompanyScope,
+    documentIds: string[],
+  ): Promise<Document[]> {
+    if (!documentIds.length) return Promise.resolve([]);
+    return this.visibleInContract(scope)
+      .andWhere('document.id IN (:...documentIds)', { documentIds })
+      .setLock('pessimistic_read', undefined, ['document'])
+      .getMany();
+  }
+
+  /** The latest available version of each document, by document id. */
+  async latestAvailableVersions(
+    documentIds: string[],
+  ): Promise<Map<string, DocumentVersion>> {
+    const latest = new Map<string, DocumentVersion>();
+    if (!documentIds.length) return latest;
+    const versions = await this.repository.manager
+      .getRepository(DocumentVersion)
+      .find({
+        where: {
+          documentId: In(documentIds),
+          uploadStatus: EDocumentUploadStatus.AVAILABLE,
+        },
+        order: { versionNumber: 'DESC' },
+      });
+    for (const version of versions) {
+      if (!latest.has(version.documentId))
+        latest.set(version.documentId, version);
+    }
+    return latest;
   }
 
   async findVisiblePageInContract(

@@ -75,9 +75,11 @@ export class ActivityLogAuditFields1793700000000 implements MigrationInterface {
         DROP COLUMN IF EXISTS "reason",
         DROP COLUMN IF EXISTS "workspace"
     `);
+    // A random UUID from md5, not gen_random_uuid(): that needs PostgreSQL
+    // 13 (or the pgcrypto extension), and this must run on 12 as well.
     await queryRunner.query(`
       UPDATE "activity_log"
-        SET "entity_id" = gen_random_uuid()::text
+        SET "entity_id" = md5("id" || random()::text || clock_timestamp()::text)::uuid::text
         WHERE "entity_id" !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
     `);
     await queryRunner.query(`

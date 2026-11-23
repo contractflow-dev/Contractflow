@@ -23,11 +23,7 @@ export const CONTRACT_WORKSPACES: Array<{
     purpose:
       "Delivery of the contract: its stages, milestones, variations and the contractor's daily site logs, shared between the client's project team and the contractor's.",
     sections: ["overview", "sites", "documents", "history"],
-    planned: [
-      "Stages and milestones, with submission and approval",
-      "Variations and their cost and time impact",
-      "Daily site logs",
-    ],
+    planned: ["Variations and their cost and time impact", "Daily site logs"],
   },
   {
     id: "hse",
@@ -52,7 +48,19 @@ export const CONTRACT_WORKSPACES: Array<{
   },
 ];
 
-export type ContractWorkspaceView = "overview" | "team";
+/**
+ * A workspace's screens. Stages, milestones, reviews and activity belong to
+ * the Project workspace only.
+ */
+export type ContractWorkspaceView =
+  "overview" | "team" | "stages" | "milestones" | "reviews" | "activity";
+
+export const PROJECT_WORKSPACE_VIEWS: readonly ContractWorkspaceView[] = [
+  "stages",
+  "milestones",
+  "reviews",
+  "activity",
+];
 
 export function workspaceMeta(workspace: AssignableContractWorkspace) {
   return CONTRACT_WORKSPACES.find(({ id }) => id === workspace)!;

@@ -20,6 +20,21 @@ export class CompanyUserRepository extends CompanyScopedRepository<
     super(repository);
   }
 
+  /** The user's current membership, locked so it can't end mid-operation. */
+  findActiveMemberForUpdate(
+    scope: ICompanyScope,
+    userId: string,
+  ): Promise<CompanyUser | null> {
+    return this.findOne(scope, {
+      where: {
+        userId,
+        status: ECompanyUserStatus.ACTIVE,
+        leftAt: IsNull(),
+      },
+      lock: { mode: 'pessimistic_write' },
+    });
+  }
+
   /** The user's current membership of the scoped company, or null. */
   findActiveMember(
     scope: ICompanyScope,

@@ -243,6 +243,29 @@ export class ContractRoleAssignmentRepository extends CompanyScopedRepository<Co
     return count > 0;
   }
 
+  /**
+   * `hasActiveRole`, share-locking the assignment so it can't be revoked
+   * before the caller's transaction ends. One locked row, not a count:
+   * PostgreSQL can't lock an aggregate.
+   */
+  async hasActiveRoleForShare(
+    scope: ICompanyScope,
+    companyUserId: string,
+    contractPartyId: string,
+    role: ContractRoleAssignment['role'],
+  ): Promise<boolean> {
+    const row = await this.scopedQuery(scope)
+      .andWhere(
+        'e.companyUserId = :companyUserId AND e.contractPartyId = :contractPartyId ' +
+          'AND e.role = :role AND e.revokedAt IS NULL',
+        { companyUserId, contractPartyId, role },
+      )
+      .select('e.id')
+      .setLock('pessimistic_read')
+      .getOne();
+    return row !== null;
+  }
+
   /** Full assignment history for one user (revoked rows included). */
   findHistoryByCompanyUser(scope: ICompanyScope, companyUserId: string) {
     return this.scopedQuery(scope)

@@ -12,7 +12,7 @@ import type { IUnitOfWork } from '../../../../common/application/unit-of-work.in
 import { AppUserResponseDto } from '../../dto/app-user/responses/app-user-response.dto';
 import { CreateAppUserRequestDto } from '../../dto/app-user/requests/create-app-user-request.dto';
 import { LoginAppUserDto } from '../../dto/app-user/requests/login-app-user-request.dto';
-import { AppUser } from '../../entities/app-user.entity';
+import type { AppUser } from '../../entities/app-user.entity';
 import { MailService } from '../../../mail/mail.service';
 import type {
   AuthenticatedSession,

@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  EClientContractRole,
   EContractStatus,
   type ContractWorkspaceAccess,
   EContractorContractRole,
@@ -32,6 +33,30 @@ vi.mock("@/services/contractApi", () => ({
 }));
 vi.mock("../_hooks/use-contract-section-access", () => ({
   useContractSectionAccess: () => mocks.sectionAccess,
+}));
+// The Project screens have their own tests; here they only show which one
+// opened and with what permissions.
+vi.mock("../project/project-overview", () => ({
+  ProjectOverview: (props: { project: { permissions: object } }) => (
+    <div>PROJECT OVERVIEW {JSON.stringify(props.project.permissions)}</div>
+  ),
+}));
+vi.mock("../project/project-stages", () => ({
+  ProjectStages: () => <div>PROJECT STAGES</div>,
+}));
+vi.mock("../project/project-milestones", () => ({
+  ProjectMilestones: () => <div>PROJECT MILESTONES</div>,
+}));
+vi.mock("../project/project-reviews", () => ({
+  ProjectReviews: () => <div>PROJECT REVIEWS</div>,
+}));
+vi.mock("../project/project-activity", () => ({
+  ProjectActivity: () => <div>PROJECT ACTIVITY</div>,
+}));
+vi.mock("../project/milestone-detail", () => ({
+  MilestoneDetail: (props: { milestoneId: string }) => (
+    <div>MILESTONE DETAIL {props.milestoneId}</div>
+  ),
 }));
 vi.mock("./contract-role-assignment-management", () => ({
   ContractRoleAssignmentManagement: (props: { fixedWorkspace?: string }) => {
@@ -188,7 +213,9 @@ describe("ContractWorkspace", () => {
       'href="/dashboards/contracts/contract-1/sites"',
     );
     expect(markup).toContain("Daily site logs");
-    expect(markup.match(/>Planned</g)?.length).toBeGreaterThanOrEqual(3);
+    // Stages and milestones are built now, so they are no longer planned.
+    expect(markup).not.toContain("Stages and milestones, with submission");
+    expect(markup.match(/>Planned</g)?.length).toBe(2);
     // No Team entry without team rights.
     expect(markup).not.toContain("/workspaces/project/team");
   });
@@ -333,5 +360,95 @@ describe("ContractWorkspacesCard", () => {
     const markup = render();
     expect(markup).toContain("Unable to load your workspaces.");
     expect(markup).toMatch(/<button[^>]*>Retry<\/button>/);
+  });
+});
+
+describe("Project workspace screens", () => {
+  const clientContract = {
+    ...contract,
+    membership: { ...contract.membership, partyType: "client" },
+  };
+  const projectManager = entry("project", {
+    hasAccess: true,
+    roles: [EClientContractRole.CLIENT_PROJECT_MANAGER],
+  });
+
+  function renderProject(view: string, milestoneId?: string) {
+    return renderToStaticMarkup(
+      <ContractWorkspace
+        companyId="company-1"
+        contractId="contract-1"
+        workspace="project"
+        view={view as "overview"}
+        milestoneId={milestoneId}
+        viewer={{ membershipId: "member-1", companyName: "Acme" }}
+      />,
+    );
+  }
+
+  it("offers Stages, Milestones and Activity, and Reviews only to the Client Project Manager", () => {
+    mocks.workspace.mockReturnValue(ok(projectLead));
+    const lead = renderProject("overview");
+    expect(lead).toContain(
+      'href="/dashboards/contracts/contract-1/workspaces/project/stages"',
+    );
+    expect(lead).toContain(
+      'href="/dashboards/contracts/contract-1/workspaces/project/milestones"',
+    );
+    expect(lead).toContain(
+      'href="/dashboards/contracts/contract-1/workspaces/project/activity"',
+    );
+    expect(lead).not.toContain("/workspaces/project/reviews");
+
+    mocks.contract.mockReturnValue(ok(clientContract));
+    mocks.workspace.mockReturnValue(ok(projectManager));
+    expect(renderProject("overview")).toContain(
+      'href="/dashboards/contracts/contract-1/workspaces/project/reviews"',
+    );
+  });
+
+  it("derives permissions from the role, the side and the contract status", () => {
+    mocks.workspace.mockReturnValue(ok(projectLead));
+    const lead = renderProject("overview");
+    expect(lead).toContain("PROJECT OVERVIEW");
+    expect(lead).toContain("&quot;canSubmit&quot;:true");
+    expect(lead).toContain("&quot;canPlan&quot;:false");
+
+    mocks.contract.mockReturnValue(
+      ok({
+        ...clientContract,
+        contract: { ...clientContract.contract, status: EContractStatus.DRAFT },
+      }),
+    );
+    mocks.workspace.mockReturnValue(ok(projectManager));
+    const draft = renderProject("overview");
+    expect(draft).toContain("&quot;canPlan&quot;:true");
+    expect(draft).toContain("&quot;canOperateAsPlanner&quot;:false");
+  });
+
+  it("opens each screen, and one milestone by its id", () => {
+    mocks.workspace.mockReturnValue(ok(projectLead));
+    expect(renderProject("stages")).toContain("PROJECT STAGES");
+    expect(renderProject("milestones")).toContain("PROJECT MILESTONES");
+    expect(renderProject("activity")).toContain("PROJECT ACTIVITY");
+    expect(renderProject("milestones", "01J0000000000000000000MS01")).toContain(
+      "MILESTONE DETAIL 01J0000000000000000000MS01",
+    );
+  });
+
+  it("refuses Reviews to anyone but the Client Project Manager, even by direct URL", () => {
+    mocks.workspace.mockReturnValue(ok(projectLead));
+    const markup = renderProject("reviews");
+    expect(markup).not.toContain("PROJECT REVIEWS");
+    expect(markup).toContain("Reviews are for the Client Project Manager");
+  });
+
+  it("shows no Project screen without Project access", () => {
+    mocks.workspace.mockReturnValue(failed(403));
+    const markup = renderProject("milestones");
+    expect(markup).not.toContain("PROJECT MILESTONES");
+    expect(markup).toContain(
+      "You don&#x27;t have access to the Project workspace",
+    );
   });
 });
