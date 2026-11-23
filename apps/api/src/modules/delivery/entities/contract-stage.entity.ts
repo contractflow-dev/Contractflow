@@ -1,46 +1,46 @@
-import { Entity, Column, ManyToOne, JoinColumn } from "typeorm";
-import { Contract } from "../../contract/entities/contract.entity";
-import { BaseCustomEntity } from "../../cross-cutting/entities/base-custom.entity";
-import { IContractStageEntity } from "../interface/contract-stage.interface";
-import { EStatus } from "@contractflow/contracts-schema";
+import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { EStatus } from '@contractflow/contracts-schema';
+import { Contract } from '../../contract/entities/contract.entity';
+import { BaseCustomEntity } from '../../cross-cutting/entities/base-custom.entity';
+import { IContractStageEntity } from '../interface/contract-stage.interface';
 
+@Entity('contract_stage')
+export class ContractStage
+  extends BaseCustomEntity
+  implements IContractStageEntity
+{
+  @Column({ name: 'contract_id', type: 'varchar', length: 26 })
+  contractId!: string;
 
+  @ManyToOne(() => Contract, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'contract_id', referencedColumnName: 'id' })
+  contract!: Contract;
 
-@Entity("contract_stage")
-export class ContractStage extends BaseCustomEntity implements IContractStageEntity{
+  @Column({ name: 'name', type: 'varchar', length: 255 })
+  name!: string;
 
-    @Column({name: "contract_id", type: "varchar", length: 26})
-    contractId!: string
-    
-    @ManyToOne(() => Contract, {onDelete:"CASCADE"})
-    @JoinColumn({name:"contract_id", referencedColumnName: "id"})
-    contract!: Contract
+  @Column({ name: 'description', type: 'text', nullable: true })
+  description!: string | null;
 
-    @Column({name: "name", type: "varchar", length: 255})
-    name!: string
+  @Column({ name: 'sequence', type: 'int' })
+  sequence!: number;
 
-    @Column({name: "description", type: "text"})
-    description!: string
+  @Column({ name: 'status', type: 'enum', enum: EStatus })
+  status!: EStatus;
 
-    @Column({name: "sequence", type: "int"})
-    sequence!: string
+  /** Share of the contract, in basis points. */
+  @Column({ name: 'weight_bps', type: 'int' })
+  weightBps!: number;
 
-    @Column({name: "status", type: "enum", enum: EStatus})
-    status!: EStatus
+  @Column({ name: 'planned_start_date', type: 'date' })
+  plannedStartDate!: string;
 
-    @Column({name:"weight_bps", type: "int"})
-    weightBps!: number
+  @Column({ name: 'planned_end_date', type: 'date' })
+  plannedEndDate!: string;
 
-    @Column({name: "planned_start_date", type: "date"})
-    plannedStartDate!: Date
+  @Column({ name: 'actual_start_date', type: 'date', nullable: true })
+  actualStartDate!: string | null;
 
-    @Column({name: "planned_end_date", type: "date"})
-    plannedEndDate!: Date
-
-    @Column({name: "actual_start_date", type: "date"})
-    actualStartDate!: Date
-
-    @Column({name: "actual_end_date", type: "date"})
-    actualEndDate!: Date
-
+  @Column({ name: 'actual_end_date', type: 'date', nullable: true })
+  actualEndDate!: string | null;
 }

@@ -1,7 +1,7 @@
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { randomBytes, createHash } from 'node:crypto';
 import { EUserStatus } from '@contractflow/contracts-schema';
-import { AppUser } from '../../entities/app-user.entity';
+import type { AppUser } from '../../entities/app-user.entity';
 import {
   RequestMetadata,
   AuthenticatedSession,

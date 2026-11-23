@@ -1,4 +1,15 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 import { CurrentCompanyId } from '../../../common/decorators/current-company-id.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
@@ -6,12 +17,35 @@ import { CompanyContextGuard } from '../../../common/guards/company-context.guar
 import { ContractContextGuard } from '../../../common/guards/contract-context.guard';
 import { CurrentContractId } from '../../../common/decorators/current-contract-id.decorator';
 import type { AuthenticatedUser } from '../../identity/interface/auth-context.interface';
+import {
+  CreateContractStageRequestDto,
+  CreateMilestoneRequestDto,
+  DecideMilestoneSubmissionRequestDto,
+  ListMilestonesRequestDto,
+  SubmitMilestoneRequestDto,
+  TransitionContractStageRequestDto,
+  UpdateContractStageRequestDto,
+  UpdateMilestoneRequestDto,
+} from '../dto/milestone-workflow-request.dto';
 import { DeliveryService } from '../services/delivery.service';
+import { MilestoneReadService } from '../services/milestone-read.service';
+import { MilestoneWorkflowService } from '../services/milestone-workflow.service';
 
+/**
+ * Project workspace delivery: stages and milestones (planning, submissions,
+ * decisions and outstanding work) and variations. The company and contract
+ * come from the headers; the services decide access.
+ */
 @Controller('contract')
 @UseGuards(CompanyContextGuard, ContractContextGuard)
 export class DeliveryController {
-  constructor(private readonly delivery: DeliveryService) {}
+  constructor(
+    private readonly delivery: DeliveryService,
+    private readonly milestones: MilestoneReadService,
+    private readonly workflow: MilestoneWorkflowService,
+  ) {}
+
+  // --- Stages --------------------------------------------------------------
 
   @Get('stages')
   listStages(
@@ -20,7 +54,23 @@ export class DeliveryController {
     @CurrentContractId() contractId: string,
     @Query() query: PaginationQueryDto,
   ) {
-    return this.delivery.stages.list(user.id, companyId, contractId, query);
+    return this.milestones.listStages(
+      { userId: user.id, companyId, contractId },
+      query,
+    );
+  }
+
+  @Post('stages')
+  createStage(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
+    @Body() body: CreateContractStageRequestDto,
+  ) {
+    return this.workflow.createStage(
+      { userId: user.id, companyId, contractId },
+      body,
+    );
   }
 
   @Get('stages/:stageId')
@@ -30,17 +80,72 @@ export class DeliveryController {
     @CurrentContractId() contractId: string,
     @Param('stageId') stageId: string,
   ) {
-    return this.delivery.stages.get(user.id, companyId, contractId, stageId);
+    return this.milestones.getStage(
+      { userId: user.id, companyId, contractId },
+      stageId,
+    );
   }
+
+  @Patch('stages/:stageId')
+  updateStage(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
+    @Param('stageId') stageId: string,
+    @Body() body: UpdateContractStageRequestDto,
+  ) {
+    return this.workflow.updateStage(
+      { userId: user.id, companyId, contractId },
+      stageId,
+      body,
+    );
+  }
+
+  @Post('stages/:stageId/transitions')
+  @HttpCode(HttpStatus.OK)
+  transitionStage(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
+    @Param('stageId') stageId: string,
+    @Body() body: TransitionContractStageRequestDto,
+  ) {
+    return this.workflow.transitionStage(
+      { userId: user.id, companyId, contractId },
+      stageId,
+      body,
+    );
+  }
+
+  /** A milestone is created within its stage, named by the path. */
+  @Post('stages/:stageId/milestones')
+  createMilestone(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
+    @Param('stageId') stageId: string,
+    @Body() body: CreateMilestoneRequestDto,
+  ) {
+    return this.workflow.createMilestone(
+      { userId: user.id, companyId, contractId },
+      stageId,
+      body,
+    );
+  }
+
+  // --- Milestones ----------------------------------------------------------
 
   @Get('milestones')
   listMilestones(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Query() query: PaginationQueryDto,
+    @Query() query: ListMilestonesRequestDto,
   ) {
-    return this.delivery.milestones.list(user.id, companyId, contractId, query);
+    return this.milestones.listMilestones(
+      { userId: user.id, companyId, contractId },
+      query,
+    );
   }
 
   @Get('milestones/:milestoneId')
@@ -50,13 +155,128 @@ export class DeliveryController {
     @CurrentContractId() contractId: string,
     @Param('milestoneId') milestoneId: string,
   ) {
-    return this.delivery.milestones.get(
-      user.id,
-      companyId,
-      contractId,
+    return this.milestones.getMilestone(
+      { userId: user.id, companyId, contractId },
       milestoneId,
     );
   }
+
+  @Patch('milestones/:milestoneId')
+  updateMilestone(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
+    @Param('milestoneId') milestoneId: string,
+    @Body() body: UpdateMilestoneRequestDto,
+  ) {
+    return this.workflow.updateMilestone(
+      { userId: user.id, companyId, contractId },
+      milestoneId,
+      body,
+    );
+  }
+
+  @Post('milestones/:milestoneId/start')
+  @HttpCode(HttpStatus.OK)
+  startMilestone(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
+    @Param('milestoneId') milestoneId: string,
+  ) {
+    return this.workflow.startMilestone(
+      { userId: user.id, companyId, contractId },
+      milestoneId,
+    );
+  }
+
+  @Get('milestones/:milestoneId/submissions')
+  listSubmissions(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
+    @Param('milestoneId') milestoneId: string,
+  ) {
+    return this.workflow.listSubmissions(
+      { userId: user.id, companyId, contractId },
+      milestoneId,
+    );
+  }
+
+  @Post('milestones/:milestoneId/submissions')
+  submit(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
+    @Param('milestoneId') milestoneId: string,
+    @Body() body: SubmitMilestoneRequestDto,
+  ) {
+    return this.workflow.submit(
+      { userId: user.id, companyId, contractId },
+      milestoneId,
+      body,
+    );
+  }
+
+  @Get('milestones/:milestoneId/submissions/:submissionId')
+  getSubmission(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
+    @Param('milestoneId') milestoneId: string,
+    @Param('submissionId') submissionId: string,
+  ) {
+    return this.workflow.getSubmission(
+      { userId: user.id, companyId, contractId },
+      milestoneId,
+      submissionId,
+    );
+  }
+
+  @Post('milestones/:milestoneId/submissions/:submissionId/decision')
+  decide(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
+    @Param('milestoneId') milestoneId: string,
+    @Param('submissionId') submissionId: string,
+    @Body() body: DecideMilestoneSubmissionRequestDto,
+  ) {
+    return this.workflow.decide(
+      { userId: user.id, companyId, contractId },
+      milestoneId,
+      submissionId,
+      body,
+    );
+  }
+
+  @Get('milestones/:milestoneId/decisions')
+  listDecisions(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
+    @Param('milestoneId') milestoneId: string,
+  ) {
+    return this.milestones.listDecisions(
+      { userId: user.id, companyId, contractId },
+      milestoneId,
+    );
+  }
+
+  @Get('milestones/:milestoneId/outstanding-items')
+  listOutstandingItems(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
+    @Param('milestoneId') milestoneId: string,
+  ) {
+    return this.milestones.listOutstandingItems(
+      { userId: user.id, companyId, contractId },
+      milestoneId,
+    );
+  }
+
+  // --- Variations ----------------------------------------------------------
 
   @Get('variations')
   listVariations(

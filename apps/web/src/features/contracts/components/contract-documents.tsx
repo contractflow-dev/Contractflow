@@ -56,30 +56,24 @@ import { useUserTimeZone } from "@/hooks/use-user-time-zone";
 import { getApiErrorMessage, getApiErrorStatus } from "@/lib/apiError";
 import { formatDate, formatDateTime, formatFileSize } from "@/lib/format";
 import { notifyError, notifySuccess } from "@/lib/notify";
-import {
-  PresignedUploadError,
-  sha256Hex,
-  uploadToPresignedUrl,
-} from "@/lib/presignedUpload";
 import type { Contract } from "@/services/contractApi";
 import {
-  useCompleteDocumentUploadMutation,
   useCreateDocumentDownloadUrlMutation,
-  useCreateDocumentUploadMutation,
-  useCreateDocumentVersionUploadMutation,
   useDeleteContractDocumentMutation,
   useGetContractDocumentQuery,
   useGetContractDocumentsQuery,
   type DocumentSummary,
-  type DocumentUploadSession,
 } from "@/services/documentsApi";
+import {
+  useDocumentUpload,
+  type UploadStep,
+} from "../_hooks/use-document-upload";
 import {
   DOCUMENT_ACCEPT,
   DOCUMENT_CATEGORY_LABELS,
   DOCUMENT_TYPES_LABEL,
   DOCUMENT_VISIBILITY_LABELS,
   documentFileProblem,
-  documentMimeType,
 } from "../document-files";
 
 const categories = Object.values(EDocumentCategory);
@@ -719,100 +713,6 @@ function useDownload(scope: Scope) {
       }
     },
   };
-}
-
-type UploadStep = "hashing" | "uploading" | "finishing";
-const STEP_LABEL: Record<Exclude<UploadStep, "uploading">, string> = {
-  hashing: "Preparing file…",
-  finishing: "Checking file…",
-};
-
-/**
- * Uploads in three steps: ask the API for a presigned PUT (sending the
- * file's SHA-256, which storage checks), send the bytes straight to storage,
- * then ask the API to verify and publish the version.
- */
-function useDocumentUpload(scope: Scope) {
-  const [createUpload] = useCreateDocumentUploadMutation();
-  const [createVersion] = useCreateDocumentVersionUploadMutation();
-  const [complete] = useCompleteDocumentUploadMutation();
-  const [step, setStep] = useState<UploadStep | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [progress, setProgress] = useState(0);
-
-  async function upload(
-    file: File,
-    request:
-      | {
-          kind: "new";
-          meta: Omit<NewDocumentValues, "file" | "changeNote">;
-          changeNote: string;
-        }
-      | { kind: "version"; documentId: string; changeNote: string },
-  ): Promise<boolean> {
-    setError(null);
-    try {
-      setStep("hashing");
-      const fileRequest = {
-        fileName: file.name,
-        mimeType: documentMimeType(file),
-        sizeBytes: file.size,
-        checksumSha256: await sha256Hex(file),
-        ...(request.changeNote ? { changeNote: request.changeNote } : {}),
-      };
-      let session: DocumentUploadSession;
-      if (request.kind === "new") {
-        const { documentNumber, visibility, ...meta } = request.meta;
-        session = await createUpload({
-          ...scope,
-          body: {
-            ...meta,
-            // Company documents are always private; the API sets that.
-            ...(scope.contractId ? { visibility } : {}),
-            ...(documentNumber ? { documentNumber } : {}),
-            ...fileRequest,
-          },
-        }).unwrap();
-      } else {
-        session = await createVersion({
-          ...scope,
-          documentId: request.documentId,
-          body: fileRequest,
-        }).unwrap();
-      }
-
-      setStep("uploading");
-      setProgress(0);
-      await uploadToPresignedUrl(session.upload, file, {
-        onProgress: setProgress,
-      });
-
-      setStep("finishing");
-      await complete({
-        ...scope,
-        documentId: session.document.id,
-        versionId: session.version.id,
-      }).unwrap();
-      return true;
-    } catch (caught) {
-      setError(
-        caught instanceof PresignedUploadError
-          ? caught.message
-          : getApiErrorMessage(caught, "The document couldn't be uploaded."),
-      );
-      return false;
-    } finally {
-      setStep(null);
-    }
-  }
-
-  const label =
-    step === "uploading"
-      ? `Uploading… ${Math.round(progress * 100)}%`
-      : step
-        ? STEP_LABEL[step]
-        : null;
-  return { upload, step, label, error };
 }
 
 function NewDocumentForm({

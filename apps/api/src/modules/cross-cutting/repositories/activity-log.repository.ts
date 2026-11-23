@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository, SelectQueryBuilder } from 'typeorm';
 import { ContractScopedRepository } from '../../../common/database/repositories/contract-scoped.repository';
 import type { IContractCompanyScope } from '../../../common/database/repositories/contract-scope.interface';
+import type { ActivityEntryValues } from '../../../common/application/activity-entry';
 import { ActivityLog } from '../entities/activity-log.entity';
 import type {
   ActivityActorRecord,
@@ -23,6 +24,14 @@ export class ActivityLogRepository extends ContractScopedRepository<
     @InjectRepository(ActivityLog) repository: Repository<ActivityLog>,
   ) {
     super(repository);
+  }
+
+  /**
+   * Adds one validated entry (see `buildActivityEntry`). Its company must be
+   * the scope's, and the scope company a party to the contract.
+   */
+  append(scope: IContractCompanyScope, entry: ActivityEntryValues) {
+    return this.save(scope, this.repository.create(entry));
   }
 
   override async update(): Promise<never> {

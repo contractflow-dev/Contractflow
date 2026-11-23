@@ -74,97 +74,10 @@ interface Resource {
   keys: string[];
 }
 
+// Stages and milestones are no longer read-only: their reads and writes are
+// covered by delivery/services/milestone-workflow*.spec.ts and the
+// milestone-workflow HTTP integration spec.
 const resources: Resource[] = [
-  {
-    name: 'contract stages',
-    controller: 'delivery',
-    path: 'contract/stages',
-    list: 'listStages',
-    get: 'getStage',
-    workspace: 'project',
-    repository: 'stages',
-    row: {
-      ...base,
-      name: 'Mobilisation',
-      description: 'Site set-up',
-      sequence: '1',
-      status: 'in_progress',
-      weightBps: 2500,
-      plannedStartDate: '2026-03-01',
-      plannedEndDate: '2026-04-01',
-      actualStartDate: '2026-03-02',
-      actualEndDate: '',
-    },
-    keys: [
-      'id',
-      'contractId',
-      'name',
-      'description',
-      'sequence',
-      'status',
-      'weightBps',
-      'plannedStartDate',
-      'plannedEndDate',
-      'actualStartDate',
-      'actualEndDate',
-      'createdAt',
-      'updatedAt',
-    ],
-  },
-  {
-    name: 'milestones',
-    controller: 'delivery',
-    path: 'contract/milestones',
-    list: 'listMilestones',
-    get: 'getMilestone',
-    workspace: 'project',
-    repository: 'milestones',
-    row: {
-      ...base,
-      contractStageId: 'stage-1',
-      title: 'Foundations',
-      description: 'Pour foundations',
-      sequence: 1,
-      status: 'submitted',
-      progressBps: 10000,
-      weightBps: 2000,
-      isPaymentMilestone: true,
-      amountMinor: '9007199254740993',
-      currencyCode: 'NGN',
-      dueDate: '2026-05-01',
-      revisedDueDate: '',
-      completedDate: '2026-04-28',
-      submittedAt: new Date('2026-04-29T10:00:00Z'),
-      submittedById: 'cu-1',
-      approvedAt: null,
-      approvedById: '',
-      rejectionReason: '',
-    },
-    keys: [
-      'id',
-      'contractId',
-      'contractStageId',
-      'title',
-      'description',
-      'sequence',
-      'status',
-      'progressBps',
-      'weightBps',
-      'isPaymentMilestone',
-      'amountMinor',
-      'currencyCode',
-      'dueDate',
-      'revisedDueDate',
-      'completedDate',
-      'submittedAt',
-      'submittedById',
-      'approvedAt',
-      'approvedById',
-      'rejectionReason',
-      'createdAt',
-      'updatedAt',
-    ],
-  },
   {
     name: 'variations',
     controller: 'delivery',
@@ -735,10 +648,12 @@ function buildControllers() {
     delivery: new DeliveryController(
       new DeliveryService(
         access as never,
-        r('stages'),
-        r('milestones'),
+        {} as never,
+        {} as never,
         r('variations'),
       ),
+      {} as never,
+      {} as never,
     ),
     financial: new FinancialController(
       new FinancialService(access as never, r('invoices'), r('payments')),
@@ -802,6 +717,10 @@ describe('workspace read endpoints', () => {
   describe('route inventory', () => {
     it('exposes exactly a list and a get route per resource, all GET', () => {
       const routes = Object.values(controllerClasses).flatMap((controller) => {
+        // The Stages and Milestones workflow routes are tested on their own.
+        const workflowRoute = (path: string) =>
+          controller === DeliveryController &&
+          /^(stages|milestones)/.test(path);
         const prefix = Reflect.getMetadata(PATH_METADATA, controller) as string;
         return Object.getOwnPropertyNames(controller.prototype)
           .filter((name) => name !== 'constructor')
@@ -812,12 +731,14 @@ describe('workspace read endpoints', () => {
               handler,
             ) as RequestMethod;
             const path = Reflect.getMetadata(PATH_METADATA, handler) as string;
+            if (workflowRoute(path)) return null;
             // Normalise the record parameter name (:stageId, :invoiceId...).
             return `${RequestMethod[method]} ${prefix}/${path}`.replace(
               /\/:\w+$/,
               '/:id',
             );
-          });
+          })
+          .filter((route): route is string => route !== null);
       });
 
       expect(routes.sort()).toEqual(

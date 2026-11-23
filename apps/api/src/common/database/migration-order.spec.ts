@@ -41,6 +41,7 @@ describe('database migration configuration', () => {
       'CompanyRoleAssignmentIndex1793500000001',
       'CompanyMembershipRoles1793600000000',
       'ActivityLogAuditFields1793700000000',
+      'MilestoneWorkflow1793800000000',
     ]);
   });
 

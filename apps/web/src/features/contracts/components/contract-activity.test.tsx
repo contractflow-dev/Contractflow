@@ -3,6 +3,8 @@ import type { ChangeEvent, ComponentProps, SetStateAction } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CONTRACT_ACTIVITY_ACTIONS,
+  MILESTONE_ACTIVITY_ACTIONS,
+  STAGE_ACTIVITY_ACTIONS,
   type ContractActivityActor,
   type ContractActivityItem,
   type IPaginatedResponse,
@@ -716,6 +718,10 @@ describe("related-record navigation", () => {
     "contract.workspaces_removed",
     "contract.status_transitioned",
     "document.deleted",
+    // Stage and milestone entries open in the Project workspace, not in a
+    // contract section (see project-activity).
+    ...STAGE_ACTIVITY_ACTIONS,
+    ...MILESTONE_ACTIVITY_ACTIONS,
   ];
 
   it("decides a destination for every recorded action", () => {

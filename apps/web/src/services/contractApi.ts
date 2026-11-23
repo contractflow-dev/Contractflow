@@ -295,9 +295,22 @@ export const contractApi = api.injectEndpoints({
         toDate,
         actorUserId,
         action,
+        entityType,
+        entityId,
+        workspace,
       }) => ({
         ...contractRoute(companyId, contractId, `/activity`),
-        params: { page, limit, fromDate, toDate, actorUserId, action },
+        params: {
+          page,
+          limit,
+          fromDate,
+          toDate,
+          actorUserId,
+          action,
+          entityType,
+          entityId,
+          workspace,
+        },
       }),
       // Contract changes refresh it with the status history.
       providesTags: (_result, _error, { contractId }) => [

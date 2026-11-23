@@ -13,7 +13,29 @@ erDiagram
     CONTRACT ||--o{ CONTRACT_SITE : "is executed at"
     CONTRACT ||--o{ CONTRACT_STAGE : "is phased into"
     CONTRACT ||--o{ MILESTONE : "tracks"
-    CONTRACT_STAGE |o--o{ MILESTONE : "groups"
+    CONTRACT_STAGE ||--o{ MILESTONE : "groups"
+    COMPANY_USER |o--o{ MILESTONE : "last submitted or approved"
+    MILESTONE ||--o{ MILESTONE_SUBMISSION : "is submitted in"
+    CONTRACT ||--o{ MILESTONE_SUBMISSION : "scopes"
+    COMPANY_USER ||--o{ MILESTONE_SUBMISSION : "submits"
+    CONTRACT_PARTY ||--o{ MILESTONE_SUBMISSION : "submits for"
+    MILESTONE_SUBMISSION ||--|{ MILESTONE_SUBMISSION_EVIDENCE : "is evidenced by"
+    CONTRACT ||--o{ MILESTONE_SUBMISSION_EVIDENCE : "scopes"
+    DOCUMENT ||--o{ MILESTONE_SUBMISSION_EVIDENCE : "is evidence in"
+    DOCUMENT_VERSION ||--o{ MILESTONE_SUBMISSION_EVIDENCE : "is the submitted version in"
+    MILESTONE_SUBMISSION ||--o| MILESTONE_DECISION : "is decided by"
+    MILESTONE ||--o{ MILESTONE_DECISION : "is decided in"
+    CONTRACT ||--o{ MILESTONE_DECISION : "scopes"
+    COMPANY_USER ||--o{ MILESTONE_DECISION : "decides"
+    CONTRACT_PARTY ||--o{ MILESTONE_DECISION : "decides for"
+    MILESTONE_DECISION |o--o{ MILESTONE_SUBMISSION : "is answered by"
+    MILESTONE ||--o{ MILESTONE_OUTSTANDING_ITEM : "has outstanding work"
+    CONTRACT ||--o{ MILESTONE_OUTSTANDING_ITEM : "scopes"
+    MILESTONE_DECISION ||--o{ MILESTONE_OUTSTANDING_ITEM : "raises"
+    MILESTONE_DECISION |o--o{ MILESTONE_OUTSTANDING_ITEM : "accepts"
+    MILESTONE_SUBMISSION ||--o{ MILESTONE_SUBMISSION_ITEM : "covers"
+    MILESTONE_OUTSTANDING_ITEM ||--o{ MILESTONE_SUBMISSION_ITEM : "is covered by"
+    CONTRACT ||--o{ MILESTONE_SUBMISSION_ITEM : "scopes"
     CONTRACT ||--o{ CONTRACT_VARIATION : "is changed by"
     CONTRACT_PARTY ||--o{ CONTRACT_VARIATION : "raises"
     CONTRACT ||--o{ INVOICE : "is billed through"
@@ -55,9 +77,9 @@ erDiagram
     HSE_INSPECTION_FINDING |o--o{ HSE_CORRECTIVE_ACTION : "triggers"
     COMPANY_USER ||--o{ HSE_CORRECTIVE_ACTION : "is responsible for"
     CONTRACT ||--o{ HSE_CORRECTIVE_ACTION : "scopes"
-    CONTRACT |o--o{ ACTIVITY_LOG : "is audited in"
-    COMPANY |o--o{ ACTIVITY_LOG : "is acted for in"
-    APP_USER |o--o{ ACTIVITY_LOG : "performs"
+    CONTRACT ||--o{ ACTIVITY_LOG : "is audited in"
+    COMPANY ||--o{ ACTIVITY_LOG : "is acted for in"
+    COMPANY_USER ||--o{ ACTIVITY_LOG : "performs"
     APP_USER ||--o{ NOTIFICATION : "receives"
     CONTRACT |o--o{ NOTIFICATION : "is about"
     CONTRACT ||--o{ CONVERSATION : "has conversations"
@@ -203,12 +225,12 @@ erDiagram
     }
     CONTRACT_STAGE {
         uuid id PK
-        uuid contract_id FK
+        uuid contract_id FK "on delete cascade"
         varchar(255) name "e.g. Mobilisation, Substructure"
         text description "nullable"
         int sequence
-        enum status "NOT_STARTED | IN_PROGRESS | ON_HOLD | …"
-        int weight_bps "share of contract progress"
+        enum status "PLANNED | IN_PROGRESS | ON_HOLD | COMPLETED | … (also ACTIVE, PENDING_APPROVAL, DELAYED, CANCELLED)"
+        int weight_bps "share of contract progress; stages total at most 10000"
         date planned_start_date
         date planned_end_date
         date actual_start_date "nullable"
@@ -216,25 +238,92 @@ erDiagram
     }
     MILESTONE {
         uuid id PK
-        uuid contract_id FK
-        uuid contract_stage_id FK "nullable"
+        uuid contract_id FK "on delete cascade"
+        uuid contract_stage_id FK "on delete cascade"
         varchar(255) title
         text description "nullable"
-        int sequence
-        enum status "PENDING | IN_PROGRESS | SUBMITTED | APPROVED | …"
-        int progress_bps "0 to 10000"
-        int weight_bps "share of stage progress"
+        text acceptance_criteria "nullable"
+        text deliverables "nullable"
+        int sequence "within the stage"
+        enum status "PLANNED | IN_PROGRESS | PENDING_APPROVAL | PARTIALLY_APPROVED | REJECTED | APPROVED | … (also ACTIVE, COMPLETED, DELAYED, AT_RISK, ON_HOLD, CANCELLED)"
+        int progress_bps "0 to 10000, contractor-reported"
+        int approved_bps "0 to 10000, client-accepted, default 0"
+        int weight_bps "share of stage progress; a stage's milestones total at most 10000"
+        int target_quantity "nullable, > 0, e.g. 100 streetlights"
+        varchar(40) quantity_unit "nullable, set with target_quantity"
+        int approved_quantity "nullable, 0 to target_quantity"
         boolean is_payment_milestone
-        bigint amount_minor "nullable, payable on approval"
+        bigint amount_minor "nullable, agreed amount; approval does not invoice or pay it"
         char(3) currency_code "nullable, = contract currency"
+        date planned_start_date "nullable"
+        date actual_start_date "nullable"
         date due_date
         date revised_due_date "nullable"
-        date completed_date "nullable"
-        timestamptz submitted_at "nullable"
-        uuid submitted_by_id FK "nullable, → company_user"
+        date completed_date "nullable, day of full approval"
+        timestamptz submitted_at "nullable, latest submission"
+        uuid submitted_by_id FK "nullable, → company_user, latest submission"
         timestamptz approved_at "nullable"
         uuid approved_by_id FK "nullable, → company_user"
-        text rejection_reason "nullable"
+        text rejection_reason "nullable, latest rejection"
+        varchar(30) legacy_status "nullable, original status before the legacy transition"
+    }
+    MILESTONE_SUBMISSION {
+        uuid id PK
+        uuid contract_id FK "on delete cascade"
+        uuid milestone_id FK
+        int sequence "1, 2, 3 … per milestone, unique with milestone_id"
+        varchar(20) submission_type "INITIAL | RESUBMISSION | OUTSTANDING_WORK"
+        uuid previous_decision_id FK "nullable, → milestone_decision; null only for INITIAL"
+        uuid submitted_by_id FK "→ company_user"
+        uuid submitted_by_party_id FK "→ contract_party"
+        timestamptz submitted_at
+        text notes
+        int reported_progress_bps "nullable, 0 to 10000"
+        timestamptz created_at "append-only: updates refused by trigger"
+    }
+    MILESTONE_SUBMISSION_EVIDENCE {
+        uuid id PK
+        uuid contract_id FK "on delete cascade"
+        uuid submission_id FK
+        uuid document_id FK "unique with submission_id"
+        uuid document_version_id FK "the version submitted, kept"
+        varchar(255) caption "nullable"
+        int position "order within the submission, unique with submission_id"
+        timestamptz created_at "append-only: updates refused by trigger"
+    }
+    MILESTONE_DECISION {
+        uuid id PK
+        uuid contract_id FK "on delete cascade"
+        uuid milestone_id FK
+        uuid submission_id FK "unique: one decision per submission"
+        varchar(20) decision "APPROVED | PARTIALLY_APPROVED | REJECTED"
+        text reason "required unless APPROVED"
+        int approved_bps "this decision's share; 0 for REJECTED"
+        int cumulative_approved_bps "10000 for APPROVED, below for PARTIALLY_APPROVED"
+        text approved_work "required for PARTIALLY_APPROVED"
+        int approved_quantity "nullable, null for REJECTED"
+        uuid decided_by_id FK "→ company_user"
+        uuid decided_by_party_id FK "→ contract_party"
+        timestamptz decided_at "append-only: updates refused by trigger"
+    }
+    MILESTONE_OUTSTANDING_ITEM {
+        uuid id PK
+        uuid contract_id FK "on delete cascade"
+        uuid milestone_id FK
+        uuid raised_by_decision_id FK "→ milestone_decision"
+        text description
+        int quantity "nullable, > 0"
+        int position "order within the raising decision, unique with it"
+        uuid accepted_by_decision_id FK "nullable, → milestone_decision, set once"
+        timestamptz accepted_at "nullable, set with accepted_by_decision_id"
+        timestamptz created_at "only acceptance may change, once (trigger)"
+    }
+    MILESTONE_SUBMISSION_ITEM {
+        uuid id PK
+        uuid contract_id FK "on delete cascade"
+        uuid submission_id FK "unique with outstanding_item_id"
+        uuid outstanding_item_id FK
+        timestamptz created_at "append-only: updates refused by trigger"
     }
     CONTRACT_VARIATION {
         uuid id PK
@@ -540,17 +629,19 @@ erDiagram
     }
     ACTIVITY_LOG {
         uuid id PK
-        uuid contract_id FK "nullable, scope, → contract"
-        uuid company_id FK "nullable, company acted for"
-        uuid actor_user_id FK "nullable, null = system"
-        varchar(100) action "e.g. invoice.certified"
-        varchar(60) entity_type
-        uuid entity_id "polymorphic, no database FK"
+        uuid contract_id FK "scope, → contract, on delete cascade"
+        uuid company_id FK "company acted for, on delete cascade"
+        uuid actor_user_id FK "→ company_user, the acting membership"
+        varchar(100) action "area.verb_noun, e.g. milestone.approved"
+        varchar(60) entity_type "e.g. milestone, contract_stage"
+        varchar(36) entity_id "the record's id (older rows: a generated uuid); polymorphic, no database FK"
+        varchar(20) workspace "nullable, PROJECT | HSE | FINANCE; readers need a role in it"
+        varchar(2000) reason "nullable, the explanation given"
         varchar(500) summary
-        jsonb changes "nullable, before and after diff"
-        jsonb metadata "nullable"
+        jsonb changes "before and after, changed fields only"
+        jsonb metadata
         inet ip_address "nullable"
-        text user_agent "nullable"
+        varchar user_agent "nullable"
         uuid request_id "nullable, correlation id"
         timestamptz occurred_at "append-only"
     }

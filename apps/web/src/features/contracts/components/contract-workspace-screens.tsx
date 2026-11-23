@@ -43,6 +43,14 @@ import {
   type ContractWorkspaceView as WorkspaceView,
 } from "../contract-workspaces";
 import { ContractRoleAssignmentManagement } from "./contract-role-assignment-management";
+import { MilestoneDetail } from "../project/milestone-detail";
+import { ProjectActivity } from "../project/project-activity";
+import { ProjectMilestones } from "../project/project-milestones";
+import { ProjectOverview } from "../project/project-overview";
+import { ProjectReviews } from "../project/project-reviews";
+import { projectPermissions } from "../project/project-rules";
+import { ProjectStages } from "../project/project-stages";
+import type { ProjectContext } from "../project/project-ui";
 
 const tabClass = (active: boolean) =>
   cn(
@@ -64,11 +72,17 @@ export function ContractWorkspace({
   contractId,
   workspace,
   view,
+  milestoneId,
+  viewer,
 }: {
   companyId: string;
   contractId: string;
   workspace: AssignableContractWorkspace;
   view: WorkspaceView;
+  /** One milestone's page (Project workspace). */
+  milestoneId?: string;
+  /** The signed-in member's company membership, to mark their own records. */
+  viewer?: { membershipId: string; companyName: string };
 }) {
   const query = { companyId, contractId };
   const contract = useGetContractByIdQuery(query);
@@ -116,6 +130,21 @@ export function ContractWorkspace({
 
   const entered = current.currentData;
   const status = getApiErrorStatus(current.error);
+  const project: ProjectContext | null =
+    entered && workspace === "project"
+      ? {
+          companyId,
+          contractId,
+          contract: detail.contract,
+          viewerMembershipId: viewer?.membershipId,
+          permissions: projectPermissions({
+            roles: entered.roles,
+            partyType: detail.membership.partyType,
+            contractStatus: detail.contract.status,
+            archived: Boolean(detail.contract.deletedAt),
+          }),
+        }
+      : null;
   const enterable = (access.currentData?.workspaces ?? []).filter(
     (entry) => entry.hasAccess,
   );
@@ -172,6 +201,21 @@ export function ContractWorkspace({
                   Overview
                 </SectionLink>
               </li>
+              {project
+                ? PROJECT_SECTIONS.filter(
+                    ({ view: section }) =>
+                      section !== "reviews" || project.permissions.isPlanner,
+                  ).map(({ view: section, label }) => (
+                    <li key={section}>
+                      <SectionLink
+                        href={contractWorkspaceHref(contractId, workspace, section)}
+                        active={view === section}
+                      >
+                        {label}
+                      </SectionLink>
+                    </li>
+                  ))
+                : null}
               {entered.canManageTeam ? (
                 <li>
                   <SectionLink
@@ -185,7 +229,35 @@ export function ContractWorkspace({
               ) : null}
             </ul>
           </nav>
-          {view === "team" ? (
+          {project && view !== "overview" && view !== "team" ? (
+            view === "milestones" && milestoneId ? (
+              <MilestoneDetail project={project} milestoneId={milestoneId} />
+            ) : view === "stages" ? (
+              <ProjectStages project={project} />
+            ) : view === "milestones" ? (
+              <ProjectMilestones project={project} />
+            ) : view === "reviews" ? (
+              project.permissions.isPlanner ? (
+                <ProjectReviews project={project} />
+              ) : (
+                <WorkspaceProblem
+                  title="Reviews are for the Client Project Manager"
+                  text="The client's Client Project Manager decides on milestone submissions. You can follow each milestone's status and history under Milestones."
+                />
+              )
+            ) : (
+              <ProjectActivity
+                companyId={companyId}
+                contractId={contractId}
+                viewer={viewer}
+              />
+            )
+          ) : view !== "overview" && view !== "team" ? (
+            <WorkspaceProblem
+              title="This screen belongs to the Project workspace"
+              text={`The ${meta.label} workspace has no such screen.`}
+            />
+          ) : view === "team" ? (
             entered.canManageTeam ? (
               <ContractRoleAssignmentManagement
                 companyId={companyId}
@@ -199,12 +271,15 @@ export function ContractWorkspace({
               />
             )
           ) : (
-            <WorkspaceOverview
-              companyId={companyId}
-              contractId={contractId}
-              access={entered}
-              contractDeleted={Boolean(detail.contract.deletedAt)}
-            />
+            <div className="space-y-6">
+              {project ? <ProjectOverview project={project} /> : null}
+              <WorkspaceOverview
+                companyId={companyId}
+                contractId={contractId}
+                access={entered}
+                contractDeleted={Boolean(detail.contract.deletedAt)}
+              />
+            </div>
           )}
         </>
       ) : status === 403 ? (
@@ -239,6 +314,14 @@ export function ContractWorkspace({
     </div>
   );
 }
+
+/** The Project workspace's own screens; Reviews only for the decision-maker. */
+const PROJECT_SECTIONS: ReadonlyArray<{ view: WorkspaceView; label: string }> = [
+  { view: "stages", label: "Stages" },
+  { view: "milestones", label: "Milestones" },
+  { view: "reviews", label: "Reviews" },
+  { view: "activity", label: "Activity" },
+];
 
 function SectionLink({
   href,

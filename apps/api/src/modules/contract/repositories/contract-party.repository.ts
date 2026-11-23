@@ -49,6 +49,14 @@ export class ContractPartyRepository extends ContractScopedRepository<ContractPa
     });
   }
 
+  /** The company's party row, share-locked so it can't change meanwhile. */
+  findByCompanyForShare(scope: Scope, companyId: string) {
+    return this.findOne(scope, {
+      where: { companyId } as FindOptionsWhere<ContractParty>,
+      lock: { mode: 'pessimistic_read' },
+    });
+  }
+
   findAwarding(scope: Scope) {
     return this.findOne(scope, {
       where: { partyType: 'client' } as FindOptionsWhere<ContractParty>,

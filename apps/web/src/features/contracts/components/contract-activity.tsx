@@ -6,6 +6,7 @@ import {
   RiBuilding2Line,
   RiFileList3Line,
   RiFileTextLine,
+  RiFlagLine,
   RiHistoryLine,
   RiMapPinLine,
   RiQuillPenLine,
@@ -77,13 +78,20 @@ import {
 export const STATUS_CHANGE_ACTION = "contract.status_transitioned";
 
 type ActivityCategory =
-  "contract" | "documents" | "roles" | "parties" | "sites" | "signatories";
+  | "contract"
+  | "project"
+  | "documents"
+  | "roles"
+  | "parties"
+  | "sites"
+  | "signatories";
 
 const CATEGORY: Record<
   ActivityCategory,
   { label: string; icon: RemixiconComponentType }
 > = {
   contract: { label: "Contract", icon: RiFileList3Line },
+  project: { label: "Stages and milestones", icon: RiFlagLine },
   documents: { label: "Documents", icon: RiFileTextLine },
   roles: { label: "Roles", icon: RiUserSettingsLine },
   parties: { label: "Parties", icon: RiBuilding2Line },
@@ -117,11 +125,29 @@ const ACTION_LABEL: Record<string, string> = {
   "document.version_added": "New document version",
   "document.downloaded": "Document downloaded",
   "document.deleted": "Document deleted",
+  "stage.created": "Stage created",
+  "stage.updated": "Stage plan changed",
+  "stage.status_changed": "Stage status changed",
+  "stage.completed": "Stage completed",
+  "milestone.created": "Milestone created",
+  "milestone.updated": "Milestone plan changed",
+  "milestone.started": "Milestone work started",
+  "milestone.submitted": "Milestone submitted for review",
+  "milestone.resubmitted": "Milestone resubmitted for review",
+  "milestone.evidence_attached": "Completion evidence attached",
+  "milestone.approved": "Milestone approved",
+  "milestone.partially_approved": "Milestone partially approved",
+  "milestone.rejected": "Milestone rejected",
+  "milestone.outstanding_items_updated": "Outstanding work accepted",
+  "milestone.completed": "Milestone completed",
 };
 
 /** The category an action belongs to, from its name. */
 export function activityCategory(action: string): ActivityCategory {
   if (action.startsWith("document.")) return "documents";
+  if (action.startsWith("stage.") || action.startsWith("milestone.")) {
+    return "project";
+  }
   if (/role|workspace_admin/.test(action)) return "roles";
   if (action.includes("party_invitation")) return "parties";
   if (action.includes("site_")) return "sites";

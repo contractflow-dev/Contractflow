@@ -138,6 +138,45 @@ export class ContractRepository extends BaseRepository<
       .getOne();
   }
 
+  /**
+   * A visible contract that isn't archived, locked: `share` so it isn't
+   * archived meanwhile, `update` to serialize changes to it.
+   */
+  findActiveForLock(
+    scope: IContractVisibilityScope,
+    id: string,
+    mode: 'share' | 'update',
+  ): Promise<Contract | null> {
+    return this.scopedQuery(scope, 'contract')
+      .andWhere('contract.deletedAt IS NULL')
+      .andWhere('contract.id = :id', { id })
+      .setLock(mode === 'share' ? 'pessimistic_read' : 'pessimistic_write', undefined, [
+        'contract',
+      ])
+      .getOne();
+  }
+
+  /**
+   * The time zone of a contract the scope company is a party to, or null.
+   * For callers that have already authorized the contract (for example
+   * through `ContractAccessService.authorize`); it reads nothing else.
+   */
+  async findTimezoneForParty(scope: {
+    contractId: string;
+    companyId: string;
+  }): Promise<string | null> {
+    const row = await this.repository
+      .createQueryBuilder('contract')
+      .select('contract.timezone', 'timezone')
+      .where('contract.id = :contractId', { contractId: scope.contractId })
+      .andWhere(
+        'EXISTS (SELECT 1 FROM "contract_party" "party" WHERE "party"."contract_id" = "contract"."id" AND "party"."company_id" = :companyId)',
+        { companyId: scope.companyId },
+      )
+      .getRawOne<{ timezone: string | null }>();
+    return row?.timezone ?? null;
+  }
+
   /** Like findById, but an archived (soft-deleted) contract is returned too. */
   findByIdIncludingArchived(
     scope: IContractVisibilityScope,

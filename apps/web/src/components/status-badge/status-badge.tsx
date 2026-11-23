@@ -6,6 +6,9 @@ import {
   EDocumentUploadStatus,
   EFromStatus,
   EInvitationStatus,
+  EMilestoneOutstandingItemStatus,
+  EMilestoneStatus,
+  EStatus,
   EToStatus,
 } from "@contractflow/contracts-schema";
 import type { ContractPartyInvitation } from "@contractflow/contracts-schema";
@@ -44,6 +47,9 @@ export type KnownStatus =
   | `${ECompanyStatus}`
   | `${EContractSiteStatus}`
   | `${EDocumentUploadStatus}`
+  | `${EStatus}`
+  | `${EMilestoneStatus}`
+  | `${EMilestoneOutstandingItemStatus}`
   | ContractInvitationStatus
   | typeof ARCHIVED_STATUS;
 
@@ -79,6 +85,22 @@ const STATUS_PRESENTATION: Record<
   [EDocumentUploadStatus.PROCESSING]: { label: "Checking file", tone: "info" },
   [EDocumentUploadStatus.AVAILABLE]: { label: "Available", tone: "success" },
   [EDocumentUploadStatus.FAILED]: { label: "Upload failed", tone: "danger" },
+  // Project stages and milestones ("planned", "active", "completed",
+  // "cancelled" and "rejected" are shared with the entries above)
+  [EStatus.IN_PROGRESS]: { label: "In progress", tone: "info" },
+  [EStatus.PENDING_APPROVAL]: { label: "Awaiting review", tone: "warning" },
+  [EStatus.DELAYED]: { label: "Delayed", tone: "warning" },
+  [EStatus.ON_HOLD]: { label: "On hold", tone: "warning" },
+  [EMilestoneStatus.APPROVED]: { label: "Approved", tone: "success" },
+  [EMilestoneStatus.AT_RISK]: { label: "At risk", tone: "warning" },
+  [EMilestoneStatus.PARTIALLY_APPROVED]: {
+    label: "Partially approved",
+    tone: "info",
+  },
+  [EMilestoneOutstandingItemStatus.OUTSTANDING]: {
+    label: "Outstanding",
+    tone: "warning",
+  },
 };
 
 /** The badge variant that renders each tone. */

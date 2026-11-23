@@ -82,8 +82,8 @@ describe("getStatusPresentation", () => {
   });
 
   it("handles unknown, empty, and differently cased values safely", () => {
-    expect(getStatusPresentation("on_hold")).toEqual({
-      label: "On hold",
+    expect(getStatusPresentation("awaiting_signature")).toEqual({
+      label: "Awaiting signature",
       tone: "neutral",
     });
     expect(getStatusPresentation(undefined)).toEqual({
