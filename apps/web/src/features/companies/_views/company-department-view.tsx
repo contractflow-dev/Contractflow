@@ -29,7 +29,6 @@ import {
 import { Badge } from "@workspace/ui/components/badge";
 import { Button, buttonVariants } from "@workspace/ui/components/button";
 import { Card, CardContent } from "@workspace/ui/components/card";
-import { Checkbox } from "@workspace/ui/components/checkbox";
 import { Field, FieldLabel } from "@workspace/ui/components/field";
 import { Input } from "@workspace/ui/components/input";
 import {
@@ -38,6 +37,7 @@ import {
 } from "@workspace/ui/components/native-select";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { DataTable, DataTableEmpty } from "@/components/data-table/data-table";
+import { DataTableFilters } from "@/components/data-table/data-table-filters";
 import { ListCard } from "@/components/data-table/list-card";
 import { PageHeader } from "@/components/page-header/page-header";
 import {
@@ -382,75 +382,107 @@ export function DepartmentContracts({
             }
           >
             <div className="space-y-3">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.5fr)_repeat(4,minmax(0,1fr))] lg:items-end">
-                <form
-                  role="search"
-                  onSubmit={submitSearch}
-                  className="sm:col-span-2 lg:col-span-1"
-                >
-                  <Field>
-                    <FieldLabel htmlFor="department-search">Search</FieldLabel>
-                    <div className="flex gap-2">
-                      <Input
-                        id="department-search"
-                        type="search"
-                        maxLength={100}
-                        placeholder="Contract name or reference"
-                        value={searchInput}
-                        onChange={(event) => setSearchInput(event.target.value)}
-                      />
-                      <Button type="submit" variant="outline">
+              <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-end">
+                  <form
+                    role="search"
+                    onSubmit={submitSearch}
+                    className="w-full sm:max-w-sm"
+                  >
+                    <Field>
+                      <FieldLabel htmlFor="department-search">
                         Search
-                      </Button>
-                    </div>
-                  </Field>
-                </form>
-                <FilterSelect
-                  id="department-status"
-                  label="Status"
-                  value={filters.status ?? ""}
-                  options={Object.values(EContractStatus).map((value) => ({
-                    value,
-                    label: humanizeEnumValue(value),
-                  }))}
-                  allLabel="All statuses"
-                  onChange={(value) =>
-                    update({
-                      status: oneOf(Object.values(EContractStatus), value),
-                    })
-                  }
-                />
-                <FilterSelect
-                  id="department-party"
-                  label="Our party type"
-                  value={filters.partyType ?? ""}
-                  options={Object.values(EPartyType).map((value) => ({
-                    value,
-                    label: PARTY_TYPE_LABELS[value],
-                  }))}
-                  allLabel="All party types"
-                  onChange={(value) =>
-                    update({
-                      partyType: oneOf(Object.values(EPartyType), value),
-                    })
-                  }
-                />
-                <FilterSelect
-                  id="department-waiting"
-                  label="Waiting on"
-                  value={filters.waitingOn ?? ""}
-                  options={(["us", "others"] as const).map((value) => ({
-                    value,
-                    label: WAITING_LABELS[value],
-                  }))}
-                  allLabel="Anyone or nobody"
-                  onChange={(value) =>
-                    update({
-                      waitingOn: oneOf(["us", "others"] as const, value),
-                    })
-                  }
-                />
-                <Field>
+                      </FieldLabel>
+                      <div className="flex gap-2">
+                        <Input
+                          id="department-search"
+                          type="search"
+                          maxLength={100}
+                          placeholder="Contract name or reference"
+                          value={searchInput}
+                          onChange={(event) =>
+                            setSearchInput(event.target.value)
+                          }
+                        />
+                        <Button type="submit" variant="outline">
+                          Search
+                        </Button>
+                      </div>
+                    </Field>
+                  </form>
+                  <DataTableFilters
+                    label="contracts"
+                    fields={[
+                      {
+                        kind: "select",
+                        id: "status",
+                        group: "Contract",
+                        label: "Status",
+                        value: filters.status ?? "",
+                        options: [
+                          { value: "", label: "All statuses" },
+                          ...Object.values(EContractStatus).map((value) => ({
+                            value,
+                            label: humanizeEnumValue(value),
+                          })),
+                        ],
+                      },
+                      {
+                        kind: "select",
+                        id: "partyType",
+                        group: "Contract",
+                        label: "Our party type",
+                        value: filters.partyType ?? "",
+                        options: [
+                          { value: "", label: "All party types" },
+                          ...Object.values(EPartyType).map((value) => ({
+                            value,
+                            label: PARTY_TYPE_LABELS[value],
+                          })),
+                        ],
+                      },
+                      {
+                        kind: "select",
+                        id: "waitingOn",
+                        group: "Progress",
+                        label: "Waiting on",
+                        value: filters.waitingOn ?? "",
+                        options: [
+                          { value: "", label: "Anyone or nobody" },
+                          ...(["us", "others"] as const).map((value) => ({
+                            value,
+                            label: WAITING_LABELS[value],
+                          })),
+                        ],
+                      },
+                      {
+                        kind: "checkbox",
+                        id: "includeArchived",
+                        group: "Progress",
+                        label: "Include archived contracts (read-only)",
+                        checked: filters.includeArchived,
+                      },
+                    ]}
+                    onApply={(next) =>
+                      update({
+                        status: oneOf(
+                          Object.values(EContractStatus),
+                          next.status,
+                        ),
+                        partyType: oneOf(
+                          Object.values(EPartyType),
+                          next.partyType,
+                        ),
+                        waitingOn: oneOf(
+                          ["us", "others"] as const,
+                          next.waitingOn,
+                        ),
+                        includeArchived: next.includeArchived === "true",
+                      })
+                    }
+                  />
+                </div>
+                <Field className="md:w-56">
                   <FieldLabel htmlFor="department-sort">Sort</FieldLabel>
                   <NativeSelect
                     id="department-sort"
@@ -474,21 +506,6 @@ export function DepartmentContracts({
                   </NativeSelect>
                 </Field>
               </div>
-              <Field orientation="horizontal" className="w-fit">
-                <Checkbox
-                  id="department-archived"
-                  checked={filters.includeArchived}
-                  onCheckedChange={(checked) =>
-                    update({ includeArchived: checked === true })
-                  }
-                />
-                <FieldLabel
-                  htmlFor="department-archived"
-                  className="font-normal"
-                >
-                  Include archived contracts (read-only)
-                </FieldLabel>
-              </Field>
             </div>
 
             <DataTable
@@ -629,41 +646,6 @@ export function DepartmentContracts({
         </>
       ) : null}
     </div>
-  );
-}
-
-function FilterSelect({
-  id,
-  label,
-  value,
-  options,
-  allLabel,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  options: Array<{ value: string; label: string }>;
-  allLabel: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <Field>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <NativeSelect
-        id={id}
-        className="w-full"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        <NativeSelectOption value="">{allLabel}</NativeSelectOption>
-        {options.map((option) => (
-          <NativeSelectOption key={option.value} value={option.value}>
-            {option.label}
-          </NativeSelectOption>
-        ))}
-      </NativeSelect>
-    </Field>
   );
 }
 

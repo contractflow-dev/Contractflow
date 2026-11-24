@@ -96,13 +96,13 @@ describe("CompanyTeamView", () => {
     });
   });
 
-  it("invites from the members card's Invite member action, not an inline form", () => {
+  it("invites from the members card's Invite Team Member action, not an inline form", () => {
     const markup = renderToStaticMarkup(<CompanyTeamView />);
 
     // The action follows the members heading, before the member filters.
     const heading = markup.indexOf(">Members</h2>");
     const action = markup.search(
-      /<button[^>]*aria-haspopup="dialog"[^>]*>(?:<svg[\s\S]*?<\/svg>)?Invite member<\/button>/,
+      /<button[^>]*aria-haspopup="dialog"[^>]*>(?:<svg[\s\S]*?<\/svg>)?Invite Team Member<\/button>/,
     );
     expect(heading).toBeGreaterThanOrEqual(0);
     expect(action).toBeGreaterThan(heading);
@@ -163,13 +163,7 @@ describe("CompanyTeamView", () => {
         companyRole: undefined,
       }),
     );
-    const roleFilter = markup.slice(
-      markup.indexOf('id="member-role"'),
-      markup.indexOf("</select>", markup.indexOf('id="member-role"')),
-    );
-    expect(
-      [...roleFilter.matchAll(/value="([^"]*)"/g)].map(([, v]) => v),
-    ).toEqual(["", "Company Administrator", "Member"]);
+    expect(markup).toContain(">Filters");
     expect(markup).toContain('id="member-sort"');
     expect(markup).toContain("Name (A–Z)");
     expect(markup).toContain(
@@ -184,23 +178,12 @@ describe("CompanyTeamView", () => {
   it("lays out the members toolbar like the register: status views, search, role, sort", () => {
     const markup = renderToStaticMarkup(<CompanyTeamView />);
 
-    // Membership status is the predefined view, with All members selected.
-    const chips = markup.slice(
-      markup.indexOf('aria-label="Filter members by membership status"'),
-    );
-    expect(chips).toMatch(
-      /<button[^>]*aria-pressed="true"[^>]*>All members<\/button>/,
-    );
-    expect(chips).toMatch(
-      /<button[^>]*aria-pressed="false"[^>]*>Active<\/button>/,
-    );
-    expect(chips).toMatch(
-      /<button[^>]*aria-pressed="false"[^>]*>Inactive<\/button>/,
-    );
-    // Search is the shared search landmark; sort follows it in the toolbar.
+    // Status and role are in the Filters dropdown, after search; sort follows.
+    expect(markup).not.toContain("aria-pressed");
+    expect(markup).not.toContain('id="member-role"');
     const search = markup.indexOf('role="search"');
     expect(search).toBeGreaterThan(0);
-    expect(markup.indexOf('id="member-role"')).toBeGreaterThan(search);
+    expect(markup.indexOf(">Filters")).toBeGreaterThan(search);
     expect(markup.indexOf('id="member-sort"')).toBeGreaterThan(search);
     expect(mocks.getMembers).toHaveBeenCalledWith(
       expect.objectContaining({ status: undefined, search: undefined }),

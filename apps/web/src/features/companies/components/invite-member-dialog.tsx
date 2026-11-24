@@ -19,6 +19,7 @@ import {
 } from "@workspace/ui/components/native-select";
 import { FormField, FormGrid } from "@/components/forms/form-field";
 import { getApiErrorMessage } from "@/lib/apiError";
+import { emailFieldError } from "@/lib/email-field";
 import { notifySuccess } from "@/lib/notify";
 import { useInviteCompanyMemberMutation } from "@/features/companies";
 
@@ -46,7 +47,7 @@ export function InviteMemberDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-lg">
         {/* Remounted on every open, so it always starts empty. */}
         {open ? (
           <InviteMemberForm
@@ -71,6 +72,7 @@ export function InviteMemberForm({
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [role, setRole] = useState<ECompanyRole>(ECompanyRole.MEMBER);
+  const [emailError, setEmailError] = useState<string>();
   const [failure, setFailure] = useState("");
   const [inviteMember, inviteState] = useInviteCompanyMemberMutation();
 
@@ -78,6 +80,9 @@ export function InviteMemberForm({
     event.preventDefault();
     if (inviteState.isLoading) return;
     setFailure("");
+    const invalid = emailFieldError(email);
+    setEmailError(invalid);
+    if (invalid) return;
     try {
       await inviteMember({
         companyId,
@@ -102,6 +107,7 @@ export function InviteMemberForm({
 
   return (
     <form
+      noValidate
       onSubmit={(event) => void submit(event)}
       aria-label="Invite a team member"
       className="space-y-5"
@@ -116,15 +122,23 @@ export function InviteMemberForm({
       </DialogHeader>
 
       <FormGrid columns={2}>
-        <FormField id="invite-email" label="Email" className="sm:col-span-2">
+        <FormField
+          id="invite-email"
+          label="Email"
+          required
+          error={emailError}
+          className="sm:col-span-2"
+        >
           {(control) => (
             <Input
               {...control}
-              required
               type="email"
               maxLength={254}
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                setEmailError(undefined);
+              }}
               autoComplete="off"
             />
           )}
@@ -193,7 +207,7 @@ export function InviteMemberForm({
           disabled={inviteState.isLoading}
           aria-busy={inviteState.isLoading || undefined}
         >
-          {inviteState.isLoading ? "Sending…" : "Send invitation"}
+          {inviteState.isLoading ? "Sending…" : "Send Invitation"}
         </Button>
       </DialogFooter>
     </form>

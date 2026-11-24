@@ -16,6 +16,8 @@ import {
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
+import { DataTableFilters } from "@/components/data-table/data-table-filters";
+import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import {
   Card,
   CardContent,
@@ -31,14 +33,7 @@ import {
   EmptyTitle,
 } from "@workspace/ui/components/empty";
 import { Skeleton } from "@workspace/ui/components/skeleton";
-import { Field, FieldLabel } from "@workspace/ui/components/field";
-import { Input } from "@workspace/ui/components/input";
-import {
-  NativeSelect,
-  NativeSelectOptGroup,
-  NativeSelectOption,
-} from "@workspace/ui/components/native-select";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   CONTRACT_ACTIVITY_ACTIONS,
   type ContractActivityAction,
@@ -497,12 +492,6 @@ export function ContractActivity({
   };
   const filtered = Object.values(values).some(Boolean);
   const summary = describeActivityFilters(values, actors, viewer?.membershipId);
-  const ids = {
-    from: useId(),
-    to: useId(),
-    actor: useId(),
-    action: useId(),
-  };
   const entries = (data?.data ?? []).filter(
     (entry) => entry.action !== STATUS_CHANGE_ACTION,
   );
@@ -523,84 +512,62 @@ export function ContractActivity({
       <CardContent className="space-y-5">
         {noAccess ? null : (
           <div className="space-y-3">
-            <div
-              role="group"
-              aria-label="Filter activity"
-              className="grid gap-3 sm:grid-cols-2"
-            >
-              <Field>
-                <FieldLabel htmlFor={ids.from}>From</FieldLabel>
-                <Input
-                  id={ids.from}
-                  type="date"
-                  value={values.fromDay}
-                  max={values.toDay || undefined}
-                  onChange={(event) => update({ fromDay: event.target.value })}
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor={ids.to}>To</FieldLabel>
-                <Input
-                  id={ids.to}
-                  type="date"
-                  value={values.toDay}
-                  min={values.fromDay || undefined}
-                  aria-invalid={rangeError ? true : undefined}
-                  aria-describedby={rangeError ? `${ids.to}-error` : undefined}
-                  onChange={(event) => update({ toDay: event.target.value })}
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor={ids.actor}>Member</FieldLabel>
-                <NativeSelect
-                  id={ids.actor}
-                  className="w-full"
-                  value={values.actorUserId}
-                  onChange={(event) =>
-                    update({ actorUserId: event.target.value })
-                  }
-                >
-                  <NativeSelectOption value="">All members</NativeSelectOption>
-                  {actors.map((actor) => (
-                    <NativeSelectOption
-                      key={actor.actorUserId}
-                      value={actor.actorUserId}
-                    >
-                      {actorOptionLabel(actor, viewer?.membershipId)}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              </Field>
-              <Field>
-                <FieldLabel htmlFor={ids.action}>Action</FieldLabel>
-                <NativeSelect
-                  id={ids.action}
-                  className="w-full"
-                  value={values.action}
-                  onChange={(event) => {
-                    const action = event.target.value;
-                    update({ action: isActivityAction(action) ? action : "" });
-                  }}
-                >
-                  <NativeSelectOption value="">All actions</NativeSelectOption>
-                  {ACTION_FILTER_GROUPS.map((group) => (
-                    <NativeSelectOptGroup
-                      key={group.category}
-                      label={group.label}
-                    >
-                      {group.actions.map((action) => (
-                        <NativeSelectOption key={action} value={action}>
-                          {activityLabel(action)}
-                        </NativeSelectOption>
-                      ))}
-                    </NativeSelectOptGroup>
-                  ))}
-                </NativeSelect>
-              </Field>
-            </div>
+            <DataTableToolbar>
+              <DataTableFilters
+                label="activity"
+                fields={[
+                  {
+                    kind: "dateRange",
+                    id: "when",
+                    group: "When",
+                    label: "Date",
+                    from: values.fromDay,
+                    to: values.toDay,
+                  },
+                  {
+                    kind: "select",
+                    id: "actor",
+                    group: "Who and what",
+                    label: "Member",
+                    value: values.actorUserId,
+                    options: [
+                      { value: "", label: "All members" },
+                      ...actors.map((actor) => ({
+                        value: actor.actorUserId,
+                        label: actorOptionLabel(actor, viewer?.membershipId),
+                      })),
+                    ],
+                  },
+                  {
+                    kind: "select",
+                    id: "action",
+                    group: "Who and what",
+                    label: "Action",
+                    value: values.action,
+                    options: [
+                      { value: "", label: "All actions" },
+                      ...ACTION_FILTER_GROUPS.flatMap((group) =>
+                        group.actions.map((action) => ({
+                          value: action,
+                          label: activityLabel(action),
+                          group: group.label,
+                        })),
+                      ),
+                    ],
+                  },
+                ]}
+                onApply={(next) =>
+                  update({
+                    fromDay: next["when.from"],
+                    toDay: next["when.to"],
+                    actorUserId: next.actor,
+                    action: isActivityAction(next.action) ? next.action : "",
+                  })
+                }
+              />
+            </DataTableToolbar>
             {rangeError ? (
               <p
-                id={`${ids.to}-error`}
                 role="alert"
                 className="text-sm text-destructive-soft-foreground"
               >
@@ -608,22 +575,9 @@ export function ContractActivity({
               </p>
             ) : null}
             {filtered ? (
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p
-                  aria-live="polite"
-                  className="min-w-0 text-sm break-words text-muted-foreground"
-                >
-                  {summary}
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={clearFilters}
-                >
-                  Clear filters
-                </Button>
-              </div>
+              <p aria-live="polite" className="sr-only">
+                {summary}
+              </p>
             ) : null}
           </div>
         )}

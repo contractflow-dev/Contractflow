@@ -2,11 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import {
-  RiArrowRightLine,
-  RiShieldUserLine,
-  RiTeamLine,
-} from "@remixicon/react";
+import { RiArrowRightLine, RiShieldUserLine } from "@remixicon/react";
 import type {
   AssignableContractWorkspace,
   ContractWorkspaceAccess,
@@ -24,7 +20,6 @@ import {
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { StatusBadge } from "@/components/status-badge/status-badge";
 import { getApiErrorMessage, getApiErrorStatus } from "@/lib/apiError";
-import { cn } from "@/lib/utils";
 import {
   useGetContractByIdQuery,
   useGetContractWorkspaceAccessQuery,
@@ -52,18 +47,10 @@ import { projectPermissions } from "../project/project-rules";
 import { ProjectStages } from "../project/project-stages";
 import type { ProjectContext } from "../project/project-ui";
 
-const tabClass = (active: boolean) =>
-  cn(
-    "-mb-px inline-flex min-h-10 items-center gap-2 rounded-t-xl border-b-2 px-3 text-sm whitespace-nowrap outline-none focus-visible:ring-3 focus-visible:ring-ring/30",
-    active
-      ? "border-primary font-semibold text-foreground"
-      : "border-transparent text-muted-foreground hover:border-border hover:text-foreground",
-  );
-
 /**
- * A contract's Project, HSE or Finance workspace: the contract it belongs to,
- * the workspaces the member can enter, the workspace's own sections, and the
- * view. Everything shown comes from the API; the workspace itself is opened
+ * A contract's Project, HSE or Finance workspace: the contract it belongs to
+ * and the view. The contract's navigation in the shell lists the workspaces
+ * and their pages. Everything shown comes from the API; the workspace is opened
  * only when `GET /contract/workspaces/:workspace` allows it (the API refuses
  * members without a role there, Company Administrators included).
  */
@@ -169,66 +156,8 @@ export function ContractWorkspace({
         </div>
       </div>
 
-      {enterable.length > 0 ? (
-        <nav aria-label="Workspaces" className="-mx-1 overflow-x-auto px-1">
-          <ul className="flex min-w-max gap-1 border-b">
-            {enterable.map((entry) => (
-              <li key={entry.workspace}>
-                <Link
-                  href={contractWorkspaceHref(contractId, entry.workspace)}
-                  aria-current={
-                    entry.workspace === workspace ? "page" : undefined
-                  }
-                  className={tabClass(entry.workspace === workspace)}
-                >
-                  {workspaceMeta(entry.workspace).label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      ) : null}
-
       {entered ? (
         <>
-          <nav aria-label={`${meta.label} workspace sections`}>
-            <ul className="flex flex-wrap gap-2">
-              <li>
-                <SectionLink
-                  href={contractWorkspaceHref(contractId, workspace)}
-                  active={view === "overview"}
-                >
-                  Overview
-                </SectionLink>
-              </li>
-              {project
-                ? PROJECT_SECTIONS.filter(
-                    ({ view: section }) =>
-                      section !== "reviews" || project.permissions.isPlanner,
-                  ).map(({ view: section, label }) => (
-                    <li key={section}>
-                      <SectionLink
-                        href={contractWorkspaceHref(contractId, workspace, section)}
-                        active={view === section}
-                      >
-                        {label}
-                      </SectionLink>
-                    </li>
-                  ))
-                : null}
-              {entered.canManageTeam ? (
-                <li>
-                  <SectionLink
-                    href={contractWorkspaceHref(contractId, workspace, "team")}
-                    active={view === "team"}
-                  >
-                    <RiTeamLine className="size-4" aria-hidden="true" />
-                    Team
-                  </SectionLink>
-                </li>
-              ) : null}
-            </ul>
-          </nav>
           {project && view !== "overview" && view !== "team" ? (
             view === "milestones" && milestoneId ? (
               <MilestoneDetail project={project} milestoneId={milestoneId} />
@@ -262,6 +191,7 @@ export function ContractWorkspace({
               <ContractRoleAssignmentManagement
                 companyId={companyId}
                 contractId={contractId}
+                contractLabel={`${detail.contract.referenceNumber} · ${detail.contract.title}`}
                 fixedWorkspace={workspace}
               />
             ) : (
@@ -287,7 +217,7 @@ export function ContractWorkspace({
           title={`You don't have access to the ${meta.label} workspace`}
           text={
             enterable.length
-              ? `Entering it needs a ${meta.label} role on this contract. You can use the workspaces above.`
+              ? `Entering it needs a ${meta.label} role on this contract. The workspaces you can use are in this contract's navigation.`
               : `Entering it needs a ${meta.label} role on this contract. A Company Administrator, or the workspace's administrator, can assign one.`
           }
         />
@@ -312,39 +242,6 @@ export function ContractWorkspace({
         />
       )}
     </div>
-  );
-}
-
-/** The Project workspace's own screens; Reviews only for the decision-maker. */
-const PROJECT_SECTIONS: ReadonlyArray<{ view: WorkspaceView; label: string }> = [
-  { view: "stages", label: "Stages" },
-  { view: "milestones", label: "Milestones" },
-  { view: "reviews", label: "Reviews" },
-  { view: "activity", label: "Activity" },
-];
-
-function SectionLink({
-  href,
-  active,
-  children,
-}: {
-  href: string;
-  active: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      aria-current={active ? "page" : undefined}
-      className={cn(
-        "inline-flex min-h-9 items-center gap-1.5 rounded-2xl border px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30",
-        active
-          ? "border-primary/40 bg-accent font-medium text-accent-foreground"
-          : "bg-card text-muted-foreground hover:bg-muted hover:text-foreground",
-      )}
-    >
-      {children}
-    </Link>
   );
 }
 

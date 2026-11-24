@@ -20,7 +20,6 @@ import {
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { LogoMark } from "@workspace/ui/components/logo";
 import { AppShell } from "@/components/app-shell/app-shell";
-import { isNavItemActive } from "@/components/app-shell/navigation";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { AccountMenu } from "@/components/account-menu/account-menu";
 import { CompanyNotificationBell } from "./components/company-notification-bell";
@@ -49,7 +48,17 @@ import {
   useGetCompanyAccessSummaryQuery,
 } from "@/services/companiesApi";
 import type { ICompanyAccessResponse } from "@contractflow/contracts-schema";
-import { COMPANY_NAVIGATION, companyNavigationFor } from "./company-navigation";
+import {
+  ContractBreadcrumbs,
+  ContractNavigationBoundary,
+  type ContractShellNavigation,
+} from "@/features/contracts/components/contract-shell-navigation";
+import { contractIdFromPath } from "@/features/contracts/contract-navigation";
+import { CONTRACTS_PATH } from "@/features/contracts/contract-sections";
+import {
+  companyNavigationFor,
+  isCompanyAdminRoute,
+} from "./company-navigation";
 
 const noCompanyNotices: Partial<
   Record<
@@ -200,7 +209,11 @@ export function CompanyAdminShell({
 
   function selectCompany(companyId: string) {
     if (!availableCompanyIds.includes(companyId)) return;
+    const leavingContract =
+      companyId !== activeWorkspaceId && contractIdFromPath(pathname) !== null;
     dispatch(setActiveWorkspaceId(companyId));
+    // A contract is opened through one company: don't carry it to another.
+    if (leavingContract) router.replace(CONTRACTS_PATH);
     dispatch(
       api.util.invalidateTags([
         { type: "Company", id: companyId },
@@ -330,14 +343,14 @@ export function CompanyAdminShell({
 
   const homePath = companyLandingPath(access.membership.canManageCompany);
   const hasMultipleCompanies = availableCompanies.length > 1;
-  const isAdminRoute = COMPANY_NAVIGATION.some(
-    (item) => item.adminOnly && isNavItemActive(pathname, item),
-  );
+  const isAdminRoute = isCompanyAdminRoute(pathname);
 
   const navigation = companyNavigationFor(access.membership.canManageCompany);
-  return (
+  const contractId = contractIdFromPath(pathname);
+  const renderShell = (contract: ContractShellNavigation | null) => (
     <AppShell
       navigationLabel="Company dashboard"
+      contextModule={contract?.module}
       brand={
         <Link href={homePath} className="flex items-center gap-3">
           <LogoMark variant="inverse" className="size-9" />
@@ -381,6 +394,7 @@ export function CompanyAdminShell({
       header={
         <>
           <div className="min-w-0 flex-1">
+            {contract ? <ContractBreadcrumbs crumbs={contract.crumbs} /> : null}
             {/* The sidebar holding the desktop switcher is a drawer below md. */}
             {hasMultipleCompanies && (
               <CompanySwitcher
@@ -414,6 +428,21 @@ export function CompanyAdminShell({
         children(access)
       )}
     </AppShell>
+  );
+
+  return contractId ? (
+    <ContractNavigationBoundary
+      // Never reuse one company's or contract's answers for another.
+      key={`${access.company.id}:${contractId}`}
+      companyId={access.company.id}
+      companyName={access.company.name}
+      companyHref={homePath}
+      contractId={contractId}
+    >
+      {renderShell}
+    </ContractNavigationBoundary>
+  ) : (
+    renderShell(null)
   );
 }
 

@@ -37,16 +37,6 @@ vi.mock("@/hooks/use-user-time-zone", () => ({
   useUserTimeZone: () => "UTC",
 }));
 
-/** The values offered by the contract role select. */
-function offeredRoles(markup: string): string[] {
-  const start = markup.indexOf('aria-label="Assign a contract role"');
-  const select = markup.slice(
-    markup.indexOf("<select", markup.indexOf("Contract role", start)),
-  );
-  const options = select.slice(0, select.indexOf("</select>"));
-  return [...options.matchAll(/value="([^"]*)"/g)].map(([, value]) => value);
-}
-
 function render(workspace: "project" | "hse" | "finance") {
   return renderToStaticMarkup(
     <ContractRoleAssignmentManagement
@@ -57,87 +47,43 @@ function render(workspace: "project" | "hse" | "finance") {
   );
 }
 
-describe("ContractRoleAssignmentManagement role sides", () => {
+describe("ContractRoleAssignmentManagement in a workspace", () => {
   beforeEach(() => {
     mocks.permissions.mockReset();
   });
 
-  it("offers a client party only the client roles the API returns", () => {
+  it("shows compact actions and the side, with no form on the page", () => {
     mocks.permissions.mockReturnValue({
       data: {
         canManage: true,
         canGrantWorkspaceAdmin: true,
         roleSide: "client",
-        roles: ["Client Project Manager", "Client Site Engineer"],
+        roles: ["Client Project Manager"],
       },
       isLoading: false,
     });
 
     const markup = render("project");
 
-    expect(offeredRoles(markup)).toEqual([
-      "Client Project Manager",
-      "Client Site Engineer",
-    ]);
-    expect(markup).not.toContain("Contractor Project Lead");
-    expect(markup).not.toContain("Contractor Site Supervisor");
+    expect(markup).toMatch(/Assign Member<\/button>/);
+    expect(markup).toContain("Contract Role Invitations");
     expect(markup).toContain("on the client side of this contract");
+    expect(markup).not.toContain("<form");
+    expect(markup).not.toContain("<select");
   });
 
-  it("offers a contractor-side party only contractor roles", () => {
+  it("offers no actions to someone who can't manage the workspace", () => {
     mocks.permissions.mockReturnValue({
       data: {
-        canManage: true,
+        canManage: false,
         canGrantWorkspaceAdmin: false,
-        roleSide: "contractor",
-        roles: ["Contractor Project Lead", "Contractor Site Supervisor"],
-      },
-      isLoading: false,
-    });
-
-    const markup = render("project");
-
-    expect(offeredRoles(markup)).toEqual([
-      "Contractor Project Lead",
-      "Contractor Site Supervisor",
-    ]);
-    expect(markup).not.toContain("Client Project Manager");
-    expect(markup).toContain("on the contractor side of this contract");
-  });
-
-  it("offers the shared HSE roles to whichever side manages the workspace", () => {
-    mocks.permissions.mockReturnValue({
-      data: {
-        canManage: true,
-        canGrantWorkspaceAdmin: true,
         roleSide: "client",
-        roles: ["HSE Officer", "HSE Manager"],
-      },
-      isLoading: false,
-    });
-
-    expect(offeredRoles(render("hse"))).toEqual(["HSE Officer", "HSE Manager"]);
-  });
-
-  it("disables assigning when the API offers no roles", () => {
-    mocks.permissions.mockReturnValue({
-      data: {
-        canManage: true,
-        canGrantWorkspaceAdmin: true,
-        roleSide: "contractor",
         roles: [],
       },
       isLoading: false,
     });
 
-    const markup = render("finance");
-    expect(offeredRoles(markup)).toEqual([]);
-    const form = markup.slice(
-      markup.indexOf('aria-label="Assign a contract role"'),
-    );
-    expect(form.slice(0, form.indexOf("</form>"))).toMatch(
-      /<button[^>]*type="submit"[^>]*disabled=""/,
-    );
+    expect(render("hse")).toBe("");
   });
 });
 
@@ -230,16 +176,29 @@ describe("ContractRoleAssignmentManagement workspaces side by side", () => {
     );
   });
 
-  it("keeps the assign and invite forms, opened on the workspace from the link", () => {
+  it("keeps the forms out of the page, behind compact actions", () => {
     const markup = renderOverview("hse");
 
-    expect(markup).toContain(">Assign or invite</h2>");
-    expect(mocks.permissions).toHaveBeenCalledWith({
-      companyId: "company-1",
-      contractId: "contract-1",
-      workspace: "hse",
+    expect(markup).not.toContain("Assign or invite");
+    expect(markup).not.toContain("<form");
+    expect(markup).toContain("Assign Member");
+    expect(markup).toContain("Contract Role Invitations");
+  });
+
+  it("offers no actions when no workspace can be managed", () => {
+    mocks.permissions.mockReturnValue({
+      data: {
+        canManage: false,
+        canGrantWorkspaceAdmin: false,
+        roleSide: "contractor",
+        roles: [],
+      },
+      isLoading: false,
     });
-    expect(offeredRoles(markup)).toEqual(["HSE Officer", "HSE Manager"]);
+
+    const markup = renderOverview();
+    expect(markup).not.toContain("Assign Member");
+    expect(markup).not.toContain("Contract Role Invitations");
   });
 
   it("explains a workspace the viewer can't manage, and offers no actions there", () => {

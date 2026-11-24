@@ -148,26 +148,39 @@ describe("ProjectMilestones", () => {
     expect(screen.queryByRole("button", { name: "Add milestone" })).toBeNull();
   });
 
+  async function filter(
+    user: ReturnType<typeof userEvent.setup>,
+    label: string,
+    value: string,
+  ) {
+    await user.click(screen.getByRole("button", { name: /^Filters/ }));
+    await user.selectOptions(await screen.findByLabelText(label), value);
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByLabelText(label)).toBeNull());
+  }
+
   it("filters on the API: stage, status, awaiting review and overdue, back to page 1", async () => {
     const user = userEvent.setup({ delay: null });
     render(<ProjectMilestones project={projectContext(noPermissions)} />);
     expect(lastQuery()).toMatchObject({ page: 1, limit: 20 });
 
-    await user.selectOptions(screen.getByLabelText("Stage"), stage.id);
+    await filter(user, "Stage", stage.id);
     expect(lastQuery()).toMatchObject({ contractStageId: stage.id });
-    await user.selectOptions(
-      screen.getByLabelText("Status"),
-      EMilestoneStatus.REJECTED,
-    );
-    expect(lastQuery()).toMatchObject({ status: EMilestoneStatus.REJECTED });
-    await user.click(screen.getByRole("button", { name: "Overdue" }));
+    await filter(user, "Status", EMilestoneStatus.REJECTED);
+    // Filters work together.
+    expect(lastQuery()).toMatchObject({
+      contractStageId: stage.id,
+      status: EMilestoneStatus.REJECTED,
+    });
+    await filter(user, "Show", "overdue");
     expect(lastQuery()).toMatchObject({ overdue: true, page: 1 });
-    await user.click(screen.getByRole("button", { name: "Awaiting review" }));
+    await filter(user, "Show", "pendingReview");
     expect(lastQuery()).toMatchObject({ pendingReview: true });
     expect(lastQuery().overdue).toBeUndefined();
 
+    await user.click(screen.getByRole("button", { name: /^Filters/ }));
     await user.click(
-      screen.getByRole("button", {
+      await screen.findByRole("button", {
         name: "Remove filter: Stage: 1. Civil works",
       }),
     );
@@ -178,7 +191,7 @@ describe("ProjectMilestones", () => {
     mocks.milestones.mockReturnValue(loaded(page([])));
     const user = userEvent.setup({ delay: null });
     render(<ProjectMilestones project={projectContext(noPermissions)} />);
-    await user.click(screen.getByRole("button", { name: "Overdue" }));
+    await filter(user, "Show", "overdue");
     expect(screen.getByText("No milestones match these filters")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Clear filters" }));
     expect(lastQuery().overdue).toBeUndefined();

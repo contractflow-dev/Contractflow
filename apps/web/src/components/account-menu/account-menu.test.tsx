@@ -128,6 +128,16 @@ describe("AccountMenu", () => {
     const markup = renderToStaticMarkup(<AccountMenu area="company" />);
 
     expect(markup).not.toMatch(/Profile|Settings|Password|Security|Sessions/);
-    expect(markup.match(/role="menuitem"/g)).toHaveLength(2);
+    expect(markup.match(/role="menuitem"/g)).toHaveLength(3);
+  });
+
+  it("links to the user's own invitations from the company area only", () => {
+    mocks.user = admin;
+    expect(renderToStaticMarkup(<AccountMenu area="company" />)).toMatch(
+      /<a[^>]*href="\/invitations"[^>]*>[\s\S]*My invitations/,
+    );
+    expect(renderToStaticMarkup(<AccountMenu area="admin" />)).not.toContain(
+      "My invitations",
+    );
   });
 });

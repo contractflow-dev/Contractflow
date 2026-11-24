@@ -10,25 +10,14 @@ import {
   type Milestone,
 } from "@contractflow/contracts-schema";
 import { Button } from "@workspace/ui/components/button";
-import { Input } from "@workspace/ui/components/input";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@workspace/ui/components/native-select";
 import {
   DataTable,
   DataTableEmpty,
   type DataTableColumn,
 } from "@/components/data-table/data-table";
-import {
-  DataTableActiveFilters,
-  DataTableFilterChips,
-  DataTableMoreFilters,
-  DataTableToolbar,
-  type ActiveFilter,
-} from "@/components/data-table/data-table-toolbar";
+import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
+import { DataTableFilters } from "@/components/data-table/data-table-filters";
 import { ListCard } from "@/components/data-table/list-card";
-import { FormField, FormGrid } from "@/components/forms/form-field";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useKeepPageInRange, usePagination } from "@/hooks/use-pagination";
 import { useUserTimeZone } from "@/hooks/use-user-time-zone";
@@ -147,7 +136,7 @@ export function ProjectMilestones({ project }: { project: ProjectContext }) {
     `${values.submittedFromDay}|${values.submittedToDay}`,
     400,
   ).split("|");
-  const { filters, rangeError } = toMilestoneQueryFilters(
+  const { filters } = toMilestoneQueryFilters(
     {
       ...values,
       submittedFromDay: values.submittedFromDay ? debouncedFrom : "",
@@ -169,37 +158,14 @@ export function ProjectMilestones({ project }: { project: ProjectContext }) {
     pagination.resetPage();
   }
 
-  const active: ActiveFilter[] = [];
-  if (values.stageId) {
-    active.push({
-      key: "stage",
-      label: `Stage: ${stageName(values.stageId) ?? "selected"}`,
-      onRemove: () => update({ stageId: "" }),
-    });
-  }
-  if (values.status) {
-    active.push({
-      key: "status",
-      label: `Status: ${getStatusPresentation(values.status).label}`,
-      onRemove: () => update({ status: "" }),
-    });
-  }
-  if (values.submittedFromDay || values.submittedToDay) {
-    active.push({
-      key: "submitted",
-      label: `Submitted ${
-        values.submittedFromDay
-          ? `from ${formatCalendarDate(values.submittedFromDay)}`
-          : ""
-      }${values.submittedFromDay && values.submittedToDay ? " " : ""}${
-        values.submittedToDay
-          ? `to ${formatCalendarDate(values.submittedToDay)}`
-          : ""
-      }`,
-      onRemove: () => update({ submittedFromDay: "", submittedToDay: "" }),
-    });
-  }
-  const filtered = values.quick !== "all" || active.length > 0;
+  const filtered =
+    values.quick !== "all" ||
+    Boolean(
+      values.stageId ||
+      values.status ||
+      values.submittedFromDay ||
+      values.submittedToDay,
+    );
 
   const columns: ReadonlyArray<DataTableColumn<Milestone>> = [
     {
@@ -310,113 +276,72 @@ export function ProjectMilestones({ project }: { project: ProjectContext }) {
           ) : null
         }
       >
-        <DataTableFilterChips
-          label="Show"
-          countNoun="milestones"
-          value={values.quick}
-          onChange={(quick) => update({ quick })}
-          options={[
-            { value: "all", label: "All" },
-            { value: "pendingReview", label: "Awaiting review" },
-            { value: "overdue", label: "Overdue" },
-          ]}
-        />
         <DataTableToolbar>
-          <FormGrid columns={2} className="w-full max-w-xl">
-            <FormField id="milestone-filter-stage" label="Stage">
-              {(control) => (
-                <NativeSelect
-                  {...control}
-                  className="w-full"
-                  value={values.stageId}
-                  onChange={(event) => update({ stageId: event.target.value })}
-                >
-                  <NativeSelectOption value="">All stages</NativeSelectOption>
-                  {stages.map((stage) => (
-                    <NativeSelectOption key={stage.id} value={stage.id}>
-                      {stage.sequence}. {stage.name}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              )}
-            </FormField>
-            <FormField id="milestone-filter-status" label="Status">
-              {(control) => (
-                <NativeSelect
-                  {...control}
-                  className="w-full"
-                  value={values.status}
-                  onChange={(event) =>
-                    update({
-                      status: event.target.value as EMilestoneStatus | "",
-                    })
-                  }
-                >
-                  <NativeSelectOption value="">Any status</NativeSelectOption>
-                  {MILESTONE_FILTER_STATUSES.map((status) => (
-                    <NativeSelectOption key={status} value={status}>
-                      {getStatusPresentation(status).label}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              )}
-            </FormField>
-          </FormGrid>
-          <div className="sm:self-end">
-            <DataTableMoreFilters
-              activeCount={
-                values.submittedFromDay || values.submittedToDay ? 1 : 0
-              }
-              onClear={() =>
-                update({ submittedFromDay: "", submittedToDay: "" })
-              }
-            >
-              <p className="text-xs text-muted-foreground">
-                Milestones with work submitted on these days, in the
-                contract&apos;s time zone ({contract.timezone}).
-              </p>
-              <FormGrid columns={2}>
-                <FormField
-                  id="milestone-filter-submitted-from"
-                  label="Submitted from"
-                >
-                  {(control) => (
-                    <Input
-                      {...control}
-                      type="date"
-                      value={values.submittedFromDay}
-                      onChange={(event) =>
-                        update({ submittedFromDay: event.target.value })
-                      }
-                    />
-                  )}
-                </FormField>
-                <FormField
-                  id="milestone-filter-submitted-to"
-                  label="Submitted to"
-                  error={rangeError ?? undefined}
-                >
-                  {(control) => (
-                    <Input
-                      {...control}
-                      type="date"
-                      value={values.submittedToDay}
-                      onChange={(event) =>
-                        update({ submittedToDay: event.target.value })
-                      }
-                    />
-                  )}
-                </FormField>
-              </FormGrid>
-            </DataTableMoreFilters>
-          </div>
+          <DataTableFilters
+            label="milestones"
+            fields={[
+              {
+                kind: "select",
+                id: "quick",
+                group: "View",
+                label: "Show",
+                value: values.quick,
+                resetValue: "all",
+                options: [
+                  { value: "all", label: "All" },
+                  { value: "pendingReview", label: "Awaiting review" },
+                  { value: "overdue", label: "Overdue" },
+                ],
+              },
+              {
+                kind: "select",
+                id: "stage",
+                group: "Milestone",
+                label: "Stage",
+                value: values.stageId,
+                options: [
+                  { value: "", label: "All stages" },
+                  ...stages.map((stage) => ({
+                    value: stage.id,
+                    label: `${stage.sequence}. ${stage.name}`,
+                  })),
+                ],
+              },
+              {
+                kind: "select",
+                id: "status",
+                group: "Milestone",
+                label: "Status",
+                value: values.status,
+                options: [
+                  { value: "", label: "Any status" },
+                  ...MILESTONE_FILTER_STATUSES.map((status) => ({
+                    value: status,
+                    label: getStatusPresentation(status).label,
+                  })),
+                ],
+              },
+              {
+                kind: "dateRange",
+                id: "submitted",
+                group: "Submission",
+                label: "Submitted",
+                from: values.submittedFromDay,
+                to: values.submittedToDay,
+                description: `Milestones with work submitted on these days, in the contract's time zone (${contract.timezone}).`,
+              },
+            ]}
+            onApply={(next) =>
+              update({
+                quick: next.quick as MilestoneFilterValues["quick"],
+                stageId: next.stage,
+                status: next.status as EMilestoneStatus | "",
+                submittedFromDay: next["submitted.from"],
+                submittedToDay: next["submitted.to"],
+              })
+            }
+          />
         </DataTableToolbar>
-        <DataTableActiveFilters
-          filters={active}
-          onClearAll={() =>
-            update({ ...NO_MILESTONE_FILTERS, quick: values.quick })
-          }
-        />
         <DataTable
           label="Milestones"
           columns={columns}

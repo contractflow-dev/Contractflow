@@ -168,8 +168,9 @@ describe("ProjectActivity", () => {
   it("filters by action on the API", async () => {
     const user = userEvent.setup({ delay: null });
     render(<ProjectActivity companyId="company-1" contractId="contract-1" />);
+    await user.click(screen.getByRole("button", { name: /^Filters/ }));
     await user.selectOptions(
-      screen.getByLabelText("Action"),
+      await screen.findByLabelText("Action"),
       "milestone.rejected",
     );
     expect(mocks.activity.mock.calls.at(-1)?.[0]).toMatchObject({

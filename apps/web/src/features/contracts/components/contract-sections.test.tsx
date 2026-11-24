@@ -13,7 +13,6 @@ import {
   parseContractSection,
   type ContractSection,
 } from "../contract-sections";
-import { ContractSectionNav } from "./contract-section-nav";
 import { ContractDetail } from "./contracts-screens";
 
 // The page reads activity deep-link targets from the URL, as in the App Router.
@@ -308,65 +307,6 @@ describe("contract detail sections", () => {
     } as unknown as ReturnType<typeof useContractDetails>);
     const markup = render("history");
     expect(markup).toContain("Contract was not found.");
-    expect(markup).not.toContain('aria-label="Contract sections"');
-  });
-});
-
-describe("ContractSectionNav", () => {
-  const all = { roles: true, sites: true, signatories: true };
-
-  it("links every section to its own URL and marks the current one", () => {
-    const markup = renderToStaticMarkup(
-      <ContractSectionNav contractId="c-1" current="sites" access={all} />,
-    );
-
-    expect(markup).toContain('<nav aria-label="Contract sections"');
-    for (const [label, href] of [
-      ["Overview", "/dashboards/contracts/c-1"],
-      ["Parties", "/dashboards/contracts/c-1/parties"],
-      ["Roles", "/dashboards/contracts/c-1/roles"],
-      ["Sites", "/dashboards/contracts/c-1/sites"],
-      ["Signatories", "/dashboards/contracts/c-1/signatories"],
-      ["Documents", "/dashboards/contracts/c-1/documents"],
-      ["History", "/dashboards/contracts/c-1/history"],
-    ]) {
-      expect(markup).toMatch(new RegExp(`href="${href}"[^>]*>${label}</a>`));
-    }
-    expect(markup.match(/aria-current="page"/g)).toHaveLength(1);
-    expect(markup).toMatch(/aria-current="page"[^>]*>Sites</);
-    // The active tab is shown by weight and an underline, not colour alone.
-    expect(markup).toMatch(
-      /aria-current="page" class="[^"]*border-primary[^"]*font-semibold/,
-    );
-  });
-
-  it("hides restricted sections the user can't use, or while unknown", () => {
-    const markup = renderToStaticMarkup(
-      <ContractSectionNav
-        contractId="c-1"
-        current="overview"
-        access={{ roles: false, sites: undefined, signatories: true }}
-      />,
-    );
-
-    expect(markup).not.toContain(">Roles<");
-    expect(markup).not.toContain(">Sites<");
-    expect(markup).toContain(">Signatories<");
-    expect(markup).toContain(">Parties<");
-    expect(markup).toContain(">Documents<");
-    expect(markup).toContain(">History<");
-  });
-
-  it("keeps the current section listed even when it is restricted", () => {
-    const markup = renderToStaticMarkup(
-      <ContractSectionNav
-        contractId="c-1"
-        current="roles"
-        access={{ roles: false, sites: false, signatories: false }}
-      />,
-    );
-
-    expect(markup).toMatch(/aria-current="page"[^>]*>Roles</);
   });
 });
 

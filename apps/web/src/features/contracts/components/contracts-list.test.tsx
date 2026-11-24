@@ -138,11 +138,12 @@ describe("ContractsList", () => {
     const link = markup.search(
       /<a[^>]*href="\/dashboards\/contracts\/new"[^>]*>(?:<svg[\s\S]*?<\/svg>)?New contract<\/a>/,
     );
-    const filters = markup.indexOf('aria-label="Filter contracts by status"');
     const search = markup.indexOf('role="search"');
+    const filters = markup.indexOf(">Filters");
     expect(link).toBeGreaterThan(cardTitle);
-    expect(filters).toBeGreaterThan(link);
-    expect(search).toBeGreaterThan(filters);
+    expect(search).toBeGreaterThan(link);
+    expect(filters).toBeGreaterThan(search);
+    expect(markup).not.toContain("aria-pressed");
     const linkTag = /<a[^>]*href="\/dashboards\/contracts\/new"[^>]*>/.exec(
       markup,
     )?.[0];
@@ -227,14 +228,13 @@ describe("ContractsList", () => {
     expect(markup).not.toContain(">None yet<");
     expect(markup).toContain('<span class="sr-only">Actions</span></th>');
     expect(markup).toContain("Restore");
-    // The archived-only filter is listed as active, and can be removed.
-    expect(markup).toContain(">Archived only");
-    expect(markup).toContain('aria-label="Remove filter: Archived only"');
+    // The archived-only filter counts as active on the Filters trigger.
+    expect(markup).toMatch(/Filters<span[^>]*>1<span[^>]*> active/);
   });
 
-  it("offers archived contracts, under More filters, only to company administrators", () => {
-    expect(render(true)).toContain("More filters");
-    expect(render(false)).not.toContain("More filters");
+  it("offers one Filters dropdown to every reader", () => {
+    expect(render(true)).toContain(">Filters");
+    expect(render(false)).toContain(">Filters");
   });
 
   it("tells a company with no contracts that it has none yet", () => {
@@ -268,8 +268,8 @@ describe("ContractsList", () => {
     expect(markup).toContain("No contracts match “zzz”.");
     expect(markup).not.toContain("No contracts yet.");
     expect(markup.match(/>Clear search</g)).toHaveLength(1);
-    // The search is shown as an active filter, removable on its own.
-    expect(markup).toContain("Search: “zzz”");
+    // Search is not a filter: it doesn't count on the Filters trigger.
+    expect(markup).not.toMatch(/Filters<span/);
   });
 
   it("offers to clear every filter when a search also has others", () => {

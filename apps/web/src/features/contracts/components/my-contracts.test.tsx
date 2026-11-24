@@ -146,7 +146,7 @@ describe("MyContracts", () => {
       "None of your contracts match your search or filters.",
     );
     expect(markup).not.toContain("No contracts assigned to you yet");
-    expect(markup.match(/>Clear filters</g)).toHaveLength(2);
+    expect(markup.match(/>Clear filters</g)).toHaveLength(1);
   });
 
   it("shows loading, then an error with retry, never an empty state", () => {
@@ -166,6 +166,8 @@ describe("MyContracts", () => {
     const markup = render();
     expect(markup).toContain('role="search"');
     expect(markup).toMatch(/<label[^>]*for="my-contract-search"/);
-    expect(markup).toMatch(/<label[^>]*for="my-contract-status"/);
+    // Status is in the Filters dropdown.
+    expect(markup).not.toContain('id="my-contract-status"');
+    expect(markup).toContain(">Filters");
   });
 });

@@ -77,7 +77,7 @@ describe("InviteMemberDialog", () => {
       screen.getByLabelText("Company role"),
       ECompanyRole.COMPANY_ADMIN,
     );
-    await user.click(screen.getByRole("button", { name: "Send invitation" }));
+    await user.click(screen.getByRole("button", { name: "Send Invitation" }));
 
     expect(mocks.invite).toHaveBeenCalledWith({
       companyId: "company-1",
@@ -105,7 +105,7 @@ describe("InviteMemberDialog", () => {
     const { user, onOpenChange } = setup();
 
     await user.type(screen.getByLabelText(/Email/), "ada@example.com");
-    await user.click(screen.getByRole("button", { name: "Send invitation" }));
+    await user.click(screen.getByRole("button", { name: "Send Invitation" }));
 
     expect(await within(dialog()).findByRole("alert")).toBeTruthy();
     expect(onOpenChange).not.toHaveBeenCalledWith(false);

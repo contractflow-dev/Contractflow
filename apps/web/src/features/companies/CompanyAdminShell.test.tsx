@@ -69,6 +69,9 @@ vi.mock("@workspace/ui/components/dropdown-menu", () => ({
   DropdownMenuLabel: ({ children }: { children: ReactNode }) => (
     <div>{children}</div>
   ),
+  DropdownMenuLinkItem: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
   DropdownMenuSeparator: () => null,
   DropdownMenuTrigger: ({ children, ...props }: ComponentProps<"button">) => (
     <button {...props}>{children}</button>
@@ -143,7 +146,7 @@ describe("CompanyAdminShell", () => {
     expect(markup).toContain(">Sign out</button>");
     expect(markup).not.toContain(">Overview</span></a>");
     expect(markup).not.toContain(">Team</span></a>");
-    expect(markup).not.toContain(">Company profile</span></a>");
+    expect(markup).not.toContain(">Profile</span></a>");
   });
 
   it("denies company-admin routes to a regular company member", () => {
@@ -160,7 +163,7 @@ describe("CompanyAdminShell", () => {
     expect(markup).not.toContain("Protected profile content");
     expect(markup).toContain(">Contracts</span></a>");
     expect(markup).not.toContain(">Team</span></a>");
-    expect(markup).not.toContain(">Company profile</span></a>");
+    expect(markup).not.toContain(">Profile</span></a>");
   });
 
   it("denies New contract to a member who types its address, and doesn't list it in their Contracts pages", () => {
@@ -175,12 +178,12 @@ describe("CompanyAdminShell", () => {
     expect(markup).not.toContain("New contract form");
     // The member still sees the Contracts pages they may open.
     expect(markup).toMatch(/<nav aria-label="Contracts pages"/);
-    expect(markup).toContain(">Contract register</span>");
-    expect(markup).not.toContain(">New contract</span>");
+    expect(markup).toContain(">All Contracts</span>");
+    expect(markup).not.toContain(">New Contract</span>");
   });
 
   it("keeps the company context across modules: the same company, content keyed by it", () => {
-    mocks.pathname = "/dashboards/departments/project";
+    mocks.pathname = "/dashboards/team";
 
     const markup = renderToStaticMarkup(
       <CompanyAdminShell>
@@ -188,11 +191,11 @@ describe("CompanyAdminShell", () => {
       </CompanyAdminShell>,
     );
 
-    expect(markup).toMatch(/<nav aria-label="Departments pages"/);
+    expect(markup).toMatch(/<nav aria-label="Team pages"/);
     expect(markup).toContain("Company company-1");
   });
 
-  it("denies department pages to a regular company member, who sees them as planned", () => {
+  it("denies department pages to a regular company member, and lists no department for them", () => {
     mocks.pathname = "/dashboards/departments/hse";
     mocks.activeCompanyId = "company-2";
 
@@ -411,8 +414,7 @@ describe("CompanyAdminShell", () => {
     expect(markup).toContain(">Overview</span></a>");
   });
 
-  it("opens department pages for a company administrator, marking the one in use", () => {
-    // The page's own filters don't change which item is in use.
+  it("keeps a department page open to an administrator by its URL, without listing it", () => {
     mocks.pathname = "/dashboards/departments/project";
     mocks.search = "partyType=client";
 
@@ -421,11 +423,7 @@ describe("CompanyAdminShell", () => {
     );
 
     expect(markup).toContain("Department page");
-    const active = markup.match(/<a[^>]*aria-current="page"[^>]*>/g) ?? [];
-    expect(active).toHaveLength(1);
-    expect(active[0]).toContain('href="/dashboards/departments/project"');
-    expect(markup).toContain('href="/dashboards/departments/hse"');
-    expect(markup).not.toContain("Client Project Mgmt");
-    expect(markup).not.toContain("The HSE workspace is planned.");
+    expect(markup).not.toContain('href="/dashboards/departments/');
+    expect(markup).not.toContain("Departments pages");
   });
 });

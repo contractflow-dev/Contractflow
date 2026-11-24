@@ -1,4 +1,4 @@
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 
 /** One destination in an application area's sidebar. */
 export interface AppNavItem {
@@ -30,6 +30,17 @@ export interface AppNavItem {
    * and the page opens the dialog from the URL. It is never the active page.
    */
   dialog?: string;
+  /** Other exact paths that belong to this page, such as its edit form. */
+  alsoActiveOn?: readonly string[];
+  /**
+   * The module's pages under headings, in place of a flat `children` list.
+   * Used by a context module, such as one contract's navigation.
+   */
+  pageGroups?: readonly AppNavGroup[];
+  /** A link out of the module, shown above its heading. */
+  back?: { href: string; label: string };
+  /** Replaces the module's name in its sidebar, such as a contract's identity. */
+  heading?: ReactNode;
 }
 
 export interface AppNavGroup {
@@ -38,10 +49,19 @@ export interface AppNavGroup {
   items: readonly AppNavItem[];
 }
 
+/** Every page of a module, whether listed flat or under headings. */
+export function modulePages(module: AppNavItem): readonly AppNavItem[] {
+  return module.pageGroups
+    ? module.pageGroups.flatMap(({ items }) => items)
+    : (module.children ?? []);
+}
+
 /** Whether the path is the item's own page or, for `section`, below it. */
 function matchesHref(pathname: string, item: AppNavItem): boolean {
   if (item.plannedNote || item.dialog) return false;
-  if (pathname === item.href) return true;
+  if (pathname === item.href || item.alsoActiveOn?.includes(pathname)) {
+    return true;
+  }
   return item.match !== "exact" && pathname.startsWith(`${item.href}/`);
 }
 

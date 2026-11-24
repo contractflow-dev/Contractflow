@@ -13,18 +13,17 @@ import {
 import { RiAddLine } from "@remixicon/react";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button, buttonVariants } from "@workspace/ui/components/button";
-import { Checkbox } from "@workspace/ui/components/checkbox";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
-import { Field, FieldLabel } from "@workspace/ui/components/field";
 import {
   NativeSelect,
   NativeSelectOption,
 } from "@workspace/ui/components/native-select";
+import { DataTableFilters } from "@/components/data-table/data-table-filters";
 import { ListCard } from "@/components/data-table/list-card";
 import {
   DataTable,
@@ -33,13 +32,8 @@ import {
   type DataTableColumn,
 } from "@/components/data-table/data-table";
 import {
-  DataTableActiveFilters,
-  DataTableDateRange,
-  DataTableFilterChips,
-  DataTableMoreFilters,
   DataTableSearch,
   DataTableToolbar,
-  type ActiveFilter,
 } from "@/components/data-table/data-table-toolbar";
 import { DropdownMenuLinkItem } from "@workspace/ui/components/dropdown-menu";
 import {
@@ -81,7 +75,6 @@ import {
   isRestrictedContractSection,
   type ContractSection,
 } from "../contract-sections";
-import { ContractSectionNav } from "./contract-section-nav";
 import { ContractActivity } from "./contract-activity";
 import { ContractWorkspacesCard } from "./contract-workspace-screens";
 import { ContractWorkspaceManagement } from "./contract-workspace-management";
@@ -210,24 +203,9 @@ export function ContractsList({
     search,
     includeDeleted,
   });
-  const includeArchivedId = useId();
   const sortId = useId();
   const initialLoading = isLoading || (isFetching && !currentData);
   const contracts = currentData?.data ?? [];
-  const activeFilters: ActiveFilter[] = [
-    ...(search
-      ? [{ key: "search", label: `Search: “${search}”`, onRemove: clearSearch }]
-      : []),
-    ...(includeDeleted
-      ? [
-          {
-            key: "archived",
-            label: "Archived only",
-            onRemove: () => setIncludeDeleted(false),
-          },
-        ]
-      : []),
-  ];
   const newContractLink = (
     // For company administrators; the API makes the same check when the
     // contract is created.
@@ -254,18 +232,6 @@ export function ContractsList({
         }
         action={canCreateContracts ? newContractLink : null}
       >
-        <DataTableFilterChips
-          label="Filter contracts by status"
-          countNoun="contracts"
-          value={status}
-          onChange={setStatus}
-          options={CONTRACT_STATUS_FILTERS.map((value) => ({
-            value,
-            label: value ? humanizeEnumValue(value) : "All contracts",
-            count: counts[value],
-          }))}
-        />
-
         <div className="space-y-3">
           <DataTableToolbar
             actions={
@@ -302,34 +268,39 @@ export function ContractsList({
             />
             {/* The API lists archived contracts only to company administrators,
               and returns only the archived contracts this company created. */}
-            {canViewArchived ? (
-              <DataTableMoreFilters
-                activeCount={includeDeleted ? 1 : 0}
-                onClear={() => setIncludeDeleted(false)}
-              >
-                <Field orientation="horizontal">
-                  <Checkbox
-                    id={includeArchivedId}
-                    checked={includeDeleted}
-                    onCheckedChange={setIncludeDeleted}
-                  />
-                  <FieldLabel
-                    htmlFor={includeArchivedId}
-                    className="font-normal"
-                  >
-                    Show archived contracts only
-                  </FieldLabel>
-                </Field>
-              </DataTableMoreFilters>
-            ) : null}
+            <DataTableFilters
+              label="contracts"
+              fields={[
+                {
+                  kind: "select",
+                  id: "status",
+                  label: "Status",
+                  value: status,
+                  options: CONTRACT_STATUS_FILTERS.map((value) => ({
+                    value,
+                    label: value ? humanizeEnumValue(value) : "All contracts",
+                    count: counts[value],
+                  })),
+                },
+                ...(canViewArchived
+                  ? [
+                      {
+                        kind: "checkbox" as const,
+                        id: "archived",
+                        label: "Show archived contracts only",
+                        checked: includeDeleted,
+                      },
+                    ]
+                  : []),
+              ]}
+              onApply={(next) => {
+                setStatus(next.status as typeof status);
+                if (canViewArchived) {
+                  setIncludeDeleted(next.archived === "true");
+                }
+              }}
+            />
           </DataTableToolbar>
-          <DataTableActiveFilters
-            filters={activeFilters}
-            onClearAll={() => {
-              clearSearch();
-              setIncludeDeleted(false);
-            }}
-          />
         </div>
 
         <DataTable
@@ -773,7 +744,6 @@ export function ContractDetail({
     setHistoryPage,
     setHistoryPageSize,
     historyFilters,
-    historyRangeError,
     setHistoryFilters,
     clearHistoryFilters,
   } = useContractDetails(query, { timeZone });
@@ -879,12 +849,6 @@ export function ContractDetail({
       </div>
 
       <ArchivedContractNotice companyId={companyId} contract={contract} />
-
-      <ContractSectionNav
-        contractId={contractId}
-        current={section}
-        access={access}
-      />
 
       {section === "overview" ? (
         <>
@@ -996,6 +960,7 @@ export function ContractDetail({
             <ContractRoleAssignmentManagement
               companyId={companyId}
               contractId={contractId}
+              contractLabel={`${contract.referenceNumber} · ${contract.title}`}
               initialWorkspace={rolesWorkspace ?? undefined}
               target={target}
             />
@@ -1028,48 +993,38 @@ export function ContractDetail({
           title="Status history"
           description="Recorded status changes, newest first. Filter by a status the contract moved to or from, or by when it changed."
         >
-          <DataTableFilterChips
-            label="Filter status history by status"
-            countNoun="status changes"
-            value={historyFilters.status}
-            onChange={(status) => setHistoryFilters({ status })}
-            options={STATUS_HISTORY_FILTERS.map((value) => ({
-              value,
-              label: value ? humanizeEnumValue(value) : "All changes",
-            }))}
-          />
-          <DataTableDateRange
-            legend="Changed between"
-            from={historyFilters.fromDay}
-            to={historyFilters.toDay}
-            max={todayAsCalendarDate()}
-            error={historyRangeError}
-            onFromChange={(fromDay) => setHistoryFilters({ fromDay })}
-            onToChange={(toDay) => setHistoryFilters({ toDay })}
-          />
-          <DataTableActiveFilters
-            filters={[
-              ...(historyFilters.fromDay
-                ? [
-                    {
-                      key: "from",
-                      label: `From ${formatCalendarDate(historyFilters.fromDay)}`,
-                      onRemove: () => setHistoryFilters({ fromDay: "" }),
-                    },
-                  ]
-                : []),
-              ...(historyFilters.toDay
-                ? [
-                    {
-                      key: "to",
-                      label: `To ${formatCalendarDate(historyFilters.toDay)}`,
-                      onRemove: () => setHistoryFilters({ toDay: "" }),
-                    },
-                  ]
-                : []),
-            ]}
-            onClearAll={() => setHistoryFilters({ fromDay: "", toDay: "" })}
-          />
+          <DataTableToolbar>
+            <DataTableFilters
+              label="status history"
+              fields={[
+                {
+                  kind: "select",
+                  id: "status",
+                  label: "Status",
+                  value: historyFilters.status,
+                  options: STATUS_HISTORY_FILTERS.map((value) => ({
+                    value,
+                    label: value ? humanizeEnumValue(value) : "All changes",
+                  })),
+                },
+                {
+                  kind: "dateRange",
+                  id: "changed",
+                  label: "Changed between",
+                  from: historyFilters.fromDay,
+                  to: historyFilters.toDay,
+                  max: todayAsCalendarDate(),
+                },
+              ]}
+              onApply={(next) =>
+                setHistoryFilters({
+                  status: next.status as typeof historyFilters.status,
+                  fromDay: next["changed.from"],
+                  toDay: next["changed.to"],
+                })
+              }
+            />
+          </DataTableToolbar>
           <DataTable
             label="Status history"
             columns={historyColumns(timeZone)}

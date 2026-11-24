@@ -14,12 +14,9 @@ import {
 } from "@workspace/ui/components/card";
 import { Field, FieldLabel } from "@workspace/ui/components/field";
 import { Input } from "@workspace/ui/components/input";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@workspace/ui/components/native-select";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { DataPagination } from "@/components/pagination/data-pagination";
+import { DataTableFilters } from "@/components/data-table/data-table-filters";
 import { PageHeader } from "@/components/page-header/page-header";
 import { StatusBadge } from "@/components/status-badge/status-badge";
 import { getApiErrorMessage } from "@/lib/apiError";
@@ -96,11 +93,12 @@ export function MyContracts({
           </CardHeader>
           <CardContent className="space-y-5">
 
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
         <form
           role="search"
           aria-label="My contracts"
           onSubmit={submitSearch}
-          className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-end"
+          className="w-full sm:max-w-sm"
         >
           <Field>
             <FieldLabel htmlFor="my-contract-search">Search my contracts</FieldLabel>
@@ -114,33 +112,31 @@ export function MyContracts({
               onChange={(event) => setSearchInput(event.target.value)}
             />
           </Field>
-          <Field>
-            <FieldLabel htmlFor="my-contract-status">Status</FieldLabel>
-            <NativeSelect
-              id="my-contract-status"
-              className="w-full"
-              value={status}
-              onChange={(event) => {
-                const value = event.target.value;
-                setStatus(
-                  contractStatuses.find((candidate) => candidate === value) ?? "",
-                );
-              }}
-            >
-              <NativeSelectOption value="">All statuses</NativeSelectOption>
-              {contractStatuses.map((contractStatus) => (
-                <NativeSelectOption key={contractStatus} value={contractStatus}>
-                  {humanizeEnumValue(contractStatus)}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          </Field>
         </form>
-        {hasFilters ? (
-          <Button type="button" variant="outline" onClick={clearFilters}>
-            Clear filters
-          </Button>
-        ) : null}
+          <DataTableFilters
+            label="my contracts"
+            fields={[
+              {
+                kind: "select",
+                id: "status",
+                label: "Status",
+                value: status,
+                options: [
+                  { value: "", label: "All statuses" },
+                  ...contractStatuses.map((value) => ({
+                    value,
+                    label: humanizeEnumValue(value),
+                  })),
+                ],
+              },
+            ]}
+            onApply={(next) =>
+              setStatus(
+                contractStatuses.find((value) => value === next.status) ?? "",
+              )
+            }
+          />
+        </div>
 
         {error ? (
           <Alert variant="destructive">
