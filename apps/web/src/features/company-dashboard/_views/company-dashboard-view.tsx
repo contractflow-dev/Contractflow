@@ -1,22 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import type { ComponentType } from "react";
 import {
   RiArrowRightLine,
-  RiBarChart2Line,
   RiFileList3Line,
   RiFileTextLine,
-  RiMoneyDollarCircleLine,
   RiRefreshLine,
   RiSettings3Line,
-  RiShieldCheckLine,
   RiUserAddLine,
 } from "@remixicon/react";
-import {
-  ECompanyDepartment,
-  type ICompanyDashboardResponse,
-} from "@contractflow/contracts-schema";
+import { type ICompanyDashboardResponse } from "@contractflow/contracts-schema";
 import {
   Alert,
   AlertDescription,
@@ -47,9 +40,7 @@ import { useGetCompanyDashboardQuery } from "@/features/companies";
 import { useGetCurrentUserQuery } from "@/services/authApi";
 import { CompanyAdminShell } from "@/features/companies/CompanyAdminShell";
 import { CompanyVerificationNotice } from "@/features/companies/company-verification-notice";
-import { departmentHref } from "@/features/companies/company-navigation";
 import { TEAM_PATH } from "@/features/companies/company-navigation";
-import { departmentStaffingHref } from "@/features/companies/departments";
 import { NEW_CONTRACT_PATH } from "@/features/contracts/contract-sections";
 import { IncomingContractInvitations } from "@/features/contracts/components/incoming-contract-invitations";
 
@@ -148,7 +139,6 @@ function DashboardContent({ companyId }: { companyId: string }) {
       ) : data ? (
         <>
           <PortfolioHealth data={data} />
-          <DepartmentWorkspaces data={data} />
           <QuickActions data={data} />
           <RecentActivity data={data} timeZone={timeZone} />
           <EndingSoon data={data} />
@@ -236,137 +226,6 @@ function PortfolioHealth({ data }: { data: ICompanyDashboardResponse }) {
             </Card>
           </li>
         ))}
-      </ul>
-    </section>
-  );
-}
-
-function DepartmentWorkspaces({ data }: { data: ICompanyDashboardResponse }) {
-  const departments: Array<{
-    name: string;
-    icon: ComponentType<{ className?: string }>;
-    tint: string;
-    /** The first is the card's headline figure; any others follow it. */
-    figures: Array<{ value: number; label: string }>;
-    /** Team → Contract roles for the department's workspace (D1). */
-    staffingHref: string;
-    /** The department's oversight page. */
-    overviewHref: string;
-  }> = [
-    {
-      // One Project department for both sides, as in the sidebar.
-      name: "Project",
-      icon: RiBarChart2Line,
-      tint: "bg-dept-client-pm/15 text-dept-client-pm",
-      figures: [
-        {
-          value: data.departments.contractsNeedingAttentionCount,
-          label: "Contracts needing attention",
-        },
-      ],
-      staffingHref: departmentStaffingHref(ECompanyDepartment.PROJECT),
-      overviewHref: departmentHref("project"),
-    },
-    {
-      name: "HSE",
-      icon: RiShieldCheckLine,
-      tint: "bg-dept-hse/15 text-dept-hse",
-      // Compliance records belong to the HSE workspace.
-      figures: [
-        { value: data.departments.openIncidentCount, label: "Open incidents" },
-        {
-          value: data.departments.complianceAttentionCount,
-          label: "Compliance records needing attention",
-        },
-      ],
-      staffingHref: departmentStaffingHref(ECompanyDepartment.HSE),
-      overviewHref: departmentHref("hse"),
-    },
-    {
-      name: "Finance",
-      icon: RiMoneyDollarCircleLine,
-      tint: "bg-dept-finance/15 text-dept-finance",
-      figures: [
-        {
-          value: data.departments.invoicesDueSoonCount,
-          label: `Invoices due in the next ${data.departments.dueWindowDays} days`,
-        },
-      ],
-      staffingHref: departmentStaffingHref(ECompanyDepartment.FINANCE),
-      overviewHref: departmentHref("finance"),
-    },
-  ];
-  return (
-    <section aria-labelledby="departments-heading">
-      <SectionHeading
-        id="departments-heading"
-        title="Department workspaces"
-        description="Each department sees your contracts through its own lens."
-      />
-      <ul className="grid gap-4 md:grid-cols-3">
-        {departments.map(
-          ({
-            name,
-            icon: Icon,
-            tint,
-            figures: [headline, ...more],
-            staffingHref,
-            overviewHref,
-          }) => (
-            <li key={name}>
-              <Card highlight className="h-full">
-                <CardContent className="flex h-full flex-col gap-3">
-                  <div className="flex items-center gap-3">
-                    <span
-                      className={cn(
-                        "grid size-9 place-items-center rounded-xl",
-                        tint,
-                      )}
-                    >
-                      <Icon className="size-5" aria-hidden="true" />
-                    </span>
-                    <h3 className="type-subsection-title">{name}</h3>
-                  </div>
-                  <div>
-                    <p className="font-heading text-2xl font-semibold tabular-nums">
-                      {formatNumber(headline.value)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {headline.label}
-                    </p>
-                  </div>
-                  {more.map((figure) => (
-                    <div key={figure.label}>
-                      <p className="text-base font-semibold tabular-nums">
-                        {formatNumber(figure.value)}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {figure.label}
-                      </p>
-                    </div>
-                  ))}
-                  <div className="mt-auto flex flex-wrap gap-x-4 gap-y-1">
-                    <Link
-                      href={staffingHref}
-                      aria-label={`Manage ${name} staffing`}
-                      className="inline-flex items-center gap-1.5 text-sm font-medium text-primary underline-offset-4 group-hover/card:text-card-foreground group-hover/card:underline hover:underline"
-                    >
-                      Manage staffing
-                      <RiArrowRightLine className="size-4" aria-hidden="true" />
-                    </Link>
-                    <Link
-                      href={overviewHref}
-                      aria-label={`View ${name} contracts`}
-                      className="text-sm font-medium text-primary underline-offset-4 group-hover/card:text-card-foreground group-hover/card:underline hover:underline"
-                    >
-                      View contracts
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            </li>
-          ),
-        )}
       </ul>
     </section>
   );

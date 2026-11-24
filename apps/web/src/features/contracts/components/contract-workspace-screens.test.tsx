@@ -169,28 +169,15 @@ describe("ContractWorkspace", () => {
     });
   });
 
-  it("names the contract and workspace, and offers only workspaces the member can enter", () => {
+  it("names the contract and workspace, and leaves navigation to the shell", () => {
     mocks.workspace.mockReturnValue(ok(projectLead));
     const markup = renderWorkspace("project");
 
     expect(markup).toContain("CTR-001 · Alpha pipeline integrity");
     expect(markup).toMatch(/<h1[^>]*>Project workspace<\/h1>/);
-    expect(markup).toContain('aria-label="Workspaces"');
-    const current = [...markup.matchAll(/<a ([^>]*)>/g)]
-      .map(([, attributes]) => attributes)
-      .filter((attributes) => attributes.includes('aria-current="page"'));
-    // The Project tab and the workspace's Overview link: the same page.
-    expect(current).toHaveLength(2);
-    for (const attributes of current) {
-      expect(attributes).toContain(
-        'href="/dashboards/contracts/contract-1/workspaces/project"',
-      );
-    }
-    expect(markup).toContain(
-      'href="/dashboards/contracts/contract-1/workspaces/hse"',
-    );
-    // No role in Finance: no way in from here.
-    expect(markup).not.toContain("/workspaces/finance");
+    expect(markup).not.toContain('aria-label="Workspaces"');
+    expect(markup).not.toContain("workspace sections");
+    expect(markup).not.toContain('aria-current="page"');
   });
 
   it("shows the member's real role and what the workspace holds, with planned items marked", () => {
@@ -225,8 +212,8 @@ describe("ContractWorkspace", () => {
     const markup = renderWorkspace("hse");
 
     expect(markup).toContain("Workspace Admin");
-    expect(markup).toMatch(
-      /href="\/dashboards\/contracts\/contract-1\/workspaces\/hse\/team"[^>]*>.*Team/,
+    expect(markup).toContain(
+      'href="/dashboards/contracts/contract-1/workspaces/hse/team"',
     );
     expect(markup).toContain("Manage the HSE team");
   });
@@ -385,27 +372,6 @@ describe("Project workspace screens", () => {
       />,
     );
   }
-
-  it("offers Stages, Milestones and Activity, and Reviews only to the Client Project Manager", () => {
-    mocks.workspace.mockReturnValue(ok(projectLead));
-    const lead = renderProject("overview");
-    expect(lead).toContain(
-      'href="/dashboards/contracts/contract-1/workspaces/project/stages"',
-    );
-    expect(lead).toContain(
-      'href="/dashboards/contracts/contract-1/workspaces/project/milestones"',
-    );
-    expect(lead).toContain(
-      'href="/dashboards/contracts/contract-1/workspaces/project/activity"',
-    );
-    expect(lead).not.toContain("/workspaces/project/reviews");
-
-    mocks.contract.mockReturnValue(ok(clientContract));
-    mocks.workspace.mockReturnValue(ok(projectManager));
-    expect(renderProject("overview")).toContain(
-      'href="/dashboards/contracts/contract-1/workspaces/project/reviews"',
-    );
-  });
 
   it("derives permissions from the role, the side and the contract status", () => {
     mocks.workspace.mockReturnValue(ok(projectLead));

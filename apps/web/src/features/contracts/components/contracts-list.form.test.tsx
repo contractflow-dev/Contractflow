@@ -113,8 +113,10 @@ function setup(canManage = true) {
   return user;
 }
 
-const filters = () =>
-  screen.getByRole("group", { name: "Filter contracts by status" });
+async function openFilters(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: /^Filters/ }));
+  return (await screen.findByLabelText("Status")) as HTMLSelectElement;
+}
 const table = () => screen.getByRole("table", { name: "Contracts" });
 
 beforeEach(() => {
@@ -124,54 +126,41 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("contract register filters", () => {
-  it("offers the contract statuses as filters, with the selected one pressed", () => {
+  it("offers the contract statuses in the dropdown, with the applied one selected", async () => {
     setState({ status: EContractStatus.DRAFT });
-    setup();
+    const user = setup();
 
-    const buttons = within(filters()).getAllByRole("button");
-    expect(buttons.map((button) => button.textContent)).toEqual([
+    const status = await openFilters(user);
+    expect([...status.options].map((option) => option.textContent)).toEqual([
       "All contracts",
       "Active",
       "Draft",
       "Suspended",
       "Completed",
     ]);
-    const pressed = buttons.filter(
-      (button) => button.getAttribute("aria-pressed") === "true",
-    );
-    expect(pressed.map((button) => button.textContent)).toEqual(["Draft"]);
+    expect(status.value).toBe(EContractStatus.DRAFT);
+    expect(
+      screen.getByRole("button", { name: /^Filters\W*1 active/ }),
+    ).toBeTruthy();
   });
 
-  it("shows the API's counts, and none where the API hasn't answered", () => {
+  it("shows the API's counts, and none where the API hasn't answered", async () => {
     mocks.counts = { "": 12, [EContractStatus.ACTIVE]: 7 };
-    setup();
-
-    expect(
-      within(filters()).getByRole("button", {
-        name: /^All contracts\W*12 contracts$/,
-      }),
-    ).toBeTruthy();
-    expect(
-      within(filters()).getByRole("button", {
-        name: /^Active\W*7 contracts$/,
-      }),
-    ).toBeTruthy();
-    // No count is made up for statuses the API hasn't counted yet.
-    expect(
-      within(filters()).getByRole("button", { name: "Draft" }).textContent,
-    ).toBe("Draft");
-  });
-
-  it("asks the list for the chosen status", async () => {
     const user = setup();
 
-    await user.click(within(filters()).getByRole("button", { name: "Active" }));
-    expect(mocks.state.setStatus).toHaveBeenCalledWith(EContractStatus.ACTIVE);
+    const status = await openFilters(user);
+    const labels = [...status.options].map((option) => option.textContent);
+    expect(labels).toContain("All contracts (12)");
+    expect(labels).toContain("Active (7)");
+    // No count is made up for statuses the API hasn't counted yet.
+    expect(labels).toContain("Draft");
+  });
 
-    await user.click(
-      within(filters()).getByRole("button", { name: "All contracts" }),
-    );
-    expect(mocks.state.setStatus).toHaveBeenLastCalledWith("");
+  it("asks the list for the chosen status as soon as it is picked", async () => {
+    const user = setup();
+
+    await user.selectOptions(await openFilters(user), EContractStatus.ACTIVE);
+    expect(mocks.state.setStatus).toHaveBeenCalledWith(EContractStatus.ACTIVE);
   });
 });
 
@@ -192,22 +181,19 @@ describe("contract register toolbar", () => {
     expect(screen.queryByRole("button", { name: "Clear search" })).toBeNull();
   });
 
-  it("keeps the archived filter under More filters, labelled and working", async () => {
+  it("keeps the archived filter in the dropdown, labelled and working", async () => {
     const user = setup();
 
-    await user.click(screen.getByRole("button", { name: /More filters/ }));
+    await openFilters(user);
     const checkbox = await screen.findByRole("checkbox", {
       name: "Show archived contracts only",
     });
     expect(checkbox.getAttribute("aria-checked")).toBe("false");
     await user.click(checkbox);
-    expect(mocks.state.setIncludeDeleted).toHaveBeenCalledWith(
-      true,
-      expect.anything(),
-    );
+    expect(mocks.state.setIncludeDeleted).toHaveBeenCalledWith(true);
   });
 
-  it("lists active filters, each removable, and clears them all", async () => {
+  it("lists active filters in the dropdown, each removable, and leaves search alone", async () => {
     setState({
       searchInput: "jetty",
       search: "jetty",
@@ -216,13 +202,14 @@ describe("contract register toolbar", () => {
     });
     const user = setup();
 
+    await openFilters(user);
     await user.click(
-      screen.getByRole("button", { name: "Remove filter: Archived only" }),
+      screen.getByRole("button", {
+        name: "Remove filter: Show archived contracts only",
+      }),
     );
     expect(mocks.state.setIncludeDeleted).toHaveBeenCalledWith(false);
-
-    await user.click(screen.getByRole("button", { name: "Clear all" }));
-    expect(mocks.state.clearSearch).toHaveBeenCalled();
+    expect(mocks.state.clearSearch).not.toHaveBeenCalled();
   });
 });
 
@@ -290,10 +277,13 @@ describe("contract register table", () => {
 });
 
 describe("contract register permissions and states", () => {
-  it("offers New contract and More filters only to company administrators", () => {
-    setup(false);
+  it("offers New contract and the archived filter only to company administrators", async () => {
+    const member = setup(false);
     expect(screen.queryByRole("link", { name: /New contract/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /More filters/ })).toBeNull();
+    await openFilters(member);
+    expect(
+      screen.queryByRole("checkbox", { name: "Show archived contracts only" }),
+    ).toBeNull();
     cleanup();
 
     setup(true);

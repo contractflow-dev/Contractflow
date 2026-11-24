@@ -1,9 +1,11 @@
+import type { ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   EContractStatus,
   EContractorContractRole,
 } from "@contractflow/contracts-schema";
+import type { DataTableFilterField } from "@/components/data-table/data-table-filters";
 import type { CompanyRoleAssignment } from "@/services/contractApi";
 import { CompanyContractRoles } from "./company-contract-roles";
 
@@ -11,7 +13,26 @@ const mocks = vi.hoisted(() => ({
   roles: vi.fn(),
   search: "",
   replace: vi.fn(),
+  filterFields: [] as readonly DataTableFilterField[],
 }));
+
+// The real dropdown, keeping the fields it was given: its options render
+// only once it is open.
+vi.mock("@/components/data-table/data-table-filters", async (original) => {
+  const actual =
+    await original<
+      typeof import("@/components/data-table/data-table-filters")
+    >();
+  return {
+    ...actual,
+    DataTableFilters: (
+      props: ComponentProps<typeof actual.DataTableFilters>,
+    ) => {
+      mocks.filterFields = props.fields;
+      return <actual.DataTableFilters {...props} />;
+    },
+  };
+});
 
 // The workspace filter lives in the URL.
 vi.mock("next/navigation", () => ({
@@ -94,13 +115,8 @@ describe("CompanyContractRoles", () => {
       { refetchOnMountOrArgChange: true },
     );
     expect(markup).toContain('id="contract-roles"');
-    // The HSE chip is the selected view.
-    expect(markup).toMatch(
-      /<button[^>]*aria-pressed="true"[^>]*>HSE<\/button>/,
-    );
-    expect(markup).toMatch(
-      /<button[^>]*aria-pressed="false"[^>]*>All workspaces<\/button>/,
-    );
+    // The Filters trigger counts the workspace from the URL.
+    expect(markup).toMatch(/Filters<span[^>]*>1<span[^>]*> active/);
   });
 
   it("ignores an unknown workspace in the URL", () => {
@@ -137,7 +153,10 @@ describe("CompanyContractRoles", () => {
       'aria-label="Revoke HSE Officer from Casey Okafor on Pipeline integrity"',
     );
     // The member filter is filled from the company's active members.
-    expect(markup).toMatch(/value="member-1"[^>]*>Casey Okafor</);
+    const memberFilter = mocks.filterFields.find(({ id }) => id === "member");
+    expect(
+      memberFilter?.kind === "select" ? memberFilter.options : [],
+    ).toContainEqual({ value: "member-1", label: "Casey Okafor" });
   });
 
   it("offers workspace-admin changes and assignment, without opening a dialog", () => {

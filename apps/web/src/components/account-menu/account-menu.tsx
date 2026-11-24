@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   RiBuilding4Line,
+  RiMailOpenLine,
   RiShieldUserLine,
   RiUserLine,
 } from "@remixicon/react";
@@ -17,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
 import { SignOutAction } from "@/components/auth/sign-out-action";
+import { MY_INVITATIONS_PATH } from "@/features/workspace/workspaceLanding";
 import { useGetCurrentUserQuery } from "@/services/authApi";
 
 /** The signed-in area the menu is shown in, which decides the area link. */
@@ -97,6 +99,16 @@ export function AccountMenu({ area }: { area: AccountMenuArea }) {
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
+        {area === "company" ? (
+          <>
+            {/* The user's own invitations, whichever company they're from. */}
+            <DropdownMenuLinkItem render={<Link href={MY_INVITATIONS_PATH} />}>
+              <RiMailOpenLine aria-hidden="true" />
+              My invitations
+            </DropdownMenuLinkItem>
+            <DropdownMenuSeparator />
+          </>
+        ) : null}
         {areaLink ? (
           <>
             <DropdownMenuLinkItem render={<Link href={areaLink.href} />}>

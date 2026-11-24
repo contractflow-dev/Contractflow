@@ -188,10 +188,9 @@ describe("ContractDetail query states", () => {
 
     const markup = renderSection("history");
 
-    expect(markup).toContain('aria-label="Filter status history by status"');
-    expect(markup).toMatch(/aria-pressed="true"[^>]*>Suspended</);
-    expect(markup).toContain("Changed between");
-    expect(markup).toMatch(/>From (Mar 1, 2026|1 Mar 2026)</);
+    // Status and the date range, both applied, in one dropdown.
+    expect(markup).toMatch(/Filters<span[^>]*>2<span[^>]*> active/);
+    expect(markup).not.toContain("aria-pressed");
     expect(markup).toContain("No status changes match these filters.");
     expect(markup).toContain(">Clear filters<");
     expect(markup).not.toContain("No status changes have been recorded.");

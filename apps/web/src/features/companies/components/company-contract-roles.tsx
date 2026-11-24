@@ -6,16 +6,9 @@ import { useState } from "react";
 import { ECompanyUserStatus } from "@contractflow/contracts-schema";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@workspace/ui/components/native-select";
 import { DataTable, DataTableEmpty } from "@/components/data-table/data-table";
-import {
-  DataTableActiveFilters,
-  DataTableFilterChips,
-  DataTableToolbar,
-} from "@/components/data-table/data-table-toolbar";
+import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
+import { DataTableFilters } from "@/components/data-table/data-table-filters";
 import { ListCard } from "@/components/data-table/list-card";
 import { contractSectionHref } from "@/features/contracts/contract-sections";
 import { useUserTimeZone } from "@/hooks/use-user-time-zone";
@@ -80,9 +73,6 @@ export function CompanyContractRoles({ companyId }: { companyId: string }) {
     status: ECompanyUserStatus.ACTIVE,
   });
   const data = roles.currentData;
-  const selectedMember = (members.currentData?.data ?? []).find(
-    (option) => option.id === member,
-  );
   const filtered = Boolean(member || workspace);
   const clearFilters = () => {
     setMember("");
@@ -109,68 +99,48 @@ export function CompanyContractRoles({ companyId }: { companyId: string }) {
           </Button>
         }
       >
-        {/* Predefined views: the workspace a role opens. */}
-        <DataTableFilterChips
-          label="Filter contract roles by workspace"
-          countNoun="roles"
-          value={workspace}
-          onChange={(next) => {
-            setWorkspace(next);
-            setPage(1);
-          }}
-          options={[
-            { value: "" as const, label: "All workspaces" },
-            ...WORKSPACES.map((option) => ({
-              value: option,
-              label: humanizeEnumValue(option),
-            })),
-          ]}
-        />
-
-        <div className="space-y-3">
-          <DataTableToolbar>
-            <div className="flex items-center gap-2">
-              <label
-                htmlFor="contract-roles-member"
-                className="text-sm whitespace-nowrap text-muted-foreground"
-              >
-                Member
-              </label>
-              <NativeSelect
-                id="contract-roles-member"
-                value={member}
-                onChange={(event) => {
-                  setMember(event.target.value);
-                  setPage(1);
-                }}
-              >
-                <NativeSelectOption value="">All members</NativeSelectOption>
-                {(members.currentData?.data ?? []).map((option) => (
-                  <NativeSelectOption key={option.id} value={option.id}>
-                    {memberName(option)}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
-            </div>
-          </DataTableToolbar>
-          <DataTableActiveFilters
-            filters={
-              selectedMember
-                ? [
-                    {
-                      key: "member",
-                      label: memberName(selectedMember),
-                      onRemove: () => {
-                        setMember("");
-                        setPage(1);
-                      },
-                    },
-                  ]
-                : []
-            }
-            onClearAll={clearFilters}
+        <DataTableToolbar>
+          <DataTableFilters
+            label="contract roles"
+            fields={[
+              {
+                kind: "select",
+                id: "workspace",
+                label: "Workspace",
+                value: workspace,
+                options: [
+                  { value: "", label: "All workspaces" },
+                  ...WORKSPACES.map((option) => ({
+                    value: option,
+                    label: humanizeEnumValue(option),
+                  })),
+                ],
+              },
+              {
+                kind: "select",
+                id: "member",
+                label: "Member",
+                value: member,
+                options: [
+                  { value: "", label: "All members" },
+                  ...(members.currentData?.data ?? []).map((option) => ({
+                    value: option.id,
+                    label: memberName(option),
+                  })),
+                ],
+              },
+            ]}
+            onApply={(next) => {
+              setMember(next.member);
+              if (next.workspace !== workspace) {
+                setWorkspace(
+                  WORKSPACES.find((option) => option === next.workspace) ?? "",
+                );
+              }
+              setPage(1);
+            }}
           />
-        </div>
+        </DataTableToolbar>
 
         <DataTable
           label="Contract roles"

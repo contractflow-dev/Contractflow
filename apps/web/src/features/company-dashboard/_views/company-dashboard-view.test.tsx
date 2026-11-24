@@ -181,7 +181,7 @@ describe("CompanyDashboardView", () => {
     expect(markup).toContain("Here’s where your contracts stand today.");
   });
 
-  it("shows portfolio health and department figures from the API", () => {
+  it("shows portfolio health from the API, and no department listing", () => {
     const markup = render();
 
     expect(markup).toContain(">Portfolio health</h2>");
@@ -195,43 +195,9 @@ describe("CompanyDashboardView", () => {
     }
     expect(markup).toContain("no recorded change in 14+ days");
 
-    expect(markup).toContain(">Department workspaces</h2>");
-    for (const [value, label] of [
-      ["4", "Compliance records needing attention"],
-      ["5", "Contracts needing attention"],
-      ["6", "Open incidents"],
-      ["7", "Invoices due in the next 30 days"],
-    ]) {
-      expect(markup).toMatch(new RegExp(`>${value}</p><p[^>]*>${label}</p>`));
-    }
-    // Each card opens Team → Contract roles for its workspace (D1) and its
-    // department page: one card each for Project, HSE and Finance.
-    expect(markup).not.toContain("Workspace planned");
-    expect(markup).not.toContain('href="#planned');
-    expect(
-      markup.split('href="/dashboards/team/contract-roles?workspace=project"')
-        .length - 1,
-    ).toBe(1);
-    expect(markup).toContain(
-      'href="/dashboards/team/contract-roles?workspace=hse"',
-    );
-    expect(markup).toContain(
-      'href="/dashboards/team/contract-roles?workspace=finance"',
-    );
-    for (const href of [
-      "/dashboards/departments/project",
-      "/dashboards/departments/hse",
-      "/dashboards/departments/finance",
-    ]) {
-      expect(markup).toContain(`href="${href.replace("&", "&amp;")}"`);
-    }
-    expect(markup).toContain('aria-label="Manage HSE staffing"');
-    expect(markup).toContain('aria-label="View Project contracts"');
-    for (const name of ["Project", "HSE", "Finance"]) {
-      expect(markup).toContain(`>${name}</h3>`);
-    }
-    expect(markup).not.toContain(">Contractor</h3>");
-    expect(markup).not.toContain(">Client PM</h3>");
+    expect(markup).not.toContain("Department workspaces");
+    expect(markup).not.toContain("/dashboards/departments");
+    expect(markup).not.toContain("Manage HSE staffing");
   });
 
   it("offers real quick actions and marks stage configuration as planned", () => {
@@ -246,11 +212,11 @@ describe("CompanyDashboardView", () => {
     expect(markup).toMatch(/>Planned<\/span>/);
   });
 
-  it("flips the KPI, department and quick-action cards to the other theme on hover", () => {
+  it("flips the KPI and quick-action cards to the other theme on hover", () => {
     const markup = render();
-    // 4 portfolio KPIs, 3 department cards and all 3 quick actions, which
+    // 4 portfolio KPIs and all 3 quick actions, which
     // now look alike: none of them is dark at rest.
-    expect(markup.match(/data-highlight="true"/g)).toHaveLength(10);
+    expect(markup.match(/data-highlight="true"/g)).toHaveLength(7);
     expect(markup).not.toContain("bg-navy");
   });
 

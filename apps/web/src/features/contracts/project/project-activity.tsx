@@ -10,17 +10,13 @@ import {
   type ContractActivityItem,
 } from "@contractflow/contracts-schema";
 import {
-  NativeSelect,
-  NativeSelectOptGroup,
-  NativeSelectOption,
-} from "@workspace/ui/components/native-select";
-import {
   DataTableEmpty,
   DataTableError,
   DataTableSkeleton,
 } from "@/components/data-table/data-table";
+import { DataTableFilters } from "@/components/data-table/data-table-filters";
+import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { ListCard } from "@/components/data-table/list-card";
-import { FormField } from "@/components/forms/form-field";
 import { DataPagination } from "@/components/pagination/data-pagination";
 import { useKeepPageInRange, usePagination } from "@/hooks/use-pagination";
 import { useUserTimeZone } from "@/hooks/use-user-time-zone";
@@ -91,37 +87,36 @@ export function ProjectActivity({
       title="Project activity"
       description="Stage and milestone changes made by your company, newest first. Each milestone's history also shows the other side's submissions and decisions."
     >
-      <div className="max-w-sm">
-        <FormField id="project-activity-action" label="Action">
-          {(control) => (
-            <NativeSelect
-              {...control}
-              className="w-full"
-              value={action}
-              onChange={(event) => {
-                setAction(event.target.value as ContractActivityAction | "");
-                pagination.resetPage();
-              }}
-            >
-              <NativeSelectOption value="">All actions</NativeSelectOption>
-              <NativeSelectOptGroup label="Stages">
-                {STAGE_ACTIVITY_ACTIONS.map((value) => (
-                  <NativeSelectOption key={value} value={value}>
-                    {activityLabel(value)}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelectOptGroup>
-              <NativeSelectOptGroup label="Milestones">
-                {MILESTONE_ACTIVITY_ACTIONS.map((value) => (
-                  <NativeSelectOption key={value} value={value}>
-                    {activityLabel(value)}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelectOptGroup>
-            </NativeSelect>
-          )}
-        </FormField>
-      </div>
+      <DataTableToolbar>
+        <DataTableFilters
+          label="activity"
+          fields={[
+            {
+              kind: "select",
+              id: "action",
+              label: "Action",
+              value: action,
+              options: [
+                { value: "", label: "All actions" },
+                ...STAGE_ACTIVITY_ACTIONS.map((value) => ({
+                  value,
+                  label: activityLabel(value),
+                  group: "Stages",
+                })),
+                ...MILESTONE_ACTIVITY_ACTIONS.map((value) => ({
+                  value,
+                  label: activityLabel(value),
+                  group: "Milestones",
+                })),
+              ],
+            },
+          ]}
+          onApply={(next) => {
+            setAction(next.action as ContractActivityAction | "");
+            pagination.resetPage();
+          }}
+        />
+      </DataTableToolbar>
       {activity.error ? (
         <DataTableError
           message={getApiErrorMessage(

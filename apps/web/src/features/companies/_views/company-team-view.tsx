@@ -26,11 +26,10 @@ import {
   DataTableRowActions,
 } from "@/components/data-table/data-table";
 import {
-  DataTableActiveFilters,
-  DataTableFilterChips,
   DataTableSearch,
   DataTableToolbar,
 } from "@/components/data-table/data-table-toolbar";
+import { DataTableFilters } from "@/components/data-table/data-table-filters";
 import { ListCard } from "@/components/data-table/list-card";
 import { DropdownMenuItem } from "@workspace/ui/components/dropdown-menu";
 import { StatusBadge } from "@/components/status-badge/status-badge";
@@ -222,26 +221,10 @@ function TeamContent({ companyId }: { companyId: string }) {
             onClick={() => teamDialog.open("invite")}
           >
             <RiUserAddLine aria-hidden="true" data-icon="inline-start" />
-            Invite member
+            Invite Team Member
           </Button>
         }
       >
-        {/* Predefined views: membership status. */}
-        <DataTableFilterChips
-          label="Filter members by membership status"
-          countNoun="members"
-          value={status}
-          onChange={(next) => {
-            setStatus(next);
-            memberPages.resetPage();
-          }}
-          options={[
-            { value: "", label: "All members" },
-            { value: ECompanyUserStatus.ACTIVE, label: "Active" },
-            { value: ECompanyUserStatus.INACTIVE, label: "Inactive" },
-          ]}
-        />
-
         <div className="space-y-3">
           <DataTableToolbar
             actions={
@@ -285,64 +268,40 @@ function TeamContent({ companyId }: { companyId: string }) {
               onSubmit={(event) => event.preventDefault()}
               onClear={() => setSearch("")}
             />
-            <div className="flex items-center gap-2">
-              <label
-                htmlFor="member-role"
-                className="text-sm whitespace-nowrap text-muted-foreground"
-              >
-                Company role
-              </label>
-              <NativeSelect
-                id="member-role"
-                value={roleFilter}
-                onChange={(event) => {
-                  setRoleFilter(
-                    memberRoles.find(
-                      (option) => option === event.target.value,
-                    ) ?? "",
-                  );
-                  memberPages.resetPage();
-                }}
-              >
-                <NativeSelectOption value="">All roles</NativeSelectOption>
-                {memberRoles.map((option) => (
-                  <NativeSelectOption key={option} value={option}>
-                    {option}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
-            </div>
+            <DataTableFilters
+              label="members"
+              fields={[
+                {
+                  kind: "select",
+                  id: "status",
+                  label: "Membership status",
+                  value: status,
+                  options: [
+                    { value: "", label: "All members" },
+                    { value: ECompanyUserStatus.ACTIVE, label: "Active" },
+                    { value: ECompanyUserStatus.INACTIVE, label: "Inactive" },
+                  ],
+                },
+                {
+                  kind: "select",
+                  id: "role",
+                  label: "Company role",
+                  value: roleFilter,
+                  options: [
+                    { value: "", label: "All roles" },
+                    ...memberRoles.map((value) => ({ value, label: value })),
+                  ],
+                },
+              ]}
+              onApply={(next) => {
+                setStatus(next.status as typeof status);
+                setRoleFilter(
+                  memberRoles.find((option) => option === next.role) ?? "",
+                );
+                memberPages.resetPage();
+              }}
+            />
           </DataTableToolbar>
-          <DataTableActiveFilters
-            filters={[
-              ...(appliedSearch
-                ? [
-                    {
-                      key: "search",
-                      label: `Search: ${appliedSearch}`,
-                      onRemove: () => setSearch(""),
-                    },
-                  ]
-                : []),
-              ...(roleFilter
-                ? [
-                    {
-                      key: "role",
-                      label: roleFilter,
-                      onRemove: () => {
-                        setRoleFilter("");
-                        memberPages.resetPage();
-                      },
-                    },
-                  ]
-                : []),
-            ]}
-            onClearAll={() => {
-              setSearch("");
-              setRoleFilter("");
-              memberPages.resetPage();
-            }}
-          />
         </div>
 
         <DataTable

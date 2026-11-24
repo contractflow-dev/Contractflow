@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import type { ChangeEvent, ComponentProps, SetStateAction } from "react";
+import type { ComponentProps, SetStateAction } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CONTRACT_ACTIVITY_ACTIONS,
@@ -25,11 +25,21 @@ import {
   toActivityQueryFilters,
 } from "./contract-activity";
 
+import type {
+  DataTableFilterField,
+  DataTableFilterValues,
+} from "@/components/data-table/data-table-filters";
+
 const mocks = vi.hoisted(() => ({
   activity: vi.fn(),
   actors: vi.fn(),
   buttons: [] as Array<ComponentProps<"button">>,
   fields: new Map<string, ComponentProps<"input"> | ComponentProps<"select">>(),
+  filters: null as null | {
+    fields: readonly DataTableFilterField[];
+    onApply: (values: DataTableFilterValues) => void;
+  },
+  draft: null as DataTableFilterValues | null,
 }));
 
 /**
@@ -93,6 +103,16 @@ vi.mock("@workspace/ui/components/native-select", () => ({
   ),
 }));
 
+// The dropdown has its own tests; here the table's fields and apply are used.
+vi.mock("@/components/data-table/data-table-filters", () => ({
+  DataTableFilters: (
+    props: NonNullable<typeof mocks.filters> & { label: string },
+  ) => {
+    mocks.filters = props;
+    mocks.draft = null;
+    return <div role="group" aria-label={`Filter ${props.label}`} />;
+  },
+}));
 vi.mock("@/services/contractApi", () => ({
   useGetContractActivityQuery: mocks.activity,
   useGetContractActivityActorsQuery: mocks.actors,
@@ -415,19 +435,28 @@ describe("activity filters", () => {
 
   const lastArgs = () => mocks.activity.mock.lastCall?.[0];
 
-  /** The id of the control a visible label names. */
-  function controlId(markup: string, label: string): string {
-    const match = new RegExp(
-      `<label[^>]*for="([^"]+)"[^>]*>${label}</label>`,
-    ).exec(markup);
-    if (!match) throw new Error(`No control labelled ${label}`);
-    return match[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&");
-  }
-  function change(markup: string, label: string, value: string) {
-    const props = mocks.fields.get(controlId(markup, label));
-    props?.onChange?.({ target: { value } } as ChangeEvent<
-      HTMLInputElement & HTMLSelectElement
-    >);
+  const FILTER_KEYS: Record<string, string> = {
+    From: "when.from",
+    To: "when.to",
+    Member: "actor",
+    Action: "action",
+  };
+  /** What the dropdown sends on a choice: the applied values with one changed. */
+  function change(_markup: string, label: string, value: string) {
+    const applied: DataTableFilterValues = {};
+    for (const field of mocks.filters?.fields ?? []) {
+      if (field.kind === "select") applied[field.id] = field.value;
+      if (field.kind === "dateRange") {
+        applied[`${field.id}.from`] = field.from;
+        applied[`${field.id}.to`] = field.to;
+      }
+    }
+    mocks.draft = {
+      ...applied,
+      ...mocks.draft,
+      [FILTER_KEYS[label]]: value,
+    };
+    mocks.filters?.onApply(mocks.draft);
   }
   function press(name: string) {
     const button = mocks.buttons.find(
@@ -441,22 +470,33 @@ describe("activity filters", () => {
     const markup = render();
 
     expect(markup).toContain('aria-label="Filter activity"');
-    for (const label of ["From", "To", "Member", "Action"]) {
-      expect(() => controlId(markup, label)).not.toThrow();
-    }
-    expect(markup).toMatch(/<input[^>]*type="date"/);
-    expect(markup).toContain(">All members<");
-    expect(markup).toContain(">Max Verifier (you)<");
-    expect(markup).toContain(">Bola Adeyemi<");
-    expect(markup).toContain(">Unnamed member<");
-    expect(markup).toContain(">All actions<");
-    expect(markup).toContain('<optgroup label="Documents">');
-    expect(markup).toContain(">Site added<");
+    const fields = mocks.filters?.fields ?? [];
+    expect(fields.map(({ kind, label }) => [kind, label])).toEqual([
+      ["dateRange", "Date"],
+      ["select", "Member"],
+      ["select", "Action"],
+    ]);
+    const options = (id: string) => {
+      const field = fields.find((candidate) => candidate.id === id);
+      return field?.kind === "select" ? field.options : [];
+    };
+    expect(options("actor").map(({ label }) => label)).toEqual([
+      "All members",
+      "Max Verifier (you)",
+      "Bola Adeyemi",
+      "Unnamed member",
+    ]);
+    expect(options("action")[0].label).toBe("All actions");
+    expect(options("action").some(({ group }) => group === "Documents")).toBe(
+      true,
+    );
+    expect(options("action").some(({ label }) => label === "Site added")).toBe(
+      true,
+    );
     // Status changes live in the status history, not in this filter.
-    expect(markup).not.toContain(`value="${STATUS_CHANGE_ACTION}"`);
-    // Never more than two fields on a line: dates, then member and action.
-    expect(markup).toContain('class="grid gap-3 sm:grid-cols-2"');
-    expect(markup).not.toMatch(/grid-cols-[3-9]/);
+    expect(
+      options("action").some(({ value }) => value === STATUS_CHANGE_ACTION),
+    ).toBe(false);
   });
 
   it("asks for members only once the activity has loaded, and never on a 403", () => {
@@ -542,7 +582,6 @@ describe("activity filters", () => {
     expect(markup).toMatch(
       /role="alert"[^>]*>The end date is before the start date\.</,
     );
-    expect(markup).toMatch(/aria-invalid="true"/);
     expect(lastArgs()).toMatchObject({
       fromDate: undefined,
       toDate: undefined,
@@ -568,7 +607,12 @@ describe("activity filters", () => {
     render();
     vi.advanceTimersByTime(400);
     markup = render();
-    press("Clear filters");
+    mocks.filters?.onApply({
+      "when.from": "",
+      "when.to": "",
+      actor: "",
+      action: "",
+    });
     markup = render();
     expect(lastArgs()).toMatchObject({
       page: 1,
@@ -591,7 +635,7 @@ describe("activity filters", () => {
     expect(markup).not.toContain("No activity yet");
     expect(
       mocks.buttons.filter((props) => props.children === "Clear filters"),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
   });
 
   it("keeps the controls while a filtered page loads", () => {
@@ -881,7 +925,7 @@ describe("activity view across tabs", () => {
     );
     render();
     vi.advanceTimersByTime(400);
-    const markup = render();
+    render();
 
     expect(mocks.activity.mock.lastCall?.[0]).toMatchObject({
       page: 3,
@@ -890,7 +934,11 @@ describe("activity view across tabs", () => {
       actorUserId: "01M72Q9WP6NR672Y0TJ79ZJHMZ",
       action: "document.deleted",
     });
-    expect(markup).toMatch(/<input[^>]*type="date"[^>]*value="2026-11-01"/);
+    // The dropdown opens on the restored dates.
+    expect(mocks.filters?.fields[0]).toMatchObject({
+      kind: "dateRange",
+      from: "2026-11-01",
+    });
   });
 
   it("saves the current view as it changes", () => {

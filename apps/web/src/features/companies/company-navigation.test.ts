@@ -3,7 +3,11 @@ import {
   activeNavChild,
   activeNavModule,
 } from "@/components/app-shell/navigation";
-import { COMPANY_NAVIGATION, companyNavigationFor } from "./company-navigation";
+import {
+  COMPANY_NAVIGATION,
+  companyNavigationFor,
+  isCompanyAdminRoute,
+} from "./company-navigation";
 
 const labels = (groups: ReturnType<typeof companyNavigationFor>) =>
   groups.map(({ label, items }) => ({
@@ -12,30 +16,19 @@ const labels = (groups: ReturnType<typeof companyNavigationFor>) =>
   }));
 
 describe("company navigation", () => {
-  it("follows the Overview layout: work, department workspaces, company", () => {
+  it("groups only built, company-owned destinations", () => {
     expect(labels(companyNavigationFor(true))).toEqual([
-      {
-        label: undefined,
-        items: [
-          "Overview",
-          "Contracts",
-          "Company documents",
-          "Tasks",
-          "Calendar",
-        ],
-      },
-      {
-        label: "Department workspaces",
-        items: ["Departments"],
-      },
-      {
-        label: undefined,
-        items: ["Team", "Company profile", "Help & Support"],
-      },
+      { label: undefined, items: ["Overview"] },
+      { label: undefined, items: ["Contracts"] },
+      { label: "Company", items: ["Documents", "Team", "Profile"] },
+    ]);
+    expect(labels(companyNavigationFor(false))).toEqual([
+      { label: undefined, items: ["Contracts"] },
+      { label: "Company", items: ["Documents"] },
     ]);
   });
 
-  it("gives Contracts its pages, with New contract only for administrators", () => {
+  it("gives Contracts its pages, with New Contract only for administrators", () => {
     const contracts = (canManage: boolean) =>
       companyNavigationFor(canManage)
         .flatMap(({ items }) => items)
@@ -44,11 +37,11 @@ describe("company navigation", () => {
     expect(
       contracts(true).children!.map(({ label, href }) => ({ label, href })),
     ).toEqual([
-      { label: "Contract register", href: "/dashboards/contracts" },
-      { label: "New contract", href: "/dashboards/contracts/new" },
+      { label: "All Contracts", href: "/dashboards/contracts" },
+      { label: "New Contract", href: "/dashboards/contracts/new" },
     ]);
     expect(contracts(false).children!.map(({ label }) => label)).toEqual([
-      "Contract register",
+      "All Contracts",
     ]);
   });
 
@@ -85,42 +78,25 @@ describe("company navigation", () => {
     ).toBe("Contract roles");
   });
 
-  it("gives administrators a Departments module of live pages, and members the planned items", () => {
-    const department = (canManage: boolean) =>
-      companyNavigationFor(canManage).find(
-        ({ label }) => label === "Department workspaces",
-      )!.items;
+  it("lists no department or workspace, for anyone", () => {
+    for (const canManage of [true, false]) {
+      const items = companyNavigationFor(canManage).flatMap(({ items }) =>
+        items.flatMap((item) => [item, ...(item.children ?? [])]),
+      );
+      for (const item of items) {
+        expect(item.href, item.label).not.toContain("/departments");
+        expect(item.href, item.label).not.toContain("/workspaces");
+      }
+    }
+  });
 
-    const [module] = department(true);
-    expect(module.label).toBe("Departments");
-    expect(module.href).toBe("/dashboards/departments/project");
-    expect(
-      module.children!.map(({ label, href, plannedNote }) => ({
-        label,
-        href,
-        planned: Boolean(plannedNote),
-      })),
-    ).toEqual([
-      {
-        label: "Project",
-        href: "/dashboards/departments/project",
-        planned: false,
-      },
-      { label: "HSE", href: "/dashboards/departments/hse", planned: false },
-      {
-        label: "Finance",
-        href: "/dashboards/departments/finance",
-        planned: false,
-      },
-    ]);
-    expect(department(false).every(({ plannedNote }) => plannedNote)).toBe(
-      true,
-    );
-    expect(department(false).map(({ label }) => label)).toEqual([
-      "Project",
-      "HSE",
-      "Finance",
-    ]);
+  it("keeps the unlisted department pages for administrators only", () => {
+    expect(isCompanyAdminRoute("/dashboards/departments")).toBe(true);
+    expect(isCompanyAdminRoute("/dashboards/departments/hse")).toBe(true);
+    expect(isCompanyAdminRoute("/dashboards/departments-other")).toBe(false);
+    expect(isCompanyAdminRoute("/dashboards/contracts")).toBe(false);
+    expect(isCompanyAdminRoute("/dashboards/contracts/new")).toBe(true);
+    expect(isCompanyAdminRoute("/dashboards/team")).toBe(true);
   });
 
   it("hides administrator pages from members, in modules too", () => {
@@ -130,8 +106,7 @@ describe("company navigation", () => {
     const labels = items.map((item) => item.label);
     expect(labels).not.toContain("Overview");
     expect(labels).not.toContain("Team");
-    expect(labels).not.toContain("Departments");
-    expect(labels).not.toContain("New contract");
+    expect(labels).not.toContain("New Contract");
     expect(labels).toContain("Contracts");
   });
 
@@ -140,28 +115,14 @@ describe("company navigation", () => {
       (item) => item.adminOnly && !item.plannedNote,
     ).map((item) => item.href);
     expect(adminOnly).toContain("/dashboards/contracts/new");
-    expect(adminOnly).toContain("/dashboards/departments/hse");
     expect(adminOnly).toContain("/dashboards/team/contract-roles");
     expect(adminOnly).not.toContain("/dashboards/contracts");
   });
 
-  it("marks every unbuilt destination as planned, so none links anywhere", () => {
-    const planned = COMPANY_NAVIGATION.filter((item) => item.plannedNote);
-    expect(planned.map((item) => item.label)).toEqual([
-      "Tasks",
-      "Calendar",
-      "Project",
-      "HSE",
-      "Finance",
-      "Help & Support",
-    ]);
+  it("lists no unbuilt destination, and every entry is a dashboard page", () => {
     for (const item of COMPANY_NAVIGATION) {
-      expect(
-        item.plannedNote
-          ? item.href.startsWith("#planned-")
-          : item.href.startsWith("/dashboards"),
-        item.label,
-      ).toBe(true);
+      expect(item.plannedNote, item.label).toBeUndefined();
+      expect(item.href.startsWith("/dashboards"), item.label).toBe(true);
     }
   });
 });

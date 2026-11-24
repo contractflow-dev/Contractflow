@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { RiMailSendLine } from "@remixicon/react";
 import {
   EContractStatus,
-  EPartyType,
   type ContractActivityTarget,
 } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
@@ -18,14 +18,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
-import { Input } from "@workspace/ui/components/input";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@workspace/ui/components/native-select";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
+import { ListCard } from "@/components/data-table/list-card";
 import { ArchiveContractDialog } from "./contract-archive";
+import { InviteCompanyDialog } from "./invite-company-dialog";
 import { contractEditHref } from "../contract-sections";
 import { FormField } from "@/components/forms/form-field";
 import {
@@ -36,7 +33,6 @@ import { getApiErrorMessage } from "@/lib/apiError";
 import { humanizeEnumValue } from "@/lib/format";
 import { notifySuccess } from "@/lib/notify";
 import {
-  useCreateContractPartyInvitationMutation,
   useGetContractLifecyclePermissionsQuery,
   useGetContractPartyInvitationsQuery,
   useRevokeContractPartyInvitationMutation,
@@ -107,8 +103,6 @@ export function ContractLifecycleManagement({
     skip: !permissions?.canManage,
   });
   const [transitionContract, transitionState] = useTransitionContractMutation();
-  const [createInvitation, invitationState] =
-    useCreateContractPartyInvitationMutation();
   const [revokeInvitation, revokeInvitationState] =
     useRevokeContractPartyInvitationMutation();
   const router = useRouter();
@@ -124,10 +118,7 @@ export function ContractLifecycleManagement({
   const [archiveRequested, setArchiveRequested] = useState(false);
   // The failure of the confirmation currently open, shown inside it.
   const [dialogError, setDialogError] = useState("");
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteType, setInviteType] = useState<EPartyType>(
-    EPartyType.CONTRACTOR,
-  );
+  const [invitingCompany, setInvitingCompany] = useState(false);
 
   if (permissionsQuery.isLoading) return null;
   if (permissionsQuery.isError) {
@@ -194,22 +185,6 @@ export function ContractLifecycleManagement({
       `The invitation for ${invitationToRevoke.email} no longer works.`,
     );
     setInvitationToRevoke(null);
-  }
-
-  async function invite(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const result = await createInvitation({
-      ...query,
-      email: inviteEmail.trim(),
-      partyType: inviteType,
-    });
-    if (!("error" in result)) {
-      notifySuccess(
-        "Company invitation sent",
-        `${inviteEmail.trim()} can now accept the invitation to this contract.`,
-      );
-      setInviteEmail("");
-    }
   }
 
   return (
@@ -314,126 +289,89 @@ export function ContractLifecycleManagement({
       ) : null}
 
       {part === "invitations" && permissions.canManage ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              <h2>Invite a company</h2>
-            </CardTitle>
-            <CardDescription>
-              Invite an active, verified company to join this contract, using
-              the email address on its company profile.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <form
-              onSubmit={invite}
-              aria-label="Invite a company"
-              className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem_auto] sm:items-end"
-            >
-              <FormField id="party-invitation-email" label="Company email">
-                {(control) => (
-                  <Input
-                    {...control}
-                    type="email"
-                    autoComplete="off"
-                    value={inviteEmail}
-                    onChange={(event) => setInviteEmail(event.target.value)}
-                    required
-                  />
-                )}
-              </FormField>
-              <FormField id="party-invitation-type" label="Party type">
-                {(control) => (
-                  <NativeSelect
-                    {...control}
-                    className="w-full"
-                    value={inviteType}
-                    onChange={(event) =>
-                      setInviteType(event.target.value as EPartyType)
-                    }
-                  >
-                    <NativeSelectOption value={EPartyType.CONTRACTOR}>
-                      Contractor
-                    </NativeSelectOption>
-                    <NativeSelectOption value={EPartyType.SUBCONTRACTOR}>
-                      Subcontractor
-                    </NativeSelectOption>
-                  </NativeSelect>
-                )}
-              </FormField>
+        <ListCard
+          title="Company invitations"
+          description="Companies invited to join this contract and where each invitation stands."
+          action={
+            contract.deletedAt ? null : (
               <Button
-                type="submit"
-                disabled={invitationState.isLoading}
-                aria-busy={invitationState.isLoading || undefined}
+                type="button"
+                aria-haspopup="dialog"
+                onClick={() => setInvitingCompany(true)}
               >
-                {invitationState.isLoading ? "Sending…" : "Send invitation"}
+                <RiMailSendLine aria-hidden="true" data-icon="inline-start" />
+                Invite Company
               </Button>
-            </form>
-            {invitationState.error ? (
-              <ErrorAlert
-                error={invitationState.error}
-                fallback="Unable to send the company invitation."
-              />
-            ) : null}
-            {invitationsQuery.error ? (
-              <ErrorAlert
-                error={invitationsQuery.error}
-                fallback="Unable to load contract invitations."
-              />
-            ) : invitationsQuery.currentData?.length ? (
-              <ul className="divide-y">
-                {invitationsQuery.currentData.map((invitation) => (
-                  <li
-                    id={`activity-target-${invitation.id}`}
-                    className={`flex flex-wrap items-center justify-between gap-3 py-3 text-sm ${
-                      target?.type === "contract_party_invitation" &&
-                      target.id === invitation.id
-                        ? "bg-primary/10"
-                        : ""
-                    }`}
-                    key={invitation.id}
-                  >
-                    <span>
-                      {invitation.email} · {formatLabel(invitation.partyType)}
-                    </span>
-                    <span className="flex items-center gap-3">
-                      <StatusBadge
-                        status={effectiveInvitationStatus(
-                          invitation.status,
-                          invitation.expiresAt,
-                        )}
-                      />
-                      {effectiveInvitationStatus(
+            )
+          }
+        >
+          {invitationsQuery.error ? (
+            <ErrorAlert
+              error={invitationsQuery.error}
+              fallback="Unable to load contract invitations."
+            />
+          ) : invitationsQuery.currentData?.length ? (
+            <ul className="divide-y">
+              {invitationsQuery.currentData.map((invitation) => (
+                <li
+                  id={`activity-target-${invitation.id}`}
+                  className={`flex flex-wrap items-center justify-between gap-3 py-3 text-sm ${
+                    target?.type === "contract_party_invitation" &&
+                    target.id === invitation.id
+                      ? "bg-primary/10"
+                      : ""
+                  }`}
+                  key={invitation.id}
+                >
+                  <span>
+                    {invitation.email} · {formatLabel(invitation.partyType)}
+                  </span>
+                  <span className="flex items-center gap-3">
+                    <StatusBadge
+                      status={effectiveInvitationStatus(
                         invitation.status,
                         invitation.expiresAt,
-                      ) === "pending" ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={revokeInvitationState.isLoading}
-                          onClick={() => {
-                            setDialogError("");
-                            setInvitationToRevoke({
-                              id: invitation.id,
-                              email: invitation.email,
-                            });
-                          }}
-                        >
-                          Revoke
-                        </Button>
-                      ) : null}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No company invitations have been sent.
-              </p>
-            )}
-          </CardContent>
-        </Card>
+                      )}
+                    />
+                    {effectiveInvitationStatus(
+                      invitation.status,
+                      invitation.expiresAt,
+                    ) === "pending" ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={revokeInvitationState.isLoading}
+                        onClick={() => {
+                          setDialogError("");
+                          setInvitationToRevoke({
+                            id: invitation.id,
+                            email: invitation.email,
+                          });
+                        }}
+                      >
+                        Revoke
+                      </Button>
+                    ) : null}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No company invitations have been sent.
+            </p>
+          )}
+        </ListCard>
+      ) : null}
+
+      {part === "invitations" && permissions.canManage ? (
+        <InviteCompanyDialog
+          companyId={companyId}
+          contract={contract}
+          open={invitingCompany}
+          onOpenChange={setInvitingCompany}
+        />
       ) : null}
 
       <ConfirmDialog

@@ -1,28 +1,17 @@
 "use client";
 
-import { useId, useRef, useState, type FormEvent } from "react";
-import type {
-  ContractActivityTarget,
-  ContractRole,
-} from "@contractflow/contracts-schema";
+import { useState, type ReactNode } from "react";
+import { RiMailSendLine, RiUserAddLine } from "@remixicon/react";
+import type { ContractActivityTarget } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
-import { Checkbox } from "@workspace/ui/components/checkbox";
-import { Field, FieldLabel } from "@workspace/ui/components/field";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
-import { Input } from "@workspace/ui/components/input";
-import { FormField } from "@/components/forms/form-field";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@workspace/ui/components/native-select";
 import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
 import {
   DataTable,
@@ -30,29 +19,25 @@ import {
   DataTableRowActions,
   type DataTableColumn,
 } from "@/components/data-table/data-table";
+import { ListCard } from "@/components/data-table/list-card";
 import { DropdownMenuItem } from "@workspace/ui/components/dropdown-menu";
-import {
-  StatusBadge,
-  effectiveInvitationStatus,
-} from "@/components/status-badge/status-badge";
 import { useUserTimeZone } from "@/hooks/use-user-time-zone";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { formatDate, humanizeEnumValue } from "@/lib/format";
 import { notifySuccess } from "@/lib/notify";
 import {
-  useAssignContractRoleMutation,
-  useCreateContractRoleInvitationMutation,
-  useGetContractRoleAssignmentMembersQuery,
   useGetContractRoleAssignmentsQuery,
-  useGetContractRoleInvitationsQuery,
   useGetContractRoleManagementPermissionsQuery,
   useGetContractWorkspacesQuery,
   useRevokeContractRoleMutation,
-  useRevokeContractRoleInvitationMutation,
   useSetContractWorkspaceAdminMutation,
   type AssignableContractWorkspace,
   type ContractRoleAssignment,
 } from "@/services/contractApi";
+import {
+  AssignMemberDialog,
+  ContractRoleInvitationsSheet,
+} from "./contract-role-dialogs";
 
 const workspaceOptions: AssignableContractWorkspace[] = [
   "project",
@@ -105,13 +90,16 @@ const memberName = (assignment: ContractRoleAssignment) =>
 export function ContractRoleAssignmentManagement({
   companyId,
   contractId,
+  contractLabel,
   fixedWorkspace,
   initialWorkspace,
   target,
 }: {
   companyId: string;
   contractId: string;
-  /** The workspace the assign and invite forms start on (from ?workspace=). */
+  /** Reference and title, naming the contract in the invitations panel. */
+  contractLabel?: string;
+  /** The workspace the assign and invite actions start on (?workspace=). */
   initialWorkspace?: AssignableContractWorkspace;
   /**
    * Manage only this workspace (inside a workspace's Team screen): the
@@ -120,174 +108,80 @@ export function ContractRoleAssignmentManagement({
   fixedWorkspace?: AssignableContractWorkspace;
   target?: ContractActivityTarget | null;
 }) {
-  const formId = useId();
-  const [workspace, setWorkspace] = useState<AssignableContractWorkspace>(
-    fixedWorkspace ?? initialWorkspace ?? "project",
+  const scope = { companyId, contractId };
+  const otherWorkspace = (option: AssignableContractWorkspace) =>
+    Boolean(fixedWorkspace) && option !== fixedWorkspace;
+  const permissionQueries = {
+    project: useGetContractRoleManagementPermissionsQuery(
+      { ...scope, workspace: "project" },
+      { skip: otherWorkspace("project") },
+    ),
+    hse: useGetContractRoleManagementPermissionsQuery(
+      { ...scope, workspace: "hse" },
+      { skip: otherWorkspace("hse") },
+    ),
+    finance: useGetContractRoleManagementPermissionsQuery(
+      { ...scope, workspace: "finance" },
+      { skip: otherWorkspace("finance") },
+    ),
+  };
+  const enabled = useGetContractWorkspacesQuery(scope, {
+    skip: Boolean(fixedWorkspace),
+  });
+  // Only workspaces this viewer may manage are offered in the dialogs.
+  const manageable = workspaceOptions.filter(
+    (option) =>
+      permissionQueries[option].data?.canManage === true &&
+      (fixedWorkspace
+        ? option === fixedWorkspace
+        : (enabled.data ?? []).includes(option)),
   );
-  // The workspace of the role being revoked: a workspace card may differ
-  // from the one selected in the forms.
+  const startWorkspace =
+    manageable.find(
+      (option) => option === (target?.workspace ?? initialWorkspace),
+    ) ?? manageable[0];
+
+  // The workspace the Assign Member dialog is open on, or null when closed.
+  const [assigningIn, setAssigningIn] =
+    useState<AssignableContractWorkspace | null>(null);
+  // A link to one invitation opens the panel that lists it.
+  const [invitationsOpen, setInvitationsOpen] = useState(
+    target?.type === "contract_role_invitation",
+  );
+  const [linkedTarget, setLinkedTarget] = useState(target?.id);
+  if (linkedTarget !== target?.id) {
+    setLinkedTarget(target?.id);
+    if (target?.type === "contract_role_invitation") setInvitationsOpen(true);
+  }
   const [revokeWorkspace, setRevokeWorkspace] =
-    useState<AssignableContractWorkspace>(workspace);
-  const formRef = useRef<HTMLFormElement>(null);
-  const [companyUserId, setCompanyUserId] = useState("");
-  // Empty until chosen: the first of the offered roles is used.
-  const [role, setRole] = useState<ContractRole | "">("");
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteAsWorkspaceAdmin, setInviteAsWorkspaceAdmin] = useState(false);
+    useState<AssignableContractWorkspace>(
+      fixedWorkspace ?? initialWorkspace ?? "project",
+    );
   const [assignmentToRevoke, setAssignmentToRevoke] =
     useState<ContractRoleAssignment | null>(null);
-  const [invitationToRevoke, setInvitationToRevoke] = useState<{
-    id: string;
-    email: string;
-    role: string;
-  } | null>(null);
-  // Form and row-action failures are shown inline; confirmation failures
-  // inside the open dialog.
+  // Row-action failures are shown inline; confirmation failures in its dialog.
   const [failure, setFailure] = useState<string | null>(null);
   const [dialogError, setDialogError] = useState("");
   const timeZone = useUserTimeZone();
-
-  const permissionQuery = useGetContractRoleManagementPermissionsQuery({
-    companyId,
-    contractId,
-    workspace,
-  });
-  const permissions = permissionQuery.data;
-  const canManage = permissions?.canManage === true;
-  const canGrantWorkspaceAdmin = permissions?.canGrantWorkspaceAdmin === true;
-  const membersQuery = useGetContractRoleAssignmentMembersQuery(
-    { companyId, contractId, workspace },
-    { skip: !canManage },
-  );
+  const fixedPermissions = fixedWorkspace
+    ? permissionQueries[fixedWorkspace]
+    : null;
   const assignmentsQuery = useGetContractRoleAssignmentsQuery(
-    { companyId, contractId, workspace },
-    { skip: !canManage },
+    { ...scope, workspace: fixedWorkspace ?? "project" },
+    { skip: !fixedWorkspace || fixedPermissions?.data?.canManage !== true },
   );
-  const invitationsQuery = useGetContractRoleInvitationsQuery(
-    { companyId, contractId, workspace },
-    { skip: !canManage },
-  );
-  const [assignRole, assignState] = useAssignContractRoleMutation();
   const [revokeRole, revokeState] = useRevokeContractRoleMutation();
   const [setWorkspaceAdmin, workspaceAdminState] =
     useSetContractWorkspaceAdminMutation();
-  const [createInvitation, invitationState] =
-    useCreateContractRoleInvitationMutation();
-  const [revokeInvitation, revokeInvitationState] =
-    useRevokeContractRoleInvitationMutation();
-  // The API offers only the roles of this company's side of the contract:
-  // client roles for the client, contractor roles for every other party.
-  const roles = permissions?.roles ?? [];
-  const selectedRole: ContractRole | undefined =
-    role && roles.includes(role) ? role : roles[0];
-  const sideLabel =
-    permissions?.roleSide === "client" ? "client" : "contractor";
-
-  // Without a fixed workspace, every enabled workspace is shown side by side
-  // (prototype D5); the forms below act on the selected one.
-  const workspaceCards = fixedWorkspace ? null : (
-    <ContractWorkspaceTeams
-      companyId={companyId}
-      contractId={contractId}
-      target={target}
-      busy={workspaceAdminState.isLoading || revokeState.isLoading}
-      onAdd={(next) => {
-        setWorkspace(next);
-        setRole("");
-        setFailure(null);
-        formRef.current?.scrollIntoView({ block: "center" });
-        formRef.current?.querySelector("select")?.focus();
-      }}
-      onToggleAdmin={(assignment, next) =>
-        void changeWorkspaceAdmin(assignment, next)
-      }
-      onRevoke={(assignment, next) => {
-        setDialogError("");
-        setRevokeWorkspace(next);
-        setAssignmentToRevoke(assignment);
-      }}
-    />
-  );
-
-  if (permissionQuery.isLoading) return workspaceCards;
-  if (permissionQuery.error) {
-    return (
-      <Alert variant="destructive">
-        <AlertDescription>
-          {getApiErrorMessage(
-            permissionQuery.error,
-            "Unable to verify contract role management access.",
-          )}
-        </AlertDescription>
-      </Alert>
-    );
-  }
-  if (!canManage || !permissions) {
-    return workspaceCards ? (
-      <>
-        {workspaceCards}
-        {revocationDialog()}
-      </>
-    ) : null;
-  }
-
-  async function submitAssignment(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setFailure(null);
-    if (!selectedRole) return;
-    try {
-      await assignRole({
-        companyId,
-        contractId,
-        workspace,
-        companyUserId,
-        role: selectedRole,
-        isWorkspaceAdmin: false,
-      }).unwrap();
-      setCompanyUserId("");
-      notifySuccess("Contract role assigned", `${selectedRole} was assigned.`);
-    } catch (error) {
-      setFailure(
-        getApiErrorMessage(error, "Unable to assign this contract role."),
-      );
-    }
-  }
-
-  async function submitInvitation(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setFailure(null);
-    if (!selectedRole) return;
-    try {
-      await createInvitation({
-        companyId,
-        contractId,
-        workspace,
-        email: inviteEmail.trim(),
-        role: selectedRole,
-        isWorkspaceAdmin: inviteAsWorkspaceAdmin && canGrantWorkspaceAdmin,
-      }).unwrap();
-      notifySuccess(
-        "Role invitation sent",
-        `${inviteEmail.trim()} was invited as ${selectedRole}.`,
-      );
-      setInviteEmail("");
-      setInviteAsWorkspaceAdmin(false);
-    } catch (error) {
-      setFailure(
-        getApiErrorMessage(error, "Unable to send this role invitation."),
-      );
-    }
-  }
 
   async function changeWorkspaceAdmin(
     assignment: ContractRoleAssignment,
-    assignmentWorkspace: AssignableContractWorkspace = workspace,
+    assignmentWorkspace: AssignableContractWorkspace,
   ) {
     setFailure(null);
     try {
       await setWorkspaceAdmin({
-        companyId,
-        contractId,
+        ...scope,
         workspace: assignmentWorkspace,
         assignmentId: assignment.id,
         isWorkspaceAdmin: !assignment.isWorkspaceAdmin,
@@ -310,35 +204,12 @@ export function ContractRoleAssignmentManagement({
     }
   }
 
-  async function confirmInvitationRevocation() {
-    if (!invitationToRevoke || revokeInvitationState.isLoading) return;
-    setDialogError("");
-    try {
-      await revokeInvitation({
-        companyId,
-        contractId,
-        workspace,
-        invitationId: invitationToRevoke.id,
-      }).unwrap();
-      notifySuccess(
-        "Role invitation revoked",
-        `The invitation for ${invitationToRevoke.email} no longer works.`,
-      );
-      setInvitationToRevoke(null);
-    } catch (error) {
-      setDialogError(
-        getApiErrorMessage(error, "Unable to revoke this invitation."),
-      );
-    }
-  }
-
   async function confirmRevocation() {
     if (!assignmentToRevoke || revokeState.isLoading) return;
     setDialogError("");
     try {
       await revokeRole({
-        companyId,
-        contractId,
+        ...scope,
         workspace: revokeWorkspace,
         assignmentId: assignmentToRevoke.id,
       }).unwrap();
@@ -354,8 +225,52 @@ export function ContractRoleAssignmentManagement({
     }
   }
 
-  function revocationDialog() {
-    return (
+  const actions: ReactNode = startWorkspace ? (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        aria-haspopup="dialog"
+        onClick={() => setInvitationsOpen(true)}
+      >
+        <RiMailSendLine aria-hidden="true" data-icon="inline-start" />
+        Contract Role Invitations
+      </Button>
+      <Button
+        type="button"
+        aria-haspopup="dialog"
+        onClick={() => setAssigningIn(startWorkspace)}
+      >
+        <RiUserAddLine aria-hidden="true" data-icon="inline-start" />
+        Assign Member
+      </Button>
+    </div>
+  ) : null;
+
+  const overlays = (
+    <>
+      {startWorkspace ? (
+        <>
+          <AssignMemberDialog
+            {...scope}
+            workspaces={manageable}
+            initialWorkspace={assigningIn ?? startWorkspace}
+            open={assigningIn !== null}
+            onOpenChange={(open) => {
+              if (!open) setAssigningIn(null);
+            }}
+          />
+          <ContractRoleInvitationsSheet
+            {...scope}
+            workspaces={manageable}
+            initialWorkspace={startWorkspace}
+            contractLabel={contractLabel}
+            target={target}
+            open={invitationsOpen}
+            onOpenChange={setInvitationsOpen}
+          />
+        </>
+      ) : null}
       <ConfirmDialog
         open={assignmentToRevoke !== null}
         title={
@@ -376,376 +291,141 @@ export function ContractRoleAssignmentManagement({
         onConfirm={() => void confirmRevocation()}
         onCancel={() => setAssignmentToRevoke(null)}
       />
+    </>
+  );
+
+  const failureAlert = failure ? (
+    <Alert variant="destructive">
+      <AlertDescription>{failure}</AlertDescription>
+    </Alert>
+  ) : null;
+
+  if (!fixedWorkspace) {
+    const permissionError = workspaceOptions
+      .map((option) => permissionQueries[option].error)
+      .find(Boolean);
+    return (
+      <>
+        {permissionError ? (
+          <Alert variant="destructive">
+            <AlertDescription>
+              {getApiErrorMessage(
+                permissionError,
+                "Unable to verify contract role management access.",
+              )}
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        {failureAlert}
+        <ContractWorkspaceTeams
+          companyId={companyId}
+          contractId={contractId}
+          target={target}
+          busy={workspaceAdminState.isLoading || revokeState.isLoading}
+          actions={actions}
+          onAdd={setAssigningIn}
+          onToggleAdmin={(assignment, next) =>
+            void changeWorkspaceAdmin(assignment, next)
+          }
+          onRevoke={(assignment, next) => {
+            setDialogError("");
+            setRevokeWorkspace(next);
+            setAssignmentToRevoke(assignment);
+          }}
+        />
+        {overlays}
+      </>
     );
   }
 
+  if (fixedPermissions?.isLoading) return null;
+  if (fixedPermissions?.error) {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>
+          {getApiErrorMessage(
+            fixedPermissions.error,
+            "Unable to verify contract role management access.",
+          )}
+        </AlertDescription>
+      </Alert>
+    );
+  }
+  const permissions = fixedPermissions?.data;
+  if (!permissions?.canManage) return null;
+  const sideLabel = permissions.roleSide === "client" ? "client" : "contractor";
+
   return (
     <>
-      {workspaceCards}
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            <h2>
-              {fixedWorkspace
-                ? "Contract role assignments"
-                : "Assign or invite"}
-            </h2>
-          </CardTitle>
-          <CardDescription>
-            Manage active roles for members of your company. Contract access
-            ends when an assignment is revoked. Your company is on the{" "}
-            {sideLabel} side of this contract, so only {sideLabel} roles are
-            offered.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          {failure ? (
-            <Alert variant="destructive">
-              <AlertDescription>{failure}</AlertDescription>
-            </Alert>
-          ) : null}
-
-          {fixedWorkspace ? null : (
-            <FormField
-              id={`${formId}-workspace`}
-              label="Workspace"
-              description="Role assignments and invitations below apply to this workspace."
-              className="max-w-sm"
+      <ListCard
+        title="Contract role assignments"
+        description={`Manage active roles for members of your company. Contract access ends when an assignment is revoked. Your company is on the ${sideLabel} side of this contract, so only ${sideLabel} roles are offered.`}
+        action={actions}
+      >
+        {failureAlert}
+        {/* Narrow enough for phones once the actions sit in a menu, so one
+            table serves every width and deep links keep a single target. */}
+        <DataTable
+          label="Role assignments"
+          columns={assignmentColumns(timeZone)}
+          rows={assignmentsQuery.data ?? []}
+          getRowKey={(assignment) => assignment.id}
+          getRowProps={(assignment) => ({
+            id: `activity-target-${assignment.id}`,
+            className:
+              target?.type === "contract_role_assignment" &&
+              target.id === assignment.id
+                ? "bg-primary/10"
+                : undefined,
+          })}
+          rowActions={(assignment) => (
+            <DataTableRowActions
+              label={`Actions for ${memberName(assignment)}, ${assignment.role}`}
             >
-              {(control) => (
-                <NativeSelect
-                  {...control}
-                  className="w-full"
-                  value={workspace}
-                  onChange={(event) => {
-                    const nextWorkspace = workspaceOptions.find(
-                      (option) => option === event.target.value,
-                    );
-                    if (!nextWorkspace) return;
-                    setWorkspace(nextWorkspace);
-                    setRole("");
-                    setFailure(null);
-                  }}
-                >
-                  {workspaceOptions.map((option) => (
-                    <NativeSelectOption key={option} value={option}>
-                      {formatLabel(option)}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              )}
-            </FormField>
-          )}
-
-          <form
-            ref={formRef}
-            onSubmit={(event) => void submitAssignment(event)}
-            aria-label="Assign a contract role"
-            className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
-          >
-            <FormField id={`${formId}-member`} label="Company member">
-              {(control) => (
-                <NativeSelect
-                  {...control}
-                  className="w-full"
-                  required
-                  value={companyUserId}
-                  onChange={(event) => setCompanyUserId(event.target.value)}
-                  disabled={
-                    membersQuery.isFetching || !membersQuery.data?.length
-                  }
-                >
-                  <NativeSelectOption value="">
-                    Select a member
-                  </NativeSelectOption>
-                  {membersQuery.data?.map((member) => (
-                    <NativeSelectOption key={member.id} value={member.id}>
-                      {`${member.firstName} ${member.lastName}`.trim() ||
-                        member.email}
-                      {" · "}
-                      {member.email}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              )}
-            </FormField>
-            <FormField id={`${formId}-role`} label="Contract role">
-              {(control) => (
-                <NativeSelect
-                  {...control}
-                  className="w-full"
-                  value={selectedRole}
-                  onChange={(event) => {
-                    const nextRole = roles.find(
-                      (option) => option === event.target.value,
-                    );
-                    if (nextRole) setRole(nextRole);
-                  }}
-                >
-                  {roles.map((option) => (
-                    <NativeSelectOption key={option} value={option}>
-                      {option}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              )}
-            </FormField>
-            <Button
-              type="submit"
-              disabled={
-                assignState.isLoading ||
-                !companyUserId ||
-                !selectedRole ||
-                membersQuery.isFetching ||
-                !membersQuery.data?.length
-              }
-            >
-              {assignState.isLoading ? "Assigning…" : "Assign role"}
-            </Button>
-          </form>
-
-          {membersQuery.error ? (
-            <Alert variant="destructive">
-              <AlertDescription>
-                {getApiErrorMessage(
-                  membersQuery.error,
-                  "Unable to load eligible company members.",
-                )}
-              </AlertDescription>
-            </Alert>
-          ) : null}
-          {!membersQuery.error &&
-          membersQuery.data &&
-          membersQuery.data.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No active company members are available to assign.
-            </p>
-          ) : null}
-          {fixedWorkspace ? (
-            // Narrow enough for phones once the actions sit in a menu, so one
-            // table serves every width and deep links keep a single target.
-            <DataTable
-              label="Role assignments"
-              columns={assignmentColumns(timeZone)}
-              rows={assignmentsQuery.data ?? []}
-              getRowKey={(assignment) => assignment.id}
-              getRowProps={(assignment) => ({
-                id: `activity-target-${assignment.id}`,
-                className:
-                  target?.type === "contract_role_assignment" &&
-                  target.id === assignment.id
-                    ? "bg-primary/10"
-                    : undefined,
-              })}
-              rowActions={(assignment) => (
-                <DataTableRowActions
-                  label={`Actions for ${memberName(assignment)}, ${assignment.role}`}
-                >
-                  {permissions.canGrantWorkspaceAdmin ? (
-                    <DropdownMenuItem
-                      disabled={workspaceAdminState.isLoading}
-                      onClick={() =>
-                        void changeWorkspaceAdmin(assignment, workspace)
-                      }
-                    >
-                      {assignment.isWorkspaceAdmin
-                        ? "Remove workspace admin"
-                        : "Make workspace admin"}
-                    </DropdownMenuItem>
-                  ) : null}
-                  {/* Revoking asks for confirmation first. */}
-                  <DropdownMenuItem
-                    variant="destructive"
-                    disabled={revokeState.isLoading}
-                    onClick={() => {
-                      setDialogError("");
-                      setRevokeWorkspace(workspace);
-                      setAssignmentToRevoke(assignment);
-                    }}
-                  >
-                    Revoke role…
-                  </DropdownMenuItem>
-                </DataTableRowActions>
-              )}
-              isLoading={assignmentsQuery.isLoading}
-              loadingLabel="Loading role assignments…"
-              skeletonRows={3}
-              error={
-                assignmentsQuery.error
-                  ? getApiErrorMessage(
-                      assignmentsQuery.error,
-                      "Unable to load contract role assignments.",
-                    )
-                  : null
-              }
-              onRetry={() => void assignmentsQuery.refetch()}
-              empty={
-                <DataTableEmpty title="No active roles are assigned in this workspace." />
-              }
-            />
-          ) : null}
-
-          <div className="space-y-4 border-t pt-5">
-            <div>
-              <h3 className="type-subsection-title">
-                Invite to this workspace
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                The recipient must sign in with this email and be an active
-                member of your company before accepting. The invitation is for
-                the contract role selected above:{" "}
-                <span className="font-medium text-foreground">
-                  {selectedRole}
-                </span>
-                .
-              </p>
-            </div>
-            <form
-              onSubmit={(event) => void submitInvitation(event)}
-              aria-label="Invite to this workspace"
-              className="space-y-3"
-            >
-              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                <FormField id={`${formId}-invite-email`} label="Invitee email">
-                  {(control) => (
-                    <Input
-                      {...control}
-                      type="email"
-                      autoComplete="off"
-                      required
-                      maxLength={320}
-                      value={inviteEmail}
-                      onChange={(event) => setInviteEmail(event.target.value)}
-                    />
-                  )}
-                </FormField>
-                <Button
-                  type="submit"
-                  disabled={
-                    invitationState.isLoading ||
-                    !inviteEmail.trim() ||
-                    !selectedRole
-                  }
-                  aria-busy={invitationState.isLoading || undefined}
-                >
-                  {invitationState.isLoading ? "Sending…" : "Send invitation"}
-                </Button>
-              </div>
               {permissions.canGrantWorkspaceAdmin ? (
-                <Field orientation="horizontal" className="w-fit">
-                  <Checkbox
-                    id={`${formId}-workspace-admin`}
-                    checked={inviteAsWorkspaceAdmin}
-                    onCheckedChange={setInviteAsWorkspaceAdmin}
-                  />
-                  <FieldLabel
-                    htmlFor={`${formId}-workspace-admin`}
-                    className="font-normal"
-                  >
-                    Invite as a workspace administrator
-                  </FieldLabel>
-                </Field>
+                <DropdownMenuItem
+                  disabled={workspaceAdminState.isLoading}
+                  onClick={() =>
+                    void changeWorkspaceAdmin(assignment, fixedWorkspace)
+                  }
+                >
+                  {assignment.isWorkspaceAdmin
+                    ? "Remove workspace admin"
+                    : "Make workspace admin"}
+                </DropdownMenuItem>
               ) : null}
-            </form>
-            {invitationsQuery.error ? (
-              <Alert variant="destructive">
-                <AlertDescription>
-                  {getApiErrorMessage(
-                    invitationsQuery.error,
-                    "Unable to load contract role invitations.",
-                  )}
-                </AlertDescription>
-              </Alert>
-            ) : null}
-            {invitationsQuery.isLoading ? (
-              <p role="status" className="text-sm text-muted-foreground">
-                Loading invitations…
-              </p>
-            ) : invitationsQuery.data?.length ? (
-              <ul className="divide-y">
-                {invitationsQuery.data.map((invitation) => {
-                  const status = effectiveInvitationStatus(
-                    invitation.status,
-                    invitation.expiresAt,
-                  );
-                  return (
-                    <li
-                      id={`activity-target-${invitation.id}`}
-                      className={`flex flex-wrap items-center justify-between gap-3 py-3 text-sm ${
-                        target?.type === "contract_role_invitation" &&
-                        target.id === invitation.id
-                          ? "bg-primary/10"
-                          : ""
-                      }`}
-                      key={invitation.id}
-                    >
-                      <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className="font-medium break-all">
-                          {invitation.email}
-                        </span>
-                        <span className="text-muted-foreground">
-                          {invitation.role}
-                          {invitation.isWorkspaceAdmin
-                            ? " · Workspace Admin"
-                            : ""}
-                        </span>
-                        <StatusBadge status={status} />
-                        {status === "pending" ? (
-                          <span className="text-xs text-muted-foreground">
-                            Expires{" "}
-                            {formatDate(invitation.expiresAt, { timeZone })}
-                          </span>
-                        ) : null}
-                      </span>
-                      {status === "pending" ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={revokeInvitationState.isLoading}
-                          onClick={() => {
-                            setDialogError("");
-                            setInvitationToRevoke({
-                              id: invitation.id,
-                              email: invitation.email,
-                              role: invitation.role,
-                            });
-                          }}
-                        >
-                          Revoke invitation
-                        </Button>
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : !invitationsQuery.error ? (
-              <p className="text-sm text-muted-foreground">
-                No invitations have been sent for this workspace.
-              </p>
-            ) : null}
-          </div>
-        </CardContent>
-      </Card>
-
-      {revocationDialog()}
-
-      <ConfirmDialog
-        open={invitationToRevoke !== null}
-        title="Revoke this role invitation?"
-        description={
-          invitationToRevoke
-            ? `The invitation for ${invitationToRevoke.email} to join as ${invitationToRevoke.role} will stop working. You can send a new invitation later.`
-            : ""
-        }
-        confirmLabel="Revoke invitation"
-        pendingLabel="Revoking…"
-        isPending={revokeInvitationState.isLoading}
-        error={invitationToRevoke ? dialogError : undefined}
-        destructive
-        onConfirm={() => void confirmInvitationRevocation()}
-        onCancel={() => setInvitationToRevoke(null)}
-      />
+              {/* Revoking asks for confirmation first. */}
+              <DropdownMenuItem
+                variant="destructive"
+                disabled={revokeState.isLoading}
+                onClick={() => {
+                  setDialogError("");
+                  setRevokeWorkspace(fixedWorkspace);
+                  setAssignmentToRevoke(assignment);
+                }}
+              >
+                Revoke role…
+              </DropdownMenuItem>
+            </DataTableRowActions>
+          )}
+          isLoading={assignmentsQuery.isLoading}
+          loadingLabel="Loading role assignments…"
+          skeletonRows={3}
+          error={
+            assignmentsQuery.error
+              ? getApiErrorMessage(
+                  assignmentsQuery.error,
+                  "Unable to load contract role assignments.",
+                )
+              : null
+          }
+          onRetry={() => void assignmentsQuery.refetch()}
+          empty={
+            <DataTableEmpty title="No active roles are assigned in this workspace." />
+          }
+        />
+      </ListCard>
+      {overlays}
     </>
   );
 }
@@ -768,6 +448,7 @@ function ContractWorkspaceTeams({
   contractId,
   target,
   busy,
+  actions,
   onAdd,
   onToggleAdmin,
   onRevoke,
@@ -776,6 +457,8 @@ function ContractWorkspaceTeams({
   contractId: string;
   target?: ContractActivityTarget | null;
   busy: boolean;
+  /** Assign Member and Contract Role Invitations, beside the heading. */
+  actions?: ReactNode;
   onAdd: (workspace: AssignableContractWorkspace) => void;
   onToggleAdmin: (
     assignment: ContractRoleAssignment,
@@ -793,17 +476,20 @@ function ContractWorkspaceTeams({
       aria-labelledby="contract-workspace-teams-heading"
       className="space-y-3"
     >
-      <div>
-        <h2
-          id="contract-workspace-teams-heading"
-          className="type-section-title"
-        >
-          Roles and workspaces
-        </h2>
-        <p className="type-lead">
-          Your company&apos;s people in each workspace of this contract. Each
-          role opens one workspace only.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2
+            id="contract-workspace-teams-heading"
+            className="type-section-title"
+          >
+            Roles and workspaces
+          </h2>
+          <p className="type-lead">
+            Your company&apos;s people in each workspace of this contract. Each
+            role opens one workspace only.
+          </p>
+        </div>
+        {actions}
       </div>
       {enabled.isLoading ? (
         <p role="status" className="text-sm text-muted-foreground">
