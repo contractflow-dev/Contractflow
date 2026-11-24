@@ -123,12 +123,30 @@ describe("AccountMenu", () => {
     expect(markup).not.toContain('href="/admin"');
   });
 
-  it("shows no links to account features that don't exist yet", () => {
+  it("links to Personal Profile, and to no company settings or unbuilt features", () => {
     mocks.user = admin;
     const markup = renderToStaticMarkup(<AccountMenu area="company" />);
 
-    expect(markup).not.toMatch(/Profile|Settings|Password|Security|Sessions/);
-    expect(markup.match(/role="menuitem"/g)).toHaveLength(3);
+    expect(markup).toMatch(
+      /<a[^>]*href="\/account\/profile"[^>]*>[\s\S]*Personal Profile/,
+    );
+    expect(markup).not.toMatch(
+      /Company Profile|Company Settings|dashboards\/profile|dashboards\/settings/,
+    );
+    expect(markup).not.toMatch(/Password|Security|Sessions|Preferences/);
+    expect(markup.match(/role="menuitem"/g)).toHaveLength(4);
+  });
+
+  it("offers Personal Profile in every area, and the way back from the account area", () => {
+    mocks.user = { ...admin, isPlatformAdmin: false };
+    for (const area of ["company", "admin", "account"] as const) {
+      expect(renderToStaticMarkup(<AccountMenu area={area} />), area).toContain(
+        'href="/account/profile"',
+      );
+    }
+    expect(renderToStaticMarkup(<AccountMenu area="account" />)).toMatch(
+      /<a[^>]*href="\/dashboards"[^>]*>[\s\S]*Company workspace/,
+    );
   });
 
   it("links to the user's own invitations from the company area only", () => {

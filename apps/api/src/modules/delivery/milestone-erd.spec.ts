@@ -16,13 +16,15 @@ import { Milestone } from './entities/milestone.entity';
  * (and the activity log they write to) as the entities define them: the same
  * columns, and a relationship for every foreign key.
  */
+// Line endings are normalised so a Windows checkout (CRLF) reads the same as
+// Linux CI (LF); the matching below expects LF.
 const ERD = readFileSync(
   join(
     __dirname,
     '../../../../../packages/db/docs/Contractflow Entity Relationship updated.mmd',
   ),
   'utf8',
-);
+).replace(/\r\n/g, '\n');
 
 const ENTITIES: Array<[Function, string]> = [
   [ContractStage, 'contract_stage'],
