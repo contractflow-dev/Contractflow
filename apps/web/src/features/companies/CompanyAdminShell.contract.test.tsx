@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { RiFileList3Line } from "@remixicon/react";
 import { CompanyAdminShell } from "./CompanyAdminShell";
 
@@ -130,6 +136,20 @@ describe("CompanyAdminShell contract context", () => {
       screen.queryByRole("navigation", { name: "Contract pages" }),
     ).toBeNull();
     expect(screen.getByRole("link", { name: "All Contracts" })).toBeTruthy();
+  });
+
+  it("shows Company Settings in the sidebar, with the company profile", () => {
+    mocks.pathname = "/dashboards/profile";
+    shell();
+    expect(mocks.boundary).not.toHaveBeenCalled();
+    const pages = screen.getByRole("navigation", { name: "Settings pages" });
+    expect(
+      within(pages)
+        .getByRole("link", { name: "Company Profile" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
+    // Personal settings live in the account menu, not in Company Settings.
+    expect(within(pages).queryByText("Personal Profile")).toBeNull();
   });
 
   it("leaves the contract when the company changes", () => {

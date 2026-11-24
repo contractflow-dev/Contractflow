@@ -6,6 +6,7 @@ import { getApiBaseUrl } from "@/lib/apiBaseUrl";
 
 const COMPANY_CONTEXT_EXEMPT_ENDPOINTS = new Set([
   "getCurrentUser",
+  "updateMyProfile",
   "login",
   "register",
   "verifyEmail",

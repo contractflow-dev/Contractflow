@@ -37,6 +37,7 @@ import { notifySuccess } from "@/lib/notify";
 import { CompanyAdminShell } from "@/features/companies/CompanyAdminShell";
 import { CompanyVerificationNotice } from "@/features/companies/company-verification-notice";
 import { PageHeader } from "@/components/page-header/page-header";
+import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
 
 const profileSchema = z.object({
   name: z.string().trim().min(1, "Company name is required").max(255),
@@ -158,9 +159,9 @@ function ProfileContent({ company }: { company: ICompanyProfileResponse }) {
   return (
     <section className="mx-auto max-w-4xl space-y-6">
       <PageHeader
-        eyebrow="Company administration"
+        eyebrow="Company Settings"
         title="Company profile"
-        description="Update the registered company and contact details."
+        description={`Update the registered and contact details of ${company.name}.`}
       />
       <ProfileForm key={company.id} company={company} />
     </section>
@@ -205,6 +206,7 @@ function ProfileForm({ company }: { company: ICompanyProfileResponse }) {
   const countryCode = useWatch({ control, name: "countryCode" });
   const stateRegion = useWatch({ control, name: "stateRegion" });
   const phone = useWatch({ control, name: "phone" });
+  useUnsavedChangesWarning(isDirty && !isLoading);
   // Before the first save attempt errors wait for submit, as for text fields.
   const fieldUpdate = { shouldDirty: true, shouldValidate: isSubmitted };
 
@@ -343,13 +345,21 @@ function ProfileForm({ company }: { company: ICompanyProfileResponse }) {
 
           <Separator />
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            {isDirty ? (
+              <p className="text-sm text-muted-foreground sm:me-auto sm:self-center">
+                You have unsaved changes.
+              </p>
+            ) : null}
             <Button
               type="button"
               variant="outline"
               disabled={!isDirty || isLoading}
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                setSubmitError("");
+                reset();
+              }}
             >
-              Reset
+              Cancel
             </Button>
             <Button type="submit" disabled={!isDirty || isLoading}>
               {isLoading ? "Saving…" : "Save changes"}

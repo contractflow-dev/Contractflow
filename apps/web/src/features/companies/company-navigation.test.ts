@@ -20,7 +20,7 @@ describe("company navigation", () => {
     expect(labels(companyNavigationFor(true))).toEqual([
       { label: undefined, items: ["Overview"] },
       { label: undefined, items: ["Contracts"] },
-      { label: "Company", items: ["Documents", "Team", "Profile"] },
+      { label: "Company", items: ["Documents", "Team", "Settings"] },
     ]);
     expect(labels(companyNavigationFor(false))).toEqual([
       { label: undefined, items: ["Contracts"] },
@@ -88,6 +88,21 @@ describe("company navigation", () => {
         expect(item.href, item.label).not.toContain("/workspaces");
       }
     }
+  });
+
+  it("gives administrators Company Settings, with the company profile at its URL", () => {
+    const settings = companyNavigationFor(true)
+      .flatMap(({ items }) => items)
+      .find(({ label }) => label === "Settings")!;
+    expect(
+      settings.children!.map(({ label, href }) => ({ label, href })),
+    ).toEqual([{ label: "Company Profile", href: "/dashboards/profile" }]);
+    expect(
+      companyNavigationFor(false)
+        .flatMap(({ items }) => items)
+        .some(({ label }) => label === "Settings"),
+    ).toBe(false);
+    expect(isCompanyAdminRoute("/dashboards/profile")).toBe(true);
   });
 
   it("keeps the unlisted department pages for administrators only", () => {

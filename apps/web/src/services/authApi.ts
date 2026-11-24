@@ -6,6 +6,7 @@ import type {
   LogoutResponse,
   RegisterRequest,
   ResetPasswordRequest,
+  UpdateMyProfileRequest,
 } from "@contractflow/contracts-schema";
 import { api } from "./api";
 export type {
@@ -16,6 +17,7 @@ export type {
   LogoutResponse,
   RegisterRequest,
   ResetPasswordRequest,
+  UpdateMyProfileRequest,
 } from "@contractflow/contracts-schema";
 
 export type UserProfile = AuthResponse["user"];
@@ -25,6 +27,25 @@ export const authApi = api.injectEndpoints({
     getCurrentUser: builder.query<UserProfile, void>({
       query: () => "/users/me",
       providesTags: ["Auth", "User"],
+    }),
+
+    /**
+     * The signed-in user's own profile (`PATCH /users/me`): only the fields
+     * sent change. The saved profile replaces the cached current user, so
+     * names and the time zone update everywhere at once.
+     */
+    updateMyProfile: builder.mutation<UserProfile, UpdateMyProfileRequest>({
+      query: (body) => ({ url: "/users/me", method: "PATCH", body }),
+      async onQueryStarted(_body, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(
+            authApi.util.updateQueryData("getCurrentUser", undefined, () => data),
+          );
+        } catch {
+          // The form shows the failure; the cached profile is unchanged.
+        }
+      },
     }),
 
     login: builder.mutation<AuthResponse, LoginRequest>({
@@ -100,6 +121,7 @@ export const authApi = api.injectEndpoints({
 export const {
   useGetCurrentUserQuery,
   useLazyGetCurrentUserQuery,
+  useUpdateMyProfileMutation,
   useLoginMutation,
   useRegisterMutation,
   useVerifyEmailMutation,

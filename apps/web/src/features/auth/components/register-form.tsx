@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect } from "react";
+import {
+  getBrowserTimezones,
+  useTimeZoneOptions,
+} from "@/hooks/use-time-zone-options";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
@@ -63,29 +67,6 @@ const nameFields = [
   },
 ] as const;
 
-// The server and browser can support different time zones, so the server
-// renders only UTC and the browser swaps in its own list after hydration.
-const serverTimezones = ["UTC"];
-let browserTimezones: string[] | null = null;
-
-function getBrowserTimezones() {
-  if (!browserTimezones) {
-    const supported =
-      typeof Intl.supportedValuesOf === "function"
-        ? Intl.supportedValuesOf("timeZone")
-        : [];
-    browserTimezones = [
-      "UTC",
-      ...supported.filter((timezone) => timezone !== "UTC"),
-    ];
-  }
-  return browserTimezones;
-}
-
-function subscribeToTimezones() {
-  return () => {};
-}
-
 /**
  * With `invitationToken`, the account is created for a company invitation:
  * the email is the invited address and can't be changed. Registering only
@@ -110,11 +91,7 @@ export function RegisterForm({
     (invitationFailed ||
       (invitationPreview !== undefined && invitation === null));
 
-  const timezones = useSyncExternalStore(
-    subscribeToTimezones,
-    getBrowserTimezones,
-    () => serverTimezones,
-  );
+  const timezones = useTimeZoneOptions();
 
   const form = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),

@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   RiBuilding4Line,
   RiMailOpenLine,
+  RiUserSettingsLine,
   RiShieldUserLine,
   RiUserLine,
 } from "@remixicon/react";
@@ -18,11 +19,12 @@ import {
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
 import { SignOutAction } from "@/components/auth/sign-out-action";
+import { ACCOUNT_PROFILE_PATH } from "@/features/account/account-navigation";
 import { MY_INVITATIONS_PATH } from "@/features/workspace/workspaceLanding";
 import { useGetCurrentUserQuery } from "@/services/authApi";
 
 /** The signed-in area the menu is shown in, which decides the area link. */
-export type AccountMenuArea = "company" | "admin";
+export type AccountMenuArea = "company" | "admin" | "account";
 
 /**
  * The account menu in the AppShell header: who is signed in, a link between
@@ -41,7 +43,7 @@ export function AccountMenu({ area }: { area: AccountMenuArea }) {
     `${user?.firstName?.[0] ?? ""}${user?.lastName?.[0] ?? ""}`.toUpperCase();
 
   const areaLink =
-    area === "admin"
+    area === "admin" || area === "account"
       ? {
           href: "/dashboards",
           label: "Company workspace",
@@ -99,7 +101,13 @@ export function AccountMenu({ area }: { area: AccountMenuArea }) {
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        {area === "company" ? (
+        {/* The signed-in user's own account, in every area. */}
+        <DropdownMenuLinkItem render={<Link href={ACCOUNT_PROFILE_PATH} />}>
+          <RiUserSettingsLine aria-hidden="true" />
+          Personal Profile
+        </DropdownMenuLinkItem>
+        <DropdownMenuSeparator />
+        {area !== "admin" ? (
           <>
             {/* The user's own invitations, whichever company they're from. */}
             <DropdownMenuLinkItem render={<Link href={MY_INVITATIONS_PATH} />}>

@@ -1,5 +1,6 @@
 import {
   RiAddCircleLine,
+  RiBuilding2Line,
   RiBuilding4Line,
   RiFileList3Line,
   RiFolderShield2Line,
@@ -22,6 +23,9 @@ export type CompanyNavItem = Omit<AppNavItem, "children"> & {
   /** The module's pages, each with its own visibility. */
   children?: readonly CompanyNavItem[];
 };
+
+/** The company profile, under Company Settings. */
+export const COMPANY_PROFILE_PATH = "/dashboards/profile";
 
 /** The Team module's pages. */
 export const TEAM_PATH = "/dashboards/team";
@@ -135,10 +139,22 @@ export const COMPANY_NAVIGATION_GROUPS: ReadonlyArray<{
         ],
       },
       {
-        href: "/dashboards/profile",
-        label: "Profile",
+        // Company Settings: the company's own configuration. Team and
+        // Documents above are company settings too, with modules of their
+        // own. Personal settings are in the account menu instead.
+        href: COMPANY_PROFILE_PATH,
+        label: "Settings",
         icon: RiSettings3Line,
         adminOnly: true,
+        description: "The selected company's own settings.",
+        children: [
+          {
+            href: COMPANY_PROFILE_PATH,
+            label: "Company Profile",
+            icon: RiBuilding2Line,
+            adminOnly: true,
+          },
+        ],
       },
     ],
   },
