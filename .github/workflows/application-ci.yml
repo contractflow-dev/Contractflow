@@ -1,8 +1,20 @@
 name: Application CI
 on: [push, pull_request]
+
+# Read-only: CI checks code and needs no write access or secrets.
+permissions:
+  contents: read
+
+# A newer push to the same pull request supersedes the run in progress.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  app-ci:
+  api:
+    name: API (lint, typecheck, unit and e2e tests)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -11,4 +23,55 @@ jobs:
           node-version: 20
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
+      # The API imports the shared schema from its built dist.
+      - name: Build shared contracts schema
+        run: pnpm --filter @contractflow/contracts-schema build
+      - name: Lint
+        run: pnpm --filter @contractflow/api lint
+      - name: Type check
+        run: pnpm --filter @contractflow/api typecheck
+      # Database-backed specs skip without a disposable PostgreSQL; they
+      # belong to the separate integration job.
+      - name: Unit tests
+        run: pnpm --filter @contractflow/api test
+      - name: E2E tests
+        run: pnpm --filter @contractflow/api test:e2e
+
+  web:
+    name: Web (lint, typecheck, unit tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      # The web app type-checks against the shared schema's built dist.
+      - name: Build shared contracts schema
+        run: pnpm --filter @contractflow/contracts-schema build
+      - name: Lint
+        run: pnpm --filter @contractflow/web lint
+      # The web app has no typecheck script; this is its own tsconfig.
+      - name: Type check
+        run: pnpm --filter @contractflow/web exec tsc --noEmit -p tsconfig.json
+      - name: Unit tests
+        run: pnpm --filter @contractflow/web test
+
+  build:
+    name: Workspace build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      # Every package with a build script, in dependency order: the shared
+      # schema (strict tsc), then the API (nest build) and web (next build).
       - run: pnpm -r build
