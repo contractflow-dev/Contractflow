@@ -11,4 +11,6 @@ jobs:
           node-version: 20
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @contractflow/contracts-schema... build
+      - run: pnpm -r --if-present test
       - run: pnpm -r build
