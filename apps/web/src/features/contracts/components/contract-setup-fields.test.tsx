@@ -89,7 +89,7 @@ describe("contract setup step fields", () => {
         /<(?:input|select|textarea)(?![^>]*aria-hidden)[^>]*id="([^"]+)"/g,
       ),
     ].map((match) => match[1]);
-    expect(ids.length).toBe(19);
+    expect(ids.length).toBe(18);
     for (const id of ids) expect(markup).toContain(`for="${id}"`);
     expect(markup.match(/role="checkbox"/g)).toHaveLength(3);
   });
@@ -117,8 +117,10 @@ describe("contract setup step fields", () => {
       "advancePaymentRate",
       "liquidatedDamagesPerDay",
       "revisedEndDate",
-      "actualCompletionDate",
     ];
+    // Removed: when a contract completed is its status history.
+    expect(markup).not.toContain("new-contract-actualCompletionDate");
+    expect(markup).not.toContain("Actual completion date");
     for (const name of required) {
       expect(controlTag(markup, `new-contract-${name}`)).toContain(
         'aria-required="true"',

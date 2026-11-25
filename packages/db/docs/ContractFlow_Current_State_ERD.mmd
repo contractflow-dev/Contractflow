@@ -1,24 +1,34 @@
 %% ContractFlow - CURRENT-STATE ERD (what the database is today)
 %%
 %% Source of truth: the registered migration chain
-%% (apps/api/src/common/database/registered-migrations.ts, 19 migrations,
-%% IdentitySchemaBootstrap1749000000000 .. MilestoneWorkflow1793800000000).
+%% (apps/api/src/common/database/registered-migrations.ts, 24 migrations,
+%% IdentitySchemaBootstrap1749000000000 .. RemoveActualCompletionDate1794000000004).
 %% Reconciled from:
 %%   1. The schema of contractflow_fresh_backup.dump (pg_restore --schema-only to a
 %%      file; no database was connected). That dump records migrations 1-10, up to
 %%      CompanyInvitationExpiryIndex1792862700001.
-%%   2. The up() of the nine later migrations, read from the migration files:
+%%   2. The up() of the fourteen later migrations, read from the migration files:
 %%      CompanyInvitationOptionalNames, CompanyEmailVerification,
 %%      DocumentObjectStorage, PasswordResetToken, CompanyLevelDocuments,
 %%      CompanyRoleAssignmentIndex, CompanyMembershipRoles,
-%%      ActivityLogAuditFields, MilestoneWorkflow.
-%% Not verified: a live development or production database.
+%%      ActivityLogAuditFields, MilestoneWorkflow,
+%%      ContractPartyClassification (party types become awarding | awarded),
+%%      UlidEntityReferences (generic entity_id columns become ULIDs),
+%%      ContractStatusHistoryValues (history holds contract statuses only),
+%%      SubcontractParentRules (one-level subcontracts, fixed parent, restrict),
+%%      ContractPartyRules (one awarding and one awarded party per contract),
+%%      RemoveActualCompletionDate (contract.actual_completion_date dropped).
+%%   The last six were run up and down on a throwaway PostgreSQL database by
+%%   their migration tests.
+%% Not verified: a live development or production database (the migrations
+%% have not been applied to one).
 %%
 %% Conventions in this file
-%% - Every id and *_id column is varchar(26): a ULID stored as text. There is no
-%%   uuid primary or foreign key anywhere. The uuid columns that remain are
-%%   polymorphic or correlation values, marked as such.
-%% - Every table except CONTRACT_WORKSPACE and MIGRATION_COMPANY_ROLE_BACKUP also
+%% - Every id and *_id column is varchar(26): a ULID stored as text, including the
+%%   generic entity_id references (CHECK that the value is a ULID). The only
+%%   uuid column left is ACTIVITY_LOG.request_id, a request correlation id;
+%%   ACTIVITY_LOG.entity_id is varchar(36) so older audit rows keep their uuid.
+%% - Every table except CONTRACT_WORKSPACE and the MIGRATION_*_BACKUP tables also
 %%   has created_at and updated_at (timestamptz NOT NULL DEFAULT now()), omitted
 %%   below for brevity.
 %% - A column is NOT NULL unless its comment says nullable. Many tables created
@@ -53,7 +63,7 @@ erDiagram
     APP_USER ||--o{ COMPANY_AUDIT_LOG : "acts (no action)"
 
     %% ---------------------------------------------------------------- Contract
-    CONTRACT |o--o{ CONTRACT : "is parent of subcontract (cascade)"
+    CONTRACT |o--o{ CONTRACT : "is parent of subcontract (restrict)"
     COMPANY |o--o{ CONTRACT : "created (restrict)"
     COMPANY_USER |o--o{ CONTRACT : "archived (set null)"
     CONTRACT ||--o{ CONTRACT_PARTY : "has parties (cascade)"
@@ -316,10 +326,28 @@ erDiagram
         varchar(26) row_id PK
         text company_role "the label before the migration"
     }
+    %% Operational table written by ContractPartyClassification1793900000000 so
+    %% its down() can restore client | contractor | subcontractor | vendor | other.
+    MIGRATION_CONTRACT_PARTY_TYPE_BACKUP {
+        varchar(32) table_name PK "contract_party | contract_party_invitation"
+        varchar(26) row_id PK
+        text party_type "the value before the migration"
+    }
+    %% Operational table written by RemoveActualCompletionDate1794000000004 so
+    %% its down() can restore the dropped contract.actual_completion_date values.
+    MIGRATION_CONTRACT_ACTUAL_COMPLETION_BACKUP {
+        varchar(26) contract_id PK "no FK"
+        date actual_completion_date
+    }
 
     %% Contract -----------------------------------------------------------------
     %% UNIQUE UQ_4eb2644094e921caea38a4fe908 (reference_number)
     %% No owning-company column: ownership and visibility come from CONTRACT_PARTY.
+    %% A subcontract is a separate contract whose parent is a main contract.
+    %% CHECK ck_contract_not_own_parent (parent_contract_id <> id)
+    %% TRIGGER contract_parent_rules: the parent must be a main contract (one
+    %%   level, so no cycles) and parent_contract_id can't change after insert.
+    %% When a contract completed is its CONTRACT_STATUS_HISTORY entry.
     CONTRACT {
         varchar(26) id PK
         varchar(40) reference_number UK
@@ -327,7 +355,7 @@ erDiagram
         text description "nullable"
         enum contract_type "service | supply | epc | maintenance"
         enum status "draft | active | suspended | completed"
-        varchar(26) parent_contract_id FK "nullable, self-ref: subcontract of"
+        varchar(26) parent_contract_id FK "nullable; the main contract of a subcontract, fixed"
         bigint original_value_minor
         bigint current_value_minor
         char(3) currency_code
@@ -339,7 +367,6 @@ erDiagram
         date start_date
         date end_date
         date revised_end_date "nullable"
-        date actual_completion_date "nullable"
         int defects_liability_days
         varchar(64) timezone
         varchar(26) created_by_company_id FK "nullable"
@@ -347,11 +374,18 @@ erDiagram
         varchar(26) deleted_by_company_user_id FK "nullable"
     }
     %% UNIQUE uq_contract_party_id_company (id, company_id), target of composite FKs
+    %% UNIQUE uq_contract_party_contract_company (contract_id, company_id)
+    %% UNIQUE uq_contract_party_one_awarding (contract_id) WHERE party_type = awarding
+    %% UNIQUE uq_contract_party_one_awarded (contract_id) WHERE party_type = awarded
+    %% TRIGGER contract_party_rules: on a subcontract, the awarding party is the
+    %%   main contract's awarded party, and the main contract's awarding party
+    %%   (the client) can't be a party.
+    %% A contract is between two companies: the awarding and the awarded party.
     CONTRACT_PARTY {
         varchar(26) id PK
         varchar(26) contract_id FK
         varchar(26) company_id FK
-        enum party_type "client | contractor | subcontractor | vendor | other"
+        enum party_type "awarding | awarded"
         varchar(100) signatory_first_name "nullable"
         varchar(100) signatory_last_name "nullable"
         varchar(150) signatory_title "nullable"
@@ -370,7 +404,7 @@ erDiagram
         varchar(26) target_company_id FK
         varchar(26) invited_by_company_user_id FK
         varchar(26) accepted_by_company_user_id FK "nullable"
-        varchar(20) party_type "contractor | subcontractor (CHECK)"
+        varchar(20) party_type "awarded (CHECK): an invited company is the awarded party"
         varchar(320) email
         varchar(64) token_hash UK
         varchar(20) status "pending | accepted | rejected | expired | revoked (CHECK), default pending"
@@ -425,8 +459,8 @@ erDiagram
     CONTRACT_STATUS_HISTORY {
         varchar(26) id PK
         varchar(26) contract_id FK
-        enum from_status "nullable; draft | active | suspended | completed | cancelled | under_review"
-        enum to_status "draft | active | suspended | completed | cancelled | under_review"
+        enum from_status "nullable; draft | active | suspended | completed"
+        enum to_status "draft | active | suspended | completed"
         text reason "nullable"
         varchar(26) changed_by_id FK "-> company_user"
         timestamptz changed_at
@@ -735,12 +769,13 @@ erDiagram
         varchar(26) uploaded_by_id FK "-> company_user"
         timestamptz uploaded_at
     }
-    %% Not usable for ULID records: entity_id is uuid and entity_type holds document categories.
+    %% CHECK ck_document_link_entity_id_ulid. Not written by any service;
+    %% entity_type still holds document categories, not entity kinds.
     DOCUMENT_LINK {
         varchar(26) id PK
         varchar(26) document_id FK
         enum entity_type "certificate | HSE | contract | invoice | report | other (same values as DOCUMENT.category, not entity kinds)"
-        uuid entity_id "polymorphic, no FK; cannot hold a ULID"
+        varchar(26) entity_id "ULID (CHECK), polymorphic, no FK"
         varchar(255) caption "NOT NULL in the database"
     }
 
@@ -933,6 +968,7 @@ erDiagram
         timestamptz occurred_at
     }
     %% Not written by any service. sent_at and read_at NOT NULL make an unsent notification unstorable.
+    %% CHECK ck_notification_entity_id_ulid
     NOTIFICATION {
         varchar(26) id PK
         varchar(26) recipient_user_id FK "-> app_user"
@@ -941,20 +977,21 @@ erDiagram
         varchar(255) title
         text body
         varchar(60) entity_type "NOT NULL in the database"
-        uuid entity_id "polymorphic, no FK; cannot hold a ULID"
+        varchar(26) entity_id "ULID (CHECK), polymorphic, no FK"
         enum channel "push | sms | email"
         enum status "sent | delivered | pending | failed | read, default pending"
         timestamptz sent_at "NOT NULL in the database"
         timestamptz read_at "NOT NULL in the database"
     }
     %% parent_comment_id NOT NULL: a first, top-level comment cannot be stored as the schema stands.
+    %% CHECK ck_comment_entity_id_ulid
     COMMENT {
         varchar(26) id PK
         varchar(26) contract_id FK
         varchar(26) author_company_user_id FK
         varchar(26) parent_comment_id FK "NOT NULL in the database"
         enum entity_type "contract | document | comment | other"
-        uuid entity_id "polymorphic, no FK; cannot hold a ULID"
+        varchar(26) entity_id "ULID (CHECK), polymorphic, no FK"
         varchar body
         enum visibility "public | private"
     }

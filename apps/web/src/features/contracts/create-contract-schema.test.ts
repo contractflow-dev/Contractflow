@@ -24,7 +24,6 @@ const validDates: ContractDateValues = {
   startDate: "2026-02-01",
   endDate: "2026-12-31",
   revisedEndDate: "",
-  actualCompletionDate: "",
 };
 
 describe("validateContractDates", () => {
@@ -54,16 +53,11 @@ describe("validateContractDates", () => {
     });
   });
 
-  it("flags an actual completion date before the start date", () => {
-    expect(
-      validateContractDates({
-        ...validDates,
-        actualCompletionDate: "2026-01-31",
-      }),
-    ).toEqual({
-      actualCompletionDate:
-        "The actual completion date must not be before the start date.",
-    });
+  it("has no actual completion date: completion is the contract's status history", () => {
+    expect(Object.keys(validDates)).not.toContain("actualCompletionDate");
+    expect(createContractDefaults("UTC").dates).not.toHaveProperty(
+      "actualCompletionDate",
+    );
   });
 });
 
@@ -189,7 +183,6 @@ describe("toCreateContractRequest", () => {
       startDate: "2026-02-01",
       endDate: "2026-12-31",
       revisedEndDate: null,
-      actualCompletionDate: null,
       defectsLiabilityDays: 0,
       timezone: "Africa/Lagos",
     });

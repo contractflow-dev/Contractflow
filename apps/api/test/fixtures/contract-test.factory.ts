@@ -249,7 +249,6 @@ export class ContractTestFactory {
         startDate: new Date('2026-01-02T00:00:00.000Z'),
         endDate: new Date('2027-01-01T00:00:00.000Z'),
         revisedEndDate: null,
-        actualCompletionDate: null,
         defectsLiabilityDays: 365,
         timezone: 'Africa/Lagos',
         createdByCompanyId: company.id,

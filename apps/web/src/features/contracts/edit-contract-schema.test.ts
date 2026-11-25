@@ -14,6 +14,7 @@ import {
 } from "@/lib/format";
 import {
   contractToFormValues,
+  editContractSteps,
   createContractFormSchema,
   isContractValueLocked,
   toUpdateContractRequest,
@@ -39,7 +40,6 @@ function contract(overrides: Partial<Contract> = {}): Contract {
     startDate: "2026-02-01T00:00:00.000Z",
     endDate: "2026-12-31T00:00:00.000Z",
     revisedEndDate: null,
-    actualCompletionDate: null,
     defectsLiabilityDays: 365,
     timezone: "Africa/Lagos",
     createdAt: "2026-01-01T00:00:00.000Z",
@@ -155,6 +155,16 @@ describe("toUpdateContractRequest", () => {
     expect(body).not.toHaveProperty("referenceNumber");
     expect(body).not.toHaveProperty("partyType");
     expect(body).not.toHaveProperty("workspaces");
+    // The parent is fixed at creation; editing never sends it.
+    expect(body).not.toHaveProperty("parentContractId");
+  });
+
+  it("has no parties or parent contract step", () => {
+    expect(editContractSteps.map(({ id, title }) => [id, title])).toEqual([
+      ["basics", "Basics"],
+      ["commercial", "Commercial terms"],
+      ["dates", "Dates"],
+    ]);
   });
 
   it("leaves the value and currency out once the contract has left draft", () => {

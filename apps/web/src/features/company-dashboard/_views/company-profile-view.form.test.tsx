@@ -229,3 +229,46 @@ describe("Company profile phone number", () => {
     expect(mocks.updateProfile).not.toHaveBeenCalled();
   });
 });
+
+describe("Company email", () => {
+  it("shows a verified email read-only and never sends it", async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<CompanyProfileView />);
+
+    const email = screen.getByRole("textbox", { name: /Company email/ });
+    expect(email).toHaveProperty("readOnly", true);
+    expect(email.getAttribute("aria-readonly")).toBe("true");
+    expect(screen.getByText(/Verified\. Other companies invite you/)).toBeTruthy();
+
+    // Typing into a read-only field changes nothing.
+    await user.type(email, "x");
+    expect(email).toHaveProperty("value", "office@acme.example");
+
+    const name = screen.getByRole("textbox", { name: /Company name/ });
+    await user.clear(name);
+    await user.type(name, "Acme Works Renamed");
+    await user.click(saveButton());
+
+    await waitFor(() => expect(mocks.updateProfile).toHaveBeenCalledOnce());
+    const { data } = mocks.updateProfile.mock.calls[0][0];
+    expect(data).toMatchObject({ name: "Acme Works Renamed" });
+    expect(data).not.toHaveProperty("email");
+  });
+
+  it("lets an unverified company correct its email", async () => {
+    mocks.company = { ...baseCompany, verifiedAt: null };
+    const user = userEvent.setup({ delay: null });
+    render(<CompanyProfileView />);
+
+    const email = screen.getByRole("textbox", { name: /Company email/ });
+    expect(email).toHaveProperty("readOnly", false);
+    await user.clear(email);
+    await user.type(email, "new@acme.example");
+    await user.click(saveButton());
+
+    await waitFor(() => expect(mocks.updateProfile).toHaveBeenCalledOnce());
+    expect(mocks.updateProfile.mock.calls[0][0].data).toMatchObject({
+      email: "new@acme.example",
+    });
+  });
+});

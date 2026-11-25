@@ -330,9 +330,6 @@ function toContractResponse(contract: Contract): ContractApiResponse {
     revisedEndDate: contract.revisedEndDate
       ? toApiDate(contract.revisedEndDate)
       : null,
-    actualCompletionDate: contract.actualCompletionDate
-      ? toApiDate(contract.actualCompletionDate)
-      : null,
     defectsLiabilityDays: contract.defectsLiabilityDays,
     timezone: contract.timezone,
     createdAt: toApiDate(contract.createdAt),

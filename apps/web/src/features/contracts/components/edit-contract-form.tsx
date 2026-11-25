@@ -4,11 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  EContractSortField,
-  ESortOrder,
-  MAX_PAGE_LIMIT,
-  type EPartyType,
+import type {
+  ContractRelationSummary,
+  EPartyType,
 } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
@@ -18,7 +16,6 @@ import { useFormSteps, type FormStep } from "@/hooks/use-form-steps";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { notifySuccess } from "@/lib/notify";
 import {
-  useGetContractsQuery,
   useUpdateContractMutation,
   type Contract,
 } from "@/services/contractApi";
@@ -35,8 +32,8 @@ import {
   ContractBasicsFields,
   ContractCommercialFields,
   ContractDatesFields,
-  ContractPartiesFields,
 } from "./contract-setup-fields";
+import { ParentContractLine } from "./related-contracts";
 
 /** Each step validates its own group of the schema, as on creation. */
 const formSteps: ReadonlyArray<FormStep<CreateContractFormValues>> =
@@ -52,6 +49,7 @@ export function EditContractWizard({
   companyId,
   contract,
   partyType,
+  parentContract = null,
   onCancel,
   onDirtyChange,
 }: {
@@ -60,6 +58,8 @@ export function EditContractWizard({
   contract: Contract;
   /** The company's party type on the contract, for the shared schema. */
   partyType: EPartyType;
+  /** A subcontract's main contract, when the reader may open it. */
+  parentContract?: ContractRelationSummary | null;
   /** Leaves the form. The page asks first if anything has changed. */
   onCancel: () => void;
   onDirtyChange?: (dirty: boolean) => void;
@@ -92,17 +92,6 @@ export function EditContractWizard({
     schema: createContractFormSchema,
     onValid: (values) => save(values),
   });
-  const parentContractsQuery = useGetContractsQuery({
-    companyId,
-    page: 1,
-    limit: MAX_PAGE_LIMIT,
-    sortBy: EContractSortField.REFERENCE_NUMBER,
-    sortOrder: ESortOrder.ASC,
-  });
-  // A contract can't be its own parent; the API also refuses cycles.
-  const parentContracts = (parentContractsQuery.currentData?.data ?? []).filter(
-    (candidate) => candidate.id !== contract.id,
-  );
   const [updateContract, updateState] = useUpdateContractMutation();
   const step = editContractSteps[stepIndex];
   const { isDirty } = form.formState;
@@ -146,17 +135,14 @@ export function EditContractWizard({
 
         <div className="space-y-1">
           <RequiredFieldsNote />
+          {/* Context only: the parent is set when a subcontract is created. */}
+          <ParentContractLine
+            parentContractId={contract.parentContractId}
+            parentContract={parentContract}
+          />
         </div>
 
         {step.id === "basics" ? <ContractBasicsFields referenceLocked /> : null}
-        {step.id === "parties" ? (
-          <ContractPartiesFields
-            editing
-            parentContracts={parentContracts}
-            parentContractsLoading={parentContractsQuery.isFetching}
-            parentContractsError={parentContractsQuery.error}
-          />
-        ) : null}
         {step.id === "commercial" ? (
           <ContractCommercialFields valueLocked={valueLocked} />
         ) : null}

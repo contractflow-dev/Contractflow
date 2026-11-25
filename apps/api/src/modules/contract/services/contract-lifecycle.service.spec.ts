@@ -347,7 +347,6 @@ describe('ContractLifecycleService', () => {
       startDate: new Date('2026-01-02T00:00:00.000Z'),
       endDate: new Date('2026-12-31T00:00:00.000Z'),
       revisedEndDate: null,
-      actualCompletionDate: null,
     });
 
     beforeEach(() => {
@@ -1546,7 +1545,6 @@ describe('ContractLifecycleService', () => {
         startDate: '2026-01-02',
         endDate: '2026-12-31',
         revisedEndDate: null,
-        actualCompletionDate: null,
       };
 
       beforeEach(() => {

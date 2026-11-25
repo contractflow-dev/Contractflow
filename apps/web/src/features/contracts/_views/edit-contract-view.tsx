@@ -96,6 +96,7 @@ export function EditContractPage({
       companyId={companyId}
       contract={contract}
       partyType={detail.currentData!.membership.partyType}
+      parentContract={detail.currentData!.parentContract ?? null}
       contractHref={contractHref}
     />
   );
@@ -125,11 +126,13 @@ function EditContractForm({
   companyId,
   contract,
   partyType,
+  parentContract,
   contractHref,
 }: {
   companyId: string;
   contract: Parameters<typeof EditContractWizard>[0]["contract"];
   partyType: Parameters<typeof EditContractWizard>[0]["partyType"];
+  parentContract: Parameters<typeof EditContractWizard>[0]["parentContract"];
   contractHref: string;
 }) {
   const router = useRouter();
@@ -186,6 +189,7 @@ function EditContractForm({
             companyId={companyId}
             contract={contract}
             partyType={partyType}
+            parentContract={parentContract}
             onCancel={requestLeave}
             onDirtyChange={setDirty}
           />

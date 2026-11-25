@@ -217,7 +217,6 @@ export class ContractLifecycleService {
       dto.startDate,
       dto.endDate,
       dto.revisedEndDate,
-      dto.actualCompletionDate,
     );
     try {
       return await this.unitOfWork.execute(async (context) => {
@@ -254,9 +253,6 @@ export class ContractLifecycleService {
           endDate: parseDate(dto.endDate),
           revisedEndDate: dto.revisedEndDate
             ? parseDate(dto.revisedEndDate)
-            : null,
-          actualCompletionDate: dto.actualCompletionDate
-            ? parseDate(dto.actualCompletionDate)
             : null,
           defectsLiabilityDays: dto.defectsLiabilityDays,
           timezone: dto.timezone,
@@ -405,11 +401,6 @@ export class ContractLifecycleService {
           ? parseDate(dto.revisedEndDate)
           : null;
       }
-      if (dto.actualCompletionDate !== undefined) {
-        contract.actualCompletionDate = dto.actualCompletionDate
-          ? parseDate(dto.actualCompletionDate)
-          : null;
-      }
       if (dto.defectsLiabilityDays !== undefined) {
         contract.defectsLiabilityDays = dto.defectsLiabilityDays;
       }
@@ -419,7 +410,6 @@ export class ContractLifecycleService {
         contract.startDate,
         contract.endDate,
         contract.revisedEndDate,
-        contract.actualCompletionDate,
       );
       return context.contracts.save(contract);
     });
@@ -1738,13 +1728,11 @@ function validateDateRange(
   startDate: Date | string,
   endDate: Date | string,
   revisedEndDate?: Date | string | null,
-  actualCompletionDate?: Date | string | null,
 ): void {
   const award = datePart(awardDate);
   const start = datePart(startDate);
   const end = datePart(endDate);
   const revised = datePart(revisedEndDate);
-  const actual = datePart(actualCompletionDate);
   if (!award || !start || !end || start > end) {
     throw new BadRequestException(
       'The contract start date must not be after its end date.',
@@ -1753,11 +1741,6 @@ function validateDateRange(
   if (revised && revised < end) {
     throw new BadRequestException(
       'The revised end date must not be before the planned end date.',
-    );
-  }
-  if (actual && actual < start) {
-    throw new BadRequestException(
-      'The actual completion date must not be before the start date.',
     );
   }
 }

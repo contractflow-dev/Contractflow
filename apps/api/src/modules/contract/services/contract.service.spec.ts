@@ -27,7 +27,6 @@ describe('ContractService', () => {
     startDate: new Date('2026-01-02T00:00:00.000Z'),
     endDate: new Date('2026-12-31T00:00:00.000Z'),
     revisedEndDate: null,
-    actualCompletionDate: null,
     defectsLiabilityDays: 365,
     timezone: 'Africa/Lagos',
     createdAt: new Date('2025-12-01T12:00:00.000Z'),
@@ -180,6 +179,8 @@ describe('ContractService', () => {
       deletedAt: null,
     });
     expect(Object.keys(result.contract)).not.toContain('createdByCompanyId');
+    // Removed from the model: completion is recorded by status history.
+    expect(Object.keys(result.contract)).not.toContain('actualCompletionDate');
     expect(Object.keys(result.contract)).not.toContain(
       'deletedByCompanyUserId',
     );

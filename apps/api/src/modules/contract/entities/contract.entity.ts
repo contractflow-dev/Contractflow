@@ -98,9 +98,6 @@ export class Contract extends BaseCustomEntity implements IContractEntity {
   @Column({ name: 'revised_end_date', type: 'date', nullable: true })
   revisedEndDate!: Date | null;
 
-  @Column({ name: 'actual_completion_date', type: 'date', nullable: true })
-  actualCompletionDate!: Date | null;
-
   @Column({ name: 'defects_liability_days', type: 'int' })
   defectsLiabilityDays!: number;
 

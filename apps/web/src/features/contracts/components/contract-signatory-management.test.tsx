@@ -47,7 +47,6 @@ const contract: Contract = {
   startDate: "2026-01-02",
   endDate: "2026-12-31",
   revisedEndDate: null,
-  actualCompletionDate: null,
   defectsLiabilityDays: 0,
   timezone: "UTC",
   createdAt: "2026-01-01T00:00:00.000Z",

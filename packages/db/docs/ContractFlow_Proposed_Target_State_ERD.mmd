@@ -1,8 +1,20 @@
 %% ContractFlow - PROPOSED TARGET-STATE ERD (universal oil and gas contract lifecycle)
 %%
 %% STATUS: PROPOSAL FOR REVIEW. Nothing in this file exists in the database
-%% unless it is marked RETAINED. No entity, migration or API has been built.
+%% unless it is marked RETAINED or IMPLEMENTED. The lifecycle design below
+%% (templates, stage history, evidence, compliance periods) has not been built.
 %% The current schema is in ContractFlow_Current_State_ERD.mmd.
+%%
+%% IMPLEMENTED since this proposal was written (see the current-state ERD):
+%% - Contract parties are awarding | awarded, one of each per contract; a
+%%   subcontract's awarding party is the main contract's awarded party and the
+%%   main contract's client is never a party to it.
+%% - Subcontracts are one level deep with a fixed parent; parent_contract_id
+%%   is on delete restrict.
+%% - DOCUMENT_LINK, COMMENT and NOTIFICATION entity_id are varchar(26) ULIDs.
+%% - CONTRACT_STATUS_HISTORY holds the four contract statuses only.
+%% - contract.actual_completion_date was removed; completion is the status
+%%   history's completed entry.
 %%
 %% How to read this file
 %% - Each entity's id comment says what it is:
@@ -71,7 +83,7 @@ erDiagram
     %% ---------------------------------------------------------------- Contract and lifecycle
     COMPANY ||--o{ CONTRACT_PARTY : "participates as (cascade)"
     CONTRACT ||--o{ CONTRACT_PARTY : "has parties (cascade)"
-    CONTRACT |o--o{ CONTRACT : "is parent of subcontract (CHANGED: restrict)"
+    CONTRACT |o--o{ CONTRACT : "is parent of subcontract (IMPLEMENTED: restrict)"
     LIFECYCLE_TEMPLATE_VERSION |o--o{ CONTRACT : "initialised the lifecycle of (restrict)"
     COMPANY_USER |o--o{ CONTRACT : "initialised the lifecycle (restrict)"
     CONTRACT ||--o{ CONTRACT_STATUS_HISTORY : "records contract status (cascade)"
@@ -207,14 +219,13 @@ erDiagram
         varchar(40) reference_number UK
         enum contract_type "service | supply | epc | maintenance (D-13: whether more types are needed)"
         enum status "draft | active | suspended | completed (D-12: post-completion obligations)"
-        varchar(26) parent_contract_id FK "nullable; CHANGED: on delete restrict"
+        varchar(26) parent_contract_id FK "nullable, fixed; IMPLEMENTED: restrict, one level"
         bigint current_value_minor "commercial progress denominator"
         date award_date
         date start_date
         date end_date
         date revised_end_date "nullable"
-        date actual_completion_date "nullable"
-        int defects_liability_days "drives POST_CONTRACT_OBLIGATIONS dates"
+        int defects_liability_days "with the completed status date, drives POST_CONTRACT_OBLIGATIONS dates"
         varchar(64) timezone
         varchar(26) lifecycle_template_version_id FK "NEW, nullable; null = legacy or custom lifecycle"
         timestamptz lifecycle_initialised_at "NEW, nullable"
@@ -225,7 +236,7 @@ erDiagram
         varchar(26) id PK "RETAINED"
         varchar(26) contract_id FK
         varchar(26) company_id FK
-        enum party_type "client | contractor | subcontractor | vendor | other"
+        enum party_type "IMPLEMENTED: awarding | awarded, one of each per contract"
         timestamptz signed_at "nullable; D-5: required before activation?"
     }
     %% CHANGED: changed_by_id on delete restrict (today cascade).
@@ -528,7 +539,7 @@ erDiagram
         varchar(26) document_version_id FK "NEW, nullable; pins a version"
         varchar(26) contract_id FK "NEW, nullable; scope, = the document's contract"
         varchar(60) entity_type "CHANGED: varchar with CHECK of real entity kinds: contract | contract_stage | milestone | contract_variation | invoice | payment | compliance_record | hse_inspection | hse_incident | site_daily_log"
-        varchar(36) entity_id "CHANGED: from uuid, so it can hold a ULID"
+        varchar(26) entity_id "IMPLEMENTED: ULID (CHECK), from uuid"
         varchar(255) caption "CHANGED: nullable"
         varchar(26) linked_by_id FK "NEW, nullable, -> company_user"
     }

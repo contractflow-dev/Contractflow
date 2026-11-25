@@ -49,7 +49,6 @@ export interface ContractDateValues {
   startDate: string;
   endDate: string;
   revisedEndDate: string;
-  actualCompletionDate: string;
 }
 
 export type ContractDateErrors = Partial<
@@ -65,7 +64,7 @@ export function validateContractDates(
   values: ContractDateValues,
 ): ContractDateErrors {
   const errors: ContractDateErrors = {};
-  const { startDate, endDate, revisedEndDate, actualCompletionDate } = values;
+  const { startDate, endDate, revisedEndDate } = values;
   // ISO calendar dates compare correctly as strings.
   if (startDate && endDate && startDate > endDate) {
     errors.startDate = "The start date must not be after the end date.";
@@ -73,10 +72,6 @@ export function validateContractDates(
   if (revisedEndDate && endDate && revisedEndDate < endDate) {
     errors.revisedEndDate =
       "The revised end date must not be before the end date.";
-  }
-  if (actualCompletionDate && startDate && actualCompletionDate < startDate) {
-    errors.actualCompletionDate =
-      "The actual completion date must not be before the start date.";
   }
   return errors;
 }
@@ -201,7 +196,6 @@ export const createContractFormSchema = z.object({
       startDate: requiredDate("Enter the start date."),
       endDate: requiredDate("Enter the end date."),
       revisedEndDate: optionalDate,
-      actualCompletionDate: optionalDate,
       defectsLiabilityDays: days(
         "Enter the defects liability period as a whole number of days.",
       ),
@@ -278,7 +272,6 @@ export function createContractDefaults(
       startDate: "",
       endDate: "",
       revisedEndDate: "",
-      actualCompletionDate: "",
       defectsLiabilityDays: "0",
       timezone,
     },
@@ -335,7 +328,6 @@ export function toCreateContractRequest(
     startDate: dates.startDate,
     endDate: dates.endDate,
     revisedEndDate: dates.revisedEndDate || null,
-    actualCompletionDate: dates.actualCompletionDate || null,
     defectsLiabilityDays: Number(dates.defectsLiabilityDays),
     timezone: dates.timezone,
   };
@@ -346,12 +338,16 @@ export function toCreateContractRequest(
  * workspaces aren't edited here (the API doesn't change them; workspaces
  * have their own controls), so the second step is the parent contract.
  */
+/**
+ * Editing has no parties step: the party type, parent contract and
+ * workspaces are fixed when the contract is created (workspaces have their
+ * own controls on the Overview).
+ */
 export const editContractSteps: Array<{
   id: CreateContractStepId;
   title: string;
 }> = [
   { id: "basics", title: "Basics" },
-  { id: "parties", title: "Parent contract" },
   { id: "commercial", title: "Commercial terms" },
   { id: "dates", title: "Dates" },
 ];
@@ -414,7 +410,6 @@ export function contractToFormValues(
       startDate: calendarDay(contract.startDate),
       endDate: calendarDay(contract.endDate),
       revisedEndDate: calendarDay(contract.revisedEndDate),
-      actualCompletionDate: calendarDay(contract.actualCompletionDate),
       defectsLiabilityDays: String(contract.defectsLiabilityDays),
       timezone: contract.timezone,
     },
@@ -436,7 +431,6 @@ export function toUpdateContractRequest(
     title: full.title,
     description: full.description,
     contractType: full.contractType,
-    parentContractId: full.parentContractId,
     retentionRateBps: full.retentionRateBps,
     advancePaymentRateBps: full.advancePaymentRateBps,
     paymentTermsDays: full.paymentTermsDays,
@@ -445,7 +439,6 @@ export function toUpdateContractRequest(
     startDate: full.startDate,
     endDate: full.endDate,
     revisedEndDate: full.revisedEndDate,
-    actualCompletionDate: full.actualCompletionDate,
     defectsLiabilityDays: full.defectsLiabilityDays,
     timezone: full.timezone,
   };

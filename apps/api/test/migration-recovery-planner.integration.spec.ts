@@ -585,11 +585,11 @@ describeDisposablePostgres(
             original_value_minor, current_value_minor, currency_code,
             retention_rate_bps, advance_payment_rate_bps, payment_terms_days,
             liquidated_damages_per_day_minor, award_date, start_date, end_date,
-            revised_end_date, actual_completion_date, defects_liability_days, timezone
+            revised_end_date, defects_liability_days, timezone
           ) VALUES (
             '01H00000000000000000000001', 'CN-UNSEEDED-01', 'Unseeded Project',
             'Desc', 'service', 'draft', 1000, 1000, 'USD', 0, 0, 30, 0,
-            '2026-01-01', '2026-01-01', '2026-12-31', '2026-12-31', '2026-12-31',
+            '2026-01-01', '2026-01-01', '2026-12-31', '2026-12-31',
             0, 'UTC'
           )
         `);
@@ -926,7 +926,6 @@ describeDisposablePostgres(
               ('contract', 'advance_payment_rate_bps'),
               ('contract', 'liquidated_damages_per_day_minor'),
               ('contract', 'revised_end_date'),
-              ('contract', 'actual_completion_date'),
               ('contract_party', 'signatory_first_name'),
               ('contract_party', 'signatory_last_name'),
               ('contract_party', 'signatory_title'),
@@ -935,7 +934,9 @@ describeDisposablePostgres(
               ('contract_status_history', 'reason')
             )
         `);
-          expect(nullableColumns.rows).toHaveLength(11);
+          // actual_completion_date, made nullable by ContractLifecycle, is
+          // dropped later by RemoveActualCompletionDate1794000000004.
+          expect(nullableColumns.rows).toHaveLength(10);
           expect(
             nullableColumns.rows.every(
               ({ is_nullable }) => is_nullable === 'YES',

@@ -37,7 +37,6 @@ export interface Contract {
   startDate: string;
   endDate: string;
   revisedEndDate: string | null;
-  actualCompletionDate: string | null;
   defectsLiabilityDays: number;
   timezone: string;
   createdAt: string;
@@ -233,7 +232,6 @@ export interface CreateContractRequest {
   startDate: string;
   endDate: string;
   revisedEndDate?: string | null;
-  actualCompletionDate?: string | null;
   defectsLiabilityDays: number;
   timezone: string;
 }

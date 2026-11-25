@@ -130,22 +130,19 @@ export function ContractBasicsFields({
   );
 }
 
-/** Step 2: your company's role, any parent contract, and workspaces. */
+/**
+ * Step 2 of creating a contract: your company's role, any parent contract,
+ * and workspaces. None of these change after creation, so editing has no
+ * such step.
+ */
 export function ContractPartiesFields({
   parentContracts,
   parentContractsLoading,
   parentContractsError,
-  editing = false,
 }: {
   parentContracts: Array<Pick<Contract, "id" | "referenceNumber" | "title">>;
   parentContractsLoading: boolean;
   parentContractsError?: unknown;
-  /**
-   * Editing an existing contract: only the parent contract changes here.
-   * The party type is set at creation and workspaces have their own
-   * controls on the contract's Overview.
-   */
-  editing?: boolean;
 }) {
   const {
     control: formControl,
@@ -163,41 +160,35 @@ export function ContractPartiesFields({
   return (
     <>
       <FormSection
-        legend={editing ? "Parent contract" : "Contract parties"}
-        description={
-          editing
-            ? "Your company's party type is set when the contract is created. Workspaces are managed on the contract's Overview."
-            : "Other companies are invited to the contract after the draft is created."
-        }
+        legend="Contract parties"
+        description="Other companies are invited to the contract after the draft is created."
       >
         <FormGrid columns={2}>
-          {editing ? null : (
-            <FormField
-              id={fieldId("partyType")}
-              label="Your company's party type"
-              required
-              description={
-                isSubcontract
-                  ? "Awarding: your company awards this subcontract."
-                  : "Awarding if your company awards this contract; Awarded if it was awarded to your company."
-              }
-              error={fieldErrors?.partyType?.message}
-            >
-              {(control) => (
-                <NativeSelect
-                  {...control}
-                  {...register("parties.partyType")}
-                  className="w-full"
-                >
-                  {Object.values(EPartyType).map((value) => (
-                    <NativeSelectOption key={value} value={value}>
-                      {humanizeEnumValue(value)}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              )}
-            </FormField>
-          )}
+          <FormField
+            id={fieldId("partyType")}
+            label="Your company's party type"
+            required
+            description={
+              isSubcontract
+                ? "Awarding: your company awards this subcontract."
+                : "Awarding if your company awards this contract; Awarded if it was awarded to your company."
+            }
+            error={fieldErrors?.partyType?.message}
+          >
+            {(control) => (
+              <NativeSelect
+                {...control}
+                {...register("parties.partyType")}
+                className="w-full"
+              >
+                {Object.values(EPartyType).map((value) => (
+                  <NativeSelectOption key={value} value={value}>
+                    {humanizeEnumValue(value)}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            )}
+          </FormField>
           <FormField
             id={fieldId("parentContractId")}
             label="Parent contract"
@@ -242,52 +233,50 @@ export function ContractPartiesFields({
         </FormGrid>
       </FormSection>
 
-      {editing ? null : (
-        <FormSection
-          legend="Workspaces"
-          description="Choose the workspaces this contract uses. You can change them later on the contract page."
-        >
-          <Controller
-            control={formControl}
-            name="parties.workspaces"
-            render={({ field }) => (
-              <div className="flex flex-wrap gap-x-6 gap-y-3">
-                {contractWorkspaces.map((workspace) => {
-                  const id = `${workspaceFieldId}-${workspace}`;
-                  return (
-                    <Field
-                      orientation="horizontal"
-                      className="w-fit"
-                      key={workspace}
-                    >
-                      <Checkbox
-                        id={id}
-                        checked={field.value.includes(workspace)}
-                        onCheckedChange={(checked) =>
-                          field.onChange(
-                            checked
-                              ? contractWorkspaces.filter(
-                                  (candidate) =>
-                                    candidate === workspace ||
-                                    field.value.includes(candidate),
-                                )
-                              : field.value.filter(
-                                  (candidate) => candidate !== workspace,
-                                ),
-                          )
-                        }
-                      />
-                      <FieldLabel htmlFor={id} className="font-normal">
-                        {humanizeEnumValue(workspace)}
-                      </FieldLabel>
-                    </Field>
-                  );
-                })}
-              </div>
-            )}
-          />
-        </FormSection>
-      )}
+      <FormSection
+        legend="Workspaces"
+        description="Choose the workspaces this contract uses. You can change them later on the contract page."
+      >
+        <Controller
+          control={formControl}
+          name="parties.workspaces"
+          render={({ field }) => (
+            <div className="flex flex-wrap gap-x-6 gap-y-3">
+              {contractWorkspaces.map((workspace) => {
+                const id = `${workspaceFieldId}-${workspace}`;
+                return (
+                  <Field
+                    orientation="horizontal"
+                    className="w-fit"
+                    key={workspace}
+                  >
+                    <Checkbox
+                      id={id}
+                      checked={field.value.includes(workspace)}
+                      onCheckedChange={(checked) =>
+                        field.onChange(
+                          checked
+                            ? contractWorkspaces.filter(
+                                (candidate) =>
+                                  candidate === workspace ||
+                                  field.value.includes(candidate),
+                              )
+                            : field.value.filter(
+                                (candidate) => candidate !== workspace,
+                              ),
+                        )
+                      }
+                    />
+                    <FieldLabel htmlFor={id} className="font-normal">
+                      {humanizeEnumValue(workspace)}
+                    </FieldLabel>
+                  </Field>
+                );
+              })}
+            </div>
+          )}
+        />
+      </FormSection>
     </>
   );
 }
@@ -541,21 +530,6 @@ export function ContractDatesFields() {
             <Input
               {...control}
               {...register("dates.revisedEndDate")}
-              type="date"
-            />
-          )}
-        </FormField>
-        <FormField
-          id={fieldId("actualCompletionDate")}
-          label="Actual completion date"
-          optional
-          description="Must not be before the start date."
-          error={fieldErrors?.actualCompletionDate?.message}
-        >
-          {(control) => (
-            <Input
-              {...control}
-              {...register("dates.actualCompletionDate")}
               type="date"
             />
           )}

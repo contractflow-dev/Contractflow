@@ -98,10 +98,6 @@ export class CreateContractRequestDto implements CreateContractRequest {
   @IsDateString()
   revisedEndDate?: string | null;
 
-  @IsOptional()
-  @IsDateString()
-  actualCompletionDate?: string | null;
-
   @Type(() => Number)
   @IsInt()
   @Min(0)
