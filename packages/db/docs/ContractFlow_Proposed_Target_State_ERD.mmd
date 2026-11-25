@@ -1,0 +1,560 @@
+%% ContractFlow - PROPOSED TARGET-STATE ERD (universal oil and gas contract lifecycle)
+%%
+%% STATUS: PROPOSAL FOR REVIEW. Nothing in this file exists in the database
+%% unless it is marked RETAINED. No entity, migration or API has been built.
+%% The current schema is in ContractFlow_Current_State_ERD.mmd.
+%%
+%% How to read this file
+%% - Each entity's id comment says what it is:
+%%     RETAINED  - exists today and does not change (only key columns shown;
+%%                 the full definition is in the current-state ERD)
+%%     MODIFIED  - exists today; columns marked NEW or CHANGED are proposed
+%%     NEW       - proposed new entity
+%%     NEW, CONDITIONAL - proposed only if the named decision approves it
+%% - Columns with no marker in a MODIFIED entity exist today, unchanged.
+%% - Every id and *_id is varchar(26) (ULID), as in the current schema.
+%% - Every table also has created_at and updated_at (omitted).
+%% - Relationship labels end with the proposed ON DELETE behaviour.
+%%   Proposed history and evidence tables use no action (restrict) towards
+%%   actors and decisions, as the milestone history tables already do.
+%% - Entities not shown are RETAINED unchanged: APP_USER, USER_SESSION, the token
+%%   tables, COMPANY_INVITATION, COMPANY_AUDIT_LOG, CONTRACT_PARTY_INVITATION,
+%%   CONTRACT_ROLE_ASSIGNMENT, CONTRACT_ROLE_INVITATION, CONTRACT_WORKSPACE,
+%%   CONTRACT_SITE, MILESTONE_OUTSTANDING_ITEM, MILESTONE_SUBMISSION_ITEM,
+%%   INVOICE_ADJUSTMENT, SITE_DAILY_LOG and its children, INVENTORY_ITEM,
+%%   INVENTORY_TRANSACTION, HSE_INCIDENT, HSE_INCIDENT_PERSON,
+%%   HSE_INSPECTION_FINDING, HSE_CORRECTIVE_ACTION, NOTIFICATION, COMMENT,
+%%   CONVERSATION, CONVERSATION_PARTICIPANT, MESSAGE. Defects recorded in the
+%%   current-state ERD for those tables are out of scope for this design.
+%%
+%% New entities: 8, plus 1 conditional
+%%   LIFECYCLE_TEMPLATE, LIFECYCLE_TEMPLATE_VERSION, LIFECYCLE_TEMPLATE_STAGE,
+%%   CONTRACT_STAGE_HISTORY, CONTRACT_STAGE_EVIDENCE,
+%%   COMPLIANCE_OBLIGATION_PERIOD, COMPLIANCE_RECORD_EVIDENCE, COMPLIANCE_REVIEW;
+%%   conditional on decision D-8: WORK_PACKAGE.
+%%
+%% Universal lifecycle: the first SYSTEM template version (seed data, proposed)
+%%   seq | stage_code                | name                                                      | weight_bps
+%%   1   | CONTRACT_AWARD            | Contract Award and Agreement Execution                    | 0
+%%   2   | MOBILISATION              | Mobilisation and Contract Readiness                       | 800
+%%   3   | CONTRACT_EXECUTION        | Contract Execution and Service Delivery                   | 3500
+%%   4   | PERFORMANCE_MONITORING    | Performance Monitoring and Progress Reporting             | 800
+%%   5   | CHANGE_MANAGEMENT         | Contract Change and Variation Management                  | 500
+%%   6   | INSPECTION_ACCEPTANCE     | Inspection, Testing and Acceptance                        | 1500
+%%   7   | COMMERCIAL_RECONCILIATION | Invoicing, Payment and Commercial Reconciliation          | 1200
+%%   8   | CONTRACT_CLOSEOUT         | Handover, Demobilisation and Contract Close-Out           | 1000
+%%   9   | POST_CONTRACT_OBLIGATIONS | Warranty, Defects Liability and Post-Contract Obligations | 700
+%%   total 10000
+%% Construction phases (substructure, superstructure and so on) are NOT stages:
+%% they are contract-specific milestones (and work packages, if D-8 approves).
+%%
+%% Progress (calculated by the backend on read; never stored as a percentage)
+%%   Lifecycle:  sum over stages that are applicable and not cancelled of
+%%               weight_bps x stage_progress, divided by the sum of their weight_bps.
+%%               stage_progress = 10000 when the stage is completed; otherwise
+%%               sum(milestone weight x approved_bps) / sum(milestone weight) over
+%%               its non-cancelled milestones (0 when it has none).
+%%               Zero-weight stages (CONTRACT_AWARD) contribute nothing either way.
+%%   Execution:  milestone approved_bps and approved_quantity (MILESTONE_DECISION history).
+%%   Commercial: certified and paid amounts (INVOICE, PAYMENT) against CONTRACT.current_value_minor.
+%%   Compliance: COMPLIANCE_OBLIGATION_PERIOD rows verified against rows due.
+
+erDiagram
+
+    %% ---------------------------------------------------------------- Templates (NEW)
+    COMPANY |o--o{ LIFECYCLE_TEMPLATE : "owns, null = system (restrict)"
+    LIFECYCLE_TEMPLATE ||--o{ LIFECYCLE_TEMPLATE_VERSION : "is versioned as (restrict)"
+    LIFECYCLE_TEMPLATE_VERSION ||--o{ LIFECYCLE_TEMPLATE_STAGE : "defines (restrict)"
+    LIFECYCLE_TEMPLATE_VERSION |o--o{ LIFECYCLE_TEMPLATE_VERSION : "was derived from (restrict)"
+    COMPANY_USER |o--o{ LIFECYCLE_TEMPLATE_VERSION : "published (restrict)"
+
+    %% ---------------------------------------------------------------- Contract and lifecycle
+    COMPANY ||--o{ CONTRACT_PARTY : "participates as (cascade)"
+    CONTRACT ||--o{ CONTRACT_PARTY : "has parties (cascade)"
+    CONTRACT |o--o{ CONTRACT : "is parent of subcontract (CHANGED: restrict)"
+    LIFECYCLE_TEMPLATE_VERSION |o--o{ CONTRACT : "initialised the lifecycle of (restrict)"
+    COMPANY_USER |o--o{ CONTRACT : "initialised the lifecycle (restrict)"
+    CONTRACT ||--o{ CONTRACT_STATUS_HISTORY : "records contract status (cascade)"
+    COMPANY_USER ||--o{ CONTRACT_STATUS_HISTORY : "changed status (CHANGED: restrict)"
+    CONTRACT ||--o{ CONTRACT_STAGE : "is phased into (cascade)"
+    LIFECYCLE_TEMPLATE_STAGE |o--o{ CONTRACT_STAGE : "is snapshotted as (restrict)"
+    COMPANY_USER |o--o{ CONTRACT_STAGE : "decided applicability (restrict)"
+    CONTRACT_STAGE ||--o{ CONTRACT_STAGE_HISTORY : "records transitions (restrict, composite with contract)"
+    CONTRACT ||--o{ CONTRACT_STAGE_HISTORY : "scopes (cascade)"
+    COMPANY_USER ||--o{ CONTRACT_STAGE_HISTORY : "acted (restrict)"
+    CONTRACT_PARTY ||--o{ CONTRACT_STAGE_HISTORY : "acted for (restrict)"
+    CONTRACT_STAGE ||--o{ CONTRACT_STAGE_EVIDENCE : "is evidenced by (restrict, composite with contract)"
+    CONTRACT_STAGE_HISTORY |o--o{ CONTRACT_STAGE_EVIDENCE : "is supported by (restrict)"
+    CONTRACT ||--o{ CONTRACT_STAGE_EVIDENCE : "scopes (cascade)"
+    DOCUMENT ||--o{ CONTRACT_STAGE_EVIDENCE : "is evidence for (restrict)"
+    DOCUMENT_VERSION ||--o{ CONTRACT_STAGE_EVIDENCE : "is the version attached in (restrict, composite with document)"
+    COMPANY_USER ||--o{ CONTRACT_STAGE_EVIDENCE : "attached (restrict)"
+
+    %% ---------------------------------------------------------------- Execution
+    CONTRACT_STAGE ||--o{ WORK_PACKAGE : "organises (restrict, composite with contract)"
+    CONTRACT ||--o{ WORK_PACKAGE : "scopes (cascade)"
+    CONTRACT_STAGE ||--o{ MILESTONE : "groups (CHANGED: restrict, composite with contract)"
+    WORK_PACKAGE |o--o{ MILESTONE : "contains (restrict, composite with stage)"
+    CONTRACT ||--o{ MILESTONE : "tracks (cascade)"
+    MILESTONE ||--o{ MILESTONE_SUBMISSION : "is submitted in (no action)"
+    MILESTONE_SUBMISSION ||--o| MILESTONE_DECISION : "is decided by (unique, no action)"
+    MILESTONE_SUBMISSION ||--o{ MILESTONE_SUBMISSION_EVIDENCE : "is evidenced by (no action)"
+    DOCUMENT ||--o{ MILESTONE_SUBMISSION_EVIDENCE : "is evidence in (no action)"
+    DOCUMENT_VERSION ||--o{ MILESTONE_SUBMISSION_EVIDENCE : "is the version submitted in (no action)"
+    CONTRACT ||--o{ CONTRACT_VARIATION : "is changed by (cascade)"
+    CONTRACT_PARTY ||--o{ CONTRACT_VARIATION : "raises (cascade)"
+
+    %% ---------------------------------------------------------------- Commercial
+    CONTRACT ||--o{ INVOICE : "is billed through (cascade)"
+    CONTRACT_PARTY ||--o{ INVOICE : "issues (cascade)"
+    CONTRACT_PARTY ||--o{ INVOICE : "is billed (cascade)"
+    INVOICE ||--o{ INVOICE_LINE_ITEM : "itemises (no action)"
+    MILESTONE |o--o{ INVOICE_LINE_ITEM : "is claimed in (CHANGED: nullable, restrict)"
+    INVOICE ||--o{ PAYMENT : "is settled by (cascade)"
+
+    %% ---------------------------------------------------------------- Compliance and Nigerian Content
+    CONTRACT ||--o{ COMPLIANCE_REQUIREMENT : "requires (cascade)"
+    CONTRACT_PARTY |o--o{ COMPLIANCE_REQUIREMENT : "is responsible for (restrict)"
+    CONTRACT_STAGE |o--o{ COMPLIANCE_REQUIREMENT : "is gated by (restrict, composite with contract)"
+    COMPLIANCE_REQUIREMENT ||--o{ COMPLIANCE_OBLIGATION_PERIOD : "falls due in (restrict)"
+    CONTRACT ||--o{ COMPLIANCE_OBLIGATION_PERIOD : "scopes (cascade)"
+    COMPLIANCE_REQUIREMENT ||--o{ COMPLIANCE_RECORD : "is evidenced by (CHANGED: restrict)"
+    COMPLIANCE_OBLIGATION_PERIOD |o--o{ COMPLIANCE_RECORD : "is answered by (restrict)"
+    COMPLIANCE_RECORD |o--o{ COMPLIANCE_OBLIGATION_PERIOD : "satisfies (restrict)"
+    COMPLIANCE_RECORD |o--o{ COMPLIANCE_RECORD : "supersedes (restrict)"
+    CONTRACT_PARTY ||--o{ COMPLIANCE_RECORD : "submits (CHANGED: restrict)"
+    CONTRACT ||--o{ COMPLIANCE_RECORD : "scopes (cascade)"
+    COMPANY_USER |o--o{ COMPLIANCE_RECORD : "submitted (restrict)"
+    COMPANY_USER |o--o{ COMPLIANCE_RECORD : "last verified, cache (restrict)"
+    COMPLIANCE_RECORD ||--o{ COMPLIANCE_RECORD_EVIDENCE : "is evidenced by (restrict, composite with contract)"
+    DOCUMENT ||--o{ COMPLIANCE_RECORD_EVIDENCE : "is evidence in (restrict)"
+    DOCUMENT_VERSION ||--o{ COMPLIANCE_RECORD_EVIDENCE : "is the version submitted in (restrict, composite with document)"
+    CONTRACT ||--o{ COMPLIANCE_RECORD_EVIDENCE : "scopes (cascade)"
+    COMPLIANCE_RECORD ||--o{ COMPLIANCE_REVIEW : "is reviewed in (restrict, composite with contract)"
+    CONTRACT ||--o{ COMPLIANCE_REVIEW : "scopes (cascade)"
+    COMPANY_USER ||--o{ COMPLIANCE_REVIEW : "reviews (restrict)"
+    CONTRACT_PARTY ||--o{ COMPLIANCE_REVIEW : "reviews for (restrict)"
+
+    %% ---------------------------------------------------------------- Documents and audit
+    COMPANY ||--o{ DOCUMENT : "owns (cascade)"
+    CONTRACT |o--o{ DOCUMENT : "files (cascade)"
+    DOCUMENT ||--o{ DOCUMENT_VERSION : "has versions (no action)"
+    DOCUMENT ||--o{ DOCUMENT_LINK : "is attached via (no action)"
+    DOCUMENT_VERSION |o--o{ DOCUMENT_LINK : "pins (restrict)"
+    CONTRACT |o--o{ DOCUMENT_LINK : "scopes (cascade)"
+    COMPANY_USER |o--o{ DOCUMENT_LINK : "linked (restrict)"
+    CONTRACT ||--o{ HSE_INSPECTION : "scopes (cascade)"
+    CONTRACT ||--o{ ACTIVITY_LOG : "is audited in (cascade)"
+    COMPANY_USER ||--o{ ACTIVITY_LOG : "performs (no action)"
+    COMPANY ||--o{ COMPANY_USER : "employs (cascade)"
+
+    %% ================================================================ Entities
+
+    %% Templates ----------------------------------------------------------------
+    %% CHECK: owner_kind = system exactly when owner_company_id IS NULL.
+    %% UNIQUE (owner_company_id, code), with system templates unique on code alone
+    %%   (partial unique index WHERE owner_company_id IS NULL).
+    %% D-2: if only system templates are approved, add CHECK owner_kind = system;
+    %% the shape of the table does not change.
+    LIFECYCLE_TEMPLATE {
+        varchar(26) id PK "NEW"
+        varchar(10) owner_kind "system | company (CHECK)"
+        varchar(26) owner_company_id FK "nullable; null = system template"
+        varchar(60) code "e.g. UNIVERSAL_OIL_GAS"
+        varchar(255) name
+        text description "nullable"
+        boolean is_active "deactivation hides it from new contracts only"
+        timestamptz deactivated_at "nullable"
+    }
+    %% UNIQUE (lifecycle_template_id, version_number)
+    %% UNIQUE (lifecycle_template_id) WHERE status = published: one current version
+    %% CHECK: published_at and published_by_id are set exactly when status <> draft
+    %% TRIGGER: a published or retired version refuses every UPDATE except
+    %%   status published -> retired (with retired_at); DELETE refused unless draft.
+    LIFECYCLE_TEMPLATE_VERSION {
+        varchar(26) id PK "NEW"
+        varchar(26) lifecycle_template_id FK
+        int version_number "1, 2, 3 per template"
+        varchar(20) status "draft | published | retired (CHECK)"
+        varchar(26) derived_from_version_id FK "nullable; the version this draft was copied from"
+        text change_note "nullable"
+        timestamptz published_at "nullable"
+        varchar(26) published_by_id FK "nullable, -> company_user; null for a system seed"
+        timestamptz retired_at "nullable"
+    }
+    %% UNIQUE (lifecycle_template_version_id, sequence)
+    %% UNIQUE (lifecycle_template_version_id, stage_code)
+    %% CHECK default_weight_bps BETWEEN 0 AND 10000
+    %% On publish (service, in the publishing transaction): applicable default
+    %%   weights total exactly 10000. TRIGGER: rows of a non-draft version are immutable.
+    LIFECYCLE_TEMPLATE_STAGE {
+        varchar(26) id PK "NEW"
+        varchar(26) lifecycle_template_version_id FK
+        varchar(40) stage_code "e.g. MOBILISATION (CHECK: upper snake case)"
+        varchar(255) name
+        text description "nullable"
+        int sequence
+        int default_weight_bps
+        boolean default_is_applicable
+        boolean may_be_excluded "false for stages every contract must keep"
+        boolean completes_on_activation "true for CONTRACT_AWARD (D-6)"
+    }
+
+    %% Contract and lifecycle ---------------------------------------------------
+    %% No owning-company column today; ownership stays with CONTRACT_PARTY.
+    CONTRACT {
+        varchar(26) id PK "MODIFIED"
+        varchar(40) reference_number UK
+        enum contract_type "service | supply | epc | maintenance (D-13: whether more types are needed)"
+        enum status "draft | active | suspended | completed (D-12: post-completion obligations)"
+        varchar(26) parent_contract_id FK "nullable; CHANGED: on delete restrict"
+        bigint current_value_minor "commercial progress denominator"
+        date award_date
+        date start_date
+        date end_date
+        date revised_end_date "nullable"
+        date actual_completion_date "nullable"
+        int defects_liability_days "drives POST_CONTRACT_OBLIGATIONS dates"
+        varchar(64) timezone
+        varchar(26) lifecycle_template_version_id FK "NEW, nullable; null = legacy or custom lifecycle"
+        timestamptz lifecycle_initialised_at "NEW, nullable"
+        varchar(26) lifecycle_initialised_by_id FK "NEW, nullable, -> company_user"
+        timestamptz deleted_at "nullable, archived"
+    }
+    CONTRACT_PARTY {
+        varchar(26) id PK "RETAINED"
+        varchar(26) contract_id FK
+        varchar(26) company_id FK
+        enum party_type "client | contractor | subcontractor | vendor | other"
+        timestamptz signed_at "nullable; D-5: required before activation?"
+    }
+    %% CHANGED: changed_by_id on delete restrict (today cascade).
+    %% D-3 of Phase 1: optionally a BEFORE UPDATE/DELETE trigger, as on milestone history.
+    CONTRACT_STATUS_HISTORY {
+        varchar(26) id PK "MODIFIED (constraints only)"
+        varchar(26) contract_id FK
+        enum from_status "nullable"
+        enum to_status
+        text reason "nullable"
+        varchar(26) changed_by_id FK "CHANGED: restrict"
+        timestamptz changed_at
+    }
+    %% NEW UNIQUE (id, contract_id): target of composite FKs from milestone,
+    %%   work package, stage history, stage evidence and compliance requirement.
+    %% NEW UNIQUE (contract_id, sequence) DEFERRABLE INITIALLY DEFERRED (reordering in one transaction).
+    %% NEW UNIQUE (contract_id, stage_code) WHERE stage_code IS NOT NULL.
+    %% NEW CHECK weight_bps BETWEEN 0 AND 10000.
+    %% NEW CHECK applicability: is_applicable = true, or all of
+    %%   (applicability_reason, applicability_decided_by_id, applicability_decided_at) are set.
+    %% Service rules (not expressible as a CHECK): a stage can be made not applicable
+    %%   only while planned and with no non-cancelled milestones; applicable weights
+    %%   total exactly 10000 before activation (D-6).
+    CONTRACT_STAGE {
+        varchar(26) id PK "MODIFIED"
+        varchar(26) contract_id FK
+        varchar(40) stage_code "NEW, nullable; null on legacy and custom stages"
+        varchar(26) template_stage_id FK "NEW, nullable; provenance of the snapshot"
+        varchar(255) name "copied from the template at initialisation"
+        text description "nullable"
+        int sequence "CHANGED: unique within the contract"
+        enum status "planned | in_progress | on_hold | completed | cancelled (CHANGED: transitions to cancelled added; legacy values kept)"
+        int weight_bps "CHANGED: CHECK 0..10000"
+        boolean is_applicable "NEW, default true"
+        text applicability_reason "NEW, nullable; required when not applicable"
+        varchar(26) applicability_decided_by_id FK "NEW, nullable, -> company_user"
+        timestamptz applicability_decided_at "NEW, nullable"
+        date planned_start_date
+        date planned_end_date
+        date actual_start_date "nullable"
+        date actual_end_date "nullable"
+    }
+    %% Append-only: TRIGGER refuses UPDATE and DELETE (as milestone history).
+    %% FK (contract_stage_id, contract_id) -> contract_stage (id, contract_id)
+    %% INDEX (contract_id, contract_stage_id, occurred_at)
+    %% CHECK: event_type = status_changed requires from_status <> to_status;
+    %%   reason required for hold, resume, cancel and applicability changes.
+    %% Written in the same Unit of Work transaction as the stage update and its
+    %% ACTIVITY_LOG entry; metadata carries the activity entry's action name.
+    CONTRACT_STAGE_HISTORY {
+        varchar(26) id PK "NEW"
+        varchar(26) contract_id FK
+        varchar(26) contract_stage_id FK
+        varchar(30) event_type "initialised | status_changed | applicability_changed | weight_changed | dates_changed (CHECK)"
+        varchar(20) from_status "nullable"
+        varchar(20) to_status "nullable"
+        boolean from_is_applicable "nullable"
+        boolean to_is_applicable "nullable"
+        int from_weight_bps "nullable"
+        int to_weight_bps "nullable"
+        date effective_date "nullable; the contract-time-zone day it took effect"
+        text reason "nullable"
+        varchar(26) actor_company_user_id FK "-> company_user"
+        varchar(26) actor_party_id FK "-> contract_party"
+        jsonb metadata "references only, e.g. the template version at initialisation"
+        timestamptz occurred_at
+    }
+    %% Append-only (trigger). UNIQUE (contract_stage_id, document_id).
+    %% FK (contract_stage_id, contract_id) -> contract_stage (id, contract_id)
+    %% FK (document_version_id, document_id) -> document_version (id, document_id): NEW UNIQUE (id, document_id) there.
+    CONTRACT_STAGE_EVIDENCE {
+        varchar(26) id PK "NEW"
+        varchar(26) contract_id FK
+        varchar(26) contract_stage_id FK
+        varchar(26) stage_history_id FK "nullable; the transition it supported, e.g. completion"
+        varchar(26) document_id FK
+        varchar(26) document_version_id FK "the version attached, kept"
+        varchar(255) caption "nullable"
+        varchar(26) attached_by_id FK "-> company_user"
+        timestamptz attached_at
+    }
+
+    %% Execution ----------------------------------------------------------------
+    %% Conditional on D-8. Organisational only: no weight, no progress of its own.
+    %% FK (contract_stage_id, contract_id) -> contract_stage (id, contract_id)
+    %% NEW UNIQUE (id, contract_stage_id): target of the milestone composite FK.
+    %% UNIQUE (contract_stage_id, code) WHERE code IS NOT NULL.
+    WORK_PACKAGE {
+        varchar(26) id PK "NEW, CONDITIONAL (D-8)"
+        varchar(26) contract_id FK
+        varchar(26) contract_stage_id FK
+        varchar(40) code "nullable, e.g. WP-03"
+        varchar(255) title
+        text description "nullable"
+        int sequence "within the stage"
+        varchar(20) status "planned | in_progress | completed | cancelled (CHECK), informational"
+    }
+    %% NEW FK (contract_stage_id, contract_id) -> contract_stage (id, contract_id),
+    %%   replacing today's single-column FK; on delete restrict (today cascade).
+    %% NEW FK (work_package_id, contract_stage_id) -> work_package (id, contract_stage_id).
+    %% Remains the only weighted, measurable execution unit.
+    MILESTONE {
+        varchar(26) id PK "MODIFIED"
+        varchar(26) contract_id FK
+        varchar(26) contract_stage_id FK "CHANGED: composite with contract_id, restrict"
+        varchar(26) work_package_id FK "NEW, CONDITIONAL (D-8), nullable"
+        varchar(255) title
+        text acceptance_criteria "nullable"
+        text deliverables "nullable"
+        enum status
+        int progress_bps "contractor-reported; not used for progress"
+        int approved_bps "client-accepted; execution progress"
+        int weight_bps "share of the stage (CHANGED: CHECK 0..10000)"
+        int target_quantity "nullable"
+        int approved_quantity "nullable"
+        boolean is_payment_milestone
+        bigint amount_minor "nullable"
+        date due_date
+        date revised_due_date "nullable"
+    }
+    MILESTONE_SUBMISSION {
+        varchar(26) id PK "RETAINED"
+        varchar(26) milestone_id FK
+        varchar(20) submission_type
+        timestamptz submitted_at
+    }
+    %% Proposed later: composite FK (document_version_id, document_id) as for the new evidence tables.
+    MILESTONE_SUBMISSION_EVIDENCE {
+        varchar(26) id PK "RETAINED (composite FK proposed)"
+        varchar(26) submission_id FK
+        varchar(26) document_id FK
+        varchar(26) document_version_id FK
+    }
+    MILESTONE_DECISION {
+        varchar(26) id PK "RETAINED"
+        varchar(26) submission_id FK, UK
+        varchar(20) decision
+        int cumulative_approved_bps "historical execution progress"
+        timestamptz decided_at
+    }
+    %% Linking variations to the milestones and stages they change is deferred
+    %% until the variation workflow is built (no write routes exist today).
+    CONTRACT_VARIATION {
+        varchar(26) id PK "RETAINED (requires further investigation)"
+        varchar(26) contract_id FK
+        varchar(26) raised_by_party_id FK
+        enum status
+        bigint amount_delta_minor
+        int time_extension_days
+    }
+
+    %% Commercial ---------------------------------------------------------------
+    INVOICE {
+        varchar(26) id PK "RETAINED (nullability fixes need investigation)"
+        varchar(26) contract_id FK
+        varchar(26) issued_by_party_id FK
+        varchar(26) billed_to_party_id FK
+        enum status "certified amounts feed commercial progress"
+        bigint net_payable_minor
+        bigint amount_paid_minor
+        timestamptz certified_at
+    }
+    INVOICE_LINE_ITEM {
+        varchar(26) id PK "MODIFIED"
+        varchar(26) invoice_id FK
+        varchar(26) milestone_id FK "CHANGED: nullable (retention, variation and other lines); restrict"
+        bigint amount_minor
+    }
+    PAYMENT {
+        varchar(26) id PK "RETAINED"
+        varchar(26) invoice_id FK
+        enum status "completed payments feed commercial progress"
+        bigint invoice_amount_minor
+        date payment_date
+    }
+
+    %% Compliance and Nigerian Content ------------------------------------------
+    %% Cross-cutting: never a lifecycle stage. Targets are entered per contract;
+    %% no statutory percentage is stored by the system.
+    %% NEW UNIQUE (id, contract_id): target of composite FKs.
+    %% FK (gating_stage_id, contract_id) -> contract_stage (id, contract_id)
+    %% CHECK: local_content_area is set only when category = local_content.
+    %% CHECK: gate_mode = none exactly when gating_stage_id IS NULL.
+    COMPLIANCE_REQUIREMENT {
+        varchar(26) id PK "MODIFIED"
+        varchar(26) contract_id FK
+        varchar(255) name
+        text description "CHANGED: nullable"
+        enum category "local_content already exists among the values"
+        varchar(40) local_content_area "NEW, nullable: workforce | local_procurement | equipment_and_materials | subcontracting | technology_transfer | ncdmb_approval | nogic_jqs | community_commitment | other (CHECK)"
+        enum applies_to_party_type
+        varchar(26) responsible_party_id FK "NEW, nullable, -> contract_party"
+        boolean is_mandatory
+        enum frequency
+        date first_due_date "CHANGED: nullable"
+        text target_description "NEW, nullable; the contract's own commitment, as agreed"
+        bigint target_value "NEW, nullable; entered per contract, never hardcoded"
+        varchar(40) target_unit "NEW, nullable, e.g. percent_bps, person_hours, NGN_minor"
+        varchar(26) gating_stage_id FK "NEW, nullable, -> contract_stage"
+        varchar(20) gate_mode "NEW: none | advisory | blocks_start | blocks_completion (CHECK), default none (D-9)"
+        boolean is_active "NEW, default true"
+    }
+    %% One row per due occurrence of a requirement: the obligation status.
+    %% UNIQUE (compliance_requirement_id, period_start)
+    %% FK (compliance_requirement_id, contract_id) -> compliance_requirement (id, contract_id)
+    %% Status is maintained by the compliance service from records and reviews:
+    %%   outstanding (due, nothing accepted) -> submitted -> under_review ->
+    %%   verified | rejected (back to outstanding for resubmission); expired when
+    %%   verified evidence passes its expiry date; waived only with a reason.
+    COMPLIANCE_OBLIGATION_PERIOD {
+        varchar(26) id PK "NEW"
+        varchar(26) contract_id FK
+        varchar(26) compliance_requirement_id FK
+        date period_start
+        date period_end "nullable for once and event-based obligations"
+        date due_date
+        varchar(20) status "outstanding | submitted | under_review | verified | rejected | expired | waived (CHECK)"
+        varchar(26) accepted_record_id FK "nullable; the record that satisfied it"
+        text waiver_reason "nullable; required when waived"
+    }
+    %% A submission of evidence. A correction is a new row that supersedes the old one,
+    %% so rejected records are kept.
+    %% NEW UNIQUE (id, contract_id). CHANGED: nullable columns listed below.
+    %% verified_at and verified_by_id become a cache of the latest COMPLIANCE_REVIEW.
+    COMPLIANCE_RECORD {
+        varchar(26) id PK "MODIFIED"
+        varchar(26) contract_id FK
+        varchar(26) compliance_requirement_id FK "CHANGED: restrict"
+        varchar(26) obligation_period_id FK "NEW, nullable; null on legacy rows"
+        varchar(26) supersedes_record_id FK "NEW, nullable, -> compliance_record"
+        varchar(26) contract_party_id FK "CHANGED: restrict"
+        varchar(100) reference_number "CHANGED: nullable"
+        varchar(255) issuing_authority "CHANGED: nullable, e.g. NCDMB"
+        date issue_date "CHANGED: nullable"
+        date expiry_date "CHANGED: nullable"
+        bigint reported_value "NEW, nullable; measured against target_value"
+        bigint covered_amount_minor "CHANGED: nullable"
+        char(3) currency_code "CHANGED: nullable"
+        enum status "CHANGED: submitted | under_review | verified | rejected | expired | withdrawn added; legacy values kept"
+        varchar(26) submitted_by_id FK "NEW, nullable, -> company_user"
+        timestamptz submitted_at "NEW, nullable"
+        timestamptz verified_at "CHANGED: nullable, cache"
+        varchar(26) verified_by_id FK "CHANGED: nullable, restrict, cache"
+        text remarks "CHANGED: nullable"
+    }
+    %% Append-only (trigger). UNIQUE (compliance_record_id, position), (compliance_record_id, document_id).
+    %% FK (compliance_record_id, contract_id) -> compliance_record (id, contract_id)
+    %% FK (document_version_id, document_id) -> document_version (id, document_id)
+    COMPLIANCE_RECORD_EVIDENCE {
+        varchar(26) id PK "NEW"
+        varchar(26) contract_id FK
+        varchar(26) compliance_record_id FK
+        varchar(26) document_id FK
+        varchar(26) document_version_id FK "the version submitted, kept"
+        varchar(255) caption "nullable"
+        int position
+    }
+    %% Append-only (trigger). The verification decision history.
+    %% FK (compliance_record_id, contract_id) -> compliance_record (id, contract_id)
+    %% CHECK: reason required unless decision = verified.
+    %% Records the client's review of evidence; it is not a regulatory certification.
+    COMPLIANCE_REVIEW {
+        varchar(26) id PK "NEW"
+        varchar(26) contract_id FK
+        varchar(26) compliance_record_id FK
+        varchar(20) decision "under_review | verified | rejected (CHECK)"
+        text reason "nullable; required for rejected"
+        varchar(26) reviewed_by_id FK "-> company_user"
+        varchar(26) reviewed_by_party_id FK "-> contract_party"
+        timestamptz reviewed_at
+    }
+
+    %% Documents and audit ------------------------------------------------------
+    DOCUMENT {
+        varchar(26) id PK "RETAINED"
+        varchar(26) contract_id FK "nullable"
+        varchar(26) owner_company_id FK
+        enum category
+        enum visibility
+        timestamptz deleted_at "nullable"
+    }
+    %% NEW UNIQUE (id, document_id): target of composite evidence FKs.
+    %% Proposed: TRIGGER refusing UPDATE of content columns once upload_status = available.
+    DOCUMENT_VERSION {
+        varchar(26) id PK "MODIFIED (constraints only)"
+        varchar(26) document_id FK
+        int version_number
+        varchar(512) storage_key UK
+        enum upload_status
+        char(64) checksum_sha256
+    }
+    %% General reference attachments that carry no decision (variations, invoices,
+    %% inspections, closeout packs) until those modules get typed evidence tables.
+    %% Integrity: the service checks entity_id exists in the same contract scope;
+    %% no database FK is possible for a polymorphic reference.
+    %% NEW INDEX (contract_id, entity_type, entity_id).
+    DOCUMENT_LINK {
+        varchar(26) id PK "MODIFIED"
+        varchar(26) document_id FK
+        varchar(26) document_version_id FK "NEW, nullable; pins a version"
+        varchar(26) contract_id FK "NEW, nullable; scope, = the document's contract"
+        varchar(60) entity_type "CHANGED: varchar with CHECK of real entity kinds: contract | contract_stage | milestone | contract_variation | invoice | payment | compliance_record | hse_inspection | hse_incident | site_daily_log"
+        varchar(36) entity_id "CHANGED: from uuid, so it can hold a ULID"
+        varchar(255) caption "CHANGED: nullable"
+        varchar(26) linked_by_id FK "NEW, nullable, -> company_user"
+    }
+    HSE_INSPECTION {
+        varchar(26) id PK "RETAINED"
+        varchar(26) contract_id FK
+        enum status
+        enum overall_result "evidence for INSPECTION_ACCEPTANCE via DOCUMENT_LINK"
+    }
+    %% Proposed: BEFORE UPDATE/DELETE trigger (open item in docs/AUDIT_LOG.md).
+    ACTIVITY_LOG {
+        varchar(26) id PK "RETAINED (trigger proposed)"
+        varchar(26) contract_id FK
+        varchar(26) actor_user_id FK "-> company_user"
+        varchar(100) action "new: stage.applicability_changed, stage.cancelled, lifecycle.initialised, compliance.*"
+        varchar(60) entity_type
+        varchar(36) entity_id
+        varchar(20) workspace "nullable"
+        timestamptz occurred_at
+    }
+    COMPANY {
+        varchar(26) id PK "RETAINED"
+        varchar(255) name
+    }
+    COMPANY_USER {
+        varchar(26) id PK "RETAINED"
+        varchar(26) company_id FK
+        enum company_role "Company Administrator | Member"
+    }
