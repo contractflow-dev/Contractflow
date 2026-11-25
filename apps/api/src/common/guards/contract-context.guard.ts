@@ -5,8 +5,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import type { AuthenticatedRequest } from './session-auth.guard';
-
-const ULID_PATTERN = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/i;
+import { isUlid } from '@contractflow/contracts-schema';
 
 /**
  * Requires contract context through the X-Contract-Id header. Apply it only to
@@ -33,7 +32,7 @@ export class ContractContextGuard implements CanActivate {
       throw new BadRequestException('X-Contract-Id header is required.');
     }
     const contractId = header.trim();
-    if (!ULID_PATTERN.test(contractId)) {
+    if (!isUlid(contractId)) {
       throw new BadRequestException('X-Contract-Id must be a valid ULID.');
     }
 

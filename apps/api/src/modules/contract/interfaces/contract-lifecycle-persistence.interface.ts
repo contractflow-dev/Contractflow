@@ -24,7 +24,7 @@ export type ICreateContractRecord = Partial<Contract>;
 
 export type IContractPermissionSnapshot = Pick<
   Contract,
-  'id' | 'createdByCompanyId' | 'deletedAt'
+  'id' | 'createdByCompanyId' | 'deletedAt' | 'parentContractId' | 'status'
 >;
 
 export interface IContractPartyWithRelations extends ContractParty {
@@ -54,10 +54,6 @@ export interface ILifecycleContractRepository {
   findActiveById(contractId: string): Promise<Contract | null>;
   create(data: ICreateContractRecord): Promise<Contract>;
   save(contract: Contract): Promise<Contract>;
-  parentWouldCreateCycle(
-    parentContractId: string,
-    contractId: string,
-  ): Promise<boolean>;
   /** Subcontracts of this contract that aren't archived. */
   countActiveChildren(contractId: string): Promise<number>;
 }
@@ -66,6 +62,8 @@ export interface ILifecyclePartyRepository {
   find(contractId: string, companyId: string): Promise<ContractParty | null>;
   /** Parties to the contract other than `companyId`'s. */
   countOtherParties(contractId: string, companyId: string): Promise<number>;
+  /** Whether the contract already has a party of this type. */
+  hasPartyOfType(contractId: string, partyType: EPartyType): Promise<boolean>;
   findForShare(
     contractId: string,
     companyId: string,
@@ -108,6 +106,11 @@ export interface IActiveAssignmentCriteria {
 
 export interface ILifecycleRoleAssignmentRepository {
   hasActiveAssignment(criteria: IActiveAssignmentCriteria): Promise<boolean>;
+  /** Gives a member a contract role on a party (not workspace admin). */
+  assign(
+    criteria: IActiveAssignmentCriteria & { assignedById: string },
+    assignedAt: Date,
+  ): Promise<void>;
   /** Whether the member holds any active role on the party (visibility). */
   hasAnyActiveAssignment(
     criteria: Omit<IActiveAssignmentCriteria, 'role'>,

@@ -26,6 +26,7 @@ import {
   DocumentService,
   type IDocumentActor,
 } from '../services/document.service';
+import { ParseUlidPipe } from '../../../common/pipes/parse-ulid.pipe';
 
 /**
  * Documents of the contract named by X-Contract-Id, within the company named
@@ -64,7 +65,7 @@ export class DocumentController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('documentId') documentId: string,
+    @Param('documentId', ParseUlidPipe) documentId: string,
   ) {
     return this.documents.get(actor(user, companyId, contractId), documentId);
   }
@@ -74,7 +75,7 @@ export class DocumentController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('documentId') documentId: string,
+    @Param('documentId', ParseUlidPipe) documentId: string,
     @Body() body: DocumentFileRequestDto,
   ) {
     return this.documents.createVersionUpload(
@@ -90,8 +91,8 @@ export class DocumentController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('documentId') documentId: string,
-    @Param('versionId') versionId: string,
+    @Param('documentId', ParseUlidPipe) documentId: string,
+    @Param('versionId', ParseUlidPipe) versionId: string,
   ) {
     return this.documents.completeUpload(
       actor(user, companyId, contractId),
@@ -105,7 +106,7 @@ export class DocumentController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('documentId') documentId: string,
+    @Param('documentId', ParseUlidPipe) documentId: string,
     @Query() query: DocumentDownloadQueryDto,
   ) {
     return this.documents.createDownloadUrl(
@@ -121,7 +122,7 @@ export class DocumentController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('documentId') documentId: string,
+    @Param('documentId', ParseUlidPipe) documentId: string,
   ) {
     return this.documents.delete(
       actor(user, companyId, contractId),

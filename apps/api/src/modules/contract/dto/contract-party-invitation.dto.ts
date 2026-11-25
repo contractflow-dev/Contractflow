@@ -14,7 +14,8 @@ export class CreateContractPartyInvitationRequestDto {
   @Length(3, 320)
   email!: string;
 
-  @IsIn([EPartyType.CONTRACTOR, EPartyType.SUBCONTRACTOR])
+  /** Invitations always bring in the AWARDED party. */
+  @IsIn([EPartyType.AWARDED])
   partyType!: InvitableContractPartyType;
 }
 

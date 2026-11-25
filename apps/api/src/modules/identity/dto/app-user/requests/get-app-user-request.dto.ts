@@ -1,6 +1,7 @@
 import { Matches } from 'class-validator';
+import { ULID_PATTERN } from '@contractflow/contracts-schema';
 
 export class GetAppUserDto {
-  @Matches(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/i)
+  @Matches(ULID_PATTERN)
   id: string;
 }

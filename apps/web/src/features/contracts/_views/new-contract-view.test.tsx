@@ -11,10 +11,12 @@ const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   replace: vi.fn(),
   canManageCompany: true,
+  search: "",
 }));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mocks.push, replace: mocks.replace }),
+  useSearchParams: () => new URLSearchParams(mocks.search),
 }));
 vi.mock("@/features/companies/CompanyAdminShell", () => ({
   CompanyAdminShell: ({
@@ -41,6 +43,7 @@ beforeEach(() => {
   mocks.push.mockReset();
   mocks.replace.mockReset();
   mocks.canManageCompany = true;
+  mocks.search = "";
 });
 afterEach(cleanup);
 
@@ -88,6 +91,29 @@ describe("NewContractView", () => {
     ).toBeTruthy();
     expect(screen.queryByRole("form")).toBeNull();
     expect(backLink().getAttribute("href")).toBe("/dashboards/contracts");
+  });
+
+  it("opens as a subcontract of ?parent= for any member; the API decides who may", () => {
+    mocks.canManageCompany = false;
+    mocks.search = "parent=01JD4X2Y3Z4A5B6C7D8E9F0G1H";
+    setup();
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "New subcontract" }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText(/Only Company Administrators can create contracts/),
+    ).toBeNull();
+  });
+
+  it("ignores a ?parent= that isn't a contract id", () => {
+    mocks.canManageCompany = false;
+    mocks.search = "parent=not-an-id";
+    setup();
+
+    expect(
+      screen.getByText(/Only Company Administrators can create contracts/),
+    ).toBeTruthy();
   });
 
   it("returns to the register on Cancel when nothing has been entered", async () => {

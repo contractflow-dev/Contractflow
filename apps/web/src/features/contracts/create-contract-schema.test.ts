@@ -1,14 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  EContractStatus,
   EContractType,
   ECurrencyCode,
   EPartyType,
 } from "@contractflow/contracts-schema";
+import type { ContractListItem } from "@/services/contractApi";
 import {
   createContractDefaults,
   createContractFormSchema,
   createContractSteps,
   defaultTimeZone,
+  eligibleParentContracts,
   timeZoneOptions,
   toCreateContractRequest,
   validateContractDates,
@@ -73,7 +76,7 @@ function validValues(): CreateContractFormValues {
       title: " Pipeline maintenance ",
       contractType: EContractType.MAINTENANCE,
     },
-    parties: { ...values.parties, partyType: EPartyType.CLIENT },
+    parties: { ...values.parties, partyType: EPartyType.AWARDING },
     commercial: {
       ...values.commercial,
       currencyCode: ECurrencyCode.NGN,
@@ -173,7 +176,7 @@ describe("toCreateContractRequest", () => {
       title: "Pipeline maintenance",
       description: null,
       contractType: EContractType.MAINTENANCE,
-      partyType: EPartyType.CLIENT,
+      partyType: EPartyType.AWARDING,
       workspaces: ["project", "hse", "finance"],
       parentContractId: null,
       originalValueMinor: "150000050",
@@ -273,5 +276,49 @@ describe("time zones", () => {
     const zones = timeZoneOptions();
     expect(zones).toContain(defaultTimeZone(zones));
     expect(defaultTimeZone(["UTC"])).toBe("UTC");
+  });
+});
+
+describe("subcontracts", () => {
+  it("requires your company to be awarding on a subcontract", () => {
+    const values = validValues();
+    values.parties.parentContractId = "01JD4X2Y3Z4A5B6C7D8E9F0G1H";
+    values.parties.partyType = EPartyType.AWARDED;
+    expect(issues(values)).toEqual({
+      "parties.partyType":
+        "Your company awards a subcontract: choose Awarding.",
+    });
+    values.parties.partyType = EPartyType.AWARDING;
+    expect(issues(values)).toEqual({});
+  });
+
+  it("offers as parents only main contracts awarded to your company, draft or active", () => {
+    const listed = (overrides: Partial<ContractListItem>) =>
+      ({
+        id: overrides.referenceNumber,
+        parentContractId: null,
+        deletedAt: null,
+        status: EContractStatus.ACTIVE,
+        myPartyType: EPartyType.AWARDED,
+        ...overrides,
+      }) as ContractListItem;
+    const contracts = [
+      listed({ referenceNumber: "ACTIVE" }),
+      listed({ referenceNumber: "DRAFT", status: EContractStatus.DRAFT }),
+      listed({
+        referenceNumber: "SUSPENDED",
+        status: EContractStatus.SUSPENDED,
+      }),
+      listed({
+        referenceNumber: "COMPLETED",
+        status: EContractStatus.COMPLETED,
+      }),
+      listed({ referenceNumber: "CLIENT", myPartyType: EPartyType.AWARDING }),
+      listed({ referenceNumber: "SUB", parentContractId: "main" }),
+      listed({ referenceNumber: "ARCHIVED", deletedAt: "2026-06-01" }),
+    ];
+    expect(
+      eligibleParentContracts(contracts).map((c) => c.referenceNumber),
+    ).toEqual(["ACTIVE", "DRAFT"]);
   });
 });

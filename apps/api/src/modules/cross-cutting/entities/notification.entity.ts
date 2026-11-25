@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, JoinColumn } from "typeorm";
+import { Entity, Column, ManyToOne, JoinColumn, Check } from "typeorm";
 import { User } from "../../identity/entities/app-user.entity";
 import { Contract } from "../../contract/entities/contract.entity";
 import { BaseCustomEntity } from "./base-custom.entity";
@@ -8,6 +8,8 @@ import { ENotificationChannel, ENotificationStatus } from "@contractflow/contrac
 
 
 @Entity("notification")
+// A polymorphic reference: no foreign key, so the writer checks it exists.
+@Check("ck_notification_entity_id_ulid", `"entity_id" ~* '^[0-7][0-9A-HJKMNP-TV-Z]{25}$'`)
 export class Notification extends BaseCustomEntity implements INotificationEntity{
 
     @Column({name: "recipient_user_id", type: "varchar", length: 26})
@@ -36,7 +38,7 @@ export class Notification extends BaseCustomEntity implements INotificationEntit
     @Column({name: "entity_type", type: "varchar", length: 60 })
     entityType!: string
 
-    @Column({name: "entity_id",type: "uuid"})
+    @Column({name: "entity_id", type: "varchar", length: 26})
     entityId!: string
 
     @Column({name: "channel", type: "enum", enum: ENotificationChannel})

@@ -77,7 +77,7 @@ function loaded(value: Contract, canManage = true) {
     error: undefined,
     currentData: {
       contract: value,
-      membership: { partyType: EPartyType.CLIENT },
+      membership: { partyType: EPartyType.AWARDING },
     },
   };
   mocks.permissions = { isLoading: false, currentData: { canManage } };

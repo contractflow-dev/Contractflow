@@ -177,6 +177,35 @@ export class ContractRepository extends BaseRepository<
     return row?.timezone ?? null;
   }
 
+  /**
+   * The visible, unarchived contracts among `ids`. Used to name a related
+   * contract only when the reader may already see it.
+   */
+  findVisibleByIds(
+    scope: IContractVisibilityScope,
+    ids: string[],
+  ): Promise<Contract[]> {
+    if (ids.length === 0) return Promise.resolve([]);
+    return this.scopedQuery(scope, 'contract')
+      .andWhere('contract.deletedAt IS NULL')
+      .andWhere('contract.id IN (:...ids)', { ids })
+      .getMany();
+  }
+
+  /** A main contract's visible, unarchived subcontracts, by reference. */
+  findVisibleSubcontracts(
+    scope: IContractVisibilityScope,
+    parentContractId: string,
+  ): Promise<Contract[]> {
+    return this.scopedQuery(scope, 'contract')
+      .andWhere('contract.deletedAt IS NULL')
+      .andWhere('contract.parentContractId = :parentContractId', {
+        parentContractId,
+      })
+      .orderBy('contract.referenceNumber', 'ASC')
+      .getMany();
+  }
+
   /** Like findById, but an archived (soft-deleted) contract is returned too. */
   findByIdIncludingArchived(
     scope: IContractVisibilityScope,

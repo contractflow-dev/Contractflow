@@ -13,10 +13,6 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/dialog";
 import { Input } from "@workspace/ui/components/input";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@workspace/ui/components/native-select";
 import { FormField } from "@/components/forms/form-field";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { emailFieldError } from "@/lib/email-field";
@@ -28,16 +24,19 @@ import {
 
 /**
  * Invites another company to be a party to this contract. This is not a
- * company team invitation: nobody joins the inviting company.
+ * company team invitation: nobody joins the inviting company. On a
+ * subcontract, the invited company is the subcontractor.
  */
 export function InviteCompanyDialog({
   companyId,
   contract,
+  subcontract = false,
   open,
   onOpenChange,
 }: {
   companyId: string;
   contract: Pick<Contract, "id" | "referenceNumber" | "title">;
+  subcontract?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -49,6 +48,7 @@ export function InviteCompanyDialog({
           <InviteCompanyForm
             companyId={companyId}
             contract={contract}
+            subcontract={subcontract}
             onDone={() => onOpenChange(false)}
           />
         ) : null}
@@ -60,14 +60,15 @@ export function InviteCompanyDialog({
 function InviteCompanyForm({
   companyId,
   contract,
+  subcontract,
   onDone,
 }: {
   companyId: string;
   contract: Pick<Contract, "id" | "referenceNumber" | "title">;
+  subcontract: boolean;
   onDone: () => void;
 }) {
   const [email, setEmail] = useState("");
-  const [partyType, setPartyType] = useState<EPartyType>(EPartyType.CONTRACTOR);
   const [emailError, setEmailError] = useState<string>();
   const [failure, setFailure] = useState("");
   const [createInvitation, state] = useCreateContractPartyInvitationMutation();
@@ -84,7 +85,8 @@ function InviteCompanyForm({
         companyId,
         contractId: contract.id,
         email: email.trim(),
-        partyType,
+        // An invited company always joins as the awarded party.
+        partyType: EPartyType.AWARDED,
       }).unwrap();
       notifySuccess(
         "Company invitation sent",
@@ -102,11 +104,13 @@ function InviteCompanyForm({
     <form
       noValidate
       onSubmit={(event) => void submit(event)}
-      aria-label="Invite a company"
+      aria-label={subcontract ? "Invite a subcontractor" : "Invite a company"}
       className="space-y-5"
     >
       <DialogHeader className="pe-8">
-        <DialogTitle>Invite a company</DialogTitle>
+        <DialogTitle>
+          {subcontract ? "Invite a subcontractor" : "Invite a company"}
+        </DialogTitle>
         <DialogDescription>
           Invite an active, verified company to join {contract.referenceNumber}{" "}
           · {contract.title}, using the email address on its company profile.
@@ -134,25 +138,11 @@ function InviteCompanyForm({
             />
           )}
         </FormField>
-        <FormField id="party-invitation-type" label="Party type">
-          {(control) => (
-            <NativeSelect
-              {...control}
-              className="w-full"
-              value={partyType}
-              onChange={(event) =>
-                setPartyType(event.target.value as EPartyType)
-              }
-            >
-              <NativeSelectOption value={EPartyType.CONTRACTOR}>
-                Contractor
-              </NativeSelectOption>
-              <NativeSelectOption value={EPartyType.SUBCONTRACTOR}>
-                Subcontractor
-              </NativeSelectOption>
-            </NativeSelect>
-          )}
-        </FormField>
+        <p className="text-sm text-muted-foreground">
+          The company joins this contract as the{" "}
+          <span className="font-medium text-foreground">awarded</span> party
+          {subcontract ? ": the subcontractor." : "."}
+        </p>
       </div>
 
       {failure ? (

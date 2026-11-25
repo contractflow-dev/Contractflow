@@ -295,7 +295,7 @@ export class MailService {
       partyType.charAt(0).toUpperCase() + partyType.slice(1);
     const { text, html } = renderEmail({
       heading: `Your company is invited to join ${contractTitle}`,
-      intro: `${invitingCompanyName} invited your verified company to join ${contractTitle} as ${partyType} on ContractFlow.`,
+      intro: `${invitingCompanyName} invited your verified company to join ${contractTitle} as the ${partyType} party on ContractFlow.`,
       details: [
         { label: 'Contract', value: contractTitle },
         { label: 'Invited by', value: invitingCompanyName },

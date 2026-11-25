@@ -862,6 +862,8 @@ export const probeSql: Record<string, string> = {
         WHERE n.nspname = current_schema() AND t.relname = 'contract_party_invitation' AND c.contype = 'c'
           AND (
             pg_get_constraintdef(c.oid) ILIKE '%party_type%contractor%subcontractor%'
+            -- ContractPartyClassification1793900000000 narrows it to awarded.
+            OR pg_get_constraintdef(c.oid) ILIKE '%party_type%awarded%'
             OR pg_get_constraintdef(c.oid) ILIKE '%status%pending%accepted%rejected%expired%revoked%'
           )
       )

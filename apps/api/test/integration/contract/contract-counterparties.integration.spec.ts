@@ -1,3 +1,4 @@
+import { EPartyType } from '@contractflow/contracts-schema';
 import type { DataSource } from 'typeorm';
 import { Contract } from '../../../src/modules/contract/entities/contract.entity';
 import { ContractParty } from '../../../src/modules/contract/entities/contract-party.entity';
@@ -46,16 +47,20 @@ describe('ContractPartyRepository.findCounterparties (PostgreSQL)', () => {
 
     // Mine and partner's contract.
     const shared = await factory!.createAdditionalContract(mine);
-    await factory!.createAdditionalParty(shared, mine);
-    await factory!.createAdditionalParty(shared, partner);
+    await factory!.createAdditionalParty(shared, mine, EPartyType.AWARDING);
+    await factory!.createAdditionalParty(shared, partner, EPartyType.AWARDED);
     // A contract between partner and stranger that mine is not party to.
     const foreign = await factory!.createAdditionalContract(partner);
-    await factory!.createAdditionalParty(foreign, partner);
-    await factory!.createAdditionalParty(foreign, stranger);
+    await factory!.createAdditionalParty(foreign, partner, EPartyType.AWARDING);
+    await factory!.createAdditionalParty(foreign, stranger, EPartyType.AWARDED);
     // Mine and stranger's contract, archived.
     const archived = await factory!.createAdditionalContract(mine);
-    await factory!.createAdditionalParty(archived, mine);
-    await factory!.createAdditionalParty(archived, stranger);
+    await factory!.createAdditionalParty(archived, mine, EPartyType.AWARDING);
+    await factory!.createAdditionalParty(
+      archived,
+      stranger,
+      EPartyType.AWARDED,
+    );
     await dataSource!
       .getRepository(Contract)
       .update({ id: archived.id }, { deletedAt: new Date() });
@@ -70,7 +75,7 @@ describe('ContractPartyRepository.findCounterparties (PostgreSQL)', () => {
       {
         contractId: shared.id,
         companyName: partner.name,
-        partyType: 'contractor',
+        partyType: 'awarded',
       },
     ]);
   });

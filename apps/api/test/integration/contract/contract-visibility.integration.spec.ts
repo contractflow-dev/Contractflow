@@ -728,6 +728,10 @@ describe('Contract visibility (PostgreSQL)', () => {
         canManage: false,
         canTransition: true,
         canRestore: false,
+        canInviteParties: false,
+        invitesSubcontractors: false,
+        // The awarded party's Contractor Project Lead on a draft contract.
+        canCreateSubcontract: true,
       });
     });
 
@@ -1241,6 +1245,9 @@ describe('Contract visibility (PostgreSQL)', () => {
         canManage: true,
         canTransition: false,
         canRestore: false,
+        canInviteParties: true,
+        invitesSubcontractors: false,
+        canCreateSubcontract: false,
       });
       const roles = await getContract(
         '/role-management',

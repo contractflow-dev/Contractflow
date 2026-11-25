@@ -12,14 +12,13 @@ export type ContractPartyInvitationStatus =
   | 'expired'
   | 'revoked';
 
-export type InvitableContractPartyType =
-  | EPartyType.CONTRACTOR
-  | EPartyType.SUBCONTRACTOR;
+/** An invitation always brings in an AWARDED party. */
+export type InvitableContractPartyType = EPartyType.AWARDED;
 
 @Entity('contract_party_invitation')
 @Check(
   'ck_contract_party_invitation_type',
-  `"party_type" IN ('contractor', 'subcontractor')`,
+  `"party_type" IN ('awarded')`,
 )
 @Check(
   'ck_contract_party_invitation_status',

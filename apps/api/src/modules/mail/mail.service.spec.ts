@@ -309,7 +309,7 @@ describe('MailService', () => {
       'company@example.com',
       'Pipeline Upgrade',
       'Example Energy',
-      'subcontractor',
+      'awarded',
       'party-token',
     );
 
@@ -319,9 +319,10 @@ describe('MailService', () => {
     expect(subject).toBe('Contract invitation for Pipeline Upgrade');
     expect(html).toContain('>Review Contract Invitation</a>');
     expect(linksIn(html)).toEqual([url, url]);
-    expect(html).toContain('>Subcontractor<');
+    expect(html).toContain('>Awarded<');
     expect(text).toContain('Invited by: Example Energy');
-    expect(text).toContain('Party type: Subcontractor');
+    expect(text).toContain('Party type: Awarded');
+    expect(text).toContain('as the awarded party');
     expect(text).toContain('accept or reject');
     expect(text).toContain(`Review Contract Invitation: ${url}`);
   });

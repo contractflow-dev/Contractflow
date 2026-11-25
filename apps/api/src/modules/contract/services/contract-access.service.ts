@@ -44,6 +44,8 @@ export interface IContractOversightAuthorization {
   contract: Contract;
   /** The reader is an active Company Administrator of the header company. */
   isCompanyAdmin: boolean;
+  /** The reader's own membership id in the header company. */
+  companyUserId: string;
 }
 
 /**
@@ -126,6 +128,7 @@ export class ContractAccessService {
       party,
       contract,
       isCompanyAdmin,
+      companyUserId: membership.id,
     };
   }
 

@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useState, type MouseEvent } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useId, useState, type MouseEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { isUlid } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
@@ -16,12 +17,28 @@ const backLinkClass = "text-sm text-primary underline-offset-4 hover:underline";
 
 export function NewContractView() {
   return (
+    <Suspense fallback={null}>
+      <NewContractRoute />
+    </Suspense>
+  );
+}
+
+function NewContractRoute() {
+  // `?parent=` opens the form as a subcontract of that main contract. The
+  // id is only a starting value: the API decides who may subcontract it.
+  const parent = useSearchParams().get("parent");
+  const parentContractId = parent && isUlid(parent) ? parent : undefined;
+  return (
     <CompanyAdminShell>
       {(access) =>
-        // Creating contracts is for Company Administrators; the API makes the
-        // same check when the contract is created.
-        access.membership.canManageCompany ? (
-          <NewContractPage companyId={access.company.id} />
+        // A main contract is created by a Company Administrator; a
+        // subcontract by the main contract's Contractor Project Lead. The API
+        // makes the same checks when the contract is created.
+        parentContractId || access.membership.canManageCompany ? (
+          <NewContractPage
+            companyId={access.company.id}
+            parentContractId={parentContractId}
+          />
         ) : (
           <div className="space-y-4">
             <Link className={backLinkClass} href={CONTRACTS_PATH}>
@@ -42,7 +59,14 @@ export function NewContractView() {
 }
 
 /** The New contract form as its own page under the contract register. */
-export function NewContractPage({ companyId }: { companyId: string }) {
+export function NewContractPage({
+  companyId,
+  parentContractId,
+}: {
+  companyId: string;
+  /** Set to create a subcontract of this main contract. */
+  parentContractId?: string;
+}) {
   const router = useRouter();
   const formId = useId();
   const [dirty, setDirty] = useState(false);
@@ -75,8 +99,12 @@ export function NewContractPage({ companyId }: { companyId: string }) {
           Back to contracts
         </Link>
         <PageHeader
-          title="New contract"
-          description="Create a draft contract for this company. You can invite the other parties and assign roles once the draft exists."
+          title={parentContractId ? "New subcontract" : "New contract"}
+          description={
+            parentContractId
+              ? "Create a draft subcontract that your company awards. You lead it, and invite the subcontractor once the draft exists."
+              : "Create a draft contract for this company. You can invite the other parties and assign roles once the draft exists."
+          }
         />
       </div>
 
@@ -85,6 +113,7 @@ export function NewContractPage({ companyId }: { companyId: string }) {
           <CreateContractWizard
             formId={formId}
             companyId={companyId}
+            parentContractId={parentContractId}
             onCancel={requestLeave}
             onDirtyChange={setDirty}
           />

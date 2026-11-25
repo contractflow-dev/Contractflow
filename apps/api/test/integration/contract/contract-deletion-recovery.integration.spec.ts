@@ -197,10 +197,9 @@ describe('Contract deletion and recovery (PostgreSQL)', () => {
         revokedAt: null,
       }),
     );
-    const subcontract = await factory.createAdditionalContract(company);
-    await dataSource
-      .getRepository(Contract)
-      .update({ id: subcontract.id }, { parentContractId: contract.id });
+    const subcontract = await factory.createAdditionalContract(company, {
+      parentContractId: contract.id,
+    });
     return {
       company,
       actor,

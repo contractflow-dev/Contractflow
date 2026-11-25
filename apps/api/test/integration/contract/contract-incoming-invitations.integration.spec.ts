@@ -57,6 +57,10 @@ describe('Incoming contract invitations (PostgreSQL)', () => {
     contract = fixture.contract;
     client = fixture.company;
     clientAdmin = fixture.actor;
+    // The inviting client awards the contract; the invitee will be awarded.
+    await dataSource!
+      .getRepository(ContractParty)
+      .update({ id: fixture.party.id }, { partyType: EPartyType.AWARDING });
     ({ company: invitee, member: inviteeAdmin } =
       await factory!.createCompanyMember(ECompanyRole.COMPANY_ADMIN));
     inviteeMember = await factory!.createAdditionalMember(invitee);
@@ -79,7 +83,7 @@ describe('Incoming contract invitations (PostgreSQL)', () => {
   const invite = () =>
     service.inviteCompany(clientAdmin.userId, client.id, contract.id, {
       email: invitee.email,
-      partyType: EPartyType.CONTRACTOR,
+      partyType: EPartyType.AWARDED,
     });
   const listFor = (member: CompanyUser) =>
     service.listIncomingInvitations(member.userId, member.companyId);
@@ -108,7 +112,7 @@ describe('Incoming contract invitations (PostgreSQL)', () => {
         contractTitle: contract.title,
         contractReference: contract.referenceNumber,
         invitingCompanyName: client.name,
-        partyType: EPartyType.CONTRACTOR,
+        partyType: EPartyType.AWARDED,
         email: invitee.email,
       }),
     ]);
@@ -144,7 +148,7 @@ describe('Incoming contract invitations (PostgreSQL)', () => {
       status: 'accepted',
     });
     await expect(partyOf(invitee)).resolves.toMatchObject({
-      partyType: EPartyType.CONTRACTOR,
+      partyType: EPartyType.AWARDED,
     });
     await expect(respond(inviteeAdmin, id, 'reject')).rejects.toBeInstanceOf(
       ConflictException,

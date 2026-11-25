@@ -150,10 +150,15 @@ export function ContractPartiesFields({
   const {
     control: formControl,
     register,
+    setValue,
     formState: { errors },
   } = useCreateContractForm();
   const workspaceFieldId = useId();
   const fieldErrors = errors.parties;
+  // A subcontract is awarded by your company, so its party type is fixed.
+  const isSubcontract = Boolean(
+    useWatch({ control: formControl, name: "parties.parentContractId" }),
+  );
 
   return (
     <>
@@ -171,7 +176,11 @@ export function ContractPartiesFields({
               id={fieldId("partyType")}
               label="Your company's party type"
               required
-              description="The role your company has in this contract."
+              description={
+                isSubcontract
+                  ? "Awarding: your company awards this subcontract."
+                  : "Awarding if your company awards this contract; Awarded if it was awarded to your company."
+              }
               error={fieldErrors?.partyType?.message}
             >
               {(control) => (
@@ -193,7 +202,7 @@ export function ContractPartiesFields({
             id={fieldId("parentContractId")}
             label="Parent contract"
             optional
-            description="Choose the main contract if this is a subcontract."
+            description="Choose the main contract if this is a subcontract. Only main contracts awarded to your company, in draft or active, are listed."
             error={
               parentContractsError
                 ? getApiErrorMessage(
@@ -206,7 +215,15 @@ export function ContractPartiesFields({
             {(control) => (
               <NativeSelect
                 {...control}
-                {...register("parties.parentContractId")}
+                {...register("parties.parentContractId", {
+                  onChange: (event: { target: { value: string } }) => {
+                    if (event.target.value) {
+                      setValue("parties.partyType", EPartyType.AWARDING, {
+                        shouldDirty: true,
+                      });
+                    }
+                  },
+                })}
                 className="w-full"
                 disabled={parentContractsLoading}
                 aria-busy={parentContractsLoading || undefined}

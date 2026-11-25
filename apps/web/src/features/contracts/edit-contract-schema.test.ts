@@ -95,14 +95,14 @@ describe("editing values round-trip exactly", () => {
 
 describe("contractToFormValues", () => {
   it("fills every step from the contract, and passes the form's own checks", () => {
-    const values = contractToFormValues(contract(), EPartyType.CLIENT);
+    const values = contractToFormValues(contract(), EPartyType.AWARDING);
     expect(values).toMatchObject({
       basics: {
         referenceNumber: "CTR-001",
         title: "Pipeline maintenance",
         description: "",
       },
-      parties: { partyType: EPartyType.CLIENT, parentContractId: "" },
+      parties: { partyType: EPartyType.AWARDING, parentContractId: "" },
       commercial: {
         currencyCode: ECurrencyCode.NGN,
         originalValue: "1,500,000.50",
@@ -129,7 +129,7 @@ describe("contractToFormValues", () => {
         advancePaymentRateBps: null,
         liquidatedDamagesPerDayMinor: null,
       }),
-      EPartyType.CLIENT,
+      EPartyType.AWARDING,
     );
     expect(values.commercial.advancePaymentRate).toBe("");
     expect(values.commercial.liquidatedDamagesPerDay).toBe("");
@@ -138,7 +138,7 @@ describe("contractToFormValues", () => {
 
 describe("toUpdateContractRequest", () => {
   it("sends what the update changes, never the reference, party type or workspaces", () => {
-    const values = contractToFormValues(contract(), EPartyType.CLIENT);
+    const values = contractToFormValues(contract(), EPartyType.AWARDING);
     values.basics.title = "Pipeline maintenance (phase 2)";
     const body = toUpdateContractRequest(values, { valueLocked: false });
 
@@ -163,7 +163,7 @@ describe("toUpdateContractRequest", () => {
     expect(isContractValueLocked(active)).toBe(true);
 
     const body = toUpdateContractRequest(
-      contractToFormValues(active, EPartyType.CLIENT),
+      contractToFormValues(active, EPartyType.AWARDING),
       { valueLocked: true },
     );
     expect(body).not.toHaveProperty("originalValueMinor");

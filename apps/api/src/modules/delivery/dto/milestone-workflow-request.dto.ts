@@ -12,6 +12,7 @@ import {
   type TransitionContractStageRequest,
   type UpdateContractStageRequest,
   type UpdateMilestoneRequest,
+  ULID_PATTERN,
 } from '@contractflow/contracts-schema';
 import { PartialType } from '@nestjs/mapped-types';
 import { Transform, Type } from 'class-transformer';
@@ -36,7 +37,7 @@ import { DAY_OR_ZONED_INSTANT } from '../../../common/application/instant-range'
 import { IsMinorAmount } from '../../../common/dto/minor-amount.validation';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
-const ULID = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/i;
+const ULID = ULID_PATTERN;
 const INSTANT_MESSAGE =
   'must be a date (YYYY-MM-DD) or an ISO 8601 time with a time zone';
 const DAY = /^\d{4}-\d{2}-\d{2}$/;

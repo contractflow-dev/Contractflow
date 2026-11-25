@@ -4,6 +4,7 @@ import {
   Index,
   ManyToOne,
   JoinColumn,
+  Unique,
 } from 'typeorm';
 import { Contract } from './contract.entity';
 import { Company } from '../../identity/entities/company.entity';
@@ -13,6 +14,18 @@ import { EPartyType } from '@contractflow/contracts-schema';
 
 @Entity('contract_party')
 @Index('uq_contract_party_id_company', ['id', 'companyId'], { unique: true })
+// A contract is between two companies: at most one AWARDING and one
+// AWARDED party, each a different company. The subcontract rules that span
+// two contracts are the database trigger contract_party_rules.
+@Index('uq_contract_party_one_awarding', ['contractId'], {
+  unique: true,
+  where: `"party_type" = 'awarding'`,
+})
+@Index('uq_contract_party_one_awarded', ['contractId'], {
+  unique: true,
+  where: `"party_type" = 'awarded'`,
+})
+@Unique('uq_contract_party_contract_company', ['contractId', 'companyId'])
 export class ContractParty extends BaseCustomEntity implements IContractPartyEntity
 {
   @Column({ name: 'contract_id', type: 'varchar', length: 26 })

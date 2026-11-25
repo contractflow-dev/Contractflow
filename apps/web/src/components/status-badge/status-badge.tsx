@@ -62,8 +62,8 @@ const STATUS_PRESENTATION: Record<
   [EContractStatus.ACTIVE]: { label: "Active", tone: "success" },
   [EContractStatus.SUSPENDED]: { label: "Suspended", tone: "warning" },
   [EContractStatus.COMPLETED]: { label: "Completed", tone: "info" },
-  [EToStatus.CANCELLED]: { label: "Cancelled", tone: "danger" },
-  [EToStatus.UNDER_REVIEW]: { label: "Under review", tone: "warning" },
+  // Stages and milestones; contracts are archived, never cancelled.
+  [EStatus.CANCELLED]: { label: "Cancelled", tone: "danger" },
   [ARCHIVED_STATUS]: { label: "Archived", tone: "inactive" },
   // Company, contract-party, and contract-role invitations
   [EInvitationStatus.PENDING]: { label: "Pending", tone: "warning" },

@@ -23,6 +23,7 @@ import {
   EContractType,
   ECurrencyCode,
   EPartyType,
+  ULID_PATTERN,
 } from '@contractflow/contracts-schema';
 import { IsMinorAmount } from '../../../common/dto/minor-amount.validation';
 
@@ -53,7 +54,7 @@ export class CreateContractRequestDto implements CreateContractRequest {
   workspaces!: AssignableContractWorkspace[];
 
   @IsOptional()
-  @Matches(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/i)
+  @Matches(ULID_PATTERN)
   parentContractId?: string | null;
 
   @IsMinorAmount('non-negative')

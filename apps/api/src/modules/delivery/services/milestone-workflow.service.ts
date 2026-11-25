@@ -66,17 +66,17 @@ import {
   type ContractAction,
 } from './milestone-workflow.rules';
 
-/** Who plans and decides: the client's Client Project Manager. */
+/** Who plans and decides: the awarding party's Client Project Manager. */
 const PLANNER = {
   role: EClientContractRole.CLIENT_PROJECT_MANAGER,
-  parties: [EPartyType.CLIENT],
+  parties: [EPartyType.AWARDING],
   refusal: 'Only the client’s Client Project Manager can',
 } as const;
 
-/** Who performs and submits: the contractor's Contractor Project Lead. */
+/** Who performs and submits: the awarded party's Contractor Project Lead. */
 const SUBMITTER = {
   role: EContractorContractRole.CONTRACTOR_PROJECT_LEAD,
-  parties: [EPartyType.CONTRACTOR, EPartyType.SUBCONTRACTOR],
+  parties: [EPartyType.AWARDED],
   refusal: 'Only the contractor’s Contractor Project Lead can',
 } as const;
 

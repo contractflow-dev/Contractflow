@@ -66,7 +66,7 @@ describe("ContractSignatoryManagement", () => {
       data: {
         id: "party-1",
         companyId: "company-1",
-        partyType: EPartyType.CLIENT,
+        partyType: EPartyType.AWARDING,
         signatoryFirstName: "Ada",
         signatoryLastName: "Lovelace",
         signatoryTitle: "Director",

@@ -48,6 +48,7 @@ import {
   CompanyDepartmentParamDto,
   ListDepartmentContractsRequestDto,
 } from '../dto/company-department.dto';
+import { ParseUlidPipe } from '../../../common/pipes/parse-ulid.pipe';
 
 @Controller()
 @UseGuards(CompanyContextGuard)
@@ -260,7 +261,7 @@ export class ContractController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('siteId') siteId: string,
+    @Param('siteId', ParseUlidPipe) siteId: string,
     @Body() body: UpdateContractSiteRequestDto,
   ) {
     return this.lifecycle.updateSite(
@@ -336,7 +337,7 @@ export class ContractController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('invitationId') invitationId: string,
+    @Param('invitationId', ParseUlidPipe) invitationId: string,
   ) {
     return this.lifecycle.revokeCompanyInvitation(
       user.id,
@@ -449,7 +450,7 @@ export class ContractController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('assignmentId') assignmentId: string,
+    @Param('assignmentId', ParseUlidPipe) assignmentId: string,
   ) {
     return this.roleAssignments.revoke(
       user.id,
@@ -465,7 +466,7 @@ export class ContractController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('assignmentId') assignmentId: string,
+    @Param('assignmentId', ParseUlidPipe) assignmentId: string,
     @Body() body: SetWorkspaceAdminRequestDto,
   ) {
     return this.roleAssignments.setWorkspaceAdmin(
@@ -519,7 +520,7 @@ export class ContractController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('invitationId') invitationId: string,
+    @Param('invitationId', ParseUlidPipe) invitationId: string,
   ) {
     return this.roleAssignments.revokeInvitation(
       user.id,

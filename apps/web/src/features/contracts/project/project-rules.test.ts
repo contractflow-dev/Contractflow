@@ -36,7 +36,7 @@ describe("projectPermissions", () => {
     const permissions = projectPermissions({
       ...base,
       roles: [CPM],
-      partyType: EPartyType.CLIENT,
+      partyType: EPartyType.AWARDING,
     });
     expect(permissions).toMatchObject({
       isPlanner: true,
@@ -48,8 +48,8 @@ describe("projectPermissions", () => {
     });
   });
 
-  it("lets a contractor-side Contractor Project Lead submit, never plan or decide", () => {
-    for (const partyType of [EPartyType.CONTRACTOR, EPartyType.SUBCONTRACTOR]) {
+  it("lets the awarded party's Contractor Project Lead submit, never plan or decide", () => {
+    for (const partyType of [EPartyType.AWARDED]) {
       expect(
         projectPermissions({ ...base, roles: [CPL], partyType }),
       ).toMatchObject({
@@ -72,7 +72,7 @@ describe("projectPermissions", () => {
       const permissions = projectPermissions({
         ...base,
         roles,
-        partyType: EPartyType.CLIENT,
+        partyType: EPartyType.AWARDING,
       });
       expect(permissions.canPlan || permissions.canSubmit).toBe(false);
       expect(permissions.canOperateAsPlanner).toBe(false);
@@ -84,14 +84,14 @@ describe("projectPermissions", () => {
       projectPermissions({
         ...base,
         roles: [CPM],
-        partyType: EPartyType.CONTRACTOR,
+        partyType: EPartyType.AWARDED,
       }).isPlanner,
     ).toBe(false);
     expect(
       projectPermissions({
         ...base,
         roles: [CPL],
-        partyType: EPartyType.CLIENT,
+        partyType: EPartyType.AWARDING,
       }).isSubmitter,
     ).toBe(false);
     expect(
@@ -103,7 +103,7 @@ describe("projectPermissions", () => {
   it("allows planning only on a draft, and nothing on a suspended, completed or archived contract", () => {
     const draft = projectPermissions({
       roles: [CPM],
-      partyType: EPartyType.CLIENT,
+      partyType: EPartyType.AWARDING,
       contractStatus: EContractStatus.DRAFT,
       archived: false,
     });
@@ -112,7 +112,7 @@ describe("projectPermissions", () => {
     expect(
       projectPermissions({
         roles: [CPL],
-        partyType: EPartyType.CONTRACTOR,
+        partyType: EPartyType.AWARDED,
         contractStatus: EContractStatus.DRAFT,
         archived: false,
       }).canSubmit,
@@ -124,13 +124,13 @@ describe("projectPermissions", () => {
     ]) {
       const planner = projectPermissions({
         roles: [CPM],
-        partyType: EPartyType.CLIENT,
+        partyType: EPartyType.AWARDING,
         contractStatus,
         archived: false,
       });
       const lead = projectPermissions({
         roles: [CPL],
-        partyType: EPartyType.CONTRACTOR,
+        partyType: EPartyType.AWARDED,
         contractStatus,
         archived: false,
       });
@@ -143,7 +143,7 @@ describe("projectPermissions", () => {
 
     const archived = projectPermissions({
       roles: [CPM],
-      partyType: EPartyType.CLIENT,
+      partyType: EPartyType.AWARDING,
       contractStatus: EContractStatus.ACTIVE,
       archived: true,
     });

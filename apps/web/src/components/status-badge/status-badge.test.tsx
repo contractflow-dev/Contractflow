@@ -7,6 +7,7 @@ import {
   EContractStatus,
   EFromStatus,
   EInvitationStatus,
+  EStatus,
   EToStatus,
 } from "@contractflow/contracts-schema";
 import {
@@ -48,11 +49,7 @@ describe("getStatusPresentation", () => {
       "warning",
     );
     expect(getStatusPresentation(EContractStatus.COMPLETED).tone).toBe("info");
-    expect(getStatusPresentation(EToStatus.CANCELLED).tone).toBe("danger");
-    expect(getStatusPresentation(EToStatus.UNDER_REVIEW)).toEqual({
-      label: "Under review",
-      tone: "warning",
-    });
+    expect(getStatusPresentation(EStatus.CANCELLED).tone).toBe("danger");
     expect(getStatusPresentation(EInvitationStatus.PENDING).tone).toBe(
       "warning",
     );

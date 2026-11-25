@@ -56,7 +56,7 @@ function contract(overrides: Partial<ContractListItem> = {}): ContractListItem {
     revisedEndDate: null,
     deletedAt: null,
     counterparties: [
-      { companyName: "Bravo Energy Ltd", partyType: EPartyType.CLIENT },
+      { companyName: "Bravo Energy Ltd", partyType: EPartyType.AWARDING },
     ],
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
@@ -186,8 +186,8 @@ describe("ContractsList", () => {
       currentData: page([
         contract({
           counterparties: [
-            { companyName: "Bravo Energy Ltd", partyType: EPartyType.CLIENT },
-            { companyName: "Delta Supply", partyType: EPartyType.VENDOR },
+            { companyName: "Bravo Energy Ltd", partyType: EPartyType.AWARDING },
+            { companyName: "Delta Supply", partyType: EPartyType.AWARDED },
           ],
         }),
         contract({ id: "c-2", counterparties: [] }),
@@ -198,9 +198,9 @@ describe("ContractsList", () => {
     expect(markup).toContain(">Counterparty</th>");
     expect(markup).toContain(">Counterparty</dt>");
     expect(markup.match(/Bravo Energy Ltd/g)).toHaveLength(2);
-    expect(markup).toContain("(Client)");
+    expect(markup).toContain("(Awarding)");
     expect(markup).toContain("Delta Supply");
-    expect(markup).toContain("(Vendor)");
+    expect(markup).toContain("(Awarded)");
     // A contract no other company has joined yet says so.
     expect(markup.match(/>None yet</g)).toHaveLength(2);
   });

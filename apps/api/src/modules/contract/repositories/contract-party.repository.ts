@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, Repository } from 'typeorm';
+import { FindOptionsWhere, In, Repository } from 'typeorm';
 import { ContractParty } from '../entities/contract-party.entity';
 import { ContractScopedRepository } from '../../../common/database/repositories/contract-scoped.repository';
 import { IContractScope } from '../../../common/database/repositories/contract-scope.interface';
-import { EContractStatus } from '@contractflow/contracts-schema';
+import { EContractStatus, EPartyType } from '@contractflow/contracts-schema';
 import type { DashboardContractRow } from '../interfaces/dashboard-contract-row.interface';
 
 type Scope = IContractScope;
@@ -49,6 +49,22 @@ export class ContractPartyRepository extends ContractScopedRepository<ContractPa
     });
   }
 
+  /**
+   * The company's own party type on each of the given contracts. Pass only
+   * contracts already proven visible: it reveals nothing about others.
+   */
+  async findOwnPartyTypes(
+    companyId: string,
+    contractIds: string[],
+  ): Promise<{ contractId: string; partyType: ContractParty['partyType'] }[]> {
+    if (!companyId.trim() || contractIds.length === 0) return [];
+    const rows = await this.repository.find({
+      select: { contractId: true, partyType: true },
+      where: { companyId, contractId: In(contractIds) },
+    });
+    return rows.map(({ contractId, partyType }) => ({ contractId, partyType }));
+  }
+
   /** The company's party row, share-locked so it can't change meanwhile. */
   findByCompanyForShare(scope: Scope, companyId: string) {
     return this.findOne(scope, {
@@ -59,17 +75,17 @@ export class ContractPartyRepository extends ContractScopedRepository<ContractPa
 
   findAwarding(scope: Scope) {
     return this.findOne(scope, {
-      where: { partyType: 'client' } as FindOptionsWhere<ContractParty>,
+      where: { partyType: EPartyType.AWARDING } as FindOptionsWhere<ContractParty>,
     });
   }
 
   findAwarded(scope: Scope) {
     return this.findOne(scope, {
-      where: { partyType: 'contractor' } as FindOptionsWhere<ContractParty>,
+      where: { partyType: EPartyType.AWARDED } as FindOptionsWhere<ContractParty>,
     });
   }
 
-  /** True once every party has signed (drives PENDING_SIGNATURE -> ACTIVE). */
+  /** True once every party to the contract has signed. */
   async allSigned(scope: Scope): Promise<boolean> {
     const r = await this.scopedQuery(scope)
       .select('COUNT(*)', 'total')
@@ -196,7 +212,7 @@ export class ContractPartyRepository extends ContractScopedRepository<ContractPa
          FROM compliance_record r
          JOIN own o ON o.id = r.contract_id
          JOIN contract_party p ON p.id = r.contract_party_id
-         WHERE p.party_type IN ('contractor', 'subcontractor')
+         WHERE p.party_type = 'awarded'
        ),
        open_invoices AS (
          SELECT v.due_date

@@ -108,7 +108,13 @@ export class ContractLifecycleContextFactory implements ITransactionContextFacto
         findPermissionSnapshot: (contractId) =>
           contracts.findOne({
             where: { id: contractId },
-            select: { id: true, createdByCompanyId: true, deletedAt: true },
+            select: {
+              id: true,
+              createdByCompanyId: true,
+              deletedAt: true,
+              parentContractId: true,
+              status: true,
+            },
           }),
         findForUpdate: (contractId) =>
           contracts.findOne({
@@ -128,34 +134,14 @@ export class ContractLifecycleContextFactory implements ITransactionContextFacto
           contracts.count({
             where: { parentContractId: contractId, deletedAt: IsNull() },
           }),
-        parentWouldCreateCycle: async (parentContractId, contractId) => {
-          const rows = (await manager.query(
-            `
-              WITH RECURSIVE parent_chain("id", "parent_contract_id") AS (
-                SELECT "id", "parent_contract_id"
-                FROM "contract"
-                WHERE "id" = $1 AND "deleted_at" IS NULL
-                UNION ALL
-                SELECT parent."id", parent."parent_contract_id"
-                FROM "contract" AS parent
-                INNER JOIN parent_chain AS chain
-                  ON parent."id" = chain."parent_contract_id"
-                WHERE parent."deleted_at" IS NULL
-              )
-              SELECT EXISTS (
-                SELECT 1 FROM parent_chain WHERE "id" = $2
-              ) AS "found"
-            `,
-            [parentContractId, contractId],
-          )) as Array<{ found: boolean }>;
-          return rows[0]?.found === true;
-        },
       },
       parties: {
         find: (contractId, companyId) =>
           parties.findOne({ where: { contractId, companyId } }),
         countOtherParties: (contractId, companyId) =>
           parties.count({ where: { contractId, companyId: Not(companyId) } }),
+        hasPartyOfType: async (contractId, partyType) =>
+          (await parties.count({ where: { contractId, partyType } })) > 0,
         findForShare: (contractId, companyId) =>
           parties.findOne({
             where: { contractId, companyId },
@@ -207,6 +193,21 @@ export class ContractLifecycleContextFactory implements ITransactionContextFacto
       roleAssignments: {
         hasActiveAssignment: async (criteria) =>
           Boolean(await assignmentQuery(criteria).getOne()),
+        assign: async (criteria, assignedAt) => {
+          await assignments.save(
+            assignments.create({
+              companyId: criteria.companyId,
+              contractPartyId: criteria.contractPartyId,
+              companyUserId: criteria.companyUserId,
+              role: criteria.role,
+              isWorkspaceAdmin: false,
+              assignedAt,
+              assignedById: criteria.assignedById,
+              revokedAt: null,
+              revokedById: null,
+            }),
+          );
+        },
         hasAnyActiveAssignment: async (criteria) =>
           Boolean(await memberAssignmentQuery(criteria).getOne()),
         hasActiveAssignmentForShare: async (criteria) =>

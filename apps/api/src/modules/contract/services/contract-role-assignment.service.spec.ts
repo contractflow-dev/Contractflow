@@ -41,7 +41,7 @@ describe('ContractRoleAssignmentService', () => {
     id: 'party-1',
     contractId: 'contract-1',
     companyId: 'company-1',
-    partyType: EPartyType.CONTRACTOR,
+    partyType: EPartyType.AWARDED,
   };
   const assignment: IRoleAssignmentRecord = {
     id: 'assignment-1',
@@ -299,7 +299,7 @@ describe('ContractRoleAssignmentService', () => {
   it('preserves party-type validation before creating an assignment', async () => {
     transactionContext.parties.findForUpdate = vi.fn(async () => ({
       ...party,
-      partyType: EPartyType.CONTRACTOR,
+      partyType: EPartyType.AWARDED,
     }));
 
     await expect(
@@ -318,7 +318,7 @@ describe('ContractRoleAssignmentService', () => {
   describe('client and contractor role sides', () => {
     it.each([
       [
-        EPartyType.CLIENT,
+        EPartyType.AWARDING,
         'project',
         'client',
         [
@@ -327,7 +327,7 @@ describe('ContractRoleAssignmentService', () => {
         ],
       ],
       [
-        EPartyType.CONTRACTOR,
+        EPartyType.AWARDED,
         'project',
         'contractor',
         [
@@ -336,7 +336,7 @@ describe('ContractRoleAssignmentService', () => {
         ],
       ],
       [
-        EPartyType.VENDOR,
+        EPartyType.AWARDED,
         'hse',
         'contractor',
         [
@@ -345,7 +345,7 @@ describe('ContractRoleAssignmentService', () => {
         ],
       ],
       [
-        EPartyType.CLIENT,
+        EPartyType.AWARDING,
         'finance',
         'client',
         [
@@ -395,31 +395,29 @@ describe('ContractRoleAssignmentService', () => {
 
     it.each([
       [
-        EPartyType.CLIENT,
+        EPartyType.AWARDING,
         'project',
         EClientContractRole.CLIENT_PROJECT_MANAGER,
       ],
-      [EPartyType.CLIENT, 'project', EClientContractRole.CLIENT_SITE_ENGINEER],
-      [EPartyType.CLIENT, 'hse', EClientContractRole.HSE_OFFICER],
-      [EPartyType.CLIENT, 'finance', EClientContractRole.FINANCE_DIRECTOR],
       [
-        EPartyType.CONTRACTOR,
+        EPartyType.AWARDING,
+        'project',
+        EClientContractRole.CLIENT_SITE_ENGINEER,
+      ],
+      [EPartyType.AWARDING, 'hse', EClientContractRole.HSE_OFFICER],
+      [EPartyType.AWARDING, 'finance', EClientContractRole.FINANCE_DIRECTOR],
+      [
+        EPartyType.AWARDED,
         'project',
         EContractorContractRole.CONTRACTOR_PROJECT_LEAD,
       ],
-      [EPartyType.CONTRACTOR, 'hse', EContractorContractRole.HSE_MANAGER],
+      [EPartyType.AWARDED, 'hse', EContractorContractRole.HSE_MANAGER],
+      [EPartyType.AWARDED, 'finance', EContractorContractRole.FINANCE_OFFICER],
       [
-        EPartyType.CONTRACTOR,
-        'finance',
-        EContractorContractRole.FINANCE_OFFICER,
-      ],
-      [
-        EPartyType.SUBCONTRACTOR,
+        EPartyType.AWARDED,
         'project',
         EContractorContractRole.CONTRACTOR_SITE_SUPERVISOR,
       ],
-      [EPartyType.VENDOR, 'finance', EContractorContractRole.FINANCE_DIRECTOR],
-      [EPartyType.OTHER, 'hse', EContractorContractRole.HSE_OFFICER],
     ] as const)(
       'assigns a %s party its own side’s role (%s: %s)',
       async (partyType, workspace, role) => {
@@ -445,12 +443,10 @@ describe('ContractRoleAssignmentService', () => {
     );
 
     it.each([
-      [EPartyType.CLIENT, EContractorContractRole.CONTRACTOR_PROJECT_LEAD],
-      [EPartyType.CLIENT, EContractorContractRole.CONTRACTOR_SITE_SUPERVISOR],
-      [EPartyType.CONTRACTOR, EClientContractRole.CLIENT_PROJECT_MANAGER],
-      [EPartyType.SUBCONTRACTOR, EClientContractRole.CLIENT_SITE_ENGINEER],
-      [EPartyType.VENDOR, EClientContractRole.CLIENT_PROJECT_MANAGER],
-      [EPartyType.OTHER, EClientContractRole.CLIENT_SITE_ENGINEER],
+      [EPartyType.AWARDING, EContractorContractRole.CONTRACTOR_PROJECT_LEAD],
+      [EPartyType.AWARDING, EContractorContractRole.CONTRACTOR_SITE_SUPERVISOR],
+      [EPartyType.AWARDED, EClientContractRole.CLIENT_PROJECT_MANAGER],
+      [EPartyType.AWARDED, EClientContractRole.CLIENT_SITE_ENGINEER],
     ] as const)(
       'refuses a %s party the other side’s role %s, for assignments and invitations',
       async (partyType, role) => {

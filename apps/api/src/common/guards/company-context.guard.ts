@@ -7,8 +7,7 @@ import {
 } from '@nestjs/common';
 import type { AuthenticatedRequest } from './session-auth.guard';
 import { CompanyScopeService } from '../../modules/identity/services/company/company-scope.service';
-
-const ULID_PATTERN = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/i;
+import { isUlid } from '@contractflow/contracts-schema';
 
 @Injectable()
 export class CompanyContextGuard implements CanActivate {
@@ -25,7 +24,7 @@ export class CompanyContextGuard implements CanActivate {
       throw new BadRequestException('X-Company-Id header is required.');
     }
     const companyId = header.trim();
-    if (!ULID_PATTERN.test(companyId)) {
+    if (!isUlid(companyId)) {
       throw new BadRequestException('X-Company-Id must be a valid ULID.');
     }
 

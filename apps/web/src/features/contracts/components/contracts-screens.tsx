@@ -76,6 +76,11 @@ import {
   type ContractSection,
 } from "../contract-sections";
 import { ContractActivity } from "./contract-activity";
+import {
+  ParentContractLine,
+  SubcontractNote,
+  SubcontractsSection,
+} from "./related-contracts";
 import { ContractWorkspacesCard } from "./contract-workspace-screens";
 import { ContractWorkspaceManagement } from "./contract-workspace-management";
 import {
@@ -337,6 +342,7 @@ export function ContractsList({
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {contract.referenceNumber} ·{" "}
                     {humanizeEnumValue(contract.contractType)}
+                    <SubcontractNote contract={contract} />
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
@@ -588,6 +594,7 @@ const REGISTER_COLUMNS: ReadonlyArray<DataTableColumn<ContractListItem>> = [
         <p className="mt-0.5 text-xs text-muted-foreground">
           {contract.referenceNumber} ·{" "}
           {humanizeEnumValue(contract.contractType)}
+          <SubcontractNote contract={contract} />
         </p>
       </>
     ),
@@ -835,17 +842,10 @@ export function ContractDetail({
             {contract.description}
           </p>
         ) : null}
-        {contract.parentContractId ? (
-          <p className="mt-3 text-sm text-muted-foreground">
-            Subcontract of{" "}
-            <Link
-              className="text-primary underline-offset-4 hover:underline"
-              href={`/dashboards/contracts/${encodeURIComponent(contract.parentContractId)}`}
-            >
-              the parent contract
-            </Link>
-          </p>
-        ) : null}
+        <ParentContractLine
+          parentContractId={contract.parentContractId}
+          parentContract={detail.parentContract ?? null}
+        />
       </div>
 
       <ArchivedContractNotice companyId={companyId} contract={contract} />
@@ -903,6 +903,11 @@ export function ContractDetail({
               canAssignRoles={access.roles === true}
             />
           )}
+          <SubcontractsSection
+            companyId={companyId}
+            contractId={contractId}
+            subcontracts={detail.subcontracts ?? []}
+          />
           <ContractWorkspaceManagement
             companyId={companyId}
             contractId={contractId}

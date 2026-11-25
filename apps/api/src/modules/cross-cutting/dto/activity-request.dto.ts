@@ -4,6 +4,7 @@ import {
   type ContractActivityAction,
   type ContractActivityFilters,
   type ContractActivityWorkspace,
+  ULID_PATTERN,
 } from '@contractflow/contracts-schema';
 import { ACTIVITY_WORKSPACES } from '../../../common/application/activity-entry';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
@@ -35,7 +36,7 @@ export class ListContractActivityRequestDto
 
   /** A company membership id (ULID), as `actorUserId` in the entries. */
   @IsOptional()
-  @Matches(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/i)
+  @Matches(ULID_PATTERN)
   actorUserId?: string;
 
   @IsOptional()

@@ -11,6 +11,7 @@ import {
 import {
   CONTRACT_ROLES,
   type ContractRole,
+  ULID_PATTERN,
 } from '@contractflow/contracts-schema';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 import type { AssignableContractWorkspace } from '../services/contract-workspace';
@@ -35,7 +36,7 @@ export class ContractWorkspaceParamDto {
  */
 export class ListCompanyRoleAssignmentsRequestDto extends PaginationQueryDto {
   @IsOptional()
-  @Matches(/^[0-9A-HJKMNP-TV-Z]{26}$/i, {
+  @Matches(ULID_PATTERN, {
     message: 'companyUserId must be a valid ULID',
   })
   companyUserId?: string;
@@ -46,9 +47,7 @@ export class ListCompanyRoleAssignmentsRequestDto extends PaginationQueryDto {
 }
 
 export class CreateContractRoleAssignmentRequestDto {
-  @IsString()
-  @MinLength(1)
-  @MaxLength(26)
+  @Matches(ULID_PATTERN, { message: 'companyUserId must be a valid ULID' })
   companyUserId!: string;
 
   @IsIn([...CONTRACT_ROLES])

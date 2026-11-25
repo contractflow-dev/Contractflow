@@ -30,6 +30,7 @@ import {
 import { DeliveryService } from '../services/delivery.service';
 import { MilestoneReadService } from '../services/milestone-read.service';
 import { MilestoneWorkflowService } from '../services/milestone-workflow.service';
+import { ParseUlidPipe } from '../../../common/pipes/parse-ulid.pipe';
 
 /**
  * Project workspace delivery: stages and milestones (planning, submissions,
@@ -78,7 +79,7 @@ export class DeliveryController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('stageId') stageId: string,
+    @Param('stageId', ParseUlidPipe) stageId: string,
   ) {
     return this.milestones.getStage(
       { userId: user.id, companyId, contractId },
@@ -91,7 +92,7 @@ export class DeliveryController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('stageId') stageId: string,
+    @Param('stageId', ParseUlidPipe) stageId: string,
     @Body() body: UpdateContractStageRequestDto,
   ) {
     return this.workflow.updateStage(
@@ -107,7 +108,7 @@ export class DeliveryController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('stageId') stageId: string,
+    @Param('stageId', ParseUlidPipe) stageId: string,
     @Body() body: TransitionContractStageRequestDto,
   ) {
     return this.workflow.transitionStage(
@@ -123,7 +124,7 @@ export class DeliveryController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('stageId') stageId: string,
+    @Param('stageId', ParseUlidPipe) stageId: string,
     @Body() body: CreateMilestoneRequestDto,
   ) {
     return this.workflow.createMilestone(
@@ -153,7 +154,7 @@ export class DeliveryController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('milestoneId') milestoneId: string,
+    @Param('milestoneId', ParseUlidPipe) milestoneId: string,
   ) {
     return this.milestones.getMilestone(
       { userId: user.id, companyId, contractId },
@@ -166,7 +167,7 @@ export class DeliveryController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('milestoneId') milestoneId: string,
+    @Param('milestoneId', ParseUlidPipe) milestoneId: string,
     @Body() body: UpdateMilestoneRequestDto,
   ) {
     return this.workflow.updateMilestone(
@@ -182,7 +183,7 @@ export class DeliveryController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('milestoneId') milestoneId: string,
+    @Param('milestoneId', ParseUlidPipe) milestoneId: string,
   ) {
     return this.workflow.startMilestone(
       { userId: user.id, companyId, contractId },
@@ -195,7 +196,7 @@ export class DeliveryController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('milestoneId') milestoneId: string,
+    @Param('milestoneId', ParseUlidPipe) milestoneId: string,
   ) {
     return this.workflow.listSubmissions(
       { userId: user.id, companyId, contractId },
@@ -208,7 +209,7 @@ export class DeliveryController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('milestoneId') milestoneId: string,
+    @Param('milestoneId', ParseUlidPipe) milestoneId: string,
     @Body() body: SubmitMilestoneRequestDto,
   ) {
     return this.workflow.submit(
@@ -223,8 +224,8 @@ export class DeliveryController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('milestoneId') milestoneId: string,
-    @Param('submissionId') submissionId: string,
+    @Param('milestoneId', ParseUlidPipe) milestoneId: string,
+    @Param('submissionId', ParseUlidPipe) submissionId: string,
   ) {
     return this.workflow.getSubmission(
       { userId: user.id, companyId, contractId },
@@ -238,8 +239,8 @@ export class DeliveryController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('milestoneId') milestoneId: string,
-    @Param('submissionId') submissionId: string,
+    @Param('milestoneId', ParseUlidPipe) milestoneId: string,
+    @Param('submissionId', ParseUlidPipe) submissionId: string,
     @Body() body: DecideMilestoneSubmissionRequestDto,
   ) {
     return this.workflow.decide(
@@ -255,7 +256,7 @@ export class DeliveryController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('milestoneId') milestoneId: string,
+    @Param('milestoneId', ParseUlidPipe) milestoneId: string,
   ) {
     return this.milestones.listDecisions(
       { userId: user.id, companyId, contractId },
@@ -268,7 +269,7 @@ export class DeliveryController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('milestoneId') milestoneId: string,
+    @Param('milestoneId', ParseUlidPipe) milestoneId: string,
   ) {
     return this.milestones.listOutstandingItems(
       { userId: user.id, companyId, contractId },
@@ -293,7 +294,7 @@ export class DeliveryController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('variationId') variationId: string,
+    @Param('variationId', ParseUlidPipe) variationId: string,
   ) {
     return this.delivery.variations.get(
       user.id,

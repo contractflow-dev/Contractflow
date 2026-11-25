@@ -62,7 +62,7 @@ export function projectPermissions({
   /** The contract is archived (soft-deleted). */
   archived: boolean;
 }): ProjectPermissions {
-  const clientSide = partyType === EPartyType.CLIENT;
+  const clientSide = partyType === EPartyType.AWARDING;
   const isPlanner =
     clientSide && roles.includes(EClientContractRole.CLIENT_PROJECT_MANAGER);
   const isSubmitter =

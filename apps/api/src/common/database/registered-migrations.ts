@@ -17,6 +17,11 @@ import { CompanyRoleAssignmentIndex1793500000001 } from './migrations/1793500000
 import { CompanyMembershipRoles1793600000000 } from './migrations/1793600000000-company-membership-roles';
 import { ActivityLogAuditFields1793700000000 } from './migrations/1793700000000-activity-log-audit-fields';
 import { MilestoneWorkflow1793800000000 } from './migrations/1793800000000-milestone-workflow';
+import { ContractPartyClassification1793900000000 } from './migrations/1793900000000-contract-party-classification';
+import { UlidEntityReferences1794000000000 } from './migrations/1794000000000-ulid-entity-references';
+import { ContractStatusHistoryValues1794000000001 } from './migrations/1794000000001-contract-status-history-values';
+import { SubcontractParentRules1794000000002 } from './migrations/1794000000002-subcontract-parent-rules';
+import { ContractPartyRules1794000000003 } from './migrations/1794000000003-contract-party-rules';
 
 export const registeredMigrations = [
   IdentitySchemaBootstrap1749000000000,
@@ -38,4 +43,9 @@ export const registeredMigrations = [
   CompanyMembershipRoles1793600000000,
   ActivityLogAuditFields1793700000000,
   MilestoneWorkflow1793800000000,
+  ContractPartyClassification1793900000000,
+  UlidEntityReferences1794000000000,
+  ContractStatusHistoryValues1794000000001,
+  SubcontractParentRules1794000000002,
+  ContractPartyRules1794000000003,
 ];

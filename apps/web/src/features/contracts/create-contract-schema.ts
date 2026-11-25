@@ -15,8 +15,27 @@ import {
 import type {
   AssignableContractWorkspace,
   Contract,
+  ContractListItem,
   CreateContractRequest,
 } from "@/services/contractApi";
+
+/**
+ * The contracts a new subcontract may belong to: main contracts (not
+ * themselves subcontracts), draft or active and not archived, on which the
+ * company is the awarded party. The API checks the same rules.
+ */
+export function eligibleParentContracts(
+  contracts: readonly ContractListItem[],
+): ContractListItem[] {
+  return contracts.filter(
+    (contract) =>
+      !contract.parentContractId &&
+      !contract.deletedAt &&
+      (contract.status === EContractStatus.DRAFT ||
+        contract.status === EContractStatus.ACTIVE) &&
+      contract.myPartyType === EPartyType.AWARDED,
+  );
+}
 
 export const contractWorkspaces: AssignableContractWorkspace[] = [
   "project",
@@ -112,13 +131,24 @@ export const createContractFormSchema = z.object({
     }),
     description: z.string().trim(),
   }),
-  parties: z.object({
-    partyType: z.enum(EPartyType, {
-      message: "Choose your company's party type.",
+  parties: z
+    .object({
+      partyType: z.enum(EPartyType, {
+        message: "Choose your company's party type.",
+      }),
+      parentContractId: z.string(),
+      workspaces: z.array(z.enum(["project", "hse", "finance"])),
+    })
+    .superRefine((values, context) => {
+      // As the API: your company awards a subcontract.
+      if (values.parentContractId && values.partyType !== EPartyType.AWARDING) {
+        context.addIssue({
+          code: "custom",
+          path: ["partyType"],
+          message: "Your company awards a subcontract: choose Awarding.",
+        });
+      }
     }),
-    parentContractId: z.string(),
-    workspaces: z.array(z.enum(["project", "hse", "finance"])),
-  }),
   commercial: z
     .object({
       currencyCode: z.enum(ECurrencyCode, { message: "Choose a currency." }),

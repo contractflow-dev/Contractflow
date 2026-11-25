@@ -74,7 +74,7 @@ function setup(
     parties: {
       findOwnForShare: vi.fn().mockResolvedValue({
         id: 'party-1',
-        partyType: options.partyType ?? EPartyType.CONTRACTOR,
+        partyType: options.partyType ?? EPartyType.AWARDED,
       }),
     },
     roleAssignments: {
@@ -286,7 +286,7 @@ describe('MilestoneWorkflowService', () => {
   describe('scope', () => {
     it('authorizes the Project workspace, then queries only with the scope it returned', async () => {
       const { access, context, service, scopesUsed } = setup({
-        partyType: EPartyType.CONTRACTOR,
+        partyType: EPartyType.AWARDED,
       });
       context.milestones.findForUpdate.mockResolvedValue(
         milestone({ status: EMilestoneStatus.IN_PROGRESS }),
@@ -320,7 +320,7 @@ describe('MilestoneWorkflowService', () => {
   describe('roles', () => {
     it('refuses submissions from the client side, even with a Contractor Project Lead role', async () => {
       const { context, service, writes } = setup({
-        partyType: EPartyType.CLIENT,
+        partyType: EPartyType.AWARDING,
       });
       await expect(
         service.submit(CALLER, 'milestone-1', submission),
@@ -334,7 +334,7 @@ describe('MilestoneWorkflowService', () => {
     });
 
     it('refuses planning and decisions from the contractor side', async () => {
-      const { service, writes } = setup({ partyType: EPartyType.CONTRACTOR });
+      const { service, writes } = setup({ partyType: EPartyType.AWARDED });
       await expect(
         service.createStage(CALLER, {
           name: 'S',
@@ -352,7 +352,7 @@ describe('MilestoneWorkflowService', () => {
     });
 
     it('checks the exact role on the caller’s own party', async () => {
-      const { context, service } = setup({ partyType: EPartyType.CLIENT });
+      const { context, service } = setup({ partyType: EPartyType.AWARDING });
       await service.decide(CALLER, 'milestone-1', 'submission-1', {
         decision: EMilestoneDecisionType.APPROVED,
       });
@@ -368,7 +368,7 @@ describe('MilestoneWorkflowService', () => {
 
     it('refuses a member of the right side without the role', async () => {
       const { service, writes } = setup({
-        partyType: EPartyType.CONTRACTOR,
+        partyType: EPartyType.AWARDED,
         holdsRole: false,
       });
       await expect(
@@ -377,9 +377,9 @@ describe('MilestoneWorkflowService', () => {
       expect(writes()).toEqual([]);
     });
 
-    it('accepts a subcontractor’s Contractor Project Lead as the submitter', async () => {
+    it('accepts the awarded party’s Contractor Project Lead as the submitter', async () => {
       const { context, service } = setup({
-        partyType: EPartyType.SUBCONTRACTOR,
+        partyType: EPartyType.AWARDED,
       });
       context.milestones.findForUpdate.mockResolvedValue(
         milestone({ status: EMilestoneStatus.PLANNED }),
@@ -397,7 +397,7 @@ describe('MilestoneWorkflowService', () => {
 
     it('refuses a decision made by the submitting side', async () => {
       const { context, service, writes } = setup({
-        partyType: EPartyType.CLIENT,
+        partyType: EPartyType.AWARDING,
       });
       context.submissions.findInMilestone.mockResolvedValue({
         id: 'submission-1',
@@ -418,7 +418,7 @@ describe('MilestoneWorkflowService', () => {
   describe('state', () => {
     it('refuses changes to an archived contract before anything is written', async () => {
       const { service, writes } = setup({
-        partyType: EPartyType.CONTRACTOR,
+        partyType: EPartyType.AWARDED,
         contract: null,
       });
       await expect(
@@ -428,7 +428,7 @@ describe('MilestoneWorkflowService', () => {
     });
 
     it('share-locks the stage, not update-locks it, when submitting', async () => {
-      const { context, service } = setup({ partyType: EPartyType.CONTRACTOR });
+      const { context, service } = setup({ partyType: EPartyType.AWARDED });
       context.milestones.findForUpdate.mockResolvedValue(
         milestone({ status: EMilestoneStatus.IN_PROGRESS }),
       );
@@ -442,7 +442,7 @@ describe('MilestoneWorkflowService', () => {
 
     it('refuses to start a milestone twice', async () => {
       const { context, service, writes } = setup({
-        partyType: EPartyType.CONTRACTOR,
+        partyType: EPartyType.AWARDED,
       });
       context.milestones.findForUpdate.mockResolvedValue(
         milestone({ status: EMilestoneStatus.IN_PROGRESS }),
@@ -455,7 +455,7 @@ describe('MilestoneWorkflowService', () => {
 
     it('refuses a second decision on a submission', async () => {
       const { context, service, writes } = setup({
-        partyType: EPartyType.CLIENT,
+        partyType: EPartyType.AWARDING,
       });
       context.decisions.findForSubmission.mockResolvedValue({
         id: 'decision-0',
@@ -471,7 +471,7 @@ describe('MilestoneWorkflowService', () => {
 
   describe('audit', () => {
     it('records each step in the Project workspace, as the checked member, naming the milestone', async () => {
-      const { context, service } = setup({ partyType: EPartyType.CLIENT });
+      const { context, service } = setup({ partyType: EPartyType.AWARDING });
       await service.decide(CALLER, 'milestone-1', 'submission-1', {
         decision: EMilestoneDecisionType.APPROVED,
       });
@@ -504,7 +504,7 @@ describe('MilestoneWorkflowService', () => {
     });
 
     it('keeps a stage hold’s reason on its entry', async () => {
-      const { context, service } = setup({ partyType: EPartyType.CLIENT });
+      const { context, service } = setup({ partyType: EPartyType.AWARDING });
       await service.transitionStage(CALLER, 'stage-1', {
         status: EStatus.ON_HOLD,
         reason: 'Permit suspended.',
@@ -535,7 +535,7 @@ describe('MilestoneWorkflowService', () => {
 
     it('allows planning but no operations on a draft contract', async () => {
       const client = setup({
-        partyType: EPartyType.CLIENT,
+        partyType: EPartyType.AWARDING,
         contractStatus: EContractStatus.DRAFT,
       });
       await client.service.createStage(CALLER, newStage);
@@ -547,7 +547,7 @@ describe('MilestoneWorkflowService', () => {
       ).rejects.toThrow(/still a draft/);
 
       const contractor = setup({
-        partyType: EPartyType.CONTRACTOR,
+        partyType: EPartyType.AWARDED,
         contractStatus: EContractStatus.DRAFT,
       });
       contractor.context.milestones.findForUpdate.mockResolvedValue(
@@ -566,7 +566,7 @@ describe('MilestoneWorkflowService', () => {
       'refuses planning and operations on a %s contract',
       async (contractStatus) => {
         const { service, writes } = setup({
-          partyType: EPartyType.CLIENT,
+          partyType: EPartyType.AWARDING,
           contractStatus,
         });
         await expect(service.createStage(CALLER, newStage)).rejects.toThrow(
@@ -588,7 +588,7 @@ describe('MilestoneWorkflowService', () => {
       vi.setSystemTime(new Date('2026-12-31T23:30:00Z'));
       try {
         const { context, service } = setup({
-          partyType: EPartyType.CONTRACTOR,
+          partyType: EPartyType.AWARDED,
         });
         context.milestones.findForUpdate.mockResolvedValue(
           milestone({ status: EMilestoneStatus.PLANNED }),
@@ -605,7 +605,7 @@ describe('MilestoneWorkflowService', () => {
     });
 
     it('refuses milestone dates outside the stage unless overridden, and records the reason', async () => {
-      const { context, service } = setup({ partyType: EPartyType.CLIENT });
+      const { context, service } = setup({ partyType: EPartyType.AWARDING });
       const request = {
         title: 'Late',
         weightBps: 100,
@@ -632,7 +632,7 @@ describe('MilestoneWorkflowService', () => {
     });
 
     it('refuses stage dates that would leave milestones outside, unless overridden', async () => {
-      const { context, service } = setup({ partyType: EPartyType.CLIENT });
+      const { context, service } = setup({ partyType: EPartyType.AWARDING });
       context.milestones.countOutsideDates.mockResolvedValue(2);
       await expect(
         service.updateStage(CALLER, 'stage-1', {

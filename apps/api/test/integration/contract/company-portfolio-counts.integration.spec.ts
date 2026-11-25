@@ -1,4 +1,5 @@
 import { ulid } from 'ulid';
+import { EPartyType } from '@contractflow/contracts-schema';
 import type { DataSource } from 'typeorm';
 import { ContractParty } from '../../../src/modules/contract/entities/contract-party.entity';
 import type { Contract } from '../../../src/modules/contract/entities/contract.entity';
@@ -75,7 +76,8 @@ describe('Company portfolio counts (PostgreSQL)', () => {
   ): Promise<Contract> {
     const created = await factory!.createAdditionalContract(company);
     contractIds.push(created.id);
-    await factory!.createAdditionalParty(created, company);
+    // The creating company awards it; a counterparty added later is awarded.
+    await factory!.createAdditionalParty(created, company, EPartyType.AWARDING);
     await q(
       `UPDATE contract SET status = $2, updated_at = $3, end_date = $4,
          deleted_at = $5 WHERE id = $1`,

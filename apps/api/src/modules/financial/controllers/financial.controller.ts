@@ -7,6 +7,7 @@ import { ContractContextGuard } from '../../../common/guards/contract-context.gu
 import { CurrentContractId } from '../../../common/decorators/current-contract-id.decorator';
 import type { AuthenticatedUser } from '../../identity/interface/auth-context.interface';
 import { FinancialService } from '../services/financial.service';
+import { ParseUlidPipe } from '../../../common/pipes/parse-ulid.pipe';
 
 @Controller('contract')
 @UseGuards(CompanyContextGuard, ContractContextGuard)
@@ -28,7 +29,7 @@ export class FinancialController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('invoiceId') invoiceId: string,
+    @Param('invoiceId', ParseUlidPipe) invoiceId: string,
   ) {
     return this.financial.invoices.get(
       user.id,
@@ -53,7 +54,7 @@ export class FinancialController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('paymentId') paymentId: string,
+    @Param('paymentId', ParseUlidPipe) paymentId: string,
   ) {
     return this.financial.payments.get(
       user.id,

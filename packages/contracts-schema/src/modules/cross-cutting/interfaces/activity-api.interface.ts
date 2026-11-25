@@ -65,6 +65,7 @@ export const CONTRACT_ACTIVITY_ACTIONS = [
   "contract.status_transitioned",
   "contract.deleted",
   "contract.restored",
+  "contract.subcontract_created",
   "contract.site_created",
   "contract.site_updated",
   "contract.signatory_recorded",

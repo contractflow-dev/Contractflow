@@ -6,6 +6,7 @@ import { FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   EContractSortField,
+  EPartyType,
   ESortOrder,
   MAX_PAGE_LIMIT,
 } from "@contractflow/contracts-schema";
@@ -26,6 +27,7 @@ import {
   createContractFormSchema,
   createContractSteps,
   defaultTimeZone,
+  eligibleParentContracts,
   timeZoneOptions,
   toCreateContractRequest,
   type CreateContractFormValues,
@@ -44,20 +46,34 @@ const formSteps: ReadonlyArray<FormStep<CreateContractFormValues>> =
 export function CreateContractWizard({
   formId,
   companyId,
+  parentContractId,
   onCancel,
   onDirtyChange,
 }: {
   formId: string;
   companyId: string;
+  /** Starts the form as a subcontract of this main contract. */
+  parentContractId?: string;
   /** Leaves the form. The page asks first if anything has been entered. */
   onCancel: () => void;
   /** Called whenever the form gains or loses unsaved input. */
   onDirtyChange?: (dirty: boolean) => void;
 }) {
   const router = useRouter();
-  const [defaultValues] = useState(() =>
-    createContractDefaults(defaultTimeZone(timeZoneOptions())),
-  );
+  const [defaultValues] = useState(() => {
+    const values = createContractDefaults(defaultTimeZone(timeZoneOptions()));
+    return parentContractId
+      ? {
+          ...values,
+          parties: {
+            ...values.parties,
+            parentContractId,
+            // Your company awards a subcontract.
+            partyType: EPartyType.AWARDING,
+          },
+        }
+      : values;
+  });
   const form = useForm<CreateContractFormValues>({
     resolver: zodResolver(createContractFormSchema),
     defaultValues,
@@ -140,7 +156,9 @@ export function CreateContractWizard({
         {step.id === "basics" ? <ContractBasicsFields /> : null}
         {step.id === "parties" ? (
           <ContractPartiesFields
-            parentContracts={parentContractsQuery.currentData?.data ?? []}
+            parentContracts={eligibleParentContracts(
+              parentContractsQuery.currentData?.data ?? [],
+            )}
             parentContractsLoading={parentContractsQuery.isFetching}
             parentContractsError={parentContractsQuery.error}
           />

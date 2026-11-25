@@ -59,11 +59,8 @@ describe('client and contractor contract roles', () => {
   });
 
   it.each([
-    [EPartyType.CLIENT, 'client'],
-    [EPartyType.CONTRACTOR, 'contractor'],
-    [EPartyType.SUBCONTRACTOR, 'contractor'],
-    [EPartyType.VENDOR, 'contractor'],
-    [EPartyType.OTHER, 'contractor'],
+    [EPartyType.AWARDING, 'client'],
+    [EPartyType.AWARDED, 'contractor'],
   ] as const)('puts a %s party on the %s side', (partyType, side) => {
     expect(contractRoleSide(partyType)).toBe(side);
     expect(contractRolesForParty(partyType)).toBe(
@@ -75,25 +72,25 @@ describe('client and contractor contract roles', () => {
     expect(
       roleAllowedForParty(
         EClientContractRole.CLIENT_PROJECT_MANAGER,
-        EPartyType.CLIENT,
+        EPartyType.AWARDING,
       ),
     ).toBe(true);
     expect(
       roleAllowedForParty(
         EClientContractRole.CLIENT_PROJECT_MANAGER,
-        EPartyType.CONTRACTOR,
+        EPartyType.AWARDED,
       ),
     ).toBe(false);
     expect(
       roleAllowedForParty(
         EContractorContractRole.CONTRACTOR_PROJECT_LEAD,
-        EPartyType.CLIENT,
+        EPartyType.AWARDING,
       ),
     ).toBe(false);
     expect(
       roleAllowedForParty(
         EContractorContractRole.CONTRACTOR_SITE_SUPERVISOR,
-        EPartyType.VENDOR,
+        EPartyType.AWARDED,
       ),
     ).toBe(true);
     for (const partyType of Object.values(EPartyType)) {

@@ -99,8 +99,10 @@ export function ContractLifecycleManagement({
   const query = { companyId, contractId: contract.id };
   const permissionsQuery = useGetContractLifecyclePermissionsQuery(query);
   const permissions = permissionsQuery.data;
+  // Who sends party invitations is its own permission: on a subcontract it
+  // is the main contractor's Contractor Project Lead, not an administrator.
   const invitationsQuery = useGetContractPartyInvitationsQuery(query, {
-    skip: !permissions?.canManage,
+    skip: !permissions?.canInviteParties,
   });
   const [transitionContract, transitionState] = useTransitionContractMutation();
   const [revokeInvitation, revokeInvitationState] =
@@ -133,9 +135,15 @@ export function ContractLifecycleManagement({
       </Alert>
     );
   }
-  if (!permissions || (!permissions.canManage && !permissions.canTransition)) {
+  if (
+    !permissions ||
+    (!permissions.canManage &&
+      !permissions.canTransition &&
+      !permissions.canInviteParties)
+  ) {
     return null;
   }
+  const subcontract = permissions.invitesSubcontractors;
 
   function requestTransition(
     event: FormEvent<HTMLFormElement>,
@@ -189,7 +197,8 @@ export function ContractLifecycleManagement({
 
   return (
     <section className="space-y-5" aria-label="Contract lifecycle management">
-      {part === "manage" ? (
+      {part === "manage" &&
+      (permissions.canManage || permissions.canTransition) ? (
         <Card>
           <CardHeader>
             <CardTitle>
@@ -206,8 +215,7 @@ export function ContractLifecycleManagement({
               // same steps as creating one.
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="max-w-prose text-sm text-muted-foreground">
-                  Change the title, type, parent contract, commercial terms and
-                  dates.
+                  Change the title, type, commercial terms and dates.
                 </p>
                 <Link
                   href={contractEditHref(contract.id)}
@@ -288,10 +296,16 @@ export function ContractLifecycleManagement({
         </Card>
       ) : null}
 
-      {part === "invitations" && permissions.canManage ? (
+      {part === "invitations" && permissions.canInviteParties ? (
         <ListCard
-          title="Company invitations"
-          description="Companies invited to join this contract and where each invitation stands."
+          title={
+            subcontract ? "Subcontractor invitations" : "Company invitations"
+          }
+          description={
+            subcontract
+              ? "Subcontractors invited to this subcontract and where each invitation stands."
+              : "Companies invited to join this contract and where each invitation stands."
+          }
           action={
             contract.deletedAt ? null : (
               <Button
@@ -300,7 +314,7 @@ export function ContractLifecycleManagement({
                 onClick={() => setInvitingCompany(true)}
               >
                 <RiMailSendLine aria-hidden="true" data-icon="inline-start" />
-                Invite Company
+                {subcontract ? "Invite Subcontractor" : "Invite Company"}
               </Button>
             )
           }
@@ -365,10 +379,11 @@ export function ContractLifecycleManagement({
         </ListCard>
       ) : null}
 
-      {part === "invitations" && permissions.canManage ? (
+      {part === "invitations" && permissions.canInviteParties ? (
         <InviteCompanyDialog
           companyId={companyId}
           contract={contract}
+          subcontract={subcontract}
           open={invitingCompany}
           onOpenChange={setInvitingCompany}
         />

@@ -59,7 +59,26 @@ export interface ContractListRole {
 }
 
 /** A contract-list row: the contract and the other parties to it. */
+/**
+ * A related contract (a subcontract's main contract, or a main contract's
+ * subcontract), named only when the reader may see it.
+ */
+export interface ContractRelationSummary {
+  id: string;
+  referenceNumber: string;
+  title: string;
+  status: EContractStatus;
+}
+
 export interface ContractListItem extends Contract {
+  /**
+   * A subcontract's main contract when the reader may see it; null for a
+   * main contract, or when the main contract isn't visible to the reader
+   * (`parentContractId` still marks it as a subcontract).
+   */
+  parentContract: ContractRelationSummary | null;
+  /** The requesting company's own party type on the contract. */
+  myPartyType: EPartyType | null;
   /** Every party except the requesting company; empty for archived contracts. */
   counterparties: ContractCounterparty[];
   /** The signed-in user's active roles on it; empty when none or archived. */
@@ -112,6 +131,13 @@ export interface ContractPartySignatory {
 export interface ContractDetail {
   contract: Contract;
   membership: ContractMembership;
+  /**
+   * The main contract of a subcontract, when the reader may see it. Null for
+   * a main contract, or a main contract the reader can't open.
+   */
+  parentContract: ContractRelationSummary | null;
+  /** The subcontracts of a main contract that the reader may see. */
+  subcontracts: ContractRelationSummary[];
 }
 
 export interface ContractStatusHistory {
@@ -285,6 +311,20 @@ export interface ContractLifecyclePermissions {
   canManage: boolean;
   canTransition: boolean;
   canRestore: boolean;
+  /**
+   * The caller may list, send and revoke this contract's party invitations:
+   * on a main contract its creating company's Company Administrator, on a
+   * subcontract only the main contractor's Contractor Project Lead on the
+   * main contract.
+   */
+  canInviteParties: boolean;
+  /** This is a subcontract: an invited company joins as the subcontractor. */
+  invitesSubcontractors: boolean;
+  /**
+   * The caller may create a subcontract of this main contract: the awarded
+   * party's Contractor Project Lead, while it is draft or active.
+   */
+  canCreateSubcontract: boolean;
 }
 
 /**
