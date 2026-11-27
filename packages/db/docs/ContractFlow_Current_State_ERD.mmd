@@ -1,13 +1,13 @@
 %% ContractFlow - CURRENT-STATE ERD (what the database is today)
 %%
 %% Source of truth: the registered migration chain
-%% (apps/api/src/common/database/registered-migrations.ts, 24 migrations,
+%% (apps/api/src/common/database/registered-migrations.ts, 25 migrations,
 %% IdentitySchemaBootstrap1749000000000 .. RemoveActualCompletionDate1794000000004).
 %% Reconciled from:
 %%   1. The schema of contractflow_fresh_backup.dump (pg_restore --schema-only to a
 %%      file; no database was connected). That dump records migrations 1-10, up to
 %%      CompanyInvitationExpiryIndex1792862700001.
-%%   2. The up() of the fourteen later migrations, read from the migration files:
+%%   2. The up() of the fifteen later migrations, read from the migration files:
 %%      CompanyInvitationOptionalNames, CompanyEmailVerification,
 %%      DocumentObjectStorage, PasswordResetToken, CompanyLevelDocuments,
 %%      CompanyRoleAssignmentIndex, CompanyMembershipRoles,
@@ -20,8 +20,9 @@
 %%      RemoveActualCompletionDate (contract.actual_completion_date dropped).
 %%   The last six were run up and down on a throwaway PostgreSQL database by
 %%   their migration tests.
-%% Not verified: a live development or production database (the migrations
-%% have not been applied to one).
+%% All 25 are recorded in the local development database (checked 2026-11-25:
+%% enum labels, constraints, triggers and dropped column match this file).
+%% Not verified: any production database.
 %%
 %% Conventions in this file
 %% - Every id and *_id column is varchar(26): a ULID stored as text, including the
