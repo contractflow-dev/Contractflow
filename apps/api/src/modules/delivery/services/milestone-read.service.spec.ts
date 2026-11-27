@@ -118,3 +118,76 @@ describe('MilestoneReadService.listMilestones', () => {
     });
   });
 });
+
+describe('MilestoneReadService.getProgress', () => {
+  const stage = (
+    id: string,
+    weightBps: number,
+    status: string,
+    isApplicable = true,
+  ) => ({ id, weightBps, status, isApplicable });
+
+  async function progressOf(
+    stages: ReturnType<typeof stage>[],
+    approved: Record<string, number>,
+  ) {
+    const access = { authorize: vi.fn().mockResolvedValue(SCOPE) };
+    const reader = {
+      allStages: vi.fn().mockResolvedValue(stages),
+      stageProgress: vi
+        .fn()
+        .mockResolvedValue(new Map(Object.entries(approved))),
+    };
+    const service = new MilestoneReadService(
+      access as unknown as ContractAccessService,
+      reader as unknown as IMilestoneWorkflowReader,
+    );
+    const result = await service.getProgress(CALLER);
+    expect(reader.allStages).toHaveBeenCalledWith(SCOPE);
+    return result;
+  }
+
+  it('weights each stage by its share, counting a completed stage in full', async () => {
+    const result = await progressOf(
+      [
+        stage('award', 0, 'completed'),
+        stage('build', 6000, 'in_progress'),
+        stage('test', 4000, 'completed'),
+      ],
+      // A completed stage counts in full whatever its milestones say.
+      { build: 5000, test: 2500 },
+    );
+    // 6000 x 50% + 4000 x 100% = 7000 of 10000.
+    expect(result.lifecycleProgressBps).toBe(7000);
+    expect(result.countedWeightBps).toBe(10000);
+  });
+
+  it('leaves out stages that don’t apply or were cancelled, and reweights the rest', async () => {
+    const result = await progressOf(
+      [
+        stage('build', 6000, 'completed'),
+        stage('test', 3000, 'planned', false),
+        stage('handover', 1000, 'cancelled'),
+      ],
+      {},
+    );
+    // Only the build stage counts, and it is complete.
+    expect(result.lifecycleProgressBps).toBe(10000);
+    expect(result.countedWeightBps).toBe(6000);
+    expect(
+      result.stages.map(({ stageId, counted }) => [stageId, counted]),
+    ).toEqual([
+      ['build', true],
+      ['test', false],
+      ['handover', false],
+    ]);
+  });
+
+  it('reports no progress when no stage counts', async () => {
+    await expect(progressOf([], {})).resolves.toEqual({
+      lifecycleProgressBps: 0,
+      countedWeightBps: 0,
+      stages: [],
+    });
+  });
+});

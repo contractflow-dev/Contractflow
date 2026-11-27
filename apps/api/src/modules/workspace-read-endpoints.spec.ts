@@ -717,10 +717,11 @@ describe('workspace read endpoints', () => {
   describe('route inventory', () => {
     it('exposes exactly a list and a get route per resource, all GET', () => {
       const routes = Object.values(controllerClasses).flatMap((controller) => {
-        // The Stages and Milestones workflow routes are tested on their own.
+        // The Stages and Milestones workflow routes, and the progress read
+        // they feed, are tested on their own.
         const workflowRoute = (path: string) =>
           controller === DeliveryController &&
-          /^(stages|milestones)/.test(path);
+          /^(stages|milestones|progress)/.test(path);
         const prefix = Reflect.getMetadata(PATH_METADATA, controller) as string;
         return Object.getOwnPropertyNames(controller.prototype)
           .filter((name) => name !== 'constructor')

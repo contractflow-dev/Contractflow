@@ -6,6 +6,8 @@ import {
 } from '@nestjs/common';
 import {
   EMilestoneStatus,
+  EStatus,
+  type ContractProgress,
   type ContractStage as ContractStageResponse,
   type IPaginatedResponse,
   type ListMilestonesFilters,
@@ -38,6 +40,8 @@ interface Caller {
   companyId: string;
   contractId: string;
 }
+
+import { FULL_BPS } from './milestone-workflow.rules';
 
 /**
  * Stages, milestones and their history for any Project workspace role, on
@@ -75,6 +79,46 @@ export class MilestoneReadService {
       },
       query,
     );
+  }
+
+  /**
+   * The contract's lifecycle progress (decision D-6): each stage that
+   * applies and isn't cancelled, weighted against those stages' own total;
+   * a completed stage counts in full, another by its approved milestones.
+   * Calculated from the records on every read; nothing is stored (D-11).
+   */
+  async getProgress(caller: Caller): Promise<ContractProgress> {
+    const scope = await this.authorize(caller);
+    const stages = await this.reader.allStages(scope);
+    const progress = await this.reader.stageProgress(
+      scope,
+      stages.map(({ id }) => id),
+    );
+    const rows = stages.map((stage) => {
+      const counted =
+        (stage.isApplicable ?? true) && stage.status !== EStatus.CANCELLED;
+      return {
+        stageId: stage.id,
+        weightBps: stage.weightBps,
+        progressBps:
+          stage.status === EStatus.COMPLETED
+            ? FULL_BPS
+            : (progress.get(stage.id) ?? 0),
+        counted,
+      };
+    });
+    const countedWeightBps = rows
+      .filter(({ counted }) => counted)
+      .reduce((sum, row) => sum + row.weightBps, 0);
+    const earned = rows
+      .filter(({ counted }) => counted)
+      .reduce((sum, row) => sum + row.weightBps * row.progressBps, 0);
+    return {
+      lifecycleProgressBps:
+        countedWeightBps === 0 ? 0 : Math.floor(earned / countedWeightBps),
+      countedWeightBps,
+      stages: rows,
+    };
   }
 
   async getStage(

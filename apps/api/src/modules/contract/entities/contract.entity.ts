@@ -120,6 +120,25 @@ export class Contract extends BaseCustomEntity implements IContractEntity {
   })
   createdByCompany!: Company | null;
 
+  /**
+   * The lifecycle template version the stages were copied from when the
+   * contract was created; null for contracts created before lifecycles.
+   */
+  @Column({
+    name: 'lifecycle_template_version_id',
+    type: 'varchar',
+    length: 26,
+    nullable: true,
+  })
+  lifecycleTemplateVersionId!: string | null;
+
+  @Column({
+    name: 'lifecycle_initialised_at',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  lifecycleInitialisedAt!: Date | null;
+
   @Column({ name: 'deleted_at', type: 'timestamptz', nullable: true })
   deletedAt!: Date | null;
 

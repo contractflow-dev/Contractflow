@@ -14,6 +14,7 @@ import { DocumentRepository } from '../../cross-cutting/repositories/document.re
 import { CompanyUser } from '../../identity/entities/company-user.entity';
 import { CompanyUserRepository } from '../../identity/repositories/company-user.respository';
 import { ContractStage } from '../entities/contract-stage.entity';
+import { ContractStageHistory } from '../entities/contract-stage-history.entity';
 import { MilestoneDecision } from '../entities/milestone-decision.entity';
 import { MilestoneOutstandingItem } from '../entities/milestone-outstanding-item.entity';
 import { MilestoneSubmissionEvidence } from '../entities/milestone-submission-evidence.entity';
@@ -26,6 +27,7 @@ import type {
   ISubmissionHistoryRecord,
 } from '../interface/milestone-workflow-persistence.interface';
 import { ContractStageRepository } from './contract-stage.repository';
+import { ContractStageHistoryRepository } from './contract-stage-history.repository';
 import {
   MilestoneDecisionRepository,
   MilestoneOutstandingItemRepository,
@@ -50,6 +52,9 @@ function repositoriesFor(manager: EntityManager) {
     documents: new DocumentRepository(manager.getRepository(Document)),
     activity: new ActivityLogRepository(manager.getRepository(ActivityLog)),
     stages: new ContractStageRepository(manager.getRepository(ContractStage)),
+    stageHistory: new ContractStageHistoryRepository(
+      manager.getRepository(ContractStageHistory),
+    ),
     milestones: new MilestoneRepository(manager.getRepository(Milestone)),
     submissions: new MilestoneSubmissionRepository(
       manager.getRepository(MilestoneSubmission),
@@ -83,6 +88,7 @@ export class TypeOrmMilestoneWorkflowContext implements IMilestoneWorkflowContex
   readonly decisions: IMilestoneWorkflowContext['decisions'];
   readonly outstandingItems: IMilestoneWorkflowContext['outstandingItems'];
   readonly submissionItems: IMilestoneWorkflowContext['submissionItems'];
+  readonly stageHistory: IMilestoneWorkflowContext['stageHistory'];
   readonly activity: IMilestoneWorkflowContext['activity'];
 
   constructor(manager: EntityManager) {
@@ -137,6 +143,8 @@ export class TypeOrmMilestoneWorkflowContext implements IMilestoneWorkflowContex
         r.milestones.nextSequenceInStage(scope, stageId),
       countNotApprovedInStage: (scope, stageId) =>
         r.milestones.countNotApprovedInStage(scope, stageId),
+      countActiveInStage: (scope, stageId) =>
+        r.milestones.countActiveInStage(scope, stageId),
       countOutsideDates: (scope, stageId, start, end) =>
         r.milestones.countOutsideDates(scope, stageId, start, end),
       append: (scope, data) => r.milestones.append(scope, data),
@@ -191,6 +199,11 @@ export class TypeOrmMilestoneWorkflowContext implements IMilestoneWorkflowContex
       listForSubmissions: (scope, ids) =>
         r.submissionItems.listForSubmissions(scope, ids),
     };
+    this.stageHistory = {
+      record: async (scope, data) => {
+        await r.stageHistory.append(scope, data);
+      },
+    };
     this.activity = {
       record: async (scope, entry) => {
         await r.activity.append(scope, buildActivityEntry(entry));
@@ -218,6 +231,9 @@ export class TypeOrmMilestoneWorkflowReader implements IMilestoneWorkflowReader 
 
   findStage: IMilestoneWorkflowReader['findStage'] = (scope, stageId) =>
     this.r.stages.findById(scope, stageId);
+
+  allStages: IMilestoneWorkflowReader['allStages'] = (scope) =>
+    this.r.stages.findAll(scope, { order: { sequence: 'ASC' } });
 
   contractTimezone: IMilestoneWorkflowReader['contractTimezone'] = (scope) =>
     this.r.contracts.findTimezoneForParty(scope);

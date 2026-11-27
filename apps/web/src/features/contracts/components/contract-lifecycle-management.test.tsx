@@ -131,3 +131,32 @@ describe("Party invitations", () => {
     expect(render()).not.toContain("Manage contract");
   });
 });
+
+describe("Contract status changes", () => {
+  const renderStatus = (status: EContractStatus) =>
+    renderToStaticMarkup(
+      <ContractLifecycleManagement
+        companyId="company-1"
+        contract={{ ...contract, status }}
+        part="manage"
+      />,
+    );
+
+  beforeEach(() => {
+    mocks.permissions = { canManage: false, canTransition: true };
+  });
+
+  it("offers practical completion and completion on an active contract", () => {
+    const markup = renderStatus(EContractStatus.ACTIVE);
+    expect(markup).toContain("Record practical completion");
+    expect(markup).toContain(">Complete<");
+    expect(markup).toContain(">Suspend<");
+  });
+
+  it("offers only completion during the defects liability period", () => {
+    const markup = renderStatus(EContractStatus.DEFECTS_LIABILITY);
+    expect(markup).toContain(">Complete<");
+    expect(markup).not.toContain("Record practical completion");
+    expect(markup).not.toContain(">Suspend<");
+  });
+});

@@ -48,6 +48,7 @@ describe('database migration configuration', () => {
       'SubcontractParentRules1794000000002',
       'ContractPartyRules1794000000003',
       'RemoveActualCompletionDate1794000000004',
+      'ContractLifecycleTemplates1794100000000',
     ]);
   });
 

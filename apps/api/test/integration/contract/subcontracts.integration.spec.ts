@@ -674,6 +674,10 @@ describe('Subcontracts (PostgreSQL)', () => {
     });
 
     it('keeps the main contract’s records its own: a subcontract changes nothing on it', async () => {
+      // Both parties of the subcontract have signed (activation needs it).
+      await dataSource!
+        .getRepository(ContractParty)
+        .update({ contractId: subcontract.id }, { signedAt: new Date() });
       await lifecycle.transition(
         contractorLead.userId,
         contractor.id,

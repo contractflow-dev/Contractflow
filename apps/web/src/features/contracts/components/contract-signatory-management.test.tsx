@@ -36,6 +36,7 @@ const contract: Contract = {
   contractType: Object.values(EContractType)[0],
   status: EContractStatus.ACTIVE,
   parentContractId: null,
+  lifecycleTemplateVersionId: null,
   originalValueMinor: "100",
   currentValueMinor: "100",
   currencyCode: ECurrencyCode.USD,

@@ -90,6 +90,7 @@ export enum EFromStatus {
     DRAFT = 'draft',
     ACTIVE = 'active',
     SUSPENDED = 'suspended',
+    DEFECTS_LIABILITY = 'defects_liability',
     COMPLETED = 'completed',
 }
 /** A contract status recorded in status history: the contract statuses only. */
@@ -97,18 +98,26 @@ export enum EToStatus {
     DRAFT = 'draft',
     ACTIVE = 'active',
     SUSPENDED = 'suspended',
+    DEFECTS_LIABILITY = 'defects_liability',
     COMPLETED = 'completed',
 }
 export enum EContractType{
-    SERVICE= 'service', 
-    SUPPLY= 'supply', 
-    EPC= 'epc', 
+    SERVICE= 'service',
+    SUPPLY= 'supply',
+    EPC= 'epc',
     MAINTENANCE= 'maintenance'
 }
+/**
+ * A contract's status. Archiving is `deletedAt`, never a status.
+ * DEFECTS_LIABILITY: the work is practically complete and only the
+ * warranty, defects-liability and post-contract obligations stage is still
+ * worked on, until the contract is completed.
+ */
 export enum EContractStatus{
-    DRAFT= 'draft', 
-    ACTIVE= 'active', 
-    SUSPENDED= 'suspended', 
+    DRAFT= 'draft',
+    ACTIVE= 'active',
+    SUSPENDED= 'suspended',
+    DEFECTS_LIABILITY= 'defects_liability',
     COMPLETED= 'completed'
 }
 

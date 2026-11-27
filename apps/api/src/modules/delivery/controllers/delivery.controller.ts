@@ -23,6 +23,7 @@ import {
   DecideMilestoneSubmissionRequestDto,
   ListMilestonesRequestDto,
   SubmitMilestoneRequestDto,
+  SetContractStageApplicabilityRequestDto,
   TransitionContractStageRequestDto,
   UpdateContractStageRequestDto,
   UpdateMilestoneRequestDto,
@@ -116,6 +117,36 @@ export class DeliveryController {
       stageId,
       body,
     );
+  }
+
+  @Post('stages/:stageId/applicability')
+  @HttpCode(HttpStatus.OK)
+  setStageApplicability(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
+    @Param('stageId', ParseUlidPipe) stageId: string,
+    @Body() body: SetContractStageApplicabilityRequestDto,
+  ) {
+    return this.workflow.setStageApplicability(
+      { userId: user.id, companyId, contractId },
+      stageId,
+      body,
+    );
+  }
+
+  /** The contract's lifecycle progress, calculated by the API. */
+  @Get('progress')
+  getProgress(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentCompanyId() companyId: string,
+    @CurrentContractId() contractId: string,
+  ) {
+    return this.milestones.getProgress({
+      userId: user.id,
+      companyId,
+      contractId,
+    });
   }
 
   /** A milestone is created within its stage, named by the path. */

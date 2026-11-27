@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import {
   EClientContractRole,
+  EContractStatus,
   EContractorContractRole,
   EDocumentCategory,
   EDocumentVisibility,
@@ -15,12 +16,14 @@ import {
   EMilestoneStatus,
   EMilestoneSubmissionType,
   EPartyType,
+  EStageHistoryEvent,
   EStatus,
   type ContractRole,
   type ContractStage as ContractStageResponse,
   type CreateContractStageRequest,
   type CreateMilestoneRequest,
   type DecideMilestoneSubmissionRequest,
+  type SetContractStageApplicabilityRequest,
   type Milestone as MilestoneResponse,
   type MilestoneDecision as MilestoneDecisionResponse,
   type MilestoneSubmission as MilestoneSubmissionResponse,
@@ -53,6 +56,8 @@ import {
 import {
   CLOSED_STAGE_STATUSES,
   FULL_BPS,
+  assertPlanEditable,
+  assertStageWorkAllowed,
   assertMilestoneEditable,
   assertStageTransition,
   assertSubmittable,
@@ -163,7 +168,14 @@ export class MilestoneWorkflowService {
         PLANNER,
         'plan stages',
       );
-      await this.lockContract(context, scope, actor, 'update', 'planning');
+      const contract = await this.lockContract(
+        context,
+        scope,
+        actor,
+        'update',
+        'planning',
+      );
+      assertPlanEditable(contract);
       assertDateOrder(
         request.plannedStartDate,
         request.plannedEndDate,
@@ -189,6 +201,12 @@ export class MilestoneWorkflowService {
         changes: { before: null, after: stagePlan(stage) },
         occurredAt: new Date(),
       });
+      await this.recordStageHistory(context, scope, actor, stage, {
+        eventType: EStageHistoryEvent.INITIALISED,
+        toStatus: stage.status,
+        toApplicable: true,
+        toWeightBps: stage.weightBps,
+      });
       return toContractStageResponse(stage);
     });
   }
@@ -207,8 +225,15 @@ export class MilestoneWorkflowService {
         PLANNER,
         'change stages',
       );
-      await this.lockContract(context, scope, actor, 'update', 'planning');
+      const contract = await this.lockContract(
+        context,
+        scope,
+        actor,
+        'update',
+        'planning',
+      );
       const stage = await this.lockStage(context, scope, stageId);
+      assertStageWorkAllowed(contract, stage);
       if (CLOSED_STAGE_STATUSES.includes(stage.status)) {
         throw new ConflictException('A completed stage can no longer change.');
       }
@@ -246,7 +271,11 @@ export class MilestoneWorkflowService {
           'With these dates,',
         );
       }
-      if (request.weightBps !== undefined) {
+      if (
+        request.weightBps !== undefined &&
+        request.weightBps !== stage.weightBps
+      ) {
+        assertPlanEditable(contract);
         await this.assertStageWeight(
           context,
           scope,
@@ -273,6 +302,22 @@ export class MilestoneWorkflowService {
           : {}),
         occurredAt: new Date(),
       });
+      if (saved.weightBps !== stage.weightBps) {
+        await this.recordStageHistory(context, scope, actor, saved, {
+          eventType: EStageHistoryEvent.WEIGHT_CHANGED,
+          fromWeightBps: stage.weightBps,
+          toWeightBps: saved.weightBps,
+        });
+      }
+      if (
+        saved.plannedStartDate !== stage.plannedStartDate ||
+        saved.plannedEndDate !== stage.plannedEndDate
+      ) {
+        await this.recordStageHistory(context, scope, actor, saved, {
+          eventType: EStageHistoryEvent.DATES_CHANGED,
+          reason: dateOverride,
+        });
+      }
       return this.stageResponse(scope, saved);
     });
   }
@@ -299,6 +344,12 @@ export class MilestoneWorkflowService {
         'operation',
       );
       const stage = await this.lockStage(context, scope, stageId);
+      assertStageWorkAllowed(contract, stage);
+      if (stage.isApplicable === false) {
+        throw new ConflictException(
+          'This stage doesn’t apply to the contract; reinstate it before changing its status.',
+        );
+      }
       const from = stage.status;
       const to = request.status;
       assertStageTransition(from, to);
@@ -307,7 +358,9 @@ export class MilestoneWorkflowService {
         throw new BadRequestException(
           to === EStatus.ON_HOLD
             ? 'Putting a stage on hold needs a reason.'
-            : 'Resuming a stage needs a reason.',
+            : to === EStatus.CANCELLED
+              ? 'Cancelling a stage needs a reason.'
+              : 'Resuming a stage needs a reason.',
         );
       }
       const day = request.effectiveDate ?? contractDay(contract);
@@ -341,6 +394,12 @@ export class MilestoneWorkflowService {
         reason,
         occurredAt: new Date(),
       });
+      await this.recordStageHistory(context, scope, actor, saved, {
+        eventType: EStageHistoryEvent.STATUS_CHANGED,
+        fromStatus: from,
+        toStatus: to,
+        reason,
+      });
       return this.stageResponse(scope, saved);
     });
   }
@@ -369,9 +428,15 @@ export class MilestoneWorkflowService {
         'planning',
       );
       const stage = await this.lockStage(context, scope, stageId);
+      assertStageWorkAllowed(contract, stage);
       if (CLOSED_STAGE_STATUSES.includes(stage.status)) {
         throw new ConflictException(
           'A completed stage takes no new milestones.',
+        );
+      }
+      if (stage.isApplicable === false) {
+        throw new ConflictException(
+          'This stage doesn’t apply to the contract, so it takes no milestones.',
         );
       }
       await this.assertMilestoneWeight(
@@ -464,6 +529,7 @@ export class MilestoneWorkflowService {
         'planning',
       );
       const milestone = await this.lockMilestone(context, scope, milestoneId);
+      await this.assertMilestoneStageOpen(context, scope, contract, milestone);
       const changesScope = SCOPE_FIELDS.some(
         (field) => request[field] !== undefined,
       );
@@ -567,6 +633,7 @@ export class MilestoneWorkflowService {
         'operation',
       );
       const milestone = await this.lockMilestone(context, scope, milestoneId);
+      await this.assertMilestoneStageOpen(context, scope, contract, milestone);
       if (milestone.status !== EMilestoneStatus.PLANNED) {
         throw new ConflictException('Only a planned milestone can be started.');
       }
@@ -619,6 +686,7 @@ export class MilestoneWorkflowService {
         'operation',
       );
       const milestone = await this.lockMilestone(context, scope, milestoneId);
+      await this.assertMilestoneStageOpen(context, scope, contract, milestone);
       assertSubmittable(milestone.status);
       await this.assertStageOpen(context, scope, milestone.contractStageId);
 
@@ -757,6 +825,7 @@ export class MilestoneWorkflowService {
       );
       // The milestone lock serializes decisions and submissions.
       const milestone = await this.lockMilestone(context, scope, milestoneId);
+      await this.assertMilestoneStageOpen(context, scope, contract, milestone);
       const submission = await context.submissions.findInMilestone(
         scope,
         milestone.id,
@@ -1075,6 +1144,139 @@ export class MilestoneWorkflowService {
    * The contract, locked: `share` keeps it from being archived meanwhile,
    * `update` also serializes stage planning so weights stay within 100%.
    */
+  /**
+   * Marks a planned stage, with no milestones, as not applying to the
+   * contract, with a reason; or reinstates it while it is still planned
+   * (decision D-7). Progress leaves out a stage that doesn't apply.
+   */
+  async setStageApplicability(
+    caller: Caller,
+    stageId: string,
+    request: SetContractStageApplicabilityRequest,
+  ): Promise<ContractStageResponse> {
+    const scope = await this.authorizeProject(caller);
+    return this.unitOfWork.execute(async (context) => {
+      const actor = await this.requireRole(
+        context,
+        scope,
+        caller,
+        PLANNER,
+        'decide whether a stage applies',
+      );
+      const contract = await this.lockContract(
+        context,
+        scope,
+        actor,
+        'update',
+        'planning',
+      );
+      const stage = await this.lockStage(context, scope, stageId);
+      assertStageWorkAllowed(contract, stage);
+      if ((stage.isApplicable ?? true) === request.isApplicable) {
+        return this.stageResponse(scope, stage);
+      }
+      if (stage.status !== EStatus.PLANNED) {
+        throw new ConflictException(
+          'Only a stage that hasn’t started can be marked as not applying or reinstated.',
+        );
+      }
+      const reason = request.reason?.trim() || null;
+      if (!request.isApplicable) {
+        if (!reason) {
+          throw new BadRequestException(
+            'Say why the stage doesn’t apply to this contract.',
+          );
+        }
+        if (
+          (await context.milestones.countActiveInStage(scope, stage.id)) > 0
+        ) {
+          throw new ConflictException(
+            'This stage has milestones; cancel them before marking the stage as not applying.',
+          );
+        }
+      }
+      const now = new Date();
+      const saved = await context.stages.update(scope, stage.id, {
+        isApplicable: request.isApplicable,
+        applicabilityReason: request.isApplicable ? null : reason,
+        applicabilityDecidedById: actor.member.id,
+        applicabilityDecidedAt: now,
+      });
+      await this.record(context, scope, actor, {
+        action: 'stage.applicability_changed',
+        entityType: 'contract_stage',
+        entityId: saved.id,
+        summary: request.isApplicable
+          ? `Reinstated stage ${saved.sequence}: ${saved.name}.`
+          : `Marked stage ${saved.sequence}: ${saved.name} as not applying.`,
+        changes: {
+          before: { isApplicable: stage.isApplicable ?? true },
+          after: { isApplicable: request.isApplicable },
+        },
+        reason,
+        occurredAt: now,
+      });
+      await this.recordStageHistory(context, scope, actor, saved, {
+        eventType: EStageHistoryEvent.APPLICABILITY_CHANGED,
+        fromApplicable: stage.isApplicable ?? true,
+        toApplicable: request.isApplicable,
+        reason,
+      });
+      return this.stageResponse(scope, saved);
+    });
+  }
+
+  /** One stage history row, in the transaction of the change it records. */
+  private async recordStageHistory(
+    context: IMilestoneWorkflowContext,
+    scope: Scope,
+    actor: Actor,
+    stage: ContractStage,
+    event: {
+      eventType: EStageHistoryEvent;
+      fromStatus?: EStatus | null;
+      toStatus?: EStatus | null;
+      fromApplicable?: boolean | null;
+      toApplicable?: boolean | null;
+      fromWeightBps?: number | null;
+      toWeightBps?: number | null;
+      reason?: string | null;
+    },
+  ): Promise<void> {
+    await context.stageHistory.record(scope, {
+      contractStageId: stage.id,
+      eventType: event.eventType,
+      fromStatus: event.fromStatus ?? null,
+      toStatus: event.toStatus ?? null,
+      fromApplicable: event.fromApplicable ?? null,
+      toApplicable: event.toApplicable ?? null,
+      fromWeightBps: event.fromWeightBps ?? null,
+      toWeightBps: event.toWeightBps ?? null,
+      reason: event.reason ?? null,
+      actorCompanyUserId: actor.member.id,
+      occurredAt: new Date(),
+    });
+  }
+
+  /**
+   * During the defects liability period, a milestone changes only in the
+   * post-contract obligations stage. Other statuses need no extra read.
+   */
+  private async assertMilestoneStageOpen(
+    context: IMilestoneWorkflowContext,
+    scope: Scope,
+    contract: Contract,
+    milestone: Milestone,
+  ): Promise<void> {
+    if (contract.status !== EContractStatus.DEFECTS_LIABILITY) return;
+    const stage = await context.stages.findForShare(
+      scope,
+      milestone.contractStageId,
+    );
+    if (!stage) throw new NotFoundException('Stage was not found.');
+    assertStageWorkAllowed(contract, stage);
+  }
+
   private async lockContract(
     context: IMilestoneWorkflowContext,
     scope: Scope,

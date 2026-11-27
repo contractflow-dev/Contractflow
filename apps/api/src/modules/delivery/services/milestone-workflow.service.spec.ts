@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   NotFoundException,
@@ -13,6 +14,8 @@ import {
   EMilestoneStatus,
   EMilestoneSubmissionType,
   EPartyType,
+  ELifecycleStageCode,
+  EStageHistoryEvent,
   EStatus,
 } from '@contractflow/contracts-schema';
 import { describe, expect, it, vi } from 'vitest';
@@ -139,6 +142,7 @@ function setup(
       totalWeightInStage: vi.fn().mockResolvedValue(0),
       nextSequenceInStage: vi.fn().mockResolvedValue(1),
       countNotApprovedInStage: vi.fn().mockResolvedValue(0),
+      countActiveInStage: vi.fn().mockResolvedValue(0),
       countOutsideDates: vi.fn().mockResolvedValue(0),
       append: vi.fn(async (_scope, data) => ({
         id: 'milestone-2',
@@ -202,6 +206,7 @@ function setup(
       appendMany: vi.fn(async (_scope, rows) => rows),
       listForSubmissions: vi.fn().mockResolvedValue([]),
     },
+    stageHistory: { record: vi.fn().mockResolvedValue(undefined) },
     activity: { record: vi.fn().mockResolvedValue(undefined) },
   };
   const unitOfWork: IMilestoneWorkflowUnitOfWork = {
@@ -659,6 +664,307 @@ describe('MilestoneWorkflowService', () => {
           metadata: { dateOverride: true },
         }),
       );
+    });
+  });
+  describe('lifecycle stages (decisions D-4, D-6, D-7, D-12)', () => {
+    const lifecycleContract = (status: EContractStatus) => ({
+      id: SCOPE.contractId,
+      currencyCode: 'NGN',
+      status,
+      timezone: 'Africa/Lagos',
+      lifecycleTemplateVersionId: 'version-1',
+    });
+    const stage = (overrides: Record<string, unknown> = {}) => ({
+      id: 'stage-1',
+      contractId: SCOPE.contractId,
+      name: 'Mobilisation and Contract Readiness',
+      sequence: 2,
+      status: EStatus.PLANNED,
+      weightBps: 800,
+      plannedStartDate: '2027-01-01',
+      plannedEndDate: '2027-12-31',
+      actualStartDate: null,
+      actualEndDate: null,
+      stageCode: ELifecycleStageCode.MOBILISATION,
+      isApplicable: true,
+      applicabilityReason: null,
+      ...overrides,
+    });
+    const historyEvents = (context: ReturnType<typeof setup>['context']) =>
+      context.stageHistory.record.mock.calls.map(([, row]) => row);
+
+    describe('a lifecycle contract’s plan is fixed once it is active', () => {
+      it('refuses a new stage, but allows one while the contract is a draft', async () => {
+        const active = setup({
+          partyType: EPartyType.AWARDING,
+          contract: lifecycleContract(EContractStatus.ACTIVE),
+        });
+        await expect(
+          active.service.createStage(CALLER, {
+            name: 'Extra',
+            weightBps: 0,
+            plannedStartDate: '2027-01-01',
+            plannedEndDate: '2027-02-01',
+          }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(active.context.stages.append).not.toHaveBeenCalled();
+
+        const draft = setup({
+          partyType: EPartyType.AWARDING,
+          contract: lifecycleContract(EContractStatus.DRAFT),
+        });
+        await draft.service.createStage(CALLER, {
+          name: 'Extra',
+          weightBps: 0,
+          plannedStartDate: '2027-01-01',
+          plannedEndDate: '2027-02-01',
+        });
+        expect(historyEvents(draft.context)).toEqual([
+          expect.objectContaining({
+            eventType: EStageHistoryEvent.INITIALISED,
+            toStatus: EStatus.PLANNED,
+            toApplicable: true,
+            toWeightBps: 0,
+            actorCompanyUserId: 'member-1',
+          }),
+        ]);
+      });
+
+      it('refuses a weight change once active, but not a rename', async () => {
+        const { context, service } = setup({
+          partyType: EPartyType.AWARDING,
+          contract: lifecycleContract(EContractStatus.ACTIVE),
+        });
+        context.stages.findForUpdate.mockResolvedValue(stage() as never);
+        await expect(
+          service.updateStage(CALLER, 'stage-1', { weightBps: 900 }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(context.stages.update).not.toHaveBeenCalled();
+
+        await service.updateStage(CALLER, 'stage-1', { name: 'Renamed' });
+        expect(context.stages.update).toHaveBeenCalledWith(SCOPE, 'stage-1', {
+          name: 'Renamed',
+        });
+      });
+
+      it('keeps the older rules for a contract created before lifecycles', async () => {
+        const { context, service } = setup({ partyType: EPartyType.AWARDING });
+        await service.createStage(CALLER, {
+          name: 'Extra',
+          weightBps: 0,
+          plannedStartDate: '2027-01-01',
+          plannedEndDate: '2027-02-01',
+        });
+        expect(context.stages.append).toHaveBeenCalledOnce();
+      });
+
+      it('records a weight change in a draft as stage history', async () => {
+        const { context, service } = setup({
+          partyType: EPartyType.AWARDING,
+          contract: lifecycleContract(EContractStatus.DRAFT),
+        });
+        context.stages.findForUpdate.mockResolvedValue(stage() as never);
+        await service.updateStage(CALLER, 'stage-1', { weightBps: 900 });
+        expect(historyEvents(context)).toEqual([
+          expect.objectContaining({
+            eventType: EStageHistoryEvent.WEIGHT_CHANGED,
+            fromWeightBps: 800,
+            toWeightBps: 900,
+          }),
+        ]);
+      });
+    });
+
+    describe('whether a stage applies', () => {
+      it('marks a planned stage with no milestones as not applying, with its reason and history', async () => {
+        const { context, service } = setup({
+          partyType: EPartyType.AWARDING,
+          contract: lifecycleContract(EContractStatus.ACTIVE),
+        });
+        context.stages.findForUpdate.mockResolvedValue(stage() as never);
+
+        const response = await service.setStageApplicability(
+          CALLER,
+          'stage-1',
+          {
+            isApplicable: false,
+            reason: 'No mobilisation: the contractor is already on site.',
+          },
+        );
+
+        expect(response).toMatchObject({
+          isApplicable: false,
+          applicabilityReason:
+            'No mobilisation: the contractor is already on site.',
+        });
+        expect(context.stages.update).toHaveBeenCalledWith(
+          SCOPE,
+          'stage-1',
+          expect.objectContaining({
+            isApplicable: false,
+            applicabilityDecidedById: 'member-1',
+          }),
+        );
+        expect(context.activity.record).toHaveBeenCalledWith(
+          SCOPE,
+          expect.objectContaining({ action: 'stage.applicability_changed' }),
+        );
+        expect(historyEvents(context)).toEqual([
+          expect.objectContaining({
+            eventType: EStageHistoryEvent.APPLICABILITY_CHANGED,
+            fromApplicable: true,
+            toApplicable: false,
+          }),
+        ]);
+      });
+
+      it.each([
+        ['without a reason', {}, () => undefined, BadRequestException],
+        [
+          'with milestones',
+          { reason: 'Not needed' },
+          (context: ReturnType<typeof setup>['context']) =>
+            context.milestones.countActiveInStage.mockResolvedValue(1),
+          ConflictException,
+        ],
+        [
+          'once started',
+          { reason: 'Not needed' },
+          (context: ReturnType<typeof setup>['context']) =>
+            context.stages.findForUpdate.mockResolvedValue(
+              stage({ status: EStatus.IN_PROGRESS }) as never,
+            ),
+          ConflictException,
+        ],
+      ] as const)(
+        'refuses to exclude a stage %s',
+        async (_label, body, arrange, error) => {
+          const { context, service } = setup({
+            partyType: EPartyType.AWARDING,
+            contract: lifecycleContract(EContractStatus.ACTIVE),
+          });
+          context.stages.findForUpdate.mockResolvedValue(stage() as never);
+          arrange(context);
+          await expect(
+            service.setStageApplicability(CALLER, 'stage-1', {
+              isApplicable: false,
+              ...body,
+            }),
+          ).rejects.toBeInstanceOf(error);
+          expect(context.stages.update).not.toHaveBeenCalled();
+        },
+      );
+
+      it('refuses the contractor: only the Client Project Manager decides', async () => {
+        const { context, service } = setup({
+          partyType: EPartyType.AWARDED,
+          contract: lifecycleContract(EContractStatus.ACTIVE),
+        });
+        await expect(
+          service.setStageApplicability(CALLER, 'stage-1', {
+            isApplicable: false,
+            reason: 'Not needed',
+          }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(context.stages.update).not.toHaveBeenCalled();
+      });
+
+      it('takes no milestones and no status change while a stage doesn’t apply', async () => {
+        const { context, service } = setup({
+          partyType: EPartyType.AWARDING,
+          contract: lifecycleContract(EContractStatus.ACTIVE),
+        });
+        context.stages.findForUpdate.mockResolvedValue(
+          stage({ isApplicable: false, applicabilityReason: 'n/a' }) as never,
+        );
+        await expect(
+          service.transitionStage(CALLER, 'stage-1', {
+            status: EStatus.IN_PROGRESS,
+          }),
+        ).rejects.toBeInstanceOf(ConflictException);
+      });
+    });
+
+    describe('cancelling a stage', () => {
+      it('needs a reason, and records it', async () => {
+        const { context, service } = setup({
+          partyType: EPartyType.AWARDING,
+          contract: lifecycleContract(EContractStatus.ACTIVE),
+        });
+        context.stages.findForUpdate.mockResolvedValue(stage() as never);
+        await expect(
+          service.transitionStage(CALLER, 'stage-1', {
+            status: EStatus.CANCELLED,
+          }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+
+        await service.transitionStage(CALLER, 'stage-1', {
+          status: EStatus.CANCELLED,
+          reason: 'Scope removed by variation.',
+        });
+        expect(historyEvents(context)).toEqual([
+          expect.objectContaining({
+            eventType: EStageHistoryEvent.STATUS_CHANGED,
+            fromStatus: EStatus.PLANNED,
+            toStatus: EStatus.CANCELLED,
+            reason: 'Scope removed by variation.',
+          }),
+        ]);
+      });
+    });
+
+    describe('the defects liability period', () => {
+      it('allows work on the post-contract obligations stage only', async () => {
+        const { context, service } = setup({
+          partyType: EPartyType.AWARDING,
+          contract: lifecycleContract(EContractStatus.DEFECTS_LIABILITY),
+        });
+        context.stages.findForUpdate.mockResolvedValue(
+          stage({ status: EStatus.IN_PROGRESS }) as never,
+        );
+        await expect(
+          service.transitionStage(CALLER, 'stage-1', {
+            status: EStatus.COMPLETED,
+          }),
+        ).rejects.toThrow('only the post-contract obligations stage');
+
+        context.stages.findForUpdate.mockResolvedValue(
+          stage({
+            status: EStatus.IN_PROGRESS,
+            stageCode: ELifecycleStageCode.POST_CONTRACT_OBLIGATIONS,
+          }) as never,
+        );
+        await service.transitionStage(CALLER, 'stage-1', {
+          status: EStatus.COMPLETED,
+        });
+        expect(context.stages.update).toHaveBeenCalledOnce();
+      });
+
+      it('refuses milestone work outside that stage, and any new stage', async () => {
+        const { context, service } = setup({
+          contract: lifecycleContract(EContractStatus.DEFECTS_LIABILITY),
+        });
+        context.milestones.findForUpdate.mockResolvedValue(
+          milestone({ status: EMilestoneStatus.PLANNED }) as never,
+        );
+        context.stages.findForShare.mockResolvedValue(stage() as never);
+        await expect(
+          service.submit(CALLER, 'milestone-1', submission),
+        ).rejects.toThrow('only the post-contract obligations stage');
+
+        const planner = setup({
+          partyType: EPartyType.AWARDING,
+          contract: lifecycleContract(EContractStatus.DEFECTS_LIABILITY),
+        });
+        await expect(
+          planner.service.createStage(CALLER, {
+            name: 'Late',
+            weightBps: 0,
+            plannedStartDate: '2027-01-01',
+            plannedEndDate: '2027-02-01',
+          }),
+        ).rejects.toBeInstanceOf(ConflictException);
+      });
     });
   });
 });

@@ -3,7 +3,9 @@
 import { useState, type FormEvent } from "react";
 import { RiAddLine } from "@remixicon/react";
 import {
+  EContractStatus,
   EMilestoneStatus,
+  EStatus,
   type ContractStage,
 } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
@@ -46,6 +48,7 @@ import {
   useCreateContractStageMutation,
   useGetContractStagesQuery,
   useGetMilestonesQuery,
+  useSetContractStageApplicabilityMutation,
   useTransitionContractStageMutation,
   useUpdateContractStageMutation,
   type UpdateContractStageRequest,
@@ -56,6 +59,7 @@ import {
   asksForDateOverride,
   isStageClosed,
   milestonesOutsideDates,
+  stageOpen,
   stageTransitions,
   type StageTransition,
 } from "./project-rules";
@@ -73,7 +77,7 @@ import {
  * statuses (while it is active); everyone in the Project workspace reads them.
  */
 export function ProjectStages({ project }: { project: ProjectContext }) {
-  const { companyId, contractId, permissions } = project;
+  const { companyId, contractId, permissions, contract } = project;
   const pagination = usePagination(20);
   const stages = useGetContractStagesQuery({
     companyId,
@@ -88,11 +92,18 @@ export function ProjectStages({ project }: { project: ProjectContext }) {
     stage: ContractStage;
     transition: StageTransition;
   } | null>(null);
+  const [deciding, setDeciding] = useState<ContractStage | null>(null);
 
   const rows = stages.currentData?.data ?? [];
   const allLoaded =
     !!stages.currentData && stages.currentData.meta.totalItems === rows.length;
-  const totalWeight = rows.reduce((sum, stage) => sum + stage.weightBps, 0);
+  // Stages that don't apply or were cancelled count for nothing.
+  const appliedWeight = rows
+    .filter(
+      (stage) =>
+        stage.isApplicable !== false && stage.status !== EStatus.CANCELLED,
+    )
+    .reduce((sum, stage) => sum + stage.weightBps, 0);
 
   const columns: ReadonlyArray<DataTableColumn<ContractStage>> = [
     {
@@ -108,6 +119,14 @@ export function ProjectStages({ project }: { project: ProjectContext }) {
           {stage.description ? (
             <span className="line-clamp-2 text-xs text-muted-foreground">
               {stage.description}
+            </span>
+          ) : null}
+          {stage.isApplicable === false ? (
+            <span className="block text-xs text-muted-foreground">
+              Doesn&apos;t apply
+              {stage.applicabilityReason
+                ? `: ${stage.applicabilityReason}`
+                : ""}
             </span>
           ) : null}
         </>
@@ -170,11 +189,11 @@ export function ProjectStages({ project }: { project: ProjectContext }) {
         title="Stages"
         description={
           allLoaded && rows.length
-            ? `The contract's phases in order. Their weights add up to ${formatBasisPoints(totalWeight)} of the contract.`
+            ? `The contract's phases in order. The stages that apply add up to ${formatBasisPoints(appliedWeight)} of the contract${contract.lifecycleTemplateVersionId && contract.status === EContractStatus.DRAFT ? "; they must total 100% before the contract is activated" : ""}.`
             : "The contract's phases in order, each with its share of the contract and its milestones."
         }
         action={
-          permissions.canPlan ? (
+          permissions.canPlan && permissions.canChangePlan ? (
             <Button type="button" onClick={() => setEditing("new")}>
               <RiAddLine aria-hidden="true" data-icon="inline-start" />
               Add stage
@@ -198,11 +217,24 @@ export function ProjectStages({ project }: { project: ProjectContext }) {
           rowActions={
             canChange
               ? (stage) => {
-                  const planning = permissions.canPlan && !isStageClosed(stage);
-                  const moves = permissions.canOperateAsPlanner
-                    ? stageTransitions(stage.status)
-                    : [];
-                  if (!planning && !moves.length) return null;
+                  // During defects liability only stage 9 changes (D-12).
+                  const open = stageOpen(contract.status, stage);
+                  const applies = stage.isApplicable !== false;
+                  const planning =
+                    permissions.canPlan &&
+                    open &&
+                    applies &&
+                    !isStageClosed(stage);
+                  const moves =
+                    permissions.canOperateAsPlanner && open && applies
+                      ? stageTransitions(stage.status)
+                      : [];
+                  // Whether it applies is decided while it hasn't started.
+                  const decide =
+                    permissions.canPlan &&
+                    open &&
+                    stage.status === EStatus.PLANNED;
+                  if (!planning && !moves.length && !decide) return null;
                   return (
                     <DataTableRowActions
                       label={`Actions for stage ${stage.name}`}
@@ -225,6 +257,11 @@ export function ProjectStages({ project }: { project: ProjectContext }) {
                           {STAGE_TRANSITIONS[transition].label}
                         </DropdownMenuItem>
                       ))}
+                      {decide ? (
+                        <DropdownMenuItem onClick={() => setDeciding(stage)}>
+                          {applies ? "Mark as not applying" : "Reinstate stage"}
+                        </DropdownMenuItem>
+                      ) : null}
                     </DataTableRowActions>
                   );
                 }
@@ -272,6 +309,15 @@ export function ProjectStages({ project }: { project: ProjectContext }) {
         milestone={null}
         onClose={() => setAddingTo(null)}
       />
+
+      {deciding ? (
+        <StageApplicabilityDialog
+          key={deciding.id}
+          project={project}
+          stage={deciding}
+          onClose={() => setDeciding(null)}
+        />
+      ) : null}
 
       {moving ? (
         <StageTransitionDialog
@@ -342,6 +388,8 @@ function StageForm({
   const [weight, setWeight] = useState(
     stage ? basisPointsToPercentInput(stage.weightBps) : "",
   );
+  // A lifecycle contract's weights are fixed once it is active (D-4).
+  const weightLocked = stage !== null && !project.permissions.canChangePlan;
   const [start, setStart] = useState(stage?.plannedStartDate ?? "");
   const [end, setEnd] = useState(stage?.plannedEndDate ?? "");
   const [overrideReason, setOverrideReason] = useState("");
@@ -477,13 +525,19 @@ function StageForm({
               label="Share of the contract (%)"
               required
               error={errors.weight}
-              description="All the contract's stages together can add up to 100% at most."
+              description={
+                weightLocked
+                  ? "Fixed once the contract is active. Mark a stage as not applying instead."
+                  : "All the contract's stages together can add up to 100% at most."
+              }
             >
               {(control) => (
                 <Input
                   {...control}
                   value={weight}
                   inputMode="decimal"
+                  readOnly={weightLocked}
+                  aria-readonly={weightLocked || undefined}
                   onChange={(event) => setWeight(event.target.value)}
                 />
               )}
@@ -707,6 +761,93 @@ function StageTransitionDialog({
           )}
         </FormField>
       </div>
+    </ConfirmDialog>
+  );
+}
+
+/**
+ * Marks a planned stage as not applying to the contract (a reason is
+ * required), or reinstates it. The API refuses a stage with milestones.
+ */
+function StageApplicabilityDialog({
+  project,
+  stage,
+  onClose,
+}: {
+  project: ProjectContext;
+  stage: ContractStage;
+  onClose: () => void;
+}) {
+  const excluding = stage.isApplicable !== false;
+  const [setApplicability, state] = useSetContractStageApplicabilityMutation();
+  const [reason, setReason] = useState("");
+  const [missingReason, setMissingReason] = useState(false);
+
+  async function confirm() {
+    if (excluding && !reason.trim()) {
+      setMissingReason(true);
+      return;
+    }
+    const result = await setApplicability({
+      companyId: project.companyId,
+      contractId: project.contractId,
+      stageId: stage.id,
+      body: { isApplicable: !excluding, reason: reason.trim() || null },
+    });
+    if (!("error" in result)) {
+      notifySuccess(
+        excluding ? "Stage marked as not applying" : "Stage reinstated",
+        stage.name,
+      );
+      onClose();
+    }
+  }
+
+  const label = excluding ? "Mark as not applying" : "Reinstate stage";
+  return (
+    <ConfirmDialog
+      open
+      title={`${label}: ${stage.name}?`}
+      description={
+        excluding
+          ? "The stage stays on record but counts for nothing in progress, and takes no milestones until it is reinstated."
+          : "The stage counts towards progress again and can be planned."
+      }
+      confirmLabel={label}
+      pendingLabel="Saving…"
+      isPending={state.isLoading}
+      error={
+        state.error
+          ? getApiErrorMessage(state.error, "The stage couldn't be changed.")
+          : null
+      }
+      onConfirm={() => void confirm()}
+      onCancel={onClose}
+    >
+      <FormField
+        id={`stage-${stage.id}-applicability-reason`}
+        label="Reason"
+        required={excluding}
+        optional={!excluding}
+        error={
+          missingReason
+            ? "Say why the stage doesn't apply to this contract."
+            : undefined
+        }
+      >
+        {(control) => (
+          <Textarea
+            {...control}
+            value={reason}
+            maxLength={2000}
+            rows={3}
+            onChange={(event) => {
+              setReason(event.target.value);
+              setMissingReason(false);
+            }}
+          />
+        )}
+      </FormField>
     </ConfirmDialog>
   );
 }

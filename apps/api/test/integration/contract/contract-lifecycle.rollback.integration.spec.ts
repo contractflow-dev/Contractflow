@@ -1,8 +1,15 @@
 ﻿import { randomUUID } from 'node:crypto';
-import { EContractStatus, EToStatus } from '@contractflow/contracts-schema';
+import {
+  EClientContractRole,
+  EContractStatus,
+  EPartyType,
+  EToStatus,
+} from '@contractflow/contracts-schema';
 import type { DataSource } from 'typeorm';
 import { ActivityLog } from '../../../src/modules/cross-cutting/entities/activity-log.entity';
 import { Contract } from '../../../src/modules/contract/entities/contract.entity';
+import { ContractParty } from '../../../src/modules/contract/entities/contract-party.entity';
+import { ContractRoleAssignment } from '../../../src/modules/contract/entities/contract-role-assignment.entity';
 import { ContractStatusHistory } from '../../../src/modules/contract/entities/contract-status-history.entity';
 import { TypeOrmUnitOfWork } from '../../../src/common/database/typeorm-unit-of-work';
 import { ContractLifecycleContextFactory } from '../../../src/modules/contract/repositories/contract-lifecycle-context.factory';
@@ -45,8 +52,36 @@ describe('ContractLifecycleService PostgreSQL rollback integration', () => {
     }
   }, 60_000);
 
-  it('persists contract status, history, and activity together on a successful transition', async () => {
+  /**
+   * The lifecycle fixture, made activatable (decision D-5): its company is
+   * the awarding party, the actor its Client Project Manager, and both
+   * parties have signed.
+   */
+  async function activatableFixture() {
     const fixture = await factory!.createLifecycleFixture();
+    await dataSource!
+      .getRepository(ContractParty)
+      .update({ id: fixture.party.id }, { partyType: EPartyType.AWARDING });
+    await dataSource!
+      .getRepository(ContractRoleAssignment)
+      .update(
+        { contractPartyId: fixture.party.id },
+        { role: EClientContractRole.CLIENT_PROJECT_MANAGER },
+      );
+    const { company: contractor } = await factory!.createCompanyMember();
+    await factory!.createAdditionalParty(
+      fixture.contract,
+      contractor,
+      EPartyType.AWARDED,
+    );
+    await dataSource!
+      .getRepository(ContractParty)
+      .update({ contractId: fixture.contract.id }, { signedAt: new Date() });
+    return fixture;
+  }
+
+  it('persists contract status, history, and activity together on a successful transition', async () => {
+    const fixture = await activatableFixture();
 
     await service.transition(
       fixture.actor.userId,
@@ -84,7 +119,7 @@ describe('ContractLifecycleService PostgreSQL rollback integration', () => {
   });
 
   it('rolls back contract and audit writes when the database rejects a history insert', async () => {
-    const fixture = await factory!.createLifecycleFixture();
+    const fixture = await activatableFixture();
     const marker = `fail-history-${randomUUID()}`;
     const removeFailure = await installPostgresFailureTrigger(dataSource!, {
       table: 'contract_status_history',
@@ -128,7 +163,7 @@ describe('ContractLifecycleService PostgreSQL rollback integration', () => {
   });
 
   it('rolls back contract and history writes when the database rejects an activity insert', async () => {
-    const fixture = await factory!.createLifecycleFixture();
+    const fixture = await activatableFixture();
     const removeFailure = await installPostgresFailureTrigger(dataSource!, {
       table: 'activity_log',
       contractId: fixture.contract.id,
@@ -171,7 +206,7 @@ describe('ContractLifecycleService PostgreSQL rollback integration', () => {
   });
 
   it('checks the persisted initial contract state before starting each rollback scenario', async () => {
-    const fixture = await factory!.createLifecycleFixture();
+    const fixture = await activatableFixture();
     const status = await dataSource!.getRepository(Contract).findOne({
       where: { id: fixture.contract.id },
       select: { status: true },

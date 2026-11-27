@@ -23,6 +23,7 @@ import { ContractStatusHistoryValues1794000000001 } from './migrations/179400000
 import { SubcontractParentRules1794000000002 } from './migrations/1794000000002-subcontract-parent-rules';
 import { ContractPartyRules1794000000003 } from './migrations/1794000000003-contract-party-rules';
 import { RemoveActualCompletionDate1794000000004 } from './migrations/1794000000004-remove-actual-completion-date';
+import { ContractLifecycleTemplates1794100000000 } from './migrations/1794100000000-contract-lifecycle-templates';
 
 export const registeredMigrations = [
   IdentitySchemaBootstrap1749000000000,
@@ -50,4 +51,5 @@ export const registeredMigrations = [
   SubcontractParentRules1794000000002,
   ContractPartyRules1794000000003,
   RemoveActualCompletionDate1794000000004,
+  ContractLifecycleTemplates1794100000000,
 ];

@@ -48,9 +48,16 @@ const transitionOptions: Record<
   [EContractStatus.DRAFT]: [{ transition: "activate", label: "Activate" }],
   [EContractStatus.ACTIVE]: [
     { transition: "hold", label: "Suspend" },
+    {
+      transition: "practical_completion",
+      label: "Record practical completion",
+    },
     { transition: "complete", label: "Complete" },
   ],
   [EContractStatus.SUSPENDED]: [{ transition: "resume", label: "Resume" }],
+  [EContractStatus.DEFECTS_LIABILITY]: [
+    { transition: "complete", label: "Complete" },
+  ],
   [EContractStatus.COMPLETED]: [],
 };
 
@@ -71,6 +78,12 @@ const transitionEffects: Record<
   resume: {
     effect: "will move from Suspended back to Active.",
     done: "Contract resumed.",
+    destructive: false,
+  },
+  practical_completion: {
+    effect:
+      "will move into its defects liability period: only the post-contract obligations stage can still be worked on.",
+    done: "Practical completion recorded.",
     destructive: false,
   },
   complete: {

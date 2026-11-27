@@ -4,6 +4,10 @@ import { getMetadataArgsStorage } from 'typeorm';
 import { describe, expect, it } from 'vitest';
 import { ActivityLog } from '../cross-cutting/entities/activity-log.entity';
 import { ContractStage } from './entities/contract-stage.entity';
+import { LifecycleTemplateStage } from './entities/lifecycle-template-stage.entity';
+import { LifecycleTemplateVersion } from './entities/lifecycle-template-version.entity';
+import { LifecycleTemplate } from './entities/lifecycle-template.entity';
+import { ContractStageHistory } from './entities/contract-stage-history.entity';
 import { MilestoneDecision } from './entities/milestone-decision.entity';
 import { MilestoneOutstandingItem } from './entities/milestone-outstanding-item.entity';
 import { MilestoneSubmissionEvidence } from './entities/milestone-submission-evidence.entity';
@@ -12,22 +16,27 @@ import { MilestoneSubmission } from './entities/milestone-submission.entity';
 import { Milestone } from './entities/milestone.entity';
 
 /**
- * The ERD in `packages/db/docs` must describe the Stages and Milestones tables
- * (and the activity log they write to) as the entities define them: the same
- * columns, and a relationship for every foreign key.
+ * The current-state ERD in `packages/db/docs` must describe the Stages and
+ * Milestones tables (and the activity log they write to) as the entities
+ * define them: the same columns, and a relationship for every foreign key.
+ * The original ERD there is kept unchanged as the historical design.
  */
 // Line endings are normalised so a Windows checkout (CRLF) reads the same as
 // Linux CI (LF); the matching below expects LF.
 const ERD = readFileSync(
   join(
     __dirname,
-    '../../../../../packages/db/docs/Contractflow Entity Relationship updated.mmd',
+    '../../../../../packages/db/docs/ContractFlow_Current_State_ERD.mmd',
   ),
   'utf8',
 ).replace(/\r\n/g, '\n');
 
 const ENTITIES: Array<[Function, string]> = [
   [ContractStage, 'contract_stage'],
+  [LifecycleTemplateStage, 'lifecycle_template_stage'],
+  [LifecycleTemplateVersion, 'lifecycle_template_version'],
+  [LifecycleTemplate, 'lifecycle_template'],
+  [ContractStageHistory, 'contract_stage_history'],
   [Milestone, 'milestone'],
   [MilestoneSubmission, 'milestone_submission'],
   [MilestoneSubmissionEvidence, 'milestone_submission_evidence'],
@@ -119,6 +128,6 @@ describe('ERD of Stages and Milestones', () => {
     expect(relationshipLine('milestone_decision', 'milestone_submission')).toBe(
       true,
     );
-    expect(ERD).toMatch(/uuid previous_decision_id FK/);
+    expect(ERD).toMatch(/varchar\(26\) previous_decision_id FK/);
   });
 });

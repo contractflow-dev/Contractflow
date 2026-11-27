@@ -15,7 +15,10 @@ import {
   ECountryCode,
   ECurrencyCode,
   EFromStatus,
+  ELifecycleStageCode,
   EPartyType,
+  EStageHistoryEvent,
+  EStatus,
   EToStatus,
 } from '@contractflow/contracts-schema';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -45,6 +48,7 @@ function createContext() {
       find: vi.fn(),
       countOtherParties: vi.fn(),
       hasPartyOfType: vi.fn(),
+      countSignatures: vi.fn(),
       findForShare: vi.fn(),
       findByIdWithContractAndCompany: vi.fn(),
       findById: vi.fn(),
@@ -95,6 +99,18 @@ function createContext() {
       save: vi.fn(async (value) => value),
     },
     statusHistory: { record: vi.fn() },
+    lifecycleTemplates: { findPublishedSystemLifecycle: vi.fn() },
+    stages: {
+      createMany: vi.fn(async (rows) =>
+        rows.map((row: object, index: number) => ({
+          id: `stage-${index + 1}`,
+          ...row,
+        })),
+      ),
+      listForUpdate: vi.fn(),
+      save: vi.fn(async (value) => value),
+    },
+    stageHistory: { record: vi.fn() },
     activity: { record: vi.fn() },
   };
 }
@@ -113,11 +129,12 @@ describe('ContractLifecycleService', () => {
     companyRole: ECompanyRole.MEMBER,
     status: ECompanyUserStatus.ACTIVE,
   };
+  // The awarding party: its Client Project Manager changes contract status.
   const party = {
     id: 'party-1',
     contractId: contract.id,
     companyId: actor.companyId,
-    partyType: EPartyType.AWARDED,
+    partyType: EPartyType.AWARDING,
   };
   const mail = { sendContractPartyInvitationEmail: vi.fn() };
   let context: ReturnType<typeof createContext>;
@@ -142,6 +159,17 @@ describe('ContractLifecycleService', () => {
     context.roleAssignments.hasActiveAssignment.mockResolvedValue(true);
     context.roleAssignments.hasAnyActiveAssignment.mockResolvedValue(true);
     context.roleAssignments.hasActiveAssignmentForShare.mockResolvedValue(true);
+    context.parties.countSignatures.mockResolvedValue({ parties: 2, signed: 2 });
+    context.lifecycleTemplates.findPublishedSystemLifecycle.mockResolvedValue(
+      null,
+    );
+    context.stages.createMany.mockImplementation(async (rows) =>
+      rows.map((row: object, index: number) => ({
+        id: `stage-${index + 1}`,
+        ...row,
+      })),
+    );
+    context.stages.save.mockImplementation(async (value) => value);
 
     outcomes = { committed: 0, rolledBack: 0 };
     unitOfWork = {
@@ -419,8 +447,8 @@ describe('ContractLifecycleService', () => {
       canRestore: false,
       canInviteParties: false,
       invitesSubcontractors: false,
-      // The awarded party's Contractor Project Lead on a draft main contract.
-      canCreateSubcontract: true,
+      // Only the awarded party subcontracts; this is the awarding party.
+      canCreateSubcontract: false,
     });
 
     context.memberships.findActive.mockResolvedValue({
@@ -1869,6 +1897,252 @@ describe('ContractLifecycleService', () => {
           partyType: EPartyType.AWARDED,
         } as never),
       ).resolves.toMatchObject({ partyType: EPartyType.AWARDED });
+    });
+  });
+  describe('the contract lifecycle (decisions D-5, D-6, D-12)', () => {
+    const admin = { ...actor, companyRole: ECompanyRole.COMPANY_ADMIN };
+    const templateStages = [
+      ['tpl-1', ELifecycleStageCode.CONTRACT_AWARD, 'Contract Award', 0, true],
+      ['tpl-2', ELifecycleStageCode.MOBILISATION, 'Mobilisation', 4000, false],
+      ['tpl-3', ELifecycleStageCode.CONTRACT_EXECUTION, 'Execution', 6000, false],
+    ].map(([id, stageCode, name, weight, completes], index) => ({
+      id,
+      stageCode,
+      name,
+      description: null,
+      sequence: index + 1,
+      defaultWeightBps: weight,
+      completesOnActivation: completes,
+    }));
+    const createRequest = {
+      referenceNumber: 'CTR-LC',
+      title: 'Lifecycle contract',
+      contractType: EContractType.SERVICE,
+      partyType: EPartyType.AWARDING,
+      workspaces: [],
+      originalValueMinor: '1000',
+      currencyCode: ECurrencyCode.NGN,
+      retentionRateBps: 500,
+      paymentTermsDays: 30,
+      awardDate: '2026-01-01',
+      startDate: '2026-01-02',
+      endDate: '2026-12-31',
+      defectsLiabilityDays: 365,
+      timezone: 'Africa/Lagos',
+    } as never;
+
+    describe('creating a contract', () => {
+      beforeEach(() => {
+        context.companies.findActiveForShare.mockResolvedValue({
+          id: actor.companyId,
+        });
+        context.memberships.findActiveForUpdate.mockResolvedValue(admin);
+        context.contracts.create.mockImplementation(async (data) => ({
+          id: 'contract-new',
+          ...data,
+        }));
+      });
+
+      it('copies the published lifecycle’s stages, each with a history row', async () => {
+        context.lifecycleTemplates.findPublishedSystemLifecycle.mockResolvedValue(
+          { versionId: 'version-1', stages: templateStages },
+        );
+
+        const created = await service.create(
+          actor.userId,
+          actor.companyId,
+          createRequest,
+        );
+
+        expect(created).toMatchObject({
+          lifecycleTemplateVersionId: 'version-1',
+          lifecycleInitialisedAt: expect.any(Date),
+        });
+        expect(context.stages.createMany).toHaveBeenCalledWith(
+          templateStages.map((templateStage) =>
+            expect.objectContaining({
+              contractId: 'contract-new',
+              stageCode: templateStage.stageCode,
+              templateStageId: templateStage.id,
+              name: templateStage.name,
+              sequence: templateStage.sequence,
+              weightBps: templateStage.defaultWeightBps,
+              status: EStatus.PLANNED,
+              isApplicable: true,
+              plannedStartDate: '2026-01-02',
+              plannedEndDate: '2026-12-31',
+            }),
+          ),
+        );
+        expect(context.stageHistory.record).toHaveBeenCalledTimes(3);
+        expect(context.stageHistory.record).toHaveBeenCalledWith(
+          expect.objectContaining({
+            eventType: EStageHistoryEvent.INITIALISED,
+            toWeightBps: 4000,
+            actorCompanyUserId: admin.id,
+          }),
+        );
+        expect(outcomes).toEqual({ committed: 1, rolledBack: 0 });
+      });
+
+      it('creates no stages when no lifecycle is published', async () => {
+        const created = await service.create(
+          actor.userId,
+          actor.companyId,
+          createRequest,
+        );
+        expect(created).toMatchObject({
+          lifecycleTemplateVersionId: null,
+          lifecycleInitialisedAt: null,
+        });
+        expect(context.stages.createMany).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('changing the contract’s status', () => {
+      const lifecycle = (status: EContractStatus) => ({
+        ...contract,
+        status,
+        timezone: 'Africa/Lagos',
+        lifecycleTemplateVersionId: 'version-1',
+      });
+      const contractStage = (
+        stageCode: ELifecycleStageCode,
+        weightBps: number,
+        overrides: Record<string, unknown> = {},
+      ) => ({
+        id: `stage-${stageCode}`,
+        stageCode,
+        weightBps,
+        status: EStatus.PLANNED,
+        isApplicable: true,
+        actualStartDate: null,
+        actualEndDate: null,
+        ...overrides,
+      });
+      const activate = () =>
+        service.transition(actor.userId, actor.companyId, contract.id, {
+          transition: 'activate',
+          reason: 'Agreement signed.',
+        });
+
+      it('is for the awarding party’s Client Project Manager only', async () => {
+        context.parties.findForShare.mockResolvedValue({
+          ...party,
+          partyType: EPartyType.AWARDED,
+        });
+        await expect(activate()).rejects.toBeInstanceOf(ForbiddenException);
+        // No role is even looked up for the awarded party.
+        expect(
+          context.roleAssignments.hasActiveAssignmentForShare,
+        ).not.toHaveBeenCalled();
+        expect(context.contracts.save).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        ['only one party', { parties: 1, signed: 1 }],
+        ['an unsigned party', { parties: 2, signed: 1 }],
+      ])('refuses activation with %s', async (_label, signatures) => {
+        context.parties.countSignatures.mockResolvedValue(signatures);
+        await expect(activate()).rejects.toThrow(
+          'Both parties must be on the contract and have recorded their signatory',
+        );
+        expect(context.contracts.save).not.toHaveBeenCalled();
+      });
+
+      it('refuses activation while the applicable stages don’t total 100%', async () => {
+        context.contracts.findActiveForUpdate.mockResolvedValue(
+          lifecycle(EContractStatus.DRAFT),
+        );
+        context.stages.listForUpdate.mockResolvedValue([
+          contractStage(ELifecycleStageCode.CONTRACT_AWARD, 0),
+          contractStage(ELifecycleStageCode.MOBILISATION, 4000),
+          contractStage(ELifecycleStageCode.CONTRACT_EXECUTION, 5000),
+        ]);
+        await expect(activate()).rejects.toThrow('they total 90%');
+        expect(context.contracts.save).not.toHaveBeenCalled();
+      });
+
+      it('leaves out stages that don’t apply or were cancelled, then completes Contract Award', async () => {
+        context.contracts.findActiveForUpdate.mockResolvedValue(
+          lifecycle(EContractStatus.DRAFT),
+        );
+        context.stages.listForUpdate.mockResolvedValue([
+          contractStage(ELifecycleStageCode.CONTRACT_AWARD, 0),
+          contractStage(ELifecycleStageCode.MOBILISATION, 4000),
+          contractStage(ELifecycleStageCode.CONTRACT_EXECUTION, 6000),
+          contractStage(ELifecycleStageCode.CHANGE_MANAGEMENT, 500, {
+            isApplicable: false,
+          }),
+          contractStage(ELifecycleStageCode.CONTRACT_CLOSEOUT, 700, {
+            status: EStatus.CANCELLED,
+          }),
+        ]);
+
+        const activated = await activate();
+
+        expect(activated.status).toBe(EContractStatus.ACTIVE);
+        expect(context.stages.save).toHaveBeenCalledOnce();
+        expect(context.stages.save).toHaveBeenCalledWith(
+          expect.objectContaining({
+            stageCode: ELifecycleStageCode.CONTRACT_AWARD,
+            status: EStatus.COMPLETED,
+            actualEndDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+          }),
+        );
+        expect(context.stageHistory.record).toHaveBeenCalledWith(
+          expect.objectContaining({
+            eventType: EStageHistoryEvent.STATUS_CHANGED,
+            fromStatus: EStatus.PLANNED,
+            toStatus: EStatus.COMPLETED,
+            reason: 'Completed on activation: Agreement signed.',
+          }),
+        );
+        expect(outcomes).toEqual({ committed: 1, rolledBack: 0 });
+      });
+
+      it('opens the defects liability period, then completes from it', async () => {
+        context.contracts.findActiveForUpdate.mockResolvedValue(
+          lifecycle(EContractStatus.ACTIVE),
+        );
+        await expect(
+          service.transition(actor.userId, actor.companyId, contract.id, {
+            transition: 'practical_completion',
+            reason: 'Works handed over.',
+          }),
+        ).resolves.toMatchObject({ status: EContractStatus.DEFECTS_LIABILITY });
+        expect(context.statusHistory.record).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            fromStatus: EFromStatus.ACTIVE,
+            toStatus: EToStatus.DEFECTS_LIABILITY,
+          }),
+        );
+
+        context.contracts.findActiveForUpdate.mockResolvedValue(
+          lifecycle(EContractStatus.DEFECTS_LIABILITY),
+        );
+        await expect(
+          service.transition(actor.userId, actor.companyId, contract.id, {
+            transition: 'complete',
+            reason: 'Defects liability period over.',
+          }),
+        ).resolves.toMatchObject({ status: EContractStatus.COMPLETED });
+        expect(context.statusHistory.record).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            fromStatus: EFromStatus.DEFECTS_LIABILITY,
+            toStatus: EToStatus.COMPLETED,
+          }),
+        );
+      });
+
+      it('refuses practical completion of a draft', async () => {
+        await expect(
+          service.transition(actor.userId, actor.companyId, contract.id, {
+            transition: 'practical_completion',
+            reason: 'Too early.',
+          }),
+        ).rejects.toBeInstanceOf(ConflictException);
+      });
     });
   });
 });

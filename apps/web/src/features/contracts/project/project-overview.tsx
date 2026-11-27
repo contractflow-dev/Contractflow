@@ -15,12 +15,13 @@ import { DataTableError } from "@/components/data-table/data-table";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { formatCalendarDate, formatNumber } from "@/lib/format";
 import {
+  useGetContractProgressQuery,
   useGetContractStagesQuery,
   useGetMilestonesQuery,
 } from "@/services/deliveryApi";
 import { contractWorkspaceHref } from "../contract-workspaces";
 import { milestoneHref } from "./project-milestones";
-import { addDays, contractToday, FULL_BPS } from "./project-rules";
+import { addDays, contractToday } from "./project-rules";
 import {
   BpsMeter,
   MilestoneStatus,
@@ -30,22 +31,6 @@ import {
 
 /** The overview's look-ahead for upcoming deadlines, in days. */
 export const UPCOMING_DAYS = 14;
-
-/**
- * Overall progress from the API's stage figures: each stage's approved
- * progress weighted by its share of the contract. Stage weights may add up
- * to less than 100% while planning is unfinished.
- */
-export function overallProgressBps(
-  stages: ReadonlyArray<{ weightBps: number; progressBps: number }>,
-): number {
-  return Math.floor(
-    stages.reduce(
-      (sum, stage) => sum + stage.weightBps * stage.progressBps,
-      0,
-    ) / FULL_BPS,
-  );
-}
 
 /**
  * The Project workspace at a glance: progress, stages, and the milestones
@@ -58,6 +43,8 @@ export function ProjectOverview({ project }: { project: ProjectContext }) {
   const scope = { companyId, contractId };
   const today = contractToday(contract.timezone);
   const stages = useGetContractStagesQuery({ ...scope, page: 1, limit: 100 });
+  // Lifecycle progress is the API's figure (decision D-6), never summed here.
+  const progress = useGetContractProgressQuery(scope);
   const count = { ...scope, page: 1, limit: 1 };
   const all = useGetMilestonesQuery(count);
   const approved = useGetMilestonesQuery({
@@ -75,6 +62,7 @@ export function ProjectOverview({ project }: { project: ProjectContext }) {
   });
 
   const stageList = stages.currentData?.data ?? [];
+  // The stage counts need every stage on the page.
   const complete =
     !!stages.currentData &&
     stages.currentData.meta.totalItems === stageList.length;
@@ -109,20 +97,24 @@ export function ProjectOverview({ project }: { project: ProjectContext }) {
             </CardTitle>
             <CardDescription>
               Each stage&apos;s client-approved progress, weighted by its share
-              of the contract.
+              of the contract. Stages that don&apos;t apply or were cancelled
+              are left out.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {stages.isLoading ? (
+            {progress.isLoading ? (
               <Skeleton className="h-6 w-full" />
-            ) : complete ? (
+            ) : progress.currentData ? (
               <BpsMeter
-                value={overallProgressBps(stageList)}
+                value={progress.currentData.lifecycleProgressBps}
                 label="Contract"
               />
             ) : (
               <p className="text-sm text-muted-foreground">
-                Shown when all stages fit on one page.
+                {getApiErrorMessage(
+                  progress.error,
+                  "Progress is unavailable right now.",
+                )}
               </p>
             )}
           </CardContent>

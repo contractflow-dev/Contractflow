@@ -1,13 +1,13 @@
 %% ContractFlow - CURRENT-STATE ERD (what the database is today)
 %%
 %% Source of truth: the registered migration chain
-%% (apps/api/src/common/database/registered-migrations.ts, 25 migrations,
-%% IdentitySchemaBootstrap1749000000000 .. RemoveActualCompletionDate1794000000004).
+%% (apps/api/src/common/database/registered-migrations.ts, 26 migrations,
+%% IdentitySchemaBootstrap1749000000000 .. ContractLifecycleTemplates1794100000000).
 %% Reconciled from:
 %%   1. The schema of contractflow_fresh_backup.dump (pg_restore --schema-only to a
 %%      file; no database was connected). That dump records migrations 1-10, up to
 %%      CompanyInvitationExpiryIndex1792862700001.
-%%   2. The up() of the fifteen later migrations, read from the migration files:
+%%   2. The up() of the sixteen later migrations, read from the migration files:
 %%      CompanyInvitationOptionalNames, CompanyEmailVerification,
 %%      DocumentObjectStorage, PasswordResetToken, CompanyLevelDocuments,
 %%      CompanyRoleAssignmentIndex, CompanyMembershipRoles,
@@ -17,11 +17,13 @@
 %%      ContractStatusHistoryValues (history holds contract statuses only),
 %%      SubcontractParentRules (one-level subcontracts, fixed parent, restrict),
 %%      ContractPartyRules (one awarding and one awarded party per contract),
-%%      RemoveActualCompletionDate (contract.actual_completion_date dropped).
-%%   The last six were run up and down on a throwaway PostgreSQL database by
+%%      RemoveActualCompletionDate (contract.actual_completion_date dropped),
+%%      ContractLifecycleTemplates (lifecycle templates, stage applicability and
+%%      history, the defects_liability contract status).
+%%   The last seven were run up and down on a throwaway PostgreSQL database by
 %%   their migration tests.
-%% All 25 are recorded in the local development database (checked 2026-11-25:
-%% enum labels, constraints, triggers and dropped column match this file).
+%% The first 25 are recorded in the local development database (checked
+%% 2026-11-25); ContractLifecycleTemplates has not been applied there yet.
 %% Not verified: any production database.
 %%
 %% Conventions in this file
@@ -89,6 +91,15 @@ erDiagram
 
     %% ---------------------------------------------------------------- Delivery
     CONTRACT ||--o{ CONTRACT_STAGE : "is phased into (cascade)"
+    COMPANY |o--o{ LIFECYCLE_TEMPLATE : "owns, null for system templates (restrict)"
+    LIFECYCLE_TEMPLATE ||--o{ LIFECYCLE_TEMPLATE_VERSION : "is versioned as (restrict)"
+    LIFECYCLE_TEMPLATE_VERSION ||--o{ LIFECYCLE_TEMPLATE_STAGE : "defines (restrict)"
+    LIFECYCLE_TEMPLATE_VERSION |o--o{ CONTRACT : "initialised the stages of (restrict)"
+    LIFECYCLE_TEMPLATE_STAGE |o--o{ CONTRACT_STAGE : "was copied to (restrict)"
+    COMPANY_USER |o--o{ CONTRACT_STAGE : "decided applicability (restrict)"
+    CONTRACT ||--o{ CONTRACT_STAGE_HISTORY : "scopes (cascade)"
+    CONTRACT_STAGE ||--o{ CONTRACT_STAGE_HISTORY : "records the events of (cascade)"
+    COMPANY_USER ||--o{ CONTRACT_STAGE_HISTORY : "acted (restrict)"
     CONTRACT ||--o{ MILESTONE : "tracks (cascade)"
     CONTRACT_STAGE ||--o{ MILESTONE : "groups (cascade)"
     COMPANY_USER |o--o{ MILESTONE : "last submitted (cascade)"
@@ -355,7 +366,7 @@ erDiagram
         varchar(255) title
         text description "nullable"
         enum contract_type "service | supply | epc | maintenance"
-        enum status "draft | active | suspended | completed"
+        enum status "draft | active | suspended | defects_liability | completed"
         varchar(26) parent_contract_id FK "nullable; the main contract of a subcontract, fixed"
         bigint original_value_minor
         bigint current_value_minor
@@ -371,6 +382,8 @@ erDiagram
         int defects_liability_days
         varchar(64) timezone
         varchar(26) created_by_company_id FK "nullable"
+        varchar(26) lifecycle_template_version_id FK "nullable; null for contracts created before lifecycles"
+        timestamptz lifecycle_initialised_at "nullable; set with the version (CHECK)"
         timestamptz deleted_at "nullable, archived (soft delete)"
         varchar(26) deleted_by_company_user_id FK "nullable"
     }
@@ -460,8 +473,8 @@ erDiagram
     CONTRACT_STATUS_HISTORY {
         varchar(26) id PK
         varchar(26) contract_id FK
-        enum from_status "nullable; draft | active | suspended | completed"
-        enum to_status "draft | active | suspended | completed"
+        enum from_status "nullable; draft | active | suspended | defects_liability | completed"
+        enum to_status "draft | active | suspended | defects_liability | completed"
         text reason "nullable"
         varchar(26) changed_by_id FK "-> company_user"
         timestamptz changed_at
@@ -490,11 +503,63 @@ erDiagram
         text description "nullable"
         int sequence
         enum status "planned | active | in_progress | pending_approval | completed | delayed | cancelled | on_hold"
-        int weight_bps "share of the contract, bps"
+        int weight_bps "share of the contract, bps (CHECK 0..10000)"
         date planned_start_date
         date planned_end_date
         date actual_start_date "nullable"
         date actual_end_date "nullable"
+        varchar(40) stage_code "nullable; the lifecycle stage it was copied from (CHECK)"
+        varchar(26) template_stage_id FK "nullable"
+        boolean is_applicable "default true"
+        text applicability_reason "nullable; required when not applicable (CHECK)"
+        varchar(26) applicability_decided_by_id FK "nullable, -> company_user"
+        timestamptz applicability_decided_at "nullable"
+    }
+    %% Append-only (trigger contract_stage_history_immutable refuses UPDATE).
+    %% CHECK ck_contract_stage_history_event; INDEX (contract_id, contract_stage_id, occurred_at)
+    CONTRACT_STAGE_HISTORY {
+        varchar(26) id PK
+        varchar(26) contract_id FK
+        varchar(26) contract_stage_id FK
+        varchar(30) event_type "initialised | status_changed | applicability_changed | weight_changed | dates_changed"
+        varchar(30) from_status "nullable"
+        varchar(30) to_status "nullable"
+        boolean from_applicable "nullable"
+        boolean to_applicable "nullable"
+        int from_weight_bps "nullable"
+        int to_weight_bps "nullable"
+        text reason "nullable"
+        varchar(26) actor_company_user_id FK "-> company_user"
+        timestamptz occurred_at
+    }
+    %% System templates only (CHECK ck_lifecycle_template_system_only).
+    LIFECYCLE_TEMPLATE {
+        varchar(26) id PK
+        varchar(60) code UK
+        varchar(255) name
+        text description "nullable"
+        varchar(20) owner_kind "system (CHECK)"
+        varchar(26) owner_company_id FK "nullable; null while only system templates exist"
+    }
+    %% UNIQUE (lifecycle_template_id, version_number); one published version per template.
+    LIFECYCLE_TEMPLATE_VERSION {
+        varchar(26) id PK
+        varchar(26) lifecycle_template_id FK
+        int version_number
+        varchar(20) status "draft | published | retired (CHECK)"
+        timestamptz published_at "nullable; set once published"
+    }
+    %% Fixed once its version is published (trigger lifecycle_template_stage_immutable).
+    %% UNIQUE (version, stage_code), (version, sequence); the seeded nine total 10000.
+    LIFECYCLE_TEMPLATE_STAGE {
+        varchar(26) id PK
+        varchar(26) lifecycle_template_version_id FK
+        varchar(40) stage_code "the nine lifecycle stage codes (CHECK)"
+        int sequence
+        varchar(255) name
+        text description "nullable"
+        int default_weight_bps "CHECK 0..10000"
+        boolean completes_on_activation "true for contract_award"
     }
     %% CHECK ck_milestone_approved_bps (0..10000), ck_milestone_target_quantity (> 0),
     %%   ck_milestone_approved_quantity (0..target_quantity, needs target_quantity)

@@ -26,6 +26,11 @@ export interface Contract {
   contractType: EContractType;
   status: EContractStatus;
   parentContractId: string | null;
+  /**
+   * The lifecycle template version the stages were copied from; null for a
+   * contract created before lifecycles, whose stage plan stays editable.
+   */
+  lifecycleTemplateVersionId: string | null;
   originalValueMinor: MinorAmount;
   currentValueMinor: MinorAmount;
   currencyCode: ECurrencyCode;
@@ -169,7 +174,17 @@ export interface CompanyContractHistoryQuery
 }
 
 export type AssignableContractWorkspace = "project" | "hse" | "finance";
-export type ContractTransition = "activate" | "hold" | "resume" | "complete";
+/**
+ * activate: draft to active. hold / resume: active to suspended and back.
+ * practical_completion: active to defects liability. complete: active or
+ * defects liability to completed.
+ */
+export type ContractTransition =
+  | "activate"
+  | "hold"
+  | "resume"
+  | "practical_completion"
+  | "complete";
 
 export interface ContractPartyInvitation {
   id: string;

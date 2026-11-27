@@ -14,6 +14,9 @@ import type {
 } from '../entities/contract-party-invitation.entity';
 import type { ContractParty } from '../entities/contract-party.entity';
 import type { ContractSite } from '../../site-operations/entities/contract-site.entity';
+import type { ContractStage } from '../../delivery/entities/contract-stage.entity';
+import type { ContractStageHistory } from '../../delivery/entities/contract-stage-history.entity';
+import type { LifecycleTemplateStage } from '../../delivery/entities/lifecycle-template-stage.entity';
 import type { AssignableContractWorkspace } from '../services/contract-workspace';
 
 export const CONTRACT_LIFECYCLE_UNIT_OF_WORK = Symbol(
@@ -64,6 +67,10 @@ export interface ILifecyclePartyRepository {
   countOtherParties(contractId: string, companyId: string): Promise<number>;
   /** Whether the contract already has a party of this type. */
   hasPartyOfType(contractId: string, partyType: EPartyType): Promise<boolean>;
+  /** How many parties the contract has, and how many have signed. */
+  countSignatures(
+    contractId: string,
+  ): Promise<{ parties: number; signed: number }>;
   findForShare(
     contractId: string,
     companyId: string,
@@ -271,6 +278,30 @@ export interface ILifecycleStatusHistoryRepository {
   record(data: IContractStatusHistoryRecord): Promise<void>;
 }
 
+/** The lifecycle template new contracts' stages are copied from. */
+export interface ILifecycleTemplateRepository {
+  /**
+   * The published version of the system lifecycle and its stages in order,
+   * or null when none is published.
+   */
+  findPublishedSystemLifecycle(): Promise<{
+    versionId: string;
+    stages: LifecycleTemplateStage[];
+  } | null>;
+}
+
+/** A contract's stages, as the contract lifecycle needs them. */
+export interface ILifecycleStageRepository {
+  createMany(rows: Partial<ContractStage>[]): Promise<ContractStage[]>;
+  /** Every stage of the contract, locked against change, in order. */
+  listForUpdate(contractId: string): Promise<ContractStage[]>;
+  save(stage: ContractStage): Promise<ContractStage>;
+}
+
+export interface ILifecycleStageHistoryRepository {
+  record(data: Partial<ContractStageHistory>): Promise<void>;
+}
+
 export interface IContractActivityRecord {
   contractId: string;
   companyId: string;
@@ -296,6 +327,9 @@ export interface IContractLifecycleContext {
   partyInvitations: ILifecyclePartyInvitationRepository;
   sites: ILifecycleSiteRepository;
   statusHistory: ILifecycleStatusHistoryRepository;
+  lifecycleTemplates: ILifecycleTemplateRepository;
+  stages: ILifecycleStageRepository;
+  stageHistory: ILifecycleStageHistoryRepository;
   activity: ILifecycleActivityRepository;
 }
 

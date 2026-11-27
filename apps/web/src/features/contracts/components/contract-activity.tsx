@@ -124,6 +124,7 @@ const ACTION_LABEL: Record<string, string> = {
   "stage.created": "Stage created",
   "stage.updated": "Stage plan changed",
   "stage.status_changed": "Stage status changed",
+  "stage.applicability_changed": "Stage applicability changed",
   "stage.completed": "Stage completed",
   "milestone.created": "Milestone created",
   "milestone.updated": "Milestone plan changed",

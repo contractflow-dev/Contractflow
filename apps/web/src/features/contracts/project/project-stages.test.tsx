@@ -8,13 +8,19 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { EMilestoneStatus, EStatus } from "@contractflow/contracts-schema";
+import {
+  EContractStatus,
+  ELifecycleStageCode,
+  EMilestoneStatus,
+  EStatus,
+} from "@contractflow/contracts-schema";
 import {
   loaded,
   milestone,
   mutation,
   noPermissions,
   page,
+  contract,
   plannerPermissions,
   projectContext,
   stage,
@@ -29,6 +35,7 @@ const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   update: vi.fn(),
   transition: vi.fn(),
+  applicability: vi.fn(),
   transitionState: { isLoading: false, error: undefined as unknown },
 }));
 
@@ -40,6 +47,7 @@ vi.mock("@/services/deliveryApi", () => ({
   useUpdateContractStageMutation: () => mutation(mocks.update),
   useTransitionContractStageMutation: () =>
     mutation(mocks.transition, mocks.transitionState),
+  useSetContractStageApplicabilityMutation: () => mutation(mocks.applicability),
   useCreateMilestoneMutation: () => mutation(vi.fn()),
   useUpdateMilestoneMutation: () => mutation(vi.fn()),
 }));
@@ -59,7 +67,12 @@ beforeEach(() => {
           : page([milestone]),
       ),
   );
-  for (const fn of [mocks.create, mocks.update, mocks.transition]) {
+  for (const fn of [
+    mocks.create,
+    mocks.update,
+    mocks.transition,
+    mocks.applicability,
+  ]) {
     fn.mockReset();
     fn.mockResolvedValue({ data: {} });
   }
@@ -79,7 +92,7 @@ describe("ProjectStages", () => {
     expect(
       within(row).getByRole("progressbar").getAttribute("aria-valuenow"),
     ).toBe("25");
-    expect(screen.getByText(/weights add up to 40%/)).toBeTruthy();
+    expect(screen.getByText(/stages that apply add up to 40%/)).toBeTruthy();
   });
 
   it("offers no planning or status actions to a read-only member", () => {
@@ -238,5 +251,130 @@ describe("ProjectStages", () => {
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
+  });
+});
+
+describe("ProjectStages lifecycle", () => {
+  const planned = {
+    ...stage,
+    status: EStatus.PLANNED,
+    actualStartDate: null,
+    stageCode: ELifecycleStageCode.MOBILISATION,
+  };
+  const openActions = async (
+    user: ReturnType<typeof userEvent.setup>,
+    name: string,
+  ) => {
+    await user.click(
+      screen.getByRole("button", { name: `Actions for stage ${name}` }),
+    );
+  };
+
+  it("marks a planned stage as not applying, requiring a reason", async () => {
+    mocks.stages.mockReturnValue(loaded(page([planned])));
+    const user = userEvent.setup({ delay: null });
+    render(<ProjectStages project={projectContext(plannerPermissions)} />);
+
+    await openActions(user, planned.name);
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Mark as not applying" }),
+    );
+    const dialog = screen.getByRole("alertdialog");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Mark as not applying" }),
+    );
+    expect(
+      within(dialog).getByText(
+        "Say why the stage doesn't apply to this contract.",
+      ),
+    ).toBeTruthy();
+    expect(mocks.applicability).not.toHaveBeenCalled();
+
+    await user.type(
+      within(dialog).getByLabelText(/Reason/),
+      "Contractor already mobilised.",
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Mark as not applying" }),
+    );
+    await waitFor(() =>
+      expect(mocks.applicability).toHaveBeenCalledWith({
+        companyId: "company-1",
+        contractId: "contract-1",
+        stageId: planned.id,
+        body: { isApplicable: false, reason: "Contractor already mobilised." },
+      }),
+    );
+  });
+
+  it("shows a stage that doesn't apply, with its reason, and offers to reinstate it", async () => {
+    mocks.stages.mockReturnValue(
+      loaded(
+        page([
+          {
+            ...planned,
+            isApplicable: false,
+            applicabilityReason: "No mobilisation needed",
+          },
+        ]),
+      ),
+    );
+    const user = userEvent.setup({ delay: null });
+    render(<ProjectStages project={projectContext(plannerPermissions)} />);
+    expect(
+      screen.getByText(/Doesn.t apply: No mobilisation needed/),
+    ).toBeTruthy();
+
+    await openActions(user, planned.name);
+    expect(
+      await screen.findByRole("menuitem", { name: "Reinstate stage" }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("menuitem", { name: "Add milestone" }),
+    ).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "Start stage" })).toBeNull();
+  });
+
+  it("offers no new stage once a lifecycle contract's plan is fixed", () => {
+    render(
+      <ProjectStages
+        project={projectContext(
+          { ...plannerPermissions, canChangePlan: false },
+          {
+            contract: {
+              ...contract,
+              lifecycleTemplateVersionId: "version-1",
+            },
+          },
+        )}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Add stage" })).toBeNull();
+  });
+
+  it("offers actions on the post-contract obligations stage only, during defects liability", async () => {
+    const warranty = {
+      ...planned,
+      id: "01J0000000000000000000STG9",
+      name: "Warranty",
+      sequence: 9,
+      stageCode: ELifecycleStageCode.POST_CONTRACT_OBLIGATIONS,
+    };
+    mocks.stages.mockReturnValue(loaded(page([planned, warranty])));
+    render(
+      <ProjectStages
+        project={projectContext(plannerPermissions, {
+          contract: { ...contract, status: EContractStatus.DEFECTS_LIABILITY },
+        })}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", {
+        name: `Actions for stage ${planned.name}`,
+      }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Actions for stage Warranty" }),
+    ).toBeTruthy();
   });
 });

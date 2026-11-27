@@ -129,6 +129,7 @@ export function ContractWorkspace({
             partyType: detail.membership.partyType,
             contractStatus: detail.contract.status,
             archived: Boolean(detail.contract.deletedAt),
+            hasLifecycle: Boolean(detail.contract.lifecycleTemplateVersionId),
           }),
         }
       : null;

@@ -175,6 +175,16 @@ export class MilestoneRepository extends ContractScopedRepository<Milestone> {
   }
 
   /** How many of the stage's milestones aren't approved (or cancelled). */
+  /** The stage's milestones that aren't cancelled. */
+  async countActiveInStage(scope: Scope, stageId: string): Promise<number> {
+    return (await this.createScopedQueryBuilder(scope, 'milestone'))
+      .andWhere('milestone.contractStageId = :stageId', { stageId })
+      .andWhere('milestone.status <> :cancelled', {
+        cancelled: EMilestoneStatus.CANCELLED,
+      })
+      .getCount();
+  }
+
   async countNotApprovedInStage(
     scope: Scope,
     stageId: string,

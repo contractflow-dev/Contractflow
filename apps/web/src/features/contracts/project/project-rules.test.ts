@@ -5,6 +5,7 @@ import {
   EContractorContractRole,
   EMilestoneStatus,
   EPartyType,
+  ELifecycleStageCode,
   EStatus,
 } from "@contractflow/contracts-schema";
 import {
@@ -20,6 +21,7 @@ import {
   projectPermissions,
   shareForQuantity,
   stageBlocksWork,
+  stageOpen,
   stageTransitions,
 } from "./project-rules";
 
@@ -173,10 +175,29 @@ describe("contract days", () => {
 
 describe("stages", () => {
   it("offers only the moves the API allows", () => {
-    expect(stageTransitions(EStatus.PLANNED)).toEqual(["start"]);
-    expect(stageTransitions(EStatus.IN_PROGRESS)).toEqual(["hold", "complete"]);
-    expect(stageTransitions(EStatus.ON_HOLD)).toEqual(["resume"]);
+    expect(stageTransitions(EStatus.PLANNED)).toEqual(["start", "cancel"]);
+    expect(stageTransitions(EStatus.IN_PROGRESS)).toEqual([
+      "hold",
+      "complete",
+      "cancel",
+    ]);
+    expect(stageTransitions(EStatus.ON_HOLD)).toEqual(["resume", "cancel"]);
     expect(stageTransitions(EStatus.COMPLETED)).toEqual([]);
+    expect(stageTransitions(EStatus.CANCELLED)).toEqual([]);
+  });
+
+  it("allows only the post-contract obligations stage during defects liability", () => {
+    expect(
+      stageOpen(EContractStatus.DEFECTS_LIABILITY, {
+        stageCode: ELifecycleStageCode.MOBILISATION,
+      }),
+    ).toBe(false);
+    expect(
+      stageOpen(EContractStatus.DEFECTS_LIABILITY, {
+        stageCode: ELifecycleStageCode.POST_CONTRACT_OBLIGATIONS,
+      }),
+    ).toBe(true);
+    expect(stageOpen(EContractStatus.ACTIVE, { stageCode: null })).toBe(true);
   });
 
   it("blocks work while a stage is on hold or closed", () => {

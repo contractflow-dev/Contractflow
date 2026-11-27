@@ -1,3 +1,29 @@
+/**
+ * The stages of the standard oil and gas contract lifecycle, in order. A
+ * contract created from the lifecycle template gets one stage of each;
+ * custom stages and stages of older contracts have no code.
+ */
+export enum ELifecycleStageCode {
+  CONTRACT_AWARD = "contract_award",
+  MOBILISATION = "mobilisation",
+  CONTRACT_EXECUTION = "contract_execution",
+  PERFORMANCE_MONITORING = "performance_monitoring",
+  CHANGE_MANAGEMENT = "change_management",
+  INSPECTION_ACCEPTANCE = "inspection_acceptance",
+  COMMERCIAL_RECONCILIATION = "commercial_reconciliation",
+  CONTRACT_CLOSEOUT = "contract_closeout",
+  POST_CONTRACT_OBLIGATIONS = "post_contract_obligations",
+}
+
+/** What a stage history entry records. */
+export enum EStageHistoryEvent {
+  INITIALISED = "initialised",
+  STATUS_CHANGED = "status_changed",
+  APPLICABILITY_CHANGED = "applicability_changed",
+  WEIGHT_CHANGED = "weight_changed",
+  DATES_CHANGED = "dates_changed",
+}
+
 export enum EStatus {
   PLANNED = "planned",
   ACTIVE = "active",

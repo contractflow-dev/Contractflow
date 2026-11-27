@@ -15,6 +15,16 @@
 %% - CONTRACT_STATUS_HISTORY holds the four contract statuses only.
 %% - contract.actual_completion_date was removed; completion is the status
 %%   history's completed entry.
+%% - The lifecycle core (decisions of 27 November 2026): LIFECYCLE_TEMPLATE,
+%%   _VERSION and _STAGE (system templates only, seeded with the nine stages);
+%%   CONTRACT.lifecycle_template_version_id and lifecycle_initialised_at;
+%%   CONTRACT_STAGE stage_code, template_stage_id and applicability; the
+%%   append-only CONTRACT_STAGE_HISTORY; the defects_liability contract status.
+%%   Their current definitions are in the current-state ERD; where they differ
+%%   from the entities below (for example, no lifecycle_initialised_by_id and
+%%   no effective_date or party on stage history), the current-state ERD is
+%%   what exists. Still proposed: stage evidence, work packages (deferred by
+%%   D-8), the compliance entities, document link changes, composite FKs.
 %%
 %% How to read this file
 %% - Each entity's id comment says what it is:

@@ -40,6 +40,7 @@ function contract(overrides: Partial<Contract> = {}): Contract {
     contractType: EContractType.MAINTENANCE,
     status: EContractStatus.DRAFT,
     parentContractId: null,
+    lifecycleTemplateVersionId: null,
     originalValueMinor: "150000050",
     currentValueMinor: "150000050",
     currencyCode: ECurrencyCode.NGN,

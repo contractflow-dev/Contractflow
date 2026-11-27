@@ -113,6 +113,7 @@ const contractDetail: ContractDetailResponse = {
     contractType: Object.values(EContractType)[0],
     status: Object.values(EContractStatus)[0],
     parentContractId: null,
+    lifecycleTemplateVersionId: null,
     originalValueMinor: "1000",
     currentValueMinor: "1000",
     currencyCode: ECurrencyCode.USD,

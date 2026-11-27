@@ -61,6 +61,10 @@ const STATUS_PRESENTATION: Record<
   [EContractStatus.DRAFT]: { label: "Draft", tone: "neutral" },
   [EContractStatus.ACTIVE]: { label: "Active", tone: "success" },
   [EContractStatus.SUSPENDED]: { label: "Suspended", tone: "warning" },
+  [EContractStatus.DEFECTS_LIABILITY]: {
+    label: "Defects liability",
+    tone: "info",
+  },
   [EContractStatus.COMPLETED]: { label: "Completed", tone: "info" },
   // Stages and milestones; contracts are archived, never cancelled.
   [EStatus.CANCELLED]: { label: "Cancelled", tone: "danger" },

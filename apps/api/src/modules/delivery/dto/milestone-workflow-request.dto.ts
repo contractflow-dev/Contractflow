@@ -9,6 +9,7 @@ import {
   type MilestoneEvidenceReference,
   type MilestoneOutstandingItemInput,
   type SubmitMilestoneRequest,
+  type SetContractStageApplicabilityRequest,
   type TransitionContractStageRequest,
   type UpdateContractStageRequest,
   type UpdateMilestoneRequest,
@@ -91,8 +92,17 @@ export class UpdateContractStageRequestDto
 }
 
 export class TransitionContractStageRequestDto implements TransitionContractStageRequest {
-  @IsIn([EStatus.IN_PROGRESS, EStatus.ON_HOLD, EStatus.COMPLETED])
-  status!: EStatus.IN_PROGRESS | EStatus.ON_HOLD | EStatus.COMPLETED;
+  @IsIn([
+    EStatus.IN_PROGRESS,
+    EStatus.ON_HOLD,
+    EStatus.COMPLETED,
+    EStatus.CANCELLED,
+  ])
+  status!:
+    | EStatus.IN_PROGRESS
+    | EStatus.ON_HOLD
+    | EStatus.COMPLETED
+    | EStatus.CANCELLED;
 
   @IsOptional()
   @Transform(trimToNull)
@@ -104,6 +114,19 @@ export class TransitionContractStageRequestDto implements TransitionContractStag
   @Matches(DAY, { message: 'effectiveDate must be a day (YYYY-MM-DD)' })
   @IsDateString({ strict: true })
   effectiveDate?: string | null;
+}
+
+/** `POST /contract/stages/:stageId/applicability`. */
+export class SetContractStageApplicabilityRequestDto implements SetContractStageApplicabilityRequest {
+  @IsBoolean()
+  isApplicable!: boolean;
+
+  /** Required to mark a stage as not applying. */
+  @IsOptional()
+  @Transform(trimToNull)
+  @IsString()
+  @Length(0, 2000)
+  reason?: string | null;
 }
 
 /** `POST /contract/stages/:stageId/milestones`: the stage comes from the path. */

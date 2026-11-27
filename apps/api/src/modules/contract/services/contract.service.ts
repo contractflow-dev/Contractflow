@@ -315,6 +315,7 @@ function toContractResponse(contract: Contract): ContractApiResponse {
     contractType: contract.contractType,
     status: contract.status,
     parentContractId: contract.parentContractId,
+    lifecycleTemplateVersionId: contract.lifecycleTemplateVersionId ?? null,
     originalValueMinor: toIntegerString(contract.originalValueMinor),
     currentValueMinor: toIntegerString(contract.currentValueMinor),
     currencyCode: contract.currencyCode,
