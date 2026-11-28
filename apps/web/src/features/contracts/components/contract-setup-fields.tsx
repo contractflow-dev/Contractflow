@@ -2,11 +2,7 @@
 
 import { useId, useMemo, type FocusEvent } from "react";
 import { Controller, useFormContext, useWatch } from "react-hook-form";
-import {
-  EContractType,
-  ECurrencyCode,
-  EPartyType,
-} from "@contractflow/contracts-schema";
+import { EContractType, ECurrencyCode } from "@contractflow/contracts-schema";
 import { Input } from "@workspace/ui/components/input";
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import { Field, FieldLabel } from "@workspace/ui/components/field";
@@ -130,70 +126,35 @@ export function ContractBasicsFields({
   );
 }
 
-/** Step 2: your company's role, any parent contract, and workspaces. */
+/**
+ * Step 2 of creating a contract: your company's role, any parent contract,
+ * and workspaces. None of these change after creation, so editing has no
+ * such step.
+ */
 export function ContractPartiesFields({
   parentContracts,
   parentContractsLoading,
   parentContractsError,
-  editing = false,
 }: {
   parentContracts: Array<Pick<Contract, "id" | "referenceNumber" | "title">>;
   parentContractsLoading: boolean;
   parentContractsError?: unknown;
-  /**
-   * Editing an existing contract: only the parent contract changes here.
-   * The party type is set at creation and workspaces have their own
-   * controls on the contract's Overview.
-   */
-  editing?: boolean;
 }) {
-  const {
-    control: formControl,
-    register,
-    formState: { errors },
-  } = useCreateContractForm();
+  const { control: formControl, register } = useCreateContractForm();
   const workspaceFieldId = useId();
-  const fieldErrors = errors.parties;
 
   return (
     <>
       <FormSection
-        legend={editing ? "Parent contract" : "Contract parties"}
-        description={
-          editing
-            ? "Your company's party type is set when the contract is created. Workspaces are managed on the contract's Overview."
-            : "Other companies are invited to the contract after the draft is created."
-        }
+        legend="Contract parties"
+        description="Your company is the awarding party: a main contract is created by its client, a subcontract by the main contractor. The awarded company is invited after the draft is created."
       >
         <FormGrid columns={2}>
-          {editing ? null : (
-            <FormField
-              id={fieldId("partyType")}
-              label="Your company's party type"
-              required
-              description="The role your company has in this contract."
-              error={fieldErrors?.partyType?.message}
-            >
-              {(control) => (
-                <NativeSelect
-                  {...control}
-                  {...register("parties.partyType")}
-                  className="w-full"
-                >
-                  {Object.values(EPartyType).map((value) => (
-                    <NativeSelectOption key={value} value={value}>
-                      {humanizeEnumValue(value)}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              )}
-            </FormField>
-          )}
           <FormField
             id={fieldId("parentContractId")}
             label="Parent contract"
             optional
-            description="Choose the main contract if this is a subcontract."
+            description="Choose the main contract if this is a subcontract. Only main contracts awarded to your company, in draft or active, are listed."
             error={
               parentContractsError
                 ? getApiErrorMessage(
@@ -225,52 +186,50 @@ export function ContractPartiesFields({
         </FormGrid>
       </FormSection>
 
-      {editing ? null : (
-        <FormSection
-          legend="Workspaces"
-          description="Choose the workspaces this contract uses. You can change them later on the contract page."
-        >
-          <Controller
-            control={formControl}
-            name="parties.workspaces"
-            render={({ field }) => (
-              <div className="flex flex-wrap gap-x-6 gap-y-3">
-                {contractWorkspaces.map((workspace) => {
-                  const id = `${workspaceFieldId}-${workspace}`;
-                  return (
-                    <Field
-                      orientation="horizontal"
-                      className="w-fit"
-                      key={workspace}
-                    >
-                      <Checkbox
-                        id={id}
-                        checked={field.value.includes(workspace)}
-                        onCheckedChange={(checked) =>
-                          field.onChange(
-                            checked
-                              ? contractWorkspaces.filter(
-                                  (candidate) =>
-                                    candidate === workspace ||
-                                    field.value.includes(candidate),
-                                )
-                              : field.value.filter(
-                                  (candidate) => candidate !== workspace,
-                                ),
-                          )
-                        }
-                      />
-                      <FieldLabel htmlFor={id} className="font-normal">
-                        {humanizeEnumValue(workspace)}
-                      </FieldLabel>
-                    </Field>
-                  );
-                })}
-              </div>
-            )}
-          />
-        </FormSection>
-      )}
+      <FormSection
+        legend="Workspaces"
+        description="Choose the workspaces this contract uses. You can change them later on the contract page."
+      >
+        <Controller
+          control={formControl}
+          name="parties.workspaces"
+          render={({ field }) => (
+            <div className="flex flex-wrap gap-x-6 gap-y-3">
+              {contractWorkspaces.map((workspace) => {
+                const id = `${workspaceFieldId}-${workspace}`;
+                return (
+                  <Field
+                    orientation="horizontal"
+                    className="w-fit"
+                    key={workspace}
+                  >
+                    <Checkbox
+                      id={id}
+                      checked={field.value.includes(workspace)}
+                      onCheckedChange={(checked) =>
+                        field.onChange(
+                          checked
+                            ? contractWorkspaces.filter(
+                                (candidate) =>
+                                  candidate === workspace ||
+                                  field.value.includes(candidate),
+                              )
+                            : field.value.filter(
+                                (candidate) => candidate !== workspace,
+                              ),
+                        )
+                      }
+                    />
+                    <FieldLabel htmlFor={id} className="font-normal">
+                      {humanizeEnumValue(workspace)}
+                    </FieldLabel>
+                  </Field>
+                );
+              })}
+            </div>
+          )}
+        />
+      </FormSection>
     </>
   );
 }
@@ -278,12 +237,18 @@ export function ContractPartiesFields({
 /** Step 3: value, currency, payment terms and rates. */
 export function ContractCommercialFields({
   valueLocked = false,
+  creating = false,
 }: {
   /**
    * Editing a contract past draft: its original value and currency are
    * fixed (the API refuses to change the value; the currency stays with it).
    */
   valueLocked?: boolean;
+  /**
+   * The New contract form: the retention rate isn't asked for. The contract
+   * is created with none, and it is set when the contract is edited.
+   */
+  creating?: boolean;
 } = {}) {
   const {
     control: formControl,
@@ -414,25 +379,27 @@ export function ContractCommercialFields({
             />
           )}
         </FormField>
-        <FormField
-          id={fieldId("retentionRate")}
-          label="Retention rate (%)"
-          required
-          description={percentHint(
-            retention,
-            "Enter 0 if there is no retention.",
-          )}
-          error={fieldErrors?.retentionRate?.message}
-        >
-          {(control) => (
-            <Input
-              {...control}
-              {...register("commercial.retentionRate")}
-              inputMode="decimal"
-              autoComplete="off"
-            />
-          )}
-        </FormField>
+        {creating ? null : (
+          <FormField
+            id={fieldId("retentionRate")}
+            label="Retention rate (%)"
+            required
+            description={percentHint(
+              retention,
+              "Enter 0 if there is no retention.",
+            )}
+            error={fieldErrors?.retentionRate?.message}
+          >
+            {(control) => (
+              <Input
+                {...control}
+                {...register("commercial.retentionRate")}
+                inputMode="decimal"
+                autoComplete="off"
+              />
+            )}
+          </FormField>
+        )}
         <FormField
           id={fieldId("advancePaymentRate")}
           label="Advance payment rate (%)"
@@ -471,7 +438,16 @@ export function ContractCommercialFields({
 }
 
 /** Step 4: key dates, defects liability and the contract's time zone. */
-export function ContractDatesFields() {
+export function ContractDatesFields({
+  creating = false,
+}: {
+  /**
+   * The New contract form: the revised end date and the defects liability
+   * period aren't asked for. The contract is created with neither, and they
+   * are set when the contract is edited.
+   */
+  creating?: boolean;
+} = {}) {
   const {
     register,
     formState: { errors },
@@ -513,51 +489,40 @@ export function ContractDatesFields() {
             <Input {...control} {...register("dates.endDate")} type="date" />
           )}
         </FormField>
-        <FormField
-          id={fieldId("revisedEndDate")}
-          label="Revised end date"
-          optional
-          description="Must not be before the end date."
-          error={fieldErrors?.revisedEndDate?.message}
-        >
-          {(control) => (
-            <Input
-              {...control}
-              {...register("dates.revisedEndDate")}
-              type="date"
-            />
-          )}
-        </FormField>
-        <FormField
-          id={fieldId("actualCompletionDate")}
-          label="Actual completion date"
-          optional
-          description="Must not be before the start date."
-          error={fieldErrors?.actualCompletionDate?.message}
-        >
-          {(control) => (
-            <Input
-              {...control}
-              {...register("dates.actualCompletionDate")}
-              type="date"
-            />
-          )}
-        </FormField>
-        <FormField
-          id={fieldId("defectsLiabilityDays")}
-          label="Defects liability (days)"
-          required
-          error={fieldErrors?.defectsLiabilityDays?.message}
-        >
-          {(control) => (
-            <Input
-              {...control}
-              {...register("dates.defectsLiabilityDays")}
-              inputMode="numeric"
-              autoComplete="off"
-            />
-          )}
-        </FormField>
+        {creating ? null : (
+          <>
+            <FormField
+              id={fieldId("revisedEndDate")}
+              label="Revised end date"
+              optional
+              description="Must not be before the end date."
+              error={fieldErrors?.revisedEndDate?.message}
+            >
+              {(control) => (
+                <Input
+                  {...control}
+                  {...register("dates.revisedEndDate")}
+                  type="date"
+                />
+              )}
+            </FormField>
+            <FormField
+              id={fieldId("defectsLiabilityDays")}
+              label="Defects liability (days)"
+              required
+              error={fieldErrors?.defectsLiabilityDays?.message}
+            >
+              {(control) => (
+                <Input
+                  {...control}
+                  {...register("dates.defectsLiabilityDays")}
+                  inputMode="numeric"
+                  autoComplete="off"
+                />
+              )}
+            </FormField>
+          </>
+        )}
         <FormField
           id={fieldId("timezone")}
           label="Contract time zone"

@@ -72,3 +72,91 @@ describe("Manage contract", () => {
     );
   });
 });
+
+describe("Party invitations", () => {
+  const renderInvitations = () =>
+    renderToStaticMarkup(
+      <ContractLifecycleManagement
+        companyId="company-1"
+        contract={contract}
+        part="invitations"
+      />,
+    );
+
+  it("offers company invitations on a main contract to whoever may invite", () => {
+    mocks.permissions = {
+      canManage: true,
+      canTransition: false,
+      canInviteParties: true,
+      invitesSubcontractors: false,
+    };
+    const markup = renderInvitations();
+    expect(markup).toContain("Company invitations");
+    expect(markup).toContain("Invite Company");
+  });
+
+  it("lets the main contractor's Project Lead invite a subcontractor without admin rights", () => {
+    mocks.permissions = {
+      canManage: false,
+      canTransition: false,
+      canInviteParties: true,
+      invitesSubcontractors: true,
+    };
+    const markup = renderInvitations();
+    expect(markup).toContain("Subcontractor invitations");
+    expect(markup).toContain("Invite Subcontractor");
+    expect(markup).not.toContain("Invite Company");
+  });
+
+  it("offers no invitations to an administrator who may not invite on a subcontract", () => {
+    // Administrator rights alone: the API refuses, so nothing is offered.
+    mocks.permissions = {
+      canManage: true,
+      canTransition: false,
+      canInviteParties: false,
+      invitesSubcontractors: true,
+    };
+    const markup = renderInvitations();
+    expect(markup).not.toContain("Invite Subcontractor");
+    expect(markup).not.toContain("Subcontractor invitations");
+  });
+
+  it("shows no empty Manage card to someone who may only invite", () => {
+    mocks.permissions = {
+      canManage: false,
+      canTransition: false,
+      canInviteParties: true,
+      invitesSubcontractors: true,
+    };
+    expect(render()).not.toContain("Manage contract");
+  });
+});
+
+describe("Contract status changes", () => {
+  const renderStatus = (status: EContractStatus) =>
+    renderToStaticMarkup(
+      <ContractLifecycleManagement
+        companyId="company-1"
+        contract={{ ...contract, status }}
+        part="manage"
+      />,
+    );
+
+  beforeEach(() => {
+    mocks.permissions = { canManage: false, canTransition: true };
+  });
+
+  it("offers practical completion and completion on an active contract", () => {
+    const markup = renderStatus(EContractStatus.ACTIVE);
+    expect(markup).toContain("Record practical completion");
+    expect(markup).toContain(">Complete<");
+    expect(markup).toContain(">Suspend<");
+  });
+
+  it("offers only completion during the defects liability period", () => {
+    const markup = renderStatus(EContractStatus.DEFECTS_LIABILITY);
+    expect(markup).toContain(">Complete<");
+    expect(markup).not.toContain("Record practical completion");
+    expect(markup).not.toContain(">Suspend<");
+  });
+});

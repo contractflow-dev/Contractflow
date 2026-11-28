@@ -319,6 +319,7 @@ describe('ContractAccessService', () => {
         party: { id: 'p1' },
         contract: { id: 'c1' },
         isCompanyAdmin: false,
+        companyUserId: expect.any(String),
       });
       expect(contracts.findById).toHaveBeenCalledWith(
         {

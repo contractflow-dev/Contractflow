@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { EContractStatus } from "@contractflow/contracts-schema";
+import {
+  contractRoleLabel,
+  EContractStatus,
+} from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button, buttonVariants } from "@workspace/ui/components/button";
@@ -92,121 +95,141 @@ export function MyContracts({
             ) : null}
           </CardHeader>
           <CardContent className="space-y-5">
-
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-        <form
-          role="search"
-          aria-label="My contracts"
-          onSubmit={submitSearch}
-          className="w-full sm:max-w-sm"
-        >
-          <Field>
-            <FieldLabel htmlFor="my-contract-search">Search my contracts</FieldLabel>
-            <Input
-              id="my-contract-search"
-              type="search"
-              value={searchInput}
-              maxLength={100}
-              placeholder="Title or reference"
-              autoComplete="off"
-              onChange={(event) => setSearchInput(event.target.value)}
-            />
-          </Field>
-        </form>
-          <DataTableFilters
-            label="my contracts"
-            fields={[
-              {
-                kind: "select",
-                id: "status",
-                label: "Status",
-                value: status,
-                options: [
-                  { value: "", label: "All statuses" },
-                  ...contractStatuses.map((value) => ({
-                    value,
-                    label: humanizeEnumValue(value),
-                  })),
-                ],
-              },
-            ]}
-            onApply={(next) =>
-              setStatus(
-                contractStatuses.find((value) => value === next.status) ?? "",
-              )
-            }
-          />
-        </div>
-
-        {error ? (
-          <Alert variant="destructive">
-            <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
-              <span>
-                {getApiErrorMessage(error, "Unable to load your contracts.")}
-              </span>
-              <Button type="button" variant="outline" onClick={() => void refetch()}>
-                Retry
-              </Button>
-            </AlertDescription>
-          </Alert>
-        ) : null}
-
-        {initialLoading ? (
-          <div role="status" aria-label="Loading your contracts" className="grid gap-4 lg:grid-cols-2">
-            {[0, 1, 2, 3].map((index) => (
-              <div key={index} className="space-y-3 rounded-2xl border p-5">
-                <Skeleton className="h-5 w-2/3" />
-                <Skeleton className="h-4 w-1/3" />
-                <Skeleton className="h-4 w-full" />
-              </div>
-            ))}
-            <span className="sr-only">Loading your contracts…</span>
-          </div>
-        ) : contracts.length ? (
-          <ul className="grid gap-4 lg:grid-cols-2">
-            {contracts.map((contract) => (
-              <MyContractCard key={contract.id} contract={contract} />
-            ))}
-          </ul>
-        ) : !error ? (
-          hasFilters ? (
-            <div className="space-y-3 rounded-2xl border border-dashed p-8 text-center">
-              <p className="text-sm text-muted-foreground">
-                None of your contracts match your search or filters.
-              </p>
-              <Button type="button" variant="outline" onClick={clearFilters}>
-                Clear filters
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-3 rounded-2xl border border-dashed p-8 text-center">
-              <h3 className="font-semibold">No contracts assigned to you yet</h3>
-              <p className="mx-auto max-w-prose text-sm leading-6 text-muted-foreground">
-                A contract appears here once you hold a role on it in{" "}
-                {companyName}. Company Administrators assign contract roles, and
-                role invitations arrive by email. Open the link in the email to
-                accept one, or ask your Company Administrator for access.
-              </p>
-              <Link
-                href="/dashboards/contracts"
-                className={cn(buttonVariants({ variant: "outline" }))}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <form
+                role="search"
+                aria-label="My contracts"
+                onSubmit={submitSearch}
+                className="w-full sm:max-w-sm"
               >
-                View the company’s contracts
-              </Link>
+                <Field>
+                  <FieldLabel htmlFor="my-contract-search">
+                    Search my contracts
+                  </FieldLabel>
+                  <Input
+                    id="my-contract-search"
+                    type="search"
+                    value={searchInput}
+                    maxLength={100}
+                    placeholder="Title or reference"
+                    autoComplete="off"
+                    onChange={(event) => setSearchInput(event.target.value)}
+                  />
+                </Field>
+              </form>
+              <DataTableFilters
+                label="my contracts"
+                fields={[
+                  {
+                    kind: "select",
+                    id: "status",
+                    label: "Status",
+                    value: status,
+                    options: [
+                      { value: "", label: "All statuses" },
+                      ...contractStatuses.map((value) => ({
+                        value,
+                        label: humanizeEnumValue(value),
+                      })),
+                    ],
+                  },
+                ]}
+                onApply={(next) =>
+                  setStatus(
+                    contractStatuses.find((value) => value === next.status) ??
+                      "",
+                  )
+                }
+              />
             </div>
-          )
-        ) : null}
 
-        {currentData && contracts.length ? (
-          <DataPagination
-            className="border-t pt-4"
-            meta={currentData.meta}
-            itemLabel="contracts"
-            isFetching={isFetching}
-            onPageChange={setPage}
-            onPageSizeChange={setLimit}
-          />
-        ) : null}
+            {error ? (
+              <Alert variant="destructive">
+                <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+                  <span>
+                    {getApiErrorMessage(
+                      error,
+                      "Unable to load your contracts.",
+                    )}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void refetch()}
+                  >
+                    Retry
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            ) : null}
+
+            {initialLoading ? (
+              <div
+                role="status"
+                aria-label="Loading your contracts"
+                className="grid gap-4 lg:grid-cols-2"
+              >
+                {[0, 1, 2, 3].map((index) => (
+                  <div key={index} className="space-y-3 rounded-2xl border p-5">
+                    <Skeleton className="h-5 w-2/3" />
+                    <Skeleton className="h-4 w-1/3" />
+                    <Skeleton className="h-4 w-full" />
+                  </div>
+                ))}
+                <span className="sr-only">Loading your contracts…</span>
+              </div>
+            ) : contracts.length ? (
+              <ul className="grid gap-4 lg:grid-cols-2">
+                {contracts.map((contract) => (
+                  <MyContractCard key={contract.id} contract={contract} />
+                ))}
+              </ul>
+            ) : !error ? (
+              hasFilters ? (
+                <div className="space-y-3 rounded-2xl border border-dashed p-8 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    None of your contracts match your search or filters.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={clearFilters}
+                  >
+                    Clear filters
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3 rounded-2xl border border-dashed p-8 text-center">
+                  <h3 className="font-semibold">
+                    No contracts assigned to you yet
+                  </h3>
+                  <p className="mx-auto max-w-prose text-sm leading-6 text-muted-foreground">
+                    A contract appears here once you hold a role on it in{" "}
+                    {companyName}. Company Administrators assign contract roles,
+                    and role invitations arrive by email. Open the link in the
+                    email to accept one, or ask your Company Administrator for
+                    access.
+                  </p>
+                  <Link
+                    href="/dashboards/contracts"
+                    className={cn(buttonVariants({ variant: "outline" }))}
+                  >
+                    View the company’s contracts
+                  </Link>
+                </div>
+              )
+            ) : null}
+
+            {currentData && contracts.length ? (
+              <DataPagination
+                className="border-t pt-4"
+                meta={currentData.meta}
+                itemLabel="contracts"
+                isFetching={isFetching}
+                onPageChange={setPage}
+                onPageSizeChange={setLimit}
+              />
+            ) : null}
           </CardContent>
         </Card>
       </section>
@@ -227,7 +250,8 @@ function MyContractCard({ contract }: { contract: ContractListItem }) {
             {contract.title}
           </Link>
           <p className="mt-0.5 text-xs break-words text-muted-foreground">
-            {contract.referenceNumber} · {humanizeEnumValue(contract.contractType)}
+            {contract.referenceNumber} ·{" "}
+            {humanizeEnumValue(contract.contractType)}
           </p>
         </div>
         <StatusBadge status={contract.status} />
@@ -239,8 +263,15 @@ function MyContractCard({ contract }: { contract: ContractListItem }) {
           <ul aria-label="Your roles" className="flex flex-wrap gap-1.5">
             {roles.map((assignment) => (
               <li key={`${assignment.role}-${assignment.workspace}`}>
-                <Badge variant="outline" className="h-auto whitespace-normal py-0.5 text-left">
-                  {assignment.role} · {humanizeEnumValue(assignment.workspace)}
+                <Badge
+                  variant="outline"
+                  className="h-auto whitespace-normal py-0.5 text-left"
+                >
+                  {contractRoleLabel(
+                    assignment.role,
+                    Boolean(contract.parentContractId),
+                  )}{" "}
+                  · {humanizeEnumValue(assignment.workspace)}
                   {assignment.isWorkspaceAdmin ? " · Workspace admin" : ""}
                 </Badge>
               </li>

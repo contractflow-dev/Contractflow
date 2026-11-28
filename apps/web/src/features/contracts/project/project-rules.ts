@@ -5,8 +5,11 @@ import {
   EMilestoneDecisionType,
   EMilestoneStatus,
   EMilestoneSubmissionType,
+  ELifecycleStageCode,
   EPartyType,
   EStatus,
+  contractRoleLabel,
+  type Contract,
   type ContractRole,
   type ContractStage,
   type Milestone,
@@ -26,6 +29,11 @@ export interface ProjectPermissions {
   isSubmitter: boolean;
   /** Create and change stages and milestones. */
   canPlan: boolean;
+  /**
+   * Add stages and change their weights. A contract created from the
+   * lifecycle has its plan fixed once it is active (decision D-4).
+   */
+  canChangePlan: boolean;
   /** Start, hold, resume and complete stages; decide on submissions. */
   canOperateAsPlanner: boolean;
   /** Start milestones and submit work. */
@@ -45,14 +53,32 @@ const ALLOWED: Record<
   [EContractStatus.DRAFT]: { planning: true, operation: false },
   [EContractStatus.ACTIVE]: { planning: true, operation: true },
   [EContractStatus.SUSPENDED]: { planning: false, operation: false },
+  // The post-contract obligations stage only: see stageOpen.
+  [EContractStatus.DEFECTS_LIABILITY]: { planning: true, operation: true },
   [EContractStatus.COMPLETED]: { planning: false, operation: false },
 };
+
+/**
+ * Whether a stage can change under the contract's status: during the
+ * defects liability period only the post-contract obligations stage can
+ * (decision D-12). The API checks the same.
+ */
+export function stageOpen(
+  contractStatus: EContractStatus,
+  stage: Pick<ContractStage, "stageCode">,
+): boolean {
+  return (
+    contractStatus !== EContractStatus.DEFECTS_LIABILITY ||
+    stage.stageCode === ELifecycleStageCode.POST_CONTRACT_OBLIGATIONS
+  );
+}
 
 export function projectPermissions({
   roles,
   partyType,
   contractStatus,
   archived,
+  hasLifecycle = false,
 }: {
   /** The viewer's active Project workspace roles. */
   roles: readonly ContractRole[];
@@ -61,8 +87,10 @@ export function projectPermissions({
   contractStatus: EContractStatus;
   /** The contract is archived (soft-deleted). */
   archived: boolean;
+  /** The contract's stages were copied from the lifecycle template. */
+  hasLifecycle?: boolean;
 }): ProjectPermissions {
-  const clientSide = partyType === EPartyType.CLIENT;
+  const clientSide = partyType === EPartyType.AWARDING;
   const isPlanner =
     clientSide && roles.includes(EClientContractRole.CLIENT_PROJECT_MANAGER);
   const isSubmitter =
@@ -76,6 +104,11 @@ export function projectPermissions({
     isPlanner,
     isSubmitter,
     canPlan: isPlanner && allowed.planning,
+    canChangePlan:
+      isPlanner &&
+      allowed.planning &&
+      contractStatus !== EContractStatus.DEFECTS_LIABILITY &&
+      (!hasLifecycle || contractStatus === EContractStatus.DRAFT),
     canOperateAsPlanner: isPlanner && allowed.operation,
     canSubmit: isSubmitter && allowed.operation,
     statusNotice: archived
@@ -85,7 +118,9 @@ export function projectPermissions({
         : contractStatus === EContractStatus.SUSPENDED ||
             contractStatus === EContractStatus.COMPLETED
           ? `This contract is ${contractStatus}: its stages and milestones can be read but not changed.`
-          : null,
+          : contractStatus === EContractStatus.DEFECTS_LIABILITY
+            ? "This contract is in its defects liability period: only the post-contract obligations stage can still change."
+            : null,
   };
 }
 
@@ -133,12 +168,17 @@ export function effectiveDueDate(
 
 // --- Stages --------------------------------------------------------------------
 
-export type StageTransition = "start" | "hold" | "resume" | "complete";
+export type StageTransition =
+  "start" | "hold" | "resume" | "complete" | "cancel";
 
 export const STAGE_TRANSITIONS: Record<
   StageTransition,
   {
-    to: EStatus.IN_PROGRESS | EStatus.ON_HOLD | EStatus.COMPLETED;
+    to:
+      | EStatus.IN_PROGRESS
+      | EStatus.ON_HOLD
+      | EStatus.COMPLETED
+      | EStatus.CANCELLED;
     label: string;
     /** The confirmation once it is done. */
     done: string;
@@ -176,17 +216,24 @@ export const STAGE_TRANSITIONS: Record<
     needsReason: false,
     recordsDate: true,
   },
+  cancel: {
+    to: EStatus.CANCELLED,
+    label: "Cancel stage",
+    done: "Stage cancelled",
+    needsReason: true,
+    recordsDate: false,
+  },
 };
 
 /** The moves the API allows from a stage's status. */
 export function stageTransitions(status: EStatus): StageTransition[] {
   switch (status) {
     case EStatus.PLANNED:
-      return ["start"];
+      return ["start", "cancel"];
     case EStatus.IN_PROGRESS:
-      return ["hold", "complete"];
+      return ["hold", "complete", "cancel"];
     case EStatus.ON_HOLD:
-      return ["resume"];
+      return ["resume", "cancel"];
     default:
       return [];
   }
@@ -316,13 +363,33 @@ export function legacyStatusLabel(legacyStatus: string | null): string | null {
 }
 
 /**
+ * The Project roles' names on this contract. On a subcontract the main
+ * contractor plans and decides, and the subcontractor submits.
+ */
+export function projectRoleNames(
+  contract: Pick<Contract, "parentContractId">,
+): { planner: string; lead: string } {
+  const isSubcontract = Boolean(contract.parentContractId);
+  return {
+    planner: contractRoleLabel(
+      EClientContractRole.CLIENT_PROJECT_MANAGER,
+      isSubcontract,
+    ),
+    lead: contractRoleLabel(
+      EContractorContractRole.CONTRACTOR_PROJECT_LEAD,
+      isSubcontract,
+    ),
+  };
+}
+
+/**
  * Who acted, from the membership ids the API returns: "You" for the viewer,
  * otherwise the side's role. The API doesn't name the other company's members.
  */
 export function actorLabel(
   membershipId: string,
   viewerMembershipId: string | undefined,
-  role: "Contractor Project Lead" | "Client Project Manager",
+  role: string,
 ): string {
   return membershipId === viewerMembershipId ? "You" : role;
 }

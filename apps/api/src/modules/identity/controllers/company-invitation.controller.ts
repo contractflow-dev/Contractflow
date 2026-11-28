@@ -6,6 +6,7 @@ import { RespondCompanyInvitationRequestDto } from '../dto/company/requests/resp
 import { RespondMyCompanyInvitationRequestDto } from '../dto/company/requests/respond-my-company-invitation-request.dto';
 import { CompanyInvitationTokenRequestDto } from '../dto/company/requests/company-invitation-token-request.dto';
 import { CompanyAdminService } from '../services/company/company-admin.service';
+import { ParseUlidPipe } from '../../../common/pipes/parse-ulid.pipe';
 
 /**
  * The invitee's side of company invitations. None of these routes use
@@ -48,7 +49,7 @@ export class CompanyInvitationController {
   @Post(':invitationId/respond')
   respondToMine(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('invitationId') invitationId: string,
+    @Param('invitationId', ParseUlidPipe) invitationId: string,
     @Body() body: RespondMyCompanyInvitationRequestDto,
   ) {
     return this.companyAdminService.respondToMyInvitation(

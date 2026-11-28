@@ -8,6 +8,7 @@
 } from '@nestjs/common';
 import { createHash, randomBytes } from 'node:crypto';
 import {
+  contractRoleLabel,
   ECompanyRole,
   EClientContractRole,
   EContractorContractRole,
@@ -16,10 +17,20 @@ import {
   EFromStatus,
   EPartyType,
   EToStatus,
+  ELifecycleStageCode,
+  EStageHistoryEvent,
+  EStatus,
   minorAmountToBigInt,
 } from '@contractflow/contracts-schema';
+import type { ContractStage } from '../../delivery/entities/contract-stage.entity';
+import type { LifecycleTemplateStage } from '../../delivery/entities/lifecycle-template-stage.entity';
+import {
+  dayInTimeZone,
+  FULL_BPS,
+} from '../../delivery/services/milestone-workflow.rules';
 import type {
   ContractDeletionImpact,
+  ContractLifecyclePermissions,
   ContractSite as ContractSiteResponse,
   ContractWorkspaceRemovalImpact,
   IncomingContractInvitation,
@@ -74,20 +85,33 @@ export type RecordedContractSignatory = Pick<
   | 'signedAt'
 >;
 
+/**
+ * The contract status lifecycle. Practical completion opens the defects
+ * liability period, in which only post-contract obligations are worked on
+ * (decision D-12); a contract without one may complete directly.
+ */
 const transitionMap: Record<
   ContractTransition,
-  { from: EContractStatus; to: EContractStatus }
+  { from: readonly EContractStatus[]; to: EContractStatus }
 > = {
-  activate: { from: EContractStatus.DRAFT, to: EContractStatus.ACTIVE },
-  hold: { from: EContractStatus.ACTIVE, to: EContractStatus.SUSPENDED },
-  resume: { from: EContractStatus.SUSPENDED, to: EContractStatus.ACTIVE },
-  complete: { from: EContractStatus.ACTIVE, to: EContractStatus.COMPLETED },
+  activate: { from: [EContractStatus.DRAFT], to: EContractStatus.ACTIVE },
+  hold: { from: [EContractStatus.ACTIVE], to: EContractStatus.SUSPENDED },
+  resume: { from: [EContractStatus.SUSPENDED], to: EContractStatus.ACTIVE },
+  practical_completion: {
+    from: [EContractStatus.ACTIVE],
+    to: EContractStatus.DEFECTS_LIABILITY,
+  },
+  complete: {
+    from: [EContractStatus.ACTIVE, EContractStatus.DEFECTS_LIABILITY],
+    to: EContractStatus.COMPLETED,
+  },
 };
 
 const historyFromStatus: Record<EContractStatus, EFromStatus> = {
   [EContractStatus.DRAFT]: EFromStatus.DRAFT,
   [EContractStatus.ACTIVE]: EFromStatus.ACTIVE,
   [EContractStatus.SUSPENDED]: EFromStatus.SUSPENDED,
+  [EContractStatus.DEFECTS_LIABILITY]: EFromStatus.DEFECTS_LIABILITY,
   [EContractStatus.COMPLETED]: EFromStatus.COMPLETED,
 };
 
@@ -95,6 +119,7 @@ const historyToStatus: Record<EContractStatus, EToStatus> = {
   [EContractStatus.DRAFT]: EToStatus.DRAFT,
   [EContractStatus.ACTIVE]: EToStatus.ACTIVE,
   [EContractStatus.SUSPENDED]: EToStatus.SUSPENDED,
+  [EContractStatus.DEFECTS_LIABILITY]: EToStatus.DEFECTS_LIABILITY,
   [EContractStatus.COMPLETED]: EToStatus.COMPLETED,
 };
 
@@ -102,13 +127,22 @@ function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
-function projectLeadRole(partyType: EPartyType): ContractRole | null {
-  if (partyType === EPartyType.CLIENT) {
-    return EClientContractRole.CLIENT_PROJECT_MANAGER;
-  }
-  return [EPartyType.CONTRACTOR, EPartyType.SUBCONTRACTOR].includes(partyType)
-    ? EContractorContractRole.CONTRACTOR_PROJECT_LEAD
+/**
+ * Who may change a contract's status (decision D-5): the awarding party's
+ * Client Project Manager. On a subcontract that is the main contractor's
+ * lead. The awarded party has no status role; null says so.
+ */
+function statusRole(partyType: EPartyType): ContractRole | null {
+  return partyType === EPartyType.AWARDING
+    ? EClientContractRole.CLIENT_PROJECT_MANAGER
     : null;
+}
+
+/** Applicable, not cancelled stages: the ones progress counts. */
+function countedStages(stages: readonly ContractStage[]): ContractStage[] {
+  return stages.filter(
+    (stage) => stage.isApplicable && stage.status !== EStatus.CANCELLED,
+  );
 }
 
 @Injectable()
@@ -123,11 +157,7 @@ export class ContractLifecycleService {
     userId: string,
     companyId: string,
     contractId: string,
-  ): Promise<{
-    canManage: boolean;
-    canTransition: boolean;
-    canRestore: boolean;
-  }> {
+  ): Promise<ContractLifecyclePermissions> {
     return this.unitOfWork.execute(async (context) => {
       const membership = await context.memberships.findActive(
         userId,
@@ -162,7 +192,7 @@ export class ContractLifecycleService {
       const isCreatorAdmin =
         membership.companyRole === ECompanyRole.COMPANY_ADMIN &&
         contract.createdByCompanyId === companyId;
-      const authorizedRole = projectLeadRole(party.partyType);
+      const authorizedRole = statusRole(party.partyType);
       const hasProjectLeadAssignment =
         !contract.deletedAt &&
         authorizedRole !== null &&
@@ -173,10 +203,43 @@ export class ContractLifecycleService {
           role: authorizedRole,
         }));
 
+      // Who sends party invitations: on a main contract its creating
+      // company's administrator; on a subcontract only the main contractor's
+      // Contractor Project Lead on the main contract.
+      const canInviteParties =
+        !contract.deletedAt &&
+        contract.createdByCompanyId === companyId &&
+        (contract.parentContractId
+          ? await this.holdsMainContractProjectLead(
+              context,
+              contract.parentContractId,
+              companyId,
+              membership.id,
+            )
+          : isCreatorAdmin);
+
+      // Subcontracting a main contract is for the awarded party's
+      // Contractor Project Lead, while the main contract is draft or active.
+      const canCreateSubcontract =
+        !contract.deletedAt &&
+        !contract.parentContractId &&
+        party.partyType === EPartyType.AWARDED &&
+        (contract.status === EContractStatus.DRAFT ||
+          contract.status === EContractStatus.ACTIVE) &&
+        (await context.roleAssignments.hasActiveAssignment({
+          companyId,
+          contractPartyId: party.id,
+          companyUserId: membership.id,
+          role: EContractorContractRole.CONTRACTOR_PROJECT_LEAD,
+        }));
+
       return {
         canManage: isCreatorAdmin && !contract.deletedAt,
         canTransition: hasProjectLeadAssignment,
         canRestore: isCreatorAdmin && Boolean(contract.deletedAt),
+        canInviteParties,
+        invitesSubcontractors: Boolean(contract.parentContractId),
+        canCreateSubcontract,
       };
     });
   }
@@ -191,23 +254,34 @@ export class ContractLifecycleService {
       dto.startDate,
       dto.endDate,
       dto.revisedEndDate,
-      dto.actualCompletionDate,
     );
+    // The creating company is always the awarding party: a contractor can't
+    // create a main contract without its client on the platform, and the
+    // main contractor awards its subcontracts.
+    if (dto.partyType !== undefined && dto.partyType !== EPartyType.AWARDING) {
+      throw new BadRequestException(
+        'The company creating a contract is its awarding party: a main contract is created by its client, a subcontract by the main contractor.',
+      );
+    }
     try {
       return await this.unitOfWork.execute(async (context) => {
-        const actor = await this.requireCompanyAdmin(
-          context,
-          userId,
-          companyId,
-        );
-        if (dto.parentContractId) {
-          await this.requireCompanyParty(
-            context,
-            dto.parentContractId,
-            companyId,
-          );
-        }
+        // A main contract is created by a Company Administrator. A
+        // subcontract is created by the main contractor's Contractor Project
+        // Lead on the main contract; administrator rights don't decide it.
+        const actor = dto.parentContractId
+          ? await this.requireSubcontractCreator(
+              context,
+              userId,
+              companyId,
+              dto.parentContractId,
+            )
+          : await this.requireCompanyAdmin(context, userId, companyId);
 
+        // Every new contract starts from the published system lifecycle
+        // (decisions D-2 and D-5); its stages are copied below.
+        const lifecycle =
+          await context.lifecycleTemplates.findPublishedSystemLifecycle();
+        const createdAt = new Date();
         const savedContract = await context.contracts.create({
           referenceNumber: dto.referenceNumber.trim(),
           title: dto.title.trim(),
@@ -229,33 +303,68 @@ export class ContractLifecycleService {
           revisedEndDate: dto.revisedEndDate
             ? parseDate(dto.revisedEndDate)
             : null,
-          actualCompletionDate: dto.actualCompletionDate
-            ? parseDate(dto.actualCompletionDate)
-            : null,
           defectsLiabilityDays: dto.defectsLiabilityDays,
           timezone: dto.timezone,
           createdByCompanyId: companyId,
+          lifecycleTemplateVersionId: lifecycle?.versionId ?? null,
+          lifecycleInitialisedAt: lifecycle ? createdAt : null,
           deletedAt: null,
           deletedByCompanyUserId: null,
         });
-        await context.parties.create({
+        const ownParty = await context.parties.create({
           contractId: savedContract.id,
           companyId,
-          partyType: dto.partyType,
+          partyType: EPartyType.AWARDING,
         });
         await context.workspaces.addMany(
           savedContract.id,
           dto.workspaces,
           actor.id,
         );
+        if (lifecycle) {
+          await this.copyLifecycleStages(
+            context,
+            savedContract,
+            lifecycle.stages,
+            actor,
+            createdAt,
+          );
+        }
+        const now = new Date();
         await context.statusHistory.record({
           contractId: savedContract.id,
           fromStatus: null,
           toStatus: EToStatus.DRAFT,
           reason: null,
           changedById: actor.id,
-          changedAt: new Date(),
+          changedAt: now,
         });
+        if (savedContract.parentContractId) {
+          // The creator leads the subcontract for the awarding contractor,
+          // so they can open and run it without administrator rights.
+          await context.roleAssignments.assign(
+            {
+              companyId,
+              contractPartyId: ownParty.id,
+              companyUserId: actor.id,
+              role: EClientContractRole.CLIENT_PROJECT_MANAGER,
+              assignedById: actor.id,
+            },
+            now,
+          );
+          await this.writeActivity(
+            context,
+            savedContract,
+            actor,
+            'contract.subcontract_created',
+            `Created subcontract ${savedContract.referenceNumber}.`,
+            {
+              parentContractId: savedContract.parentContractId,
+              assignedRole: EClientContractRole.CLIENT_PROJECT_MANAGER,
+            },
+            now,
+          );
+        }
         return savedContract;
       });
     } catch (error) {
@@ -306,25 +415,15 @@ export class ContractLifecycleService {
       if (dto.contractType !== undefined) {
         contract.contractType = dto.contractType;
       }
-      if (dto.parentContractId !== undefined) {
-        if (dto.parentContractId) {
-          await this.requireCompanyParty(
-            context,
-            dto.parentContractId,
-            companyId,
-          );
-          if (
-            await context.contracts.parentWouldCreateCycle(
-              dto.parentContractId,
-              contract.id,
-            )
-          ) {
-            throw new BadRequestException(
-              'A contract cannot be made a subcontract of its own descendant.',
-            );
-          }
-        }
-        contract.parentContractId = dto.parentContractId ?? null;
+      // The parent is set when a subcontract is created. Sending the same
+      // value is harmless; a different one is refused, never ignored.
+      if (
+        dto.parentContractId !== undefined &&
+        (dto.parentContractId ?? null) !== contract.parentContractId
+      ) {
+        throw new ConflictException(
+          'A contract’s parent contract is set when it is created and cannot be changed.',
+        );
       }
       if (dto.originalValueMinor !== undefined) {
         contract.originalValueMinor = dto.originalValueMinor;
@@ -362,11 +461,6 @@ export class ContractLifecycleService {
           ? parseDate(dto.revisedEndDate)
           : null;
       }
-      if (dto.actualCompletionDate !== undefined) {
-        contract.actualCompletionDate = dto.actualCompletionDate
-          ? parseDate(dto.actualCompletionDate)
-          : null;
-      }
       if (dto.defectsLiabilityDays !== undefined) {
         contract.defectsLiabilityDays = dto.defectsLiabilityDays;
       }
@@ -376,7 +470,6 @@ export class ContractLifecycleService {
         contract.startDate,
         contract.endDate,
         contract.revisedEndDate,
-        contract.actualCompletionDate,
       );
       return context.contracts.save(contract);
     });
@@ -594,9 +687,10 @@ export class ContractLifecycleService {
         userId,
         companyId,
         contractId,
+        contract.parentContractId !== null,
       );
       const transition = transitionMap[dto.transition];
-      if (contract.status !== transition.from) {
+      if (!transition.from.includes(contract.status)) {
         throw new ConflictException(
           `Cannot ${dto.transition} a contract in ${contract.status} status.`,
         );
@@ -608,12 +702,16 @@ export class ContractLifecycleService {
         );
       }
 
-      contract.status = transition.to;
       const now = new Date();
+      if (dto.transition === 'activate') {
+        await this.prepareActivation(context, contract, actor, reason, now);
+      }
+      const from = contract.status;
+      contract.status = transition.to;
       const saved = await context.contracts.save(contract);
       await context.statusHistory.record({
         contractId,
-        fromStatus: historyFromStatus[transition.from],
+        fromStatus: historyFromStatus[from],
         toStatus: historyToStatus[transition.to],
         reason,
         changedById: actor.id,
@@ -624,9 +722,9 @@ export class ContractLifecycleService {
         saved,
         actor,
         'contract.status_transitioned',
-        `Changed ${saved.referenceNumber} from ${transition.from} to ${transition.to}.`,
+        `Changed ${saved.referenceNumber} from ${from} to ${transition.to}.`,
         {
-          fromStatus: transition.from,
+          fromStatus: from,
           toStatus: transition.to,
           reason,
         },
@@ -828,7 +926,9 @@ export class ContractLifecycleService {
     siteId: string,
     dto: UpdateContractSiteRequestDto,
   ): Promise<ContractSiteResponse> {
-    const fields = Object.keys(dto) as Array<keyof UpdateContractSiteRequestDto>;
+    const fields = Object.keys(dto) as Array<
+      keyof UpdateContractSiteRequestDto
+    >;
     if (fields.length === 0) {
       throw new BadRequestException('At least one site field is required.');
     }
@@ -949,7 +1049,7 @@ export class ContractLifecycleService {
     contractId: string,
   ): Promise<ContractPartyInvitationResponse[]> {
     return this.unitOfWork.execute(async (context) => {
-      const { party } = await this.requireOwnedContract(
+      const { party } = await this.requireInvitationActor(
         context,
         userId,
         companyId,
@@ -971,7 +1071,7 @@ export class ContractLifecycleService {
     dto: CreateContractPartyInvitationRequestDto,
   ): Promise<ContractPartyInvitationResponse> {
     return this.unitOfWork.execute(async (context) => {
-      const { contract, actor, party } = await this.requireOwnedContract(
+      const { contract, actor, party } = await this.requireInvitationActor(
         context,
         userId,
         companyId,
@@ -996,6 +1096,23 @@ export class ContractLifecycleService {
       if (targetParty) {
         throw new ConflictException(
           'This company is already a party to the contract.',
+        );
+      }
+      // A contract is between two companies only.
+      if (
+        await context.parties.hasPartyOfType(contractId, EPartyType.AWARDED)
+      ) {
+        throw new ConflictException(
+          'This contract already has its awarded party. Each subcontractor needs its own subcontract.',
+        );
+      }
+      if (
+        contract.parentContractId &&
+        (await context.parties.find(contract.parentContractId, target.id))
+          ?.partyType === EPartyType.AWARDING
+      ) {
+        throw new BadRequestException(
+          'The main contract’s client cannot be a party to its subcontract.',
         );
       }
 
@@ -1062,7 +1179,7 @@ export class ContractLifecycleService {
     invitationId: string,
   ): Promise<ContractPartyInvitationResponse> {
     return this.unitOfWork.execute(async (context) => {
-      const { contract, actor, party } = await this.requireOwnedContract(
+      const { contract, actor, party } = await this.requireInvitationActor(
         context,
         userId,
         companyId,
@@ -1286,6 +1403,13 @@ export class ContractLifecycleService {
             'This company is already a party to the contract.',
           );
         }
+        if (
+          await context.parties.hasPartyOfType(contract.id, EPartyType.AWARDED)
+        ) {
+          throw new ConflictException(
+            'This contract already has its awarded party.',
+          );
+        }
         await context.parties.create({
           contractId: contract.id,
           companyId,
@@ -1414,21 +1538,273 @@ export class ContractLifecycleService {
     return { contract, actor, party };
   }
 
-  private async requireCompanyParty(
+  /**
+   * Copies the lifecycle template's stages to a new contract, all planned
+   * and applicable, over the contract's planned dates, each with an
+   * `initialised` history row. The Client Project Manager adjusts them
+   * while the contract is a draft (decision D-4).
+   */
+  private async copyLifecycleStages(
     context: IContractLifecycleContext,
-    contractId: string,
-    companyId: string,
+    contract: Contract,
+    templateStages: readonly LifecycleTemplateStage[],
+    actor: CompanyUser,
+    now: Date,
   ): Promise<void> {
-    const parent = await context.contracts.findActiveById(contractId);
-    if (!parent) {
-      throw new NotFoundException('Parent contract was not found.');
+    const startDate = datePart(contract.startDate)!;
+    const endDate = datePart(contract.endDate)!;
+    const stages = await context.stages.createMany(
+      templateStages.map((templateStage) => ({
+        contractId: contract.id,
+        name: templateStage.name,
+        description: templateStage.description,
+        sequence: templateStage.sequence,
+        status: EStatus.PLANNED,
+        weightBps: templateStage.defaultWeightBps,
+        plannedStartDate: startDate,
+        plannedEndDate: endDate,
+        actualStartDate: null,
+        actualEndDate: null,
+        stageCode: templateStage.stageCode,
+        templateStageId: templateStage.id,
+        isApplicable: true,
+        applicabilityReason: null,
+        applicabilityDecidedById: null,
+        applicabilityDecidedAt: null,
+      })),
+    );
+    for (const stage of stages) {
+      await context.stageHistory.record({
+        contractId: contract.id,
+        contractStageId: stage.id,
+        eventType: EStageHistoryEvent.INITIALISED,
+        fromStatus: null,
+        toStatus: stage.status,
+        fromApplicable: null,
+        toApplicable: true,
+        fromWeightBps: null,
+        toWeightBps: stage.weightBps,
+        reason: null,
+        actorCompanyUserId: actor.id,
+        occurredAt: now,
+      });
     }
-    const party = await context.parties.find(contractId, companyId);
-    if (!party) {
-      throw new NotFoundException(
-        'Parent contract was not found for this company.',
+  }
+
+  /**
+   * Checks a contract can be activated, and completes the stages that
+   * complete on activation (Contract Award), with their history:
+   * - Both parties are on the contract and have recorded a signature (D-5).
+   * - On a contract created from a lifecycle, the stages that apply and
+   *   aren't cancelled total exactly 10,000 bps (D-6).
+   */
+  private async prepareActivation(
+    context: IContractLifecycleContext,
+    contract: Contract,
+    actor: CompanyUser,
+    reason: string,
+    now: Date,
+  ): Promise<void> {
+    const signatures = await context.parties.countSignatures(contract.id);
+    if (signatures.parties < 2 || signatures.signed < signatures.parties) {
+      throw new ConflictException(
+        'Both parties must be on the contract and have recorded their signatory before it is activated.',
       );
     }
+    if (!contract.lifecycleTemplateVersionId) return;
+    const stages = await context.stages.listForUpdate(contract.id);
+    const total = countedStages(stages).reduce(
+      (sum, stage) => sum + stage.weightBps,
+      0,
+    );
+    if (total !== FULL_BPS) {
+      throw new ConflictException(
+        `The weights of the stages that apply must total 100% before activation; they total ${total / 100}%.`,
+      );
+    }
+    const day = dayInTimeZone(now, contract.timezone);
+    for (const stage of stages) {
+      if (
+        stage.stageCode !== ELifecycleStageCode.CONTRACT_AWARD ||
+        !stage.isApplicable ||
+        stage.status === EStatus.COMPLETED ||
+        stage.status === EStatus.CANCELLED
+      ) {
+        continue;
+      }
+      const from = stage.status;
+      stage.status = EStatus.COMPLETED;
+      stage.actualStartDate = stage.actualStartDate ?? day;
+      stage.actualEndDate = day;
+      await context.stages.save(stage);
+      await context.stageHistory.record({
+        contractId: contract.id,
+        contractStageId: stage.id,
+        eventType: EStageHistoryEvent.STATUS_CHANGED,
+        fromStatus: from,
+        toStatus: EStatus.COMPLETED,
+        fromApplicable: null,
+        toApplicable: null,
+        fromWeightBps: null,
+        toWeightBps: null,
+        reason: `Completed on activation: ${reason}`,
+        actorCompanyUserId: actor.id,
+        occurredAt: now,
+      });
+    }
+  }
+
+  /**
+   * A subcontract's parent must be a main contract (not itself a
+   * subcontract), not archived, and draft or active. Only the company that
+   * is the AWARDED party on it may subcontract its work (it becomes the
+   * subcontract's AWARDING party). The parent is locked so it can't be
+   * archived meanwhile.
+   */
+  private async requireEligibleParent(
+    context: IContractLifecycleContext,
+    parentContractId: string,
+    companyId: string,
+  ): Promise<void> {
+    const parent =
+      await context.contracts.findActiveForUpdate(parentContractId);
+    const parentParty = parent
+      ? await context.parties.find(parent.id, companyId)
+      : null;
+    // A contract the company isn't party to is not revealed.
+    if (!parent || !parentParty) {
+      throw new NotFoundException('Parent contract was not found.');
+    }
+    if (parent.parentContractId) {
+      throw new BadRequestException(
+        'A subcontract cannot have subcontracts. Choose the main contract as the parent.',
+      );
+    }
+    if (parentParty.partyType !== EPartyType.AWARDED) {
+      throw new ForbiddenException(
+        'Only the awarded party on the main contract can create a subcontract of it.',
+      );
+    }
+    if (
+      parent.status !== EContractStatus.DRAFT &&
+      parent.status !== EContractStatus.ACTIVE
+    ) {
+      throw new ConflictException(
+        `Subcontracts can only be added to a draft or active main contract; this one is ${parent.status}.`,
+      );
+    }
+  }
+
+  /**
+   * Who may list, send and revoke party invitations. On a main contract, the
+   * creating company's Company Administrator (`requireOwnedContract`). On a
+   * subcontract, only a member of the creating company who holds an active
+   * Contractor Project Lead role on the main contract, through the company's
+   * AWARDED party there. Company Administrator rights alone never suffice
+   * for a subcontract. Visibility comes first, so a caller who can't see the
+   * subcontract gets the same 404 as for a missing contract.
+   */
+  private async requireInvitationActor(
+    context: IContractLifecycleContext,
+    userId: string,
+    companyId: string,
+    contractId: string,
+  ): Promise<{ contract: Contract; actor: CompanyUser; party: ContractParty }> {
+    const contract = await context.contracts.findForUpdate(contractId);
+    if (
+      !contract ||
+      contract.createdByCompanyId !== companyId ||
+      contract.deletedAt
+    ) {
+      throw new NotFoundException('Contract was not found.');
+    }
+    if (!contract.parentContractId) {
+      return this.requireOwnedContract(context, userId, companyId, contractId);
+    }
+    if (!(await this.canSeeContract(context, userId, companyId, contractId))) {
+      throw new NotFoundException('Contract was not found.');
+    }
+    const actor = await context.memberships.findActiveForUpdate(
+      userId,
+      companyId,
+    );
+    if (!actor) {
+      throw new ForbiddenException('Active company membership is required.');
+    }
+    if (
+      !(await this.holdsMainContractProjectLead(
+        context,
+        contract.parentContractId,
+        companyId,
+        actor.id,
+      ))
+    ) {
+      throw new ForbiddenException(
+        'Only the main contractor’s Contractor Project Lead on the main contract can invite subcontractors.',
+      );
+    }
+    const party = await context.parties.findForShare(contractId, companyId);
+    if (!party) {
+      throw new NotFoundException('Contract was not found.');
+    }
+    return { contract, actor, party };
+  }
+
+  /**
+   * The creator of a subcontract: an active member of the main contract's
+   * AWARDED company holding an active Contractor Project Lead role on the
+   * main contract. The parent is checked (and locked) first, so a company
+   * that can't see it gets the same 404 as for a missing contract.
+   */
+  private async requireSubcontractCreator(
+    context: IContractLifecycleContext,
+    userId: string,
+    companyId: string,
+    parentContractId: string,
+  ): Promise<CompanyUser> {
+    const company = await context.companies.findActiveForShare(companyId);
+    const actor = company
+      ? await context.memberships.findActiveForUpdate(userId, companyId)
+      : null;
+    if (!actor) {
+      throw new ForbiddenException('Active company membership is required.');
+    }
+    await this.requireEligibleParent(context, parentContractId, companyId);
+    if (
+      !(await this.holdsMainContractProjectLead(
+        context,
+        parentContractId,
+        companyId,
+        actor.id,
+      ))
+    ) {
+      throw new ForbiddenException(
+        'Only the Contractor Project Lead on the main contract can create its subcontracts.',
+      );
+    }
+    return actor;
+  }
+
+  /**
+   * Whether the member holds an active Contractor Project Lead role on the
+   * (not archived) main contract, through their company's AWARDED party.
+   */
+  private async holdsMainContractProjectLead(
+    context: IContractLifecycleContext,
+    mainContractId: string,
+    companyId: string,
+    companyUserId: string,
+  ): Promise<boolean> {
+    const main = await context.contracts.findActiveById(mainContractId);
+    if (!main) return false;
+    const mainParty = await context.parties.find(main.id, companyId);
+    if (!mainParty || mainParty.partyType !== EPartyType.AWARDED) return false;
+    return context.roleAssignments.hasActiveAssignment({
+      companyId,
+      contractPartyId: mainParty.id,
+      companyUserId,
+      role: EContractorContractRole.CONTRACTOR_PROJECT_LEAD,
+    });
   }
 
   private async requireUniqueSiteCode(
@@ -1459,6 +1835,7 @@ export class ContractLifecycleService {
     userId: string,
     companyId: string,
     contractId: string,
+    isSubcontract: boolean,
   ): Promise<CompanyUser> {
     const actor = await context.memberships.findActiveForUpdate(
       userId,
@@ -1471,25 +1848,27 @@ export class ContractLifecycleService {
     if (!party) {
       throw new NotFoundException('Contract was not found.');
     }
-    const authorizedRole = projectLeadRole(party.partyType);
-    if (!authorizedRole) {
-      throw new ForbiddenException(
-        'This contract party cannot initiate lifecycle transitions.',
-      );
-    }
+    const authorizedRole = statusRole(party.partyType);
     const hasAssignment =
-      await context.roleAssignments.hasActiveAssignmentForShare({
+      authorizedRole !== null &&
+      (await context.roleAssignments.hasActiveAssignmentForShare({
         companyId,
         contractPartyId: party.id,
         companyUserId: actor.id,
         role: authorizedRole,
-      });
+      }));
     if (!hasAssignment) {
-      if (!(await this.canSeeContract(context, userId, companyId, contractId))) {
+      if (
+        !(await this.canSeeContract(context, userId, companyId, contractId))
+      ) {
         throw new NotFoundException('Contract was not found.');
       }
+      // On a subcontract the role reads Main Contractor Project Manager.
       throw new ForbiddenException(
-        'An active project lead assignment is required to change contract status.',
+        `Only the awarding party’s ${contractRoleLabel(
+          EClientContractRole.CLIENT_PROJECT_MANAGER,
+          isSubcontract,
+        )} can change the contract’s status.`,
       );
     }
     return actor;
@@ -1530,13 +1909,11 @@ function validateDateRange(
   startDate: Date | string,
   endDate: Date | string,
   revisedEndDate?: Date | string | null,
-  actualCompletionDate?: Date | string | null,
 ): void {
   const award = datePart(awardDate);
   const start = datePart(startDate);
   const end = datePart(endDate);
   const revised = datePart(revisedEndDate);
-  const actual = datePart(actualCompletionDate);
   if (!award || !start || !end || start > end) {
     throw new BadRequestException(
       'The contract start date must not be after its end date.',
@@ -1545,11 +1922,6 @@ function validateDateRange(
   if (revised && revised < end) {
     throw new BadRequestException(
       'The revised end date must not be before the planned end date.',
-    );
-  }
-  if (actual && actual < start) {
-    throw new BadRequestException(
-      'The actual completion date must not be before the start date.',
     );
   }
 }

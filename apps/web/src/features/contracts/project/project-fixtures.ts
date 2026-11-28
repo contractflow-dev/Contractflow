@@ -40,6 +40,7 @@ export const noPermissions: ProjectPermissions = {
   isPlanner: false,
   isSubmitter: false,
   canPlan: false,
+  canChangePlan: false,
   canOperateAsPlanner: false,
   canSubmit: false,
   statusNotice: null,
@@ -49,6 +50,8 @@ export const plannerPermissions: ProjectPermissions = {
   ...noPermissions,
   isPlanner: true,
   canPlan: true,
+  // The fixture contract predates lifecycles, so its plan stays editable.
+  canChangePlan: true,
   canOperateAsPlanner: true,
 };
 
@@ -75,10 +78,13 @@ export function projectContext(
 export const stage: ContractStage = {
   id: "01J0000000000000000000STG1",
   contractId: "contract-1",
+  stageCode: null,
   name: "Civil works",
   description: "Foundations and ducting",
   sequence: 1,
   status: EStatus.IN_PROGRESS,
+  isApplicable: true,
+  applicabilityReason: null,
   weightBps: 4000,
   progressBps: 2500,
   plannedStartDate: "2027-01-01",

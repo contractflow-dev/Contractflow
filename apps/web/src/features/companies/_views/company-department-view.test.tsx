@@ -40,7 +40,7 @@ const waitingOnUs: DepartmentContract = {
   title: "Pipeline integrity",
   status: EContractStatus.ACTIVE,
   archived: false,
-  partyType: EPartyType.CLIENT,
+  partyType: EPartyType.AWARDING,
   memberCount: 0,
   members: [],
   workspaceAdmins: [],
@@ -60,7 +60,7 @@ const waitingOnOther: DepartmentContract = {
   contractId: "contract-2",
   referenceNumber: "CF-2026-0200",
   title: "Jetty repairs",
-  partyType: EPartyType.CONTRACTOR,
+  partyType: EPartyType.AWARDED,
   memberCount: 6,
   members: [
     { companyUserId: "m1", firstName: "Ada", lastName: "Lead" },
@@ -187,8 +187,8 @@ describe("DepartmentContracts", () => {
   it("shows party type, staffing, admin and movement for each row", () => {
     const markup = render();
 
-    expect(markup).toContain(">Client</span>");
-    expect(markup).toContain(">Contractor</span>");
+    expect(markup).toContain(">Awarding</span>");
+    expect(markup).toContain(">Awarded</span>");
     expect(markup).toContain(">Unstaffed</span>");
     expect(markup).toContain(">No admin</span>");
     expect(markup).toContain("Ada Lead");
@@ -235,7 +235,7 @@ describe("DepartmentContracts", () => {
 
   it("reads every filter from the URL", () => {
     mocks.search =
-      "search=pipe&status=active&partyType=contractor&waitingOn=others&sort=title&page=2&limit=50";
+      "search=pipe&status=active&partyType=awarded&waitingOn=others&sort=title&page=2&limit=50";
 
     render();
 
@@ -248,7 +248,7 @@ describe("DepartmentContracts", () => {
         sort: EDepartmentContractSort.TITLE,
         search: "pipe",
         status: EContractStatus.ACTIVE,
-        partyType: EPartyType.CONTRACTOR,
+        partyType: EPartyType.AWARDED,
         waitingOn: "others",
       },
       { refetchOnMountOrArgChange: true },
@@ -292,17 +292,17 @@ describe("DepartmentContracts", () => {
 describe("department filters in the URL", () => {
   it("round-trips, leaving defaults out", () => {
     const filters = readDepartmentFilters(
-      new URLSearchParams("partyType=client&waitingOn=us&archived=1&page=3"),
+      new URLSearchParams("partyType=awarding&waitingOn=us&archived=1&page=3"),
     );
     expect(filters).toMatchObject({
-      partyType: EPartyType.CLIENT,
+      partyType: EPartyType.AWARDING,
       waitingOn: "us",
       includeArchived: true,
       page: 3,
       sort: EDepartmentContractSort.WAITING_ON_US,
     });
     expect(departmentFiltersQuery(filters)).toBe(
-      "partyType=client&waitingOn=us&archived=1&page=3",
+      "partyType=awarding&waitingOn=us&archived=1&page=3",
     );
   });
 
@@ -327,7 +327,7 @@ describe("department CSV", () => {
 
     expect(lines).toHaveLength(3);
     expect(lines[0]).toContain("Reference,Contract,Our party type");
-    expect(lines[1]).toContain("CF-2026-0142,Pipeline integrity,Client");
+    expect(lines[1]).toContain("CF-2026-0142,Pipeline integrity,Awarding");
     expect(lines[1]).toContain(",Us,1,25,");
     expect(lines[2]).toContain("Ridgeline Ltd");
   });

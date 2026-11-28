@@ -74,6 +74,7 @@ const row: CompanyRoleAssignment = {
   contractReference: "CF-2026-0142",
   contractTitle: "Pipeline integrity",
   contractStatus: EContractStatus.ACTIVE,
+  isSubcontract: false,
   companyUserId: "member-1",
   firstName: "Casey",
   lastName: "Okafor",

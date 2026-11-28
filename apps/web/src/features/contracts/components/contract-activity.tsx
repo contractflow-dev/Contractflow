@@ -101,6 +101,7 @@ const ACTION_LABEL: Record<string, string> = {
   "contract.workspaces_removed": "Workspaces removed",
   "contract.deleted": "Contract archived",
   "contract.restored": "Contract restored",
+  "contract.subcontract_created": "Subcontract created",
   "contract.site_created": "Site added",
   "contract.site_updated": "Site updated",
   "contract.signatory_recorded": "Signatory recorded",
@@ -123,6 +124,7 @@ const ACTION_LABEL: Record<string, string> = {
   "stage.created": "Stage created",
   "stage.updated": "Stage plan changed",
   "stage.status_changed": "Stage status changed",
+  "stage.applicability_changed": "Stage applicability changed",
   "stage.completed": "Stage completed",
   "milestone.created": "Milestone created",
   "milestone.updated": "Milestone plan changed",
@@ -186,7 +188,8 @@ export function activityActor(
  * record's). Each section loads its records through its own guarded API.
  *
  * Left out on purpose: contract-level actions (archived, restored, workspaces
- * removed, status changed), whose record is the contract already open, and
+ * removed, status changed, subcontract created), whose record is the
+ * contract already open, and
  * `document.deleted`, whose document no longer exists.
  */
 const ACTION_SECTION: Partial<Record<ContractActivityAction, ContractSection>> =

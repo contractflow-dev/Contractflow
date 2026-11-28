@@ -65,6 +65,7 @@ export const CONTRACT_ACTIVITY_ACTIONS = [
   "contract.status_transitioned",
   "contract.deleted",
   "contract.restored",
+  "contract.subcontract_created",
   "contract.site_created",
   "contract.site_updated",
   "contract.signatory_recorded",
@@ -87,6 +88,7 @@ export const CONTRACT_ACTIVITY_ACTIONS = [
   "stage.created",
   "stage.updated",
   "stage.status_changed",
+  "stage.applicability_changed",
   "stage.completed",
   "milestone.created",
   "milestone.updated",
@@ -111,6 +113,7 @@ export const STAGE_ACTIVITY_ACTIONS = [
   "stage.created",
   "stage.updated",
   "stage.status_changed",
+  "stage.applicability_changed",
   "stage.completed",
 ] as const satisfies readonly ContractActivityAction[];
 

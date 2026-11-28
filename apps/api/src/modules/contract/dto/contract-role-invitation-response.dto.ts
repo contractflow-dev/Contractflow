@@ -43,6 +43,8 @@ export class ContractRoleInvitationResponseDto {
 
 export interface ContractRoleInvitationPreviewDto {
   contractTitle: string;
+  /** The contract is a subcontract (for the role's label). */
+  isSubcontract: boolean;
   companyName: string;
   email: string;
   role: ContractRole;

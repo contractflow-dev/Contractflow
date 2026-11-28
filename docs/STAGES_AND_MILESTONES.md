@@ -10,7 +10,9 @@ All routes are under `/api/contract`, with the `X-Company-Id` and `X-Contract-Id
 |---|---|---|
 | `GET stages`, `GET stages/:stageId` | Any Project role | Stages, with their client-approved `progressBps` |
 | `POST stages`, `PATCH stages/:stageId` | Client Project Manager | Plan or change a stage |
-| `POST stages/:stageId/transitions` | Client Project Manager | Start, hold, resume or complete a stage |
+| `POST stages/:stageId/transitions` | Client Project Manager | Start, hold, resume, complete or cancel a stage (holding, resuming and cancelling need a reason) |
+| `POST stages/:stageId/applicability` | Client Project Manager | Mark a planned stage with no milestones as not applying (with a reason), or reinstate it |
+| `GET progress` | Any Project role | The contract's lifecycle progress, calculated by the API |
 | `POST stages/:stageId/milestones` | Client Project Manager | Create a milestone in the stage |
 | `GET milestones`, `GET milestones/:milestoneId` | Any Project role | Milestones (filters below) |
 | `PATCH milestones/:milestoneId` | Client Project Manager | Change a milestone |
@@ -90,6 +92,23 @@ The contract activity feed (`apps/web/src/features/contracts/components/contract
 
 ## Business rules
 
+### Contract lifecycle (decisions of 27 November 2026)
+
+Every new contract's stages are copied from the published system lifecycle: the nine stages of an oil and gas contract, from Contract Award (0%) to Warranty, Defects Liability and Post-Contract Obligations. Contracts created before then keep their stages exactly as they are, with no lifecycle (`lifecycleTemplateVersionId` null), and keep the older rules.
+
+| # | Decision | In the code |
+|---|---|---|
+| D-2 | Only system templates exist. The tables allow company templates later; a CHECK keeps them system-only for now. A published version's stages can't change (database trigger). | `lifecycle_template`, `_version`, `_stage` |
+| D-4 | While the contract is a draft, the Client Project Manager can change weights, add custom stages, and mark stages as not applying. Once it is active, the plan is fixed: no new stages and no weight changes; whether a stage applies can still change. | 409 otherwise |
+| D-5 | Stages are copied when the contract is created. Only the awarding party's Client Project Manager changes the contract's status. Activation needs both parties on the contract with their signatory recorded. | 403 and 409 |
+| D-6 | At activation, the stages that apply and aren't cancelled must total exactly 100%. Contract Award completes on activation. Progress leaves out stages that don't apply or were cancelled and weights the rest against their own total; a completed stage counts in full. | `GET progress` |
+| D-7 | The Client Project Manager decides whether a stage applies, with a reason; a stage that hasn't started can be reinstated. A stage that doesn't apply takes no milestones and no status change. | `POST stages/:stageId/applicability` |
+| D-10 | Existing contracts are left unchanged. | No data migration |
+| D-11 | No progress snapshots: history comes from the records. Every stage event (copied, status, applicability, weight, dates) is a `contract_stage_history` row, written in the same transaction as the change and its activity entry; the database refuses updates. | `contract_stage_history` |
+| D-12 | A contract status between active and completed: **defects liability**, entered by practical completion. Only the post-contract obligations stage, and its milestones, can change in it. | `practical_completion` transition |
+
+Contract status transitions: activate (draft → active), suspend and resume (active ↔ suspended), practical completion (active → defects liability), complete (active or defects liability → completed).
+
 ### Approved and enforced
 
 - The client's Client Project Manager plans stages and milestones and decides on submissions; the contractor's Contractor Project Lead starts and submits work. Each is checked as an active role assignment on the caller's own party. Company Administrator and Workspace Admin rights grant neither.
@@ -122,6 +141,7 @@ These were approved by the product owner on 22 November 2026, through the "Stage
 | Draft | Allowed | Refused | Allowed |
 | Active | Allowed | Allowed | Allowed |
 | Suspended | Refused | Refused | Allowed |
+| Defects liability | The post-contract obligations stage only (no new stages) | The post-contract obligations stage only | Allowed |
 | Completed | Refused | Refused | Allowed |
 | Archived | Refused | Refused | Not listed (existing archive behaviour) |
 

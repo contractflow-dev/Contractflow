@@ -48,6 +48,11 @@ vi.mock("./contract-role-assignment-management", () => ({
   ContractRoleAssignmentManagement: () => <div>Contract role assignments</div>,
 }));
 
+vi.mock("./related-contracts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./related-contracts")>()),
+  // Reads lifecycle permissions through RTK Query; not under test here.
+  SubcontractsSection: () => null,
+}));
 vi.mock("./contract-lifecycle-management", () => ({
   ContractLifecycleManagement: () => <div>Contract lifecycle management</div>,
 }));
@@ -108,6 +113,7 @@ const contractDetail: ContractDetailResponse = {
     contractType: Object.values(EContractType)[0],
     status: Object.values(EContractStatus)[0],
     parentContractId: null,
+    lifecycleTemplateVersionId: null,
     originalValueMinor: "1000",
     currentValueMinor: "1000",
     currencyCode: ECurrencyCode.USD,
@@ -119,7 +125,6 @@ const contractDetail: ContractDetailResponse = {
     startDate: "2026-01-01",
     endDate: "2026-12-31",
     revisedEndDate: "",
-    actualCompletionDate: "",
     defectsLiabilityDays: 0,
     timezone: "UTC",
     createdAt: "2026-01-01T00:00:00.000Z",
@@ -131,6 +136,8 @@ const contractDetail: ContractDetailResponse = {
     partyType: Object.values(EPartyType)[0],
     signedAt: null,
   },
+  parentContract: null,
+  subcontracts: [],
 };
 
 describe("ContractDetail query states", () => {

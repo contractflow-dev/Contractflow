@@ -1,4 +1,5 @@
 import {
+  Check,
   Entity,
   Column,
   ManyToOne,
@@ -12,6 +13,8 @@ import { EEntityType, ECommentVisibility } from '@contractflow/contracts-schema'
 
 
 @Entity('comment')
+// A polymorphic reference: no foreign key, so the writer checks it exists.
+@Check('ck_comment_entity_id_ulid', `"entity_id" ~* '^[0-7][0-9A-HJKMNP-TV-Z]{25}$'`)
 export class Comment extends BaseCustomEntity implements ICommentEntity{
   @Column({ name: 'contract_id', type: 'varchar', length: 26 })
   contractId!: string;
@@ -34,7 +37,7 @@ export class Comment extends BaseCustomEntity implements ICommentEntity{
   @Column({ name: 'entity_type', type: 'enum', enum: EEntityType })
   entityType!: EEntityType;
 
-  @Column({ name: 'entity_id', type: 'uuid' })
+  @Column({ name: 'entity_id', type: 'varchar', length: 26 })
   entityId!: string;
 
   @Column({ name: 'body', type: 'varchar' })

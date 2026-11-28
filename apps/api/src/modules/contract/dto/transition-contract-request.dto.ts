@@ -5,6 +5,7 @@ export const CONTRACT_TRANSITIONS = [
   'activate',
   'hold',
   'resume',
+  'practical_completion',
   'complete',
 ] as const;
 

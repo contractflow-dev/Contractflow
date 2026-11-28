@@ -27,16 +27,6 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/services/contractApi", () => ({
   useGetContractByIdQuery: () => mocks.detail,
   useGetContractLifecyclePermissionsQuery: () => mocks.permissions,
-  useGetContractsQuery: () => ({
-    currentData: {
-      data: [
-        { id: "contract-1", referenceNumber: "CTR-001", title: "This one" },
-        { id: "parent-1", referenceNumber: "CTR-000", title: "Main works" },
-      ],
-    },
-    isFetching: false,
-    error: undefined,
-  }),
   useUpdateContractMutation: () => [mocks.update, { isLoading: false }],
 }));
 vi.mock("@/lib/notify", () => ({ notifySuccess: vi.fn() }));
@@ -50,6 +40,7 @@ function contract(overrides: Partial<Contract> = {}): Contract {
     contractType: EContractType.MAINTENANCE,
     status: EContractStatus.DRAFT,
     parentContractId: null,
+    lifecycleTemplateVersionId: null,
     originalValueMinor: "150000050",
     currentValueMinor: "150000050",
     currencyCode: ECurrencyCode.NGN,
@@ -61,7 +52,6 @@ function contract(overrides: Partial<Contract> = {}): Contract {
     startDate: "2026-02-01T00:00:00.000Z",
     endDate: "2026-12-31T00:00:00.000Z",
     revisedEndDate: null,
-    actualCompletionDate: null,
     defectsLiabilityDays: 365,
     timezone: "UTC",
     createdAt: "2026-01-01T00:00:00.000Z",
@@ -71,13 +61,19 @@ function contract(overrides: Partial<Contract> = {}): Contract {
   };
 }
 
-function loaded(value: Contract, canManage = true) {
+function loaded(
+  value: Contract,
+  canManage = true,
+  parentContract: Record<string, string> | null = null,
+) {
   mocks.detail = {
     isLoading: false,
     error: undefined,
     currentData: {
       contract: value,
-      membership: { partyType: EPartyType.CLIENT },
+      membership: { partyType: EPartyType.AWARDING },
+      parentContract,
+      subcontracts: [],
     },
   };
   mocks.permissions = { isLoading: false, currentData: { canManage } };
@@ -169,18 +165,10 @@ describe("EditContractPage", () => {
     const title = screen.getByLabelText(/Contract title/);
     await user.clear(title);
     await user.type(title, "Pipeline maintenance (phase 2)");
-    await next(user, "Parent contract");
-    // Party type and workspaces aren't edited here; the contract can't be
-    // its own parent.
-    expect(screen.queryByLabelText(/party type/i)).toBeNull();
-    const parent = screen.getByLabelText(
-      /Parent contract/,
-    ) as HTMLSelectElement;
-    expect([...parent.options].map((option) => option.value)).toEqual([
-      "",
-      "parent-1",
-    ]);
+    // Basics, then commercial terms: no parties or parent contract step.
     await next(user, "Commercial terms");
+    expect(screen.queryByLabelText(/party type/i)).toBeNull();
+    expect(screen.queryByLabelText(/Parent contract/)).toBeNull();
 
     const value = screen.getByLabelText(
       /Original contract value/,
@@ -201,6 +189,7 @@ describe("EditContractPage", () => {
     expect(body).not.toHaveProperty("originalValueMinor");
     expect(body).not.toHaveProperty("currencyCode");
     expect(body).not.toHaveProperty("referenceNumber");
+    expect(body).not.toHaveProperty("parentContractId");
     expect(mocks.replace).toHaveBeenCalledWith(
       "/dashboards/contracts/contract-1",
     );
@@ -209,7 +198,6 @@ describe("EditContractPage", () => {
   it("sends the value and currency while the contract is still a draft", async () => {
     loaded(contract());
     const user = setup();
-    await next(user, "Parent contract");
     await next(user, "Commercial terms");
     expect(
       (screen.getByLabelText(/Original contract value/) as HTMLInputElement)
@@ -222,6 +210,34 @@ describe("EditContractPage", () => {
       originalValueMinor: "150000050",
       currencyCode: ECurrencyCode.NGN,
     });
+  });
+
+  it("shows a subcontract's main contract as read-only context, never a choice", async () => {
+    loaded(contract({ parentContractId: "parent-1" }), true, {
+      id: "parent-1",
+      referenceNumber: "MAIN-001",
+      title: "Main works",
+      status: EContractStatus.ACTIVE,
+    });
+    const user = setup();
+
+    const steps = screen.getByRole("list", { name: "Steps" });
+    expect(steps.textContent).not.toContain("Parent contract");
+    expect(screen.getByText(/Subcontract of/).textContent).toContain(
+      "MAIN-001 · Main works",
+    );
+    expect(
+      screen.queryByRole("combobox", { name: /Parent contract/ }),
+    ).toBeNull();
+
+    await next(user, "Commercial terms");
+    await next(user, "Dates");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await vi.waitFor(() => expect(mocks.update).toHaveBeenCalledOnce());
+    // Saving other fields leaves the parent alone.
+    expect(mocks.update.mock.lastCall![0].body).not.toHaveProperty(
+      "parentContractId",
+    );
   });
 
   it("goes back to the contract on Cancel when nothing changed", async () => {

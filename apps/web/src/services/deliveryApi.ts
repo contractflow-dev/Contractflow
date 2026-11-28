@@ -1,4 +1,5 @@
 import type {
+  ContractProgress,
   ContractStage,
   CreateContractStageRequest,
   CreateMilestoneRequest,
@@ -10,6 +11,7 @@ import type {
   MilestoneDecision,
   MilestoneOutstandingItem,
   MilestoneSubmission,
+  SetContractStageApplicabilityRequest,
   SubmitMilestoneRequest,
   TransitionContractStageRequest,
   UpdateContractStageRequest,
@@ -18,6 +20,7 @@ import type {
 import { api, contractRoute } from "./api";
 
 export type {
+  ContractProgress,
   ContractStage,
   CreateContractStageRequest,
   CreateMilestoneRequest,
@@ -28,6 +31,7 @@ export type {
   MilestoneEvidence,
   MilestoneOutstandingItem,
   MilestoneSubmission,
+  SetContractStageApplicabilityRequest,
   SubmitMilestoneRequest,
   TransitionContractStageRequest,
   UpdateContractStageRequest,
@@ -85,6 +89,15 @@ export const deliveryApi = api
         ],
       }),
 
+      /** Lifecycle progress, calculated by the API. */
+      getContractProgress: builder.query<ContractProgress, DeliveryScope>({
+        query: ({ companyId, contractId }) =>
+          contractRoute(companyId, contractId, "/progress"),
+        providesTags: (_result, _error, { contractId }) => [
+          deliveryTag(contractId),
+        ],
+      }),
+
       getContractStage: builder.query<ContractStage, StageScope>({
         query: ({ companyId, contractId, stageId }) =>
           contractRoute(companyId, contractId, `/stages/${stageId}`),
@@ -128,6 +141,23 @@ export const deliveryApi = api
             companyId,
             contractId,
             `/stages/${stageId}/transitions`,
+          ),
+          method: "POST",
+          body,
+        }),
+        invalidatesTags: (_result, error, { contractId }) =>
+          changed(error, contractId),
+      }),
+
+      setContractStageApplicability: builder.mutation<
+        ContractStage,
+        StageScope & { body: SetContractStageApplicabilityRequest }
+      >({
+        query: ({ companyId, contractId, stageId, body }) => ({
+          ...contractRoute(
+            companyId,
+            contractId,
+            `/stages/${stageId}/applicability`,
           ),
           method: "POST",
           body,
@@ -279,6 +309,8 @@ export const deliveryApi = api
 export const {
   useGetContractStagesQuery,
   useGetContractStageQuery,
+  useGetContractProgressQuery,
+  useSetContractStageApplicabilityMutation,
   useCreateContractStageMutation,
   useUpdateContractStageMutation,
   useTransitionContractStageMutation,

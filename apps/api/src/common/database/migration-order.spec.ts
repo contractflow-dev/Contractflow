@@ -42,6 +42,13 @@ describe('database migration configuration', () => {
       'CompanyMembershipRoles1793600000000',
       'ActivityLogAuditFields1793700000000',
       'MilestoneWorkflow1793800000000',
+      'ContractPartyClassification1793900000000',
+      'UlidEntityReferences1794000000000',
+      'ContractStatusHistoryValues1794000000001',
+      'SubcontractParentRules1794000000002',
+      'ContractPartyRules1794000000003',
+      'RemoveActualCompletionDate1794000000004',
+      'ContractLifecycleTemplates1794100000000',
     ]);
   });
 

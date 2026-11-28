@@ -12,6 +12,7 @@ import type {
   ContractListItem,
   ContractListRole,
   ContractMembership,
+  ContractRelationSummary,
   IPaginatedResponse,
 } from '@contractflow/contracts-schema';
 import { CompanyScopeService } from '../../identity/services/company/company-scope.service';
@@ -108,6 +109,14 @@ export class ContractService {
           scope.companyId,
           result.items.map((contract) => contract.id),
         );
+    const ownPartyTypes = new Map(
+      (
+        await this.parties.findOwnPartyTypes(
+          scope.companyId,
+          result.items.map((contract) => contract.id),
+        )
+      ).map(({ contractId, partyType }) => [contractId, partyType]),
+    );
     const roles = query.includeDeleted
       ? []
       : await this.roleAssignments.findActiveRolesForContracts(
@@ -121,6 +130,19 @@ export class ContractService {
       list.push({ role, workspace: workspaceForRole(role), isWorkspaceAdmin });
       rolesByContract.set(contractId, list);
     }
+    // A subcontract's main contract is named only if the reader can see it.
+    const parentIds = [
+      ...new Set(
+        result.items
+          .map(({ parentContractId }) => parentContractId)
+          .filter((id): id is string => id !== null),
+      ),
+    ];
+    const parents = new Map(
+      (await this.contracts.findVisibleByIds(scope, parentIds)).map(
+        (parent) => [parent.id, toRelationSummary(parent)],
+      ),
+    );
     const byContract = new Map<string, ContractCounterparty[]>();
     for (const { contractId, companyName, partyType } of counterparties) {
       const list = byContract.get(contractId) ?? [];
@@ -132,6 +154,10 @@ export class ContractService {
         ...result,
         items: result.items.map((contract) => ({
           ...toContractResponse(contract),
+          parentContract: contract.parentContractId
+            ? (parents.get(contract.parentContractId) ?? null)
+            : null,
+          myPartyType: ownPartyTypes.get(contract.id) ?? null,
           counterparties: byContract.get(contract.id) ?? [],
           myRoles: rolesByContract.get(contract.id) ?? [],
         })),
@@ -145,14 +171,28 @@ export class ContractService {
     companyId: string,
     contractId: string,
   ): Promise<ContractDetail> {
-    const { contract, party } = await this.authorizeReadIncludingArchived(
-      userId,
+    const { contract, party, companyUserId } =
+      await this.authorizeReadIncludingArchived(userId, companyId, contractId);
+    // Related contracts are named under the same rule as the contract list:
+    // only those the reader could open themselves.
+    const scope = {
       companyId,
-      contractId,
-    );
+      companyUserId,
+      includeCompanyAdminOversight: true,
+    };
+    const [parent] = contract.parentContractId
+      ? await this.contracts.findVisibleByIds(scope, [
+          contract.parentContractId,
+        ])
+      : [];
+    const subcontracts = contract.parentContractId
+      ? []
+      : await this.contracts.findVisibleSubcontracts(scope, contract.id);
     return {
       contract: toContractResponse(contract),
       membership: toMembershipResponse(party),
+      parentContract: parent ? toRelationSummary(parent) : null,
+      subcontracts: subcontracts.map(toRelationSummary),
     };
   }
 
@@ -275,6 +315,7 @@ function toContractResponse(contract: Contract): ContractApiResponse {
     contractType: contract.contractType,
     status: contract.status,
     parentContractId: contract.parentContractId,
+    lifecycleTemplateVersionId: contract.lifecycleTemplateVersionId ?? null,
     originalValueMinor: toIntegerString(contract.originalValueMinor),
     currentValueMinor: toIntegerString(contract.currentValueMinor),
     currencyCode: contract.currencyCode,
@@ -290,14 +331,20 @@ function toContractResponse(contract: Contract): ContractApiResponse {
     revisedEndDate: contract.revisedEndDate
       ? toApiDate(contract.revisedEndDate)
       : null,
-    actualCompletionDate: contract.actualCompletionDate
-      ? toApiDate(contract.actualCompletionDate)
-      : null,
     defectsLiabilityDays: contract.defectsLiabilityDays,
     timezone: contract.timezone,
     createdAt: toApiDate(contract.createdAt),
     updatedAt: toApiDate(contract.updatedAt),
     deletedAt: contract.deletedAt ? toApiDate(contract.deletedAt) : null,
+  };
+}
+
+function toRelationSummary(contract: Contract): ContractRelationSummary {
+  return {
+    id: contract.id,
+    referenceNumber: contract.referenceNumber,
+    title: contract.title,
+    status: contract.status,
   };
 }
 

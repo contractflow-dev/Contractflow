@@ -793,8 +793,20 @@ export class CompanyAdminService {
         const emailChanged =
           dto.email !== undefined &&
           dto.email.toLowerCase() !== company.email.toLowerCase();
+        // A verified email is fixed: it is the address other companies
+        // invite this company at. Changing it would need its own
+        // re-verification process; the profile update refuses, never
+        // ignores, a different address.
+        if (emailChanged && company.verifiedAt) {
+          throw new ConflictException(
+            'The company email is verified and cannot be changed.',
+          );
+        }
         const stateRegion = resolveStateRegionUpdate(company, dto);
-        Object.assign(company, dto);
+        // The same verified address, perhaps in another case, is kept as
+        // stored.
+        const { email: _sameEmail, ...rest } = dto;
+        Object.assign(company, company.verifiedAt ? rest : dto);
         if (stateRegion !== undefined) company.stateRegion = stateRegion;
         // Verification proves control of one inbox; a new address must be
         // verified again before the company can receive contract invitations.

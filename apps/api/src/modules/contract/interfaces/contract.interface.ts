@@ -18,7 +18,6 @@ export interface IContractEntity {
     startDate : Date
     endDate : Date
     revisedEndDate : Date | null
-    actualCompletionDate : Date | null
     defectsLiabilityDays : number
     timezone : string
     createdByCompanyId: string | null

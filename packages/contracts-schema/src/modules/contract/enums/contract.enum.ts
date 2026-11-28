@@ -1,14 +1,17 @@
 
+/**
+ * A company's classification on one contract: the party that awarded it or
+ * the party it was awarded to. On a main contract the client is AWARDING and
+ * the contractor AWARDED; on a subcontract the main contractor is AWARDING
+ * and the subcontractor AWARDED. A contract has at most one AWARDING party.
+ */
 export enum EPartyType {
-  CLIENT = 'client',
-  CONTRACTOR = 'contractor',
-  SUBCONTRACTOR = 'subcontractor',
-  VENDOR = 'vendor',
-  OTHER = 'other',
+  AWARDING = 'awarding',
+  AWARDED = 'awarded',
 }
 
 /**
- * Contract roles held through a CLIENT party. HSE and Finance roles share
+ * Contract roles held through an AWARDING party. HSE and Finance roles share
  * their stored values with the contractor side: the side comes from the
  * party the role is held through, never from the value alone.
  */
@@ -21,10 +24,7 @@ export enum EClientContractRole {
     FINANCE_DIRECTOR = 'Finance Director',
 }
 
-/**
- * Contract roles held through a contractor-side party: CONTRACTOR,
- * SUBCONTRACTOR, VENDOR or OTHER.
- */
+/** Contract roles held through an AWARDED party. */
 export enum EContractorContractRole {
     CONTRACTOR_PROJECT_LEAD = 'Contractor Project Lead',
     CONTRACTOR_SITE_SUPERVISOR = 'Contractor Site Supervisor',
@@ -57,15 +57,35 @@ export const CONTRACT_ROLES: readonly ContractRole[] = [
     EClientContractRole.FINANCE_DIRECTOR,
 ];
 
-/** Which role set a party uses. */
+/**
+ * Which role set a party uses: the client roles for the AWARDING party, the
+ * contractor roles for the AWARDED party. The role names keep their client
+ * and contractor wording on subcontracts too.
+ */
 export type ContractRoleSide = 'client' | 'contractor';
 
 /**
- * The role set of a party type: CLIENT uses the client roles; CONTRACTOR,
- * SUBCONTRACTOR, VENDOR and OTHER use the contractor roles.
+ * How a contract role reads on screen. On a subcontract the main contractor
+ * holds the awarding-side roles and the subcontractor the awarded-side ones,
+ * so the client and contractor wording becomes main contractor and
+ * subcontractor. Display only: the stored value is unchanged.
  */
+const SUBCONTRACT_ROLE_LABELS: Readonly<Record<string, string>> = {
+    [EClientContractRole.CLIENT_PROJECT_MANAGER]: 'Main Contractor Project Manager',
+    [EClientContractRole.CLIENT_SITE_ENGINEER]: 'Main Contractor Site Engineer',
+    [EContractorContractRole.CONTRACTOR_PROJECT_LEAD]: 'Subcontractor Project Lead',
+    [EContractorContractRole.CONTRACTOR_SITE_SUPERVISOR]:
+        'Subcontractor Site Supervisor',
+};
+
+/** A contract role's label on a main contract or a subcontract. */
+export function contractRoleLabel(role: string, isSubcontract: boolean): string {
+    return (isSubcontract && SUBCONTRACT_ROLE_LABELS[role]) || role;
+}
+
+/** The role set of a party type. */
 export function contractRoleSide(partyType: EPartyType): ContractRoleSide {
-    return partyType === EPartyType.CLIENT ? 'client' : 'contractor';
+    return partyType === EPartyType.AWARDING ? 'client' : 'contractor';
 }
 
 /** The roles a party of this type may hold. */
@@ -84,32 +104,39 @@ export function isContractRoleForParty(
 ): role is ContractRole {
     return (contractRolesForParty(partyType) as readonly string[]).includes(role);
 }
+/** A contract status recorded in status history: the contract statuses only. */
 export enum EFromStatus {
     DRAFT = 'draft',
     ACTIVE = 'active',
     SUSPENDED = 'suspended',
+    DEFECTS_LIABILITY = 'defects_liability',
     COMPLETED = 'completed',
-    CANCELLED = 'cancelled',
-    UNDER_REVIEW = 'under_review'
 }
+/** A contract status recorded in status history: the contract statuses only. */
 export enum EToStatus {
     DRAFT = 'draft',
     ACTIVE = 'active',
     SUSPENDED = 'suspended',
+    DEFECTS_LIABILITY = 'defects_liability',
     COMPLETED = 'completed',
-    CANCELLED = 'cancelled',
-    UNDER_REVIEW = 'under_review'
 }
 export enum EContractType{
-    SERVICE= 'service', 
-    SUPPLY= 'supply', 
-    EPC= 'epc', 
+    SERVICE= 'service',
+    SUPPLY= 'supply',
+    EPC= 'epc',
     MAINTENANCE= 'maintenance'
 }
+/**
+ * A contract's status. Archiving is `deletedAt`, never a status.
+ * DEFECTS_LIABILITY: the work is practically complete and only the
+ * warranty, defects-liability and post-contract obligations stage is still
+ * worked on, until the contract is completed.
+ */
 export enum EContractStatus{
-    DRAFT= 'draft', 
-    ACTIVE= 'active', 
-    SUSPENDED= 'suspended', 
+    DRAFT= 'draft',
+    ACTIVE= 'active',
+    SUSPENDED= 'suspended',
+    DEFECTS_LIABILITY= 'defects_liability',
     COMPLETED= 'completed'
 }
 

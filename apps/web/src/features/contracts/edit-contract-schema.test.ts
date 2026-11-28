@@ -14,6 +14,7 @@ import {
 } from "@/lib/format";
 import {
   contractToFormValues,
+  editContractSteps,
   createContractFormSchema,
   isContractValueLocked,
   toUpdateContractRequest,
@@ -28,6 +29,7 @@ function contract(overrides: Partial<Contract> = {}): Contract {
     contractType: EContractType.MAINTENANCE,
     status: EContractStatus.DRAFT,
     parentContractId: null,
+    lifecycleTemplateVersionId: null,
     originalValueMinor: "150000050",
     currentValueMinor: "150000050",
     currencyCode: ECurrencyCode.NGN,
@@ -39,7 +41,6 @@ function contract(overrides: Partial<Contract> = {}): Contract {
     startDate: "2026-02-01T00:00:00.000Z",
     endDate: "2026-12-31T00:00:00.000Z",
     revisedEndDate: null,
-    actualCompletionDate: null,
     defectsLiabilityDays: 365,
     timezone: "Africa/Lagos",
     createdAt: "2026-01-01T00:00:00.000Z",
@@ -95,14 +96,14 @@ describe("editing values round-trip exactly", () => {
 
 describe("contractToFormValues", () => {
   it("fills every step from the contract, and passes the form's own checks", () => {
-    const values = contractToFormValues(contract(), EPartyType.CLIENT);
+    const values = contractToFormValues(contract(), EPartyType.AWARDING);
     expect(values).toMatchObject({
       basics: {
         referenceNumber: "CTR-001",
         title: "Pipeline maintenance",
         description: "",
       },
-      parties: { partyType: EPartyType.CLIENT, parentContractId: "" },
+      parties: { partyType: EPartyType.AWARDING, parentContractId: "" },
       commercial: {
         currencyCode: ECurrencyCode.NGN,
         originalValue: "1,500,000.50",
@@ -129,7 +130,7 @@ describe("contractToFormValues", () => {
         advancePaymentRateBps: null,
         liquidatedDamagesPerDayMinor: null,
       }),
-      EPartyType.CLIENT,
+      EPartyType.AWARDING,
     );
     expect(values.commercial.advancePaymentRate).toBe("");
     expect(values.commercial.liquidatedDamagesPerDay).toBe("");
@@ -138,7 +139,7 @@ describe("contractToFormValues", () => {
 
 describe("toUpdateContractRequest", () => {
   it("sends what the update changes, never the reference, party type or workspaces", () => {
-    const values = contractToFormValues(contract(), EPartyType.CLIENT);
+    const values = contractToFormValues(contract(), EPartyType.AWARDING);
     values.basics.title = "Pipeline maintenance (phase 2)";
     const body = toUpdateContractRequest(values, { valueLocked: false });
 
@@ -155,6 +156,16 @@ describe("toUpdateContractRequest", () => {
     expect(body).not.toHaveProperty("referenceNumber");
     expect(body).not.toHaveProperty("partyType");
     expect(body).not.toHaveProperty("workspaces");
+    // The parent is fixed at creation; editing never sends it.
+    expect(body).not.toHaveProperty("parentContractId");
+  });
+
+  it("has no parties or parent contract step", () => {
+    expect(editContractSteps.map(({ id, title }) => [id, title])).toEqual([
+      ["basics", "Basics"],
+      ["commercial", "Commercial terms"],
+      ["dates", "Dates"],
+    ]);
   });
 
   it("leaves the value and currency out once the contract has left draft", () => {
@@ -163,7 +174,7 @@ describe("toUpdateContractRequest", () => {
     expect(isContractValueLocked(active)).toBe(true);
 
     const body = toUpdateContractRequest(
-      contractToFormValues(active, EPartyType.CLIENT),
+      contractToFormValues(active, EPartyType.AWARDING),
       { valueLocked: true },
     );
     expect(body).not.toHaveProperty("originalValueMinor");

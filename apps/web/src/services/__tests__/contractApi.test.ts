@@ -147,7 +147,7 @@ describe("RTK Query contract API contracts", () => {
             referenceNumber: "CTR-1",
             title: "Pipeline integrity",
             contractType: EContractType.SERVICE,
-            partyType: EPartyType.CLIENT,
+            partyType: EPartyType.AWARDING,
             workspaces: [],
             // Beyond Number.MAX_SAFE_INTEGER: a JSON number would round it.
             originalValueMinor: "9007199254740993",

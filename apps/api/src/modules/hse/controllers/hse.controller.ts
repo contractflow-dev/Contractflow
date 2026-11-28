@@ -7,6 +7,7 @@ import { ContractContextGuard } from '../../../common/guards/contract-context.gu
 import { CurrentContractId } from '../../../common/decorators/current-contract-id.decorator';
 import type { AuthenticatedUser } from '../../identity/interface/auth-context.interface';
 import { HseService } from '../services/hse.service';
+import { ParseUlidPipe } from '../../../common/pipes/parse-ulid.pipe';
 
 @Controller('contract/hse')
 @UseGuards(CompanyContextGuard, ContractContextGuard)
@@ -28,7 +29,7 @@ export class HseController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('incidentId') incidentId: string,
+    @Param('incidentId', ParseUlidPipe) incidentId: string,
   ) {
     return this.hse.incidents.get(user.id, companyId, contractId, incidentId);
   }
@@ -48,7 +49,7 @@ export class HseController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('inspectionId') inspectionId: string,
+    @Param('inspectionId', ParseUlidPipe) inspectionId: string,
   ) {
     return this.hse.inspections.get(
       user.id,
@@ -78,7 +79,7 @@ export class HseController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('actionId') actionId: string,
+    @Param('actionId', ParseUlidPipe) actionId: string,
   ) {
     return this.hse.correctiveActions.get(
       user.id,

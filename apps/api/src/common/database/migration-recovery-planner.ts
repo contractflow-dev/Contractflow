@@ -795,7 +795,8 @@ export const probeSql: Record<string, string> = {
         (table_name = 'contract' AND column_name IN ('description', 'advance_payment_rate_bps', 'liquidated_damages_per_day_minor', 'revised_end_date', 'actual_completion_date'))
         OR (table_name = 'contract_party' AND column_name IN ('signatory_first_name', 'signatory_last_name', 'signatory_title', 'signed_at'))
         OR (table_name = 'contract_status_history' AND column_name IN ('from_status', 'reason'))
-      )) = 11
+      -- RemoveActualCompletionDate1794000000004 later drops actual_completion_date.
+      )) = 10 + (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'contract' AND column_name = 'actual_completion_date')
     ) AS present
   `,
   'contract-lifecycle-foreign-keys': `
@@ -862,6 +863,8 @@ export const probeSql: Record<string, string> = {
         WHERE n.nspname = current_schema() AND t.relname = 'contract_party_invitation' AND c.contype = 'c'
           AND (
             pg_get_constraintdef(c.oid) ILIKE '%party_type%contractor%subcontractor%'
+            -- ContractPartyClassification1793900000000 narrows it to awarded.
+            OR pg_get_constraintdef(c.oid) ILIKE '%party_type%awarded%'
             OR pg_get_constraintdef(c.oid) ILIKE '%status%pending%accepted%rejected%expired%revoked%'
           )
       )

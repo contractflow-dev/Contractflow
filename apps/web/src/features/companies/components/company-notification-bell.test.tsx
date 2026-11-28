@@ -73,7 +73,7 @@ const invitation: IncomingContractInvitation = {
   contractTitle: "Pipeline inspection",
   contractReference: "CTR-009",
   invitingCompanyName: "Delta Energy",
-  partyType: EPartyType.CONTRACTOR,
+  partyType: EPartyType.AWARDED,
   email: "office@acme.example",
   createdAt: "2026-11-01T00:00:00.000Z",
   expiresAt: "2026-11-20T00:00:00.000Z",

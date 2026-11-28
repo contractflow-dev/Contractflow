@@ -9,9 +9,11 @@ import {
   type MilestoneEvidenceReference,
   type MilestoneOutstandingItemInput,
   type SubmitMilestoneRequest,
+  type SetContractStageApplicabilityRequest,
   type TransitionContractStageRequest,
   type UpdateContractStageRequest,
   type UpdateMilestoneRequest,
+  ULID_PATTERN,
 } from '@contractflow/contracts-schema';
 import { PartialType } from '@nestjs/mapped-types';
 import { Transform, Type } from 'class-transformer';
@@ -36,7 +38,7 @@ import { DAY_OR_ZONED_INSTANT } from '../../../common/application/instant-range'
 import { IsMinorAmount } from '../../../common/dto/minor-amount.validation';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
-const ULID = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/i;
+const ULID = ULID_PATTERN;
 const INSTANT_MESSAGE =
   'must be a date (YYYY-MM-DD) or an ISO 8601 time with a time zone';
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -90,8 +92,17 @@ export class UpdateContractStageRequestDto
 }
 
 export class TransitionContractStageRequestDto implements TransitionContractStageRequest {
-  @IsIn([EStatus.IN_PROGRESS, EStatus.ON_HOLD, EStatus.COMPLETED])
-  status!: EStatus.IN_PROGRESS | EStatus.ON_HOLD | EStatus.COMPLETED;
+  @IsIn([
+    EStatus.IN_PROGRESS,
+    EStatus.ON_HOLD,
+    EStatus.COMPLETED,
+    EStatus.CANCELLED,
+  ])
+  status!:
+    | EStatus.IN_PROGRESS
+    | EStatus.ON_HOLD
+    | EStatus.COMPLETED
+    | EStatus.CANCELLED;
 
   @IsOptional()
   @Transform(trimToNull)
@@ -103,6 +114,19 @@ export class TransitionContractStageRequestDto implements TransitionContractStag
   @Matches(DAY, { message: 'effectiveDate must be a day (YYYY-MM-DD)' })
   @IsDateString({ strict: true })
   effectiveDate?: string | null;
+}
+
+/** `POST /contract/stages/:stageId/applicability`. */
+export class SetContractStageApplicabilityRequestDto implements SetContractStageApplicabilityRequest {
+  @IsBoolean()
+  isApplicable!: boolean;
+
+  /** Required to mark a stage as not applying. */
+  @IsOptional()
+  @Transform(trimToNull)
+  @IsString()
+  @Length(0, 2000)
+  reason?: string | null;
 }
 
 /** `POST /contract/stages/:stageId/milestones`: the stage comes from the path. */

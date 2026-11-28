@@ -11,6 +11,7 @@ import {
   EContractSortField,
   EContractStatus,
   ESortOrder,
+  ULID_PATTERN,
 } from '@contractflow/contracts-schema';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
@@ -62,6 +63,6 @@ export class ListContractStatusHistoryRequestDto extends PaginationQueryDto {
   status?: EContractStatus;
 
   @IsOptional()
-  @Matches(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/i)
+  @Matches(ULID_PATTERN)
   userId?: string;
 }

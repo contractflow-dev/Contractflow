@@ -27,7 +27,6 @@ describe('ContractService', () => {
     startDate: new Date('2026-01-02T00:00:00.000Z'),
     endDate: new Date('2026-12-31T00:00:00.000Z'),
     revisedEndDate: null,
-    actualCompletionDate: null,
     defectsLiabilityDays: 365,
     timezone: 'Africa/Lagos',
     createdAt: new Date('2025-12-01T12:00:00.000Z'),
@@ -42,16 +41,22 @@ describe('ContractService', () => {
     findByCompany: vi.fn(),
     findAllWithCompany: vi.fn(),
     findCounterparties: vi.fn(),
+    findOwnPartyTypes: vi.fn(),
   };
   const history = { searchPage: vi.fn() };
-  const contracts = { findById: vi.fn(), searchPage: vi.fn() };
+  const contracts = {
+    findById: vi.fn(),
+    searchPage: vi.fn(),
+    findVisibleByIds: vi.fn(),
+    findVisibleSubcontracts: vi.fn(),
+  };
   const companyUsers = { findActiveRoleForUser: vi.fn() };
   const workspaces = { findWorkspaces: vi.fn() };
   const access = { authorizeContractOversight: vi.fn() };
   const party = {
     id: 'p-1',
     companyId: 'co-1',
-    partyType: 'contractor',
+    partyType: 'awarded',
     signedAt: null,
     signatoryFirstName: 'Private',
     signatoryLastName: 'Signatory',
@@ -69,15 +74,18 @@ describe('ContractService', () => {
     parties.findByCompany.mockResolvedValue({
       id: 'p-1',
       companyId: 'co-1',
-      partyType: 'contractor',
+      partyType: 'awarded',
       signedAt: null,
       signatoryFirstName: 'Private',
       signatoryLastName: 'Signatory',
     });
     parties.findAllWithCompany.mockResolvedValue([]);
     parties.findCounterparties.mockResolvedValue([]);
+    parties.findOwnPartyTypes.mockResolvedValue([]);
     history.searchPage.mockResolvedValue({ items: [], total: 0 });
     contracts.findById.mockResolvedValue(contractRecord);
+    contracts.findVisibleByIds.mockResolvedValue([]);
+    contracts.findVisibleSubcontracts.mockResolvedValue([]);
     companyUsers.findActiveRoleForUser.mockResolvedValue(
       ECompanyRole.COMPANY_ADMIN,
     );
@@ -171,13 +179,15 @@ describe('ContractService', () => {
       deletedAt: null,
     });
     expect(Object.keys(result.contract)).not.toContain('createdByCompanyId');
+    // Removed from the model: completion is recorded by status history.
+    expect(Object.keys(result.contract)).not.toContain('actualCompletionDate');
     expect(Object.keys(result.contract)).not.toContain(
       'deletedByCompanyUserId',
     );
     expect(result.membership).toEqual({
       id: 'p-1',
       companyId: 'co-1',
-      partyType: 'contractor',
+      partyType: 'awarded',
       signedAt: null,
     });
     expect(access.authorizeContractOversight).toHaveBeenCalledWith(
@@ -308,7 +318,7 @@ describe('ContractService', () => {
       {
         id: 'p-2',
         companyId: 'co-2',
-        partyType: 'contractor',
+        partyType: 'awarded',
         signedAt: new Date(0),
         signatoryFirstName: 'Secret',
         company: { name: 'Builder Ltd', taxIdentificationNumber: 'TAX' },
@@ -322,7 +332,7 @@ describe('ContractService', () => {
         id: 'p-2',
         companyId: 'co-2',
         companyName: 'Builder Ltd',
-        partyType: 'contractor',
+        partyType: 'awarded',
         signedAt: new Date(0),
       },
     ]);
@@ -469,8 +479,8 @@ describe('ContractService', () => {
       total: 2,
     });
     parties.findCounterparties.mockResolvedValue([
-      { contractId: 'c-1', companyName: 'Bravo Energy', partyType: 'client' },
-      { contractId: 'c-1', companyName: 'Delta Supply', partyType: 'vendor' },
+      { contractId: 'c-1', companyName: 'Bravo Energy', partyType: 'awarding' },
+      { contractId: 'c-1', companyName: 'Delta Supply', partyType: 'awarded' },
     ]);
 
     const result = await service.list('u', 'co-1', { page: 1, limit: 10 });
@@ -482,8 +492,8 @@ describe('ContractService', () => {
       'c-2',
     ]);
     expect(result.data[0].counterparties).toEqual([
-      { companyName: 'Bravo Energy', partyType: 'client' },
-      { companyName: 'Delta Supply', partyType: 'vendor' },
+      { companyName: 'Bravo Energy', partyType: 'awarding' },
+      { companyName: 'Delta Supply', partyType: 'awarded' },
     ]);
     expect(result.data[1].counterparties).toEqual([]);
     // Only the name and party type: no IDs or signatory details.
@@ -572,5 +582,115 @@ describe('ContractService', () => {
 
     expect(roleAssignments.findActiveRolesForContracts).not.toHaveBeenCalled();
     expect(result.data[0].myRoles).toEqual([]);
+  });
+  describe('main contracts and subcontracts', () => {
+    const main = {
+      ...contractRecord,
+      id: 'main-1',
+      referenceNumber: 'MAIN-001',
+      title: 'Main works',
+      status: 'active',
+      parentContractId: null,
+    };
+    const sub = {
+      ...contractRecord,
+      id: 'sub-1',
+      referenceNumber: 'SUB-001',
+      title: 'Piling',
+      parentContractId: 'main-1',
+    };
+    const readerScope = {
+      companyId: 'co-1',
+      companyUserId: 'cu-1',
+      includeCompanyAdminOversight: true,
+    };
+
+    it('names a listed subcontract’s main contract when the reader may see it', async () => {
+      contracts.searchPage.mockResolvedValue({ items: [sub, main], total: 2 });
+      contracts.findVisibleByIds.mockResolvedValue([main]);
+
+      const result = await service.list('u', 'co-1', { page: 1, limit: 10 });
+
+      expect(contracts.findVisibleByIds).toHaveBeenCalledWith(readerScope, [
+        'main-1',
+      ]);
+      expect(result.data[0]).toMatchObject({
+        parentContractId: 'main-1',
+        parentContract: {
+          id: 'main-1',
+          referenceNumber: 'MAIN-001',
+          title: 'Main works',
+          status: 'active',
+        },
+      });
+      expect(result.data[1]).toMatchObject({
+        parentContractId: null,
+        parentContract: null,
+      });
+    });
+
+    it('does not name a main contract the reader cannot see', async () => {
+      // A subcontractor is not a party to the main contract.
+      contracts.searchPage.mockResolvedValue({ items: [sub], total: 1 });
+      contracts.findVisibleByIds.mockResolvedValue([]);
+
+      const result = await service.list('u', 'co-1', { page: 1, limit: 10 });
+
+      expect(result.data[0]).toMatchObject({
+        parentContractId: 'main-1',
+        parentContract: null,
+      });
+    });
+
+    it('lists the visible subcontracts on a main contract’s detail', async () => {
+      access.authorizeContractOversight.mockResolvedValue({
+        scope: { contractId: 'main-1', companyId: 'co-1' },
+        basis: 'assignment',
+        party,
+        contract: main,
+        companyUserId: 'cu-1',
+      });
+      contracts.findVisibleSubcontracts.mockResolvedValue([sub]);
+
+      const result = await service.get('u', 'co-1', 'main-1');
+
+      expect(contracts.findVisibleSubcontracts).toHaveBeenCalledWith(
+        readerScope,
+        'main-1',
+      );
+      expect(result.parentContract).toBeNull();
+      expect(result.subcontracts).toEqual([
+        {
+          id: 'sub-1',
+          referenceNumber: 'SUB-001',
+          title: 'Piling',
+          status: 'draft',
+        },
+      ]);
+    });
+
+    it('names a subcontract’s main contract only when visible, and lists no subcontracts', async () => {
+      access.authorizeContractOversight.mockResolvedValue({
+        scope: { contractId: 'sub-1', companyId: 'co-1' },
+        basis: 'assignment',
+        party,
+        contract: sub,
+        companyUserId: 'cu-1',
+      });
+      contracts.findVisibleByIds.mockResolvedValue([main]);
+
+      const visible = await service.get('u', 'co-1', 'sub-1');
+      expect(contracts.findVisibleByIds).toHaveBeenCalledWith(readerScope, [
+        'main-1',
+      ]);
+      expect(visible.parentContract).toMatchObject({ id: 'main-1' });
+      expect(visible.subcontracts).toEqual([]);
+      expect(contracts.findVisibleSubcontracts).not.toHaveBeenCalled();
+
+      contracts.findVisibleByIds.mockResolvedValue([]);
+      const hidden = await service.get('u', 'co-1', 'sub-1');
+      expect(hidden.contract.parentContractId).toBe('main-1');
+      expect(hidden.parentContract).toBeNull();
+    });
   });
 });

@@ -514,11 +514,11 @@ describe('CompanyAdminService', () => {
     );
   });
 
-  it('clears verification and sends a new link when the company email changes', async () => {
+  it('lets an unverified company change its email and sends a new link', async () => {
     companies.lockById.mockResolvedValue({
       ...company,
       email: 'old@example.com',
-      verifiedAt: new Date('2026-01-01T00:00:00Z'),
+      verifiedAt: null,
     } as never);
 
     await service.updateCompanyProfile(actorId, companyId, {
@@ -533,7 +533,26 @@ describe('CompanyAdminService', () => {
     );
   });
 
-  it('keeps verification when the email only changes case or is unchanged', async () => {
+  it('refuses to change a verified company email, saving nothing', async () => {
+    const verifiedAt = new Date('2026-01-01T00:00:00Z');
+    companies.lockById.mockResolvedValue({
+      ...company,
+      email: 'office@example.com',
+      verifiedAt,
+    } as never);
+
+    await expect(
+      service.updateCompanyProfile(actorId, companyId, {
+        email: 'new@example.com',
+        name: 'Renamed',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    // Not even the other fields: nothing is silently half-applied.
+    expect(companies.save).not.toHaveBeenCalled();
+    expect(companyVerification.sendAfterEmailChange).not.toHaveBeenCalled();
+  });
+
+  it('keeps a verified email as stored when it is resent unchanged or in another case', async () => {
     const verifiedAt = new Date('2026-01-01T00:00:00Z');
     companies.lockById.mockResolvedValue({
       ...company,
@@ -547,7 +566,11 @@ describe('CompanyAdminService', () => {
     });
 
     expect(companies.save).toHaveBeenCalledWith(
-      expect.objectContaining({ verifiedAt }),
+      expect.objectContaining({
+        email: 'office@example.com',
+        name: 'Renamed',
+        verifiedAt,
+      }),
     );
     expect(companyVerification.sendAfterEmailChange).not.toHaveBeenCalled();
   });

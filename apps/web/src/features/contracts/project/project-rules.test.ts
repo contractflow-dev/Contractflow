@@ -5,7 +5,9 @@ import {
   EContractorContractRole,
   EMilestoneStatus,
   EPartyType,
+  ELifecycleStageCode,
   EStatus,
+  contractRoleLabel,
 } from "@contractflow/contracts-schema";
 import {
   actorLabel,
@@ -18,8 +20,10 @@ import {
   legacyStatusLabel,
   milestonesOutsideDates,
   projectPermissions,
+  projectRoleNames,
   shareForQuantity,
   stageBlocksWork,
+  stageOpen,
   stageTransitions,
 } from "./project-rules";
 
@@ -36,7 +40,7 @@ describe("projectPermissions", () => {
     const permissions = projectPermissions({
       ...base,
       roles: [CPM],
-      partyType: EPartyType.CLIENT,
+      partyType: EPartyType.AWARDING,
     });
     expect(permissions).toMatchObject({
       isPlanner: true,
@@ -48,8 +52,8 @@ describe("projectPermissions", () => {
     });
   });
 
-  it("lets a contractor-side Contractor Project Lead submit, never plan or decide", () => {
-    for (const partyType of [EPartyType.CONTRACTOR, EPartyType.SUBCONTRACTOR]) {
+  it("lets the awarded party's Contractor Project Lead submit, never plan or decide", () => {
+    for (const partyType of [EPartyType.AWARDED]) {
       expect(
         projectPermissions({ ...base, roles: [CPL], partyType }),
       ).toMatchObject({
@@ -72,7 +76,7 @@ describe("projectPermissions", () => {
       const permissions = projectPermissions({
         ...base,
         roles,
-        partyType: EPartyType.CLIENT,
+        partyType: EPartyType.AWARDING,
       });
       expect(permissions.canPlan || permissions.canSubmit).toBe(false);
       expect(permissions.canOperateAsPlanner).toBe(false);
@@ -84,14 +88,14 @@ describe("projectPermissions", () => {
       projectPermissions({
         ...base,
         roles: [CPM],
-        partyType: EPartyType.CONTRACTOR,
+        partyType: EPartyType.AWARDED,
       }).isPlanner,
     ).toBe(false);
     expect(
       projectPermissions({
         ...base,
         roles: [CPL],
-        partyType: EPartyType.CLIENT,
+        partyType: EPartyType.AWARDING,
       }).isSubmitter,
     ).toBe(false);
     expect(
@@ -103,7 +107,7 @@ describe("projectPermissions", () => {
   it("allows planning only on a draft, and nothing on a suspended, completed or archived contract", () => {
     const draft = projectPermissions({
       roles: [CPM],
-      partyType: EPartyType.CLIENT,
+      partyType: EPartyType.AWARDING,
       contractStatus: EContractStatus.DRAFT,
       archived: false,
     });
@@ -112,7 +116,7 @@ describe("projectPermissions", () => {
     expect(
       projectPermissions({
         roles: [CPL],
-        partyType: EPartyType.CONTRACTOR,
+        partyType: EPartyType.AWARDED,
         contractStatus: EContractStatus.DRAFT,
         archived: false,
       }).canSubmit,
@@ -124,13 +128,13 @@ describe("projectPermissions", () => {
     ]) {
       const planner = projectPermissions({
         roles: [CPM],
-        partyType: EPartyType.CLIENT,
+        partyType: EPartyType.AWARDING,
         contractStatus,
         archived: false,
       });
       const lead = projectPermissions({
         roles: [CPL],
-        partyType: EPartyType.CONTRACTOR,
+        partyType: EPartyType.AWARDED,
         contractStatus,
         archived: false,
       });
@@ -143,7 +147,7 @@ describe("projectPermissions", () => {
 
     const archived = projectPermissions({
       roles: [CPM],
-      partyType: EPartyType.CLIENT,
+      partyType: EPartyType.AWARDING,
       contractStatus: EContractStatus.ACTIVE,
       archived: true,
     });
@@ -173,10 +177,29 @@ describe("contract days", () => {
 
 describe("stages", () => {
   it("offers only the moves the API allows", () => {
-    expect(stageTransitions(EStatus.PLANNED)).toEqual(["start"]);
-    expect(stageTransitions(EStatus.IN_PROGRESS)).toEqual(["hold", "complete"]);
-    expect(stageTransitions(EStatus.ON_HOLD)).toEqual(["resume"]);
+    expect(stageTransitions(EStatus.PLANNED)).toEqual(["start", "cancel"]);
+    expect(stageTransitions(EStatus.IN_PROGRESS)).toEqual([
+      "hold",
+      "complete",
+      "cancel",
+    ]);
+    expect(stageTransitions(EStatus.ON_HOLD)).toEqual(["resume", "cancel"]);
     expect(stageTransitions(EStatus.COMPLETED)).toEqual([]);
+    expect(stageTransitions(EStatus.CANCELLED)).toEqual([]);
+  });
+
+  it("allows only the post-contract obligations stage during defects liability", () => {
+    expect(
+      stageOpen(EContractStatus.DEFECTS_LIABILITY, {
+        stageCode: ELifecycleStageCode.MOBILISATION,
+      }),
+    ).toBe(false);
+    expect(
+      stageOpen(EContractStatus.DEFECTS_LIABILITY, {
+        stageCode: ELifecycleStageCode.POST_CONTRACT_OBLIGATIONS,
+      }),
+    ).toBe(true);
+    expect(stageOpen(EContractStatus.ACTIVE, { stageCode: null })).toBe(true);
   });
 
   it("blocks work while a stage is on hold or closed", () => {
@@ -282,5 +305,38 @@ describe("milestones", () => {
         quantity: 1,
       }),
     ).toBe(3333);
+  });
+});
+
+describe("role names on a subcontract", () => {
+  it("reads main contractor and subcontractor on a subcontract only", () => {
+    expect(projectRoleNames({ parentContractId: null })).toEqual({
+      planner: "Client Project Manager",
+      lead: "Contractor Project Lead",
+    });
+    expect(
+      projectRoleNames({ parentContractId: "01J0000000000000000000MAIN" }),
+    ).toEqual({
+      planner: "Main Contractor Project Manager",
+      lead: "Subcontractor Project Lead",
+    });
+  });
+
+  it("renames the four Project roles and leaves HSE and Finance roles alone", () => {
+    expect(
+      contractRoleLabel(EClientContractRole.CLIENT_SITE_ENGINEER, true),
+    ).toBe("Main Contractor Site Engineer");
+    expect(
+      contractRoleLabel(
+        EContractorContractRole.CONTRACTOR_SITE_SUPERVISOR,
+        true,
+      ),
+    ).toBe("Subcontractor Site Supervisor");
+    expect(contractRoleLabel(EClientContractRole.HSE_MANAGER, true)).toBe(
+      "HSE Manager",
+    );
+    expect(
+      contractRoleLabel(EClientContractRole.CLIENT_PROJECT_MANAGER, false),
+    ).toBe("Client Project Manager");
   });
 });

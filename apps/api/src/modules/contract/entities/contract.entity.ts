@@ -1,4 +1,5 @@
 import {
+  Check,
   Column,
   Entity,
   JoinColumn,
@@ -15,6 +16,10 @@ import { Company } from '../../identity/entities/company.entity';
 import { CompanyUser } from '../../identity/entities/company-user.entity';
 
 @Entity('contract')
+@Check(
+  'ck_contract_not_own_parent',
+  '"parent_contract_id" IS NULL OR "parent_contract_id" <> "id"',
+)
 export class Contract extends BaseCustomEntity implements IContractEntity {
   @Column({
     name: 'reference_number',
@@ -42,10 +47,18 @@ export class Contract extends BaseCustomEntity implements IContractEntity {
     length: 26,
     nullable: true,
   })
+  /**
+   * The main contract of a subcontract; null for a main contract. Fixed at
+   * creation, and always a main contract (trigger contract_parent_rules).
+   */
   parentContractId!: string | null;
-  @ManyToOne(() => Contract, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'parent_contract_id', referencedColumnName: 'id' })
-  parentContract!: Contract;
+  @ManyToOne(() => Contract, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({
+    name: 'parent_contract_id',
+    referencedColumnName: 'id',
+    foreignKeyConstraintName: 'FK_f47cfaeabefd9d42a9aae56a488',
+  })
+  parentContract!: Contract | null;
 
   // node-postgres returns `bigint` columns as decimal strings (MinorAmount).
   @Column({ name: 'original_value_minor', type: 'bigint' })
@@ -85,9 +98,6 @@ export class Contract extends BaseCustomEntity implements IContractEntity {
   @Column({ name: 'revised_end_date', type: 'date', nullable: true })
   revisedEndDate!: Date | null;
 
-  @Column({ name: 'actual_completion_date', type: 'date', nullable: true })
-  actualCompletionDate!: Date | null;
-
   @Column({ name: 'defects_liability_days', type: 'int' })
   defectsLiabilityDays!: number;
 
@@ -109,6 +119,25 @@ export class Contract extends BaseCustomEntity implements IContractEntity {
     foreignKeyConstraintName: 'fk_contract_created_by_company',
   })
   createdByCompany!: Company | null;
+
+  /**
+   * The lifecycle template version the stages were copied from when the
+   * contract was created; null for contracts created before lifecycles.
+   */
+  @Column({
+    name: 'lifecycle_template_version_id',
+    type: 'varchar',
+    length: 26,
+    nullable: true,
+  })
+  lifecycleTemplateVersionId!: string | null;
+
+  @Column({
+    name: 'lifecycle_initialised_at',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  lifecycleInitialisedAt!: Date | null;
 
   @Column({ name: 'deleted_at', type: 'timestamptz', nullable: true })
   deletedAt!: Date | null;

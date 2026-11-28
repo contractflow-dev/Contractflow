@@ -18,7 +18,7 @@ const contract = {
   referenceNumber: 'CTR-1',
   title: 'Pipeline integrity',
   contractType: 'service',
-  partyType: 'client',
+  partyType: 'awarding',
   originalValueMinor: '100000',
   currencyCode: 'NGN',
   retentionRateBps: 500,

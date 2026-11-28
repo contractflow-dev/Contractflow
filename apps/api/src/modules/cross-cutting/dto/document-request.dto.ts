@@ -4,6 +4,7 @@ import {
   type CreateCompanyDocumentUploadRequest,
   type CreateDocumentUploadRequest,
   type CreateDocumentVersionUploadRequest,
+  ULID_PATTERN,
 } from '@contractflow/contracts-schema';
 import { Transform } from 'class-transformer';
 import {
@@ -102,7 +103,7 @@ export class CreateCompanyDocumentUploadRequestDto
 
 export class DocumentDownloadQueryDto {
   @IsOptional()
-  @Matches(/^[0-9A-HJKMNP-TV-Z]{26}$/i, {
+  @Matches(ULID_PATTERN, {
     message: 'versionId must be a valid ULID',
   })
   versionId?: string;

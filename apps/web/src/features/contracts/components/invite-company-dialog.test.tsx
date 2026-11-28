@@ -15,7 +15,7 @@ vi.mock("@/services/contractApi", () => ({
 }));
 vi.mock("@/lib/notify", () => ({ notifySuccess: mocks.notify }));
 
-function setup() {
+function setup({ subcontract = false } = {}) {
   const onOpenChange = vi.fn();
   render(
     <InviteCompanyDialog
@@ -25,6 +25,7 @@ function setup() {
         referenceNumber: "CTR-1",
         title: "Pipeline",
       }}
+      subcontract={subcontract}
       open
       onOpenChange={onOpenChange}
     />,
@@ -62,17 +63,16 @@ describe("InviteCompanyDialog", () => {
   it("sends through the existing workflow in this contract, then closes", async () => {
     const { user, onOpenChange } = setup();
     await user.type(screen.getByLabelText(/Company email/), " co@example.com ");
-    await user.selectOptions(
-      screen.getByLabelText("Party type"),
-      EPartyType.SUBCONTRACTOR,
-    );
+    // No party type to choose: an invited company is always the awarded party.
+    expect(screen.queryByLabelText("Party type")).toBeNull();
+    expect(screen.getByText(/joins this contract as the/)).toBeTruthy();
     await user.click(send());
 
     expect(mocks.create).toHaveBeenCalledWith({
       companyId: "company-1",
       contractId: "contract-1",
       email: "co@example.com",
-      partyType: EPartyType.SUBCONTRACTOR,
+      partyType: EPartyType.AWARDED,
     });
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
     expect(mocks.notify).toHaveBeenCalledOnce();
@@ -102,5 +102,23 @@ describe("InviteCompanyDialog", () => {
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(mocks.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("on a subcontract", () => {
+  it("invites the subcontractor, through the same workflow", async () => {
+    const { user } = setup({ subcontract: true });
+    expect(
+      screen.getByRole("heading", { name: "Invite a subcontractor" }),
+    ).toBeTruthy();
+    expect(screen.getByText(/the subcontractor\./)).toBeTruthy();
+    await user.type(screen.getByLabelText(/Company email/), "sub@example.com");
+    await user.click(send());
+    expect(mocks.create).toHaveBeenCalledWith({
+      companyId: "company-1",
+      contractId: "contract-1",
+      email: "sub@example.com",
+      partyType: EPartyType.AWARDED,
+    });
   });
 });

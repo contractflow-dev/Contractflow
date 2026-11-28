@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import {
   ECompanyRole,
+  contractRoleLabel,
   contractRoleSide,
   type ContractRole,
   type ContractRoleManagementPermissions,
@@ -176,6 +177,7 @@ export class ContractRoleAssignmentService {
       contractReference: row.contractReference,
       contractTitle: row.contractTitle,
       contractStatus: row.contractStatus,
+      isSubcontract: row.isSubcontract,
       companyUserId: row.companyUserId,
       firstName: row.firstName,
       lastName: row.lastName,
@@ -571,7 +573,8 @@ export class ContractRoleAssignmentService {
       await this.mail.sendContractRoleInvitationEmail(
         normalizedEmail,
         contract.title,
-        role,
+        // On a subcontract the roles read main contractor / subcontractor.
+        contractRoleLabel(role, contract.parentContractId !== null),
         workspace,
         token,
         companyName,
@@ -678,6 +681,7 @@ export class ContractRoleAssignmentService {
     );
     return {
       contractTitle: contract.title,
+      isSubcontract: contract.parentContractId !== null,
       companyName,
       email: invitation.email,
       role: invitation.role,

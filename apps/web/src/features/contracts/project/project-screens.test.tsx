@@ -23,13 +23,14 @@ import {
   activityReasonLabel,
   projectActivityHref,
 } from "./project-activity";
-import { ProjectOverview, overallProgressBps } from "./project-overview";
+import { ProjectOverview } from "./project-overview";
 import { ProjectReviews } from "./project-reviews";
 
 vi.setConfig({ testTimeout: 20_000 });
 
 const mocks = vi.hoisted(() => ({
   stages: vi.fn(),
+  progress: vi.fn(),
   milestones: vi.fn(),
   submissions: vi.fn(),
   activity: vi.fn(),
@@ -37,6 +38,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/services/deliveryApi", () => ({
   useGetContractStagesQuery: mocks.stages,
+  useGetContractProgressQuery: mocks.progress,
   useGetMilestonesQuery: mocks.milestones,
   useGetMilestoneSubmissionsQuery: mocks.submissions,
 }));
@@ -196,13 +198,22 @@ describe("ProjectActivity", () => {
 });
 
 describe("ProjectOverview", () => {
-  it("weights each stage's approved progress by its share of the contract", () => {
-    expect(
-      overallProgressBps([
-        { weightBps: 4000, progressBps: 5000 },
-        { weightBps: 6000, progressBps: 2500 },
-      ]),
-    ).toBe(3500);
+  it("shows the API's lifecycle progress, not a figure summed in the browser", () => {
+    mocks.progress.mockReturnValue(
+      loaded({
+        lifecycleProgressBps: 4250,
+        countedWeightBps: 8000,
+        stages: [],
+      }),
+    );
+    render(<ProjectOverview project={projectContext(plannerPermissions)} />);
+    expect(mocks.progress).toHaveBeenCalledWith({
+      companyId: "company-1",
+      contractId: "contract-1",
+    });
+    expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe(
+      "42.5",
+    );
   });
 
   it("shows the API's totals and asks for deadlines from today in the contract's time zone", () => {
@@ -240,9 +251,16 @@ describe("ProjectOverview", () => {
           : page([waiting]),
       ),
     );
+    mocks.progress.mockReturnValue(
+      loaded({
+        lifecycleProgressBps: 7000,
+        countedWeightBps: 10000,
+        stages: [],
+      }),
+    );
     render(<ProjectOverview project={projectContext(plannerPermissions)} />);
 
-    // 40% × 25% + 60% × 100% = 70%.
+    // The API's figure: 40% × 25% + 60% × 100% = 70%.
     expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe(
       "70",
     );

@@ -26,6 +26,7 @@ import {
   createContractFormSchema,
   createContractSteps,
   defaultTimeZone,
+  eligibleParentContracts,
   timeZoneOptions,
   toCreateContractRequest,
   type CreateContractFormValues,
@@ -44,20 +45,26 @@ const formSteps: ReadonlyArray<FormStep<CreateContractFormValues>> =
 export function CreateContractWizard({
   formId,
   companyId,
+  parentContractId,
   onCancel,
   onDirtyChange,
 }: {
   formId: string;
   companyId: string;
+  /** Starts the form as a subcontract of this main contract. */
+  parentContractId?: string;
   /** Leaves the form. The page asks first if anything has been entered. */
   onCancel: () => void;
   /** Called whenever the form gains or loses unsaved input. */
   onDirtyChange?: (dirty: boolean) => void;
 }) {
   const router = useRouter();
-  const [defaultValues] = useState(() =>
-    createContractDefaults(defaultTimeZone(timeZoneOptions())),
-  );
+  const [defaultValues] = useState(() => {
+    const values = createContractDefaults(defaultTimeZone(timeZoneOptions()));
+    return parentContractId
+      ? { ...values, parties: { ...values.parties, parentContractId } }
+      : values;
+  });
   const form = useForm<CreateContractFormValues>({
     resolver: zodResolver(createContractFormSchema),
     defaultValues,
@@ -140,13 +147,17 @@ export function CreateContractWizard({
         {step.id === "basics" ? <ContractBasicsFields /> : null}
         {step.id === "parties" ? (
           <ContractPartiesFields
-            parentContracts={parentContractsQuery.currentData?.data ?? []}
+            parentContracts={eligibleParentContracts(
+              parentContractsQuery.currentData?.data ?? [],
+            )}
             parentContractsLoading={parentContractsQuery.isFetching}
             parentContractsError={parentContractsQuery.error}
           />
         ) : null}
-        {step.id === "commercial" ? <ContractCommercialFields /> : null}
-        {step.id === "dates" ? <ContractDatesFields /> : null}
+        {step.id === "commercial" ? (
+          <ContractCommercialFields creating />
+        ) : null}
+        {step.id === "dates" ? <ContractDatesFields creating /> : null}
 
         {createState.error ? (
           <Alert variant="destructive">

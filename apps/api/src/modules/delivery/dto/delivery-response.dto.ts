@@ -30,10 +30,13 @@ export function toContractStageResponse(
   return {
     id: stage.id,
     contractId: stage.contractId,
+    stageCode: stage.stageCode ?? null,
     name: stage.name,
     description: toNullableText(stage.description),
     sequence: Number(stage.sequence),
     status: stage.status,
+    isApplicable: stage.isApplicable ?? true,
+    applicabilityReason: stage.applicabilityReason ?? null,
     weightBps: stage.weightBps,
     progressBps,
     plannedStartDate: toDateOnly(stage.plannedStartDate),

@@ -75,6 +75,8 @@ export interface ICompanyRoleAssignmentRow {
   contractReference: string;
   contractTitle: string;
   contractStatus: EContractStatus;
+  /** The contract is a subcontract (for its roles' labels). */
+  isSubcontract: boolean;
   companyUserId: string;
   firstName: string;
   lastName: string;
@@ -154,9 +156,11 @@ export interface IContractRoleAssignmentRepositories {
   contracts: {
     findActive(contractId: string): Promise<{ id: string } | null>;
     findActiveForUpdate(contractId: string): Promise<{ id: string } | null>;
-    findInvitationDetails(
-      contractId: string,
-    ): Promise<{ id: string; title: string } | null>;
+    findInvitationDetails(contractId: string): Promise<{
+      id: string;
+      title: string;
+      parentContractId: string | null;
+    } | null>;
   };
   companies: {
     findName(companyId: string): Promise<string | null>;

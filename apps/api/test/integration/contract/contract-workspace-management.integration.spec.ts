@@ -115,7 +115,7 @@ describe('Contract workspace management (PostgreSQL)', () => {
       referenceNumber: `WS-${Date.now()}`,
       title: 'Workspace creation',
       contractType: EContractType.SERVICE,
-      partyType: EPartyType.CLIENT,
+      partyType: EPartyType.AWARDING,
       workspaces: ['project', 'hse'],
       originalValueMinor: '100000',
       currencyCode: ECurrencyCode.NGN,

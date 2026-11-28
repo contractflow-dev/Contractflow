@@ -726,8 +726,13 @@ describe('Contract visibility (PostgreSQL)', () => {
       ).expect(200);
       expect(flags.body).toEqual({
         canManage: false,
-        canTransition: true,
+        // Only the awarding party's Client Project Manager changes status.
+        canTransition: false,
         canRestore: false,
+        canInviteParties: false,
+        invitesSubcontractors: false,
+        // The awarded party's Contractor Project Lead on a draft contract.
+        canCreateSubcontract: true,
       });
     });
 
@@ -813,12 +818,15 @@ describe('Contract visibility (PostgreSQL)', () => {
     });
 
     it('lets an administrator without a role reach the transition check only to be refused (403), and keeps conflicts as 409', async () => {
+      // An impossible transition by the right person still conflicts (409):
+      // covered with the real roles in contract-lifecycle-stages.
       const admin = await signIn(adminA);
       await send('post', '/transitions', admin, companyA.id, contract.id, {
         transition: 'activate',
         reason: 'Starting',
       }).expect(403);
-      // The project lead may transition; an impossible transition conflicts.
+      // The awarded party's project lead can't change the status either
+      // (decision D-5): only the awarding party's Client Project Manager.
       await send(
         'post',
         '/transitions',
@@ -829,7 +837,7 @@ describe('Contract visibility (PostgreSQL)', () => {
           transition: 'resume',
           reason: 'Not on hold',
         },
-      ).expect(409);
+      ).expect(403);
       // Restoring a contract that isn't archived conflicts as before.
       await send('post', '/restore', admin, companyA.id, contract.id).expect(
         409,
@@ -1241,6 +1249,9 @@ describe('Contract visibility (PostgreSQL)', () => {
         canManage: true,
         canTransition: false,
         canRestore: false,
+        canInviteParties: true,
+        invitesSubcontractors: false,
+        canCreateSubcontract: false,
       });
       const roles = await getContract(
         '/role-management',

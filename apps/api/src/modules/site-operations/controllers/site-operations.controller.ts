@@ -7,6 +7,7 @@ import { ContractContextGuard } from '../../../common/guards/contract-context.gu
 import { CurrentContractId } from '../../../common/decorators/current-contract-id.decorator';
 import type { AuthenticatedUser } from '../../identity/interface/auth-context.interface';
 import { SiteOperationsService } from '../services/site-operations.service';
+import { ParseUlidPipe } from '../../../common/pipes/parse-ulid.pipe';
 
 @Controller('contract')
 @UseGuards(CompanyContextGuard, ContractContextGuard)
@@ -33,7 +34,7 @@ export class SiteOperationsController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('siteId') siteId: string,
+    @Param('siteId', ParseUlidPipe) siteId: string,
   ) {
     return this.siteOperations.sites.get(
       user.id,
@@ -63,7 +64,7 @@ export class SiteOperationsController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('logId') logId: string,
+    @Param('logId', ParseUlidPipe) logId: string,
   ) {
     return this.siteOperations.dailyLogs.get(
       user.id,
@@ -93,7 +94,7 @@ export class SiteOperationsController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('itemId') itemId: string,
+    @Param('itemId', ParseUlidPipe) itemId: string,
   ) {
     return this.siteOperations.inventoryItems.get(
       user.id,
@@ -123,7 +124,7 @@ export class SiteOperationsController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('transactionId') transactionId: string,
+    @Param('transactionId', ParseUlidPipe) transactionId: string,
   ) {
     return this.siteOperations.inventoryTransactions.get(
       user.id,

@@ -24,6 +24,7 @@ import { InviteCompanyMemberRequestDto } from '../dto/company/requests/invite-co
 import { UpdateCompanyMemberRoleRequestDto } from '../dto/company/requests/update-company-member-role-request.dto';
 import { UpdateCompanyProfileRequestDto } from '../dto/company/requests/update-company-profile-request.dto';
 import { ListCompanyInvitationsRequestDto } from '../dto/company/requests/list-company-invitations-request.dto';
+import { ParseUlidPipe } from '../../../common/pipes/parse-ulid.pipe';
 
 @Controller()
 export class CompanyController {
@@ -133,7 +134,7 @@ export class CompanyController {
   updateMemberRole(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('membershipId') membershipId: string,
+    @Param('membershipId', ParseUlidPipe) membershipId: string,
     @Body() body: UpdateCompanyMemberRoleRequestDto,
   ) {
     return this.companyAdminService.updateMemberRole(
@@ -149,7 +150,7 @@ export class CompanyController {
   removeMember(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('membershipId') membershipId: string,
+    @Param('membershipId', ParseUlidPipe) membershipId: string,
   ) {
     return this.companyAdminService.removeMember(
       user.id,
@@ -183,7 +184,7 @@ export class CompanyController {
   revokeInvitation(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('invitationId') invitationId: string,
+    @Param('invitationId', ParseUlidPipe) invitationId: string,
   ) {
     return this.companyAdminService.revokeInvitation(
       user.id,
@@ -197,7 +198,7 @@ export class CompanyController {
   resendInvitation(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('invitationId') invitationId: string,
+    @Param('invitationId', ParseUlidPipe) invitationId: string,
   ) {
     return this.companyAdminService.resendInvitation(
       user.id,

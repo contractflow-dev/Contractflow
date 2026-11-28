@@ -38,7 +38,7 @@ const loaded = {
       status: EContractStatus.ACTIVE,
       deletedAt: null,
     },
-    membership: { partyType: EPartyType.CLIENT },
+    membership: { partyType: EPartyType.AWARDING },
   },
   error: undefined,
 };

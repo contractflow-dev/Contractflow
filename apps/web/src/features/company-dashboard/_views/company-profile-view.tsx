@@ -203,6 +203,7 @@ function ProfileForm({ company }: { company: ICompanyProfileResponse }) {
       defaultCurrencyCode: company.defaultCurrencyCode as ECurrencyCode,
     },
   });
+  const emailVerified = Boolean(company.verifiedAt);
   const countryCode = useWatch({ control, name: "countryCode" });
   const stateRegion = useWatch({ control, name: "stateRegion" });
   const phone = useWatch({ control, name: "phone" });
@@ -213,10 +214,15 @@ function ProfileForm({ company }: { company: ICompanyProfileResponse }) {
   async function save(values: ProfileValues) {
     setSubmitError("");
     try {
-      const { phone: phoneValue, ...rest } = values;
+      const { phone: phoneValue, email, ...rest } = values;
       await updateProfile({
         companyId: company.id,
-        data: { ...rest, phoneNumber: phoneToE164(phoneValue) },
+        // A verified email can't change, so it isn't sent.
+        data: {
+          ...rest,
+          ...(emailVerified ? {} : { email }),
+          phoneNumber: phoneToE164(phoneValue),
+        },
       }).unwrap();
       reset(values);
       notifySuccess("Company profile updated");
@@ -229,27 +235,38 @@ function ProfileForm({ company }: { company: ICompanyProfileResponse }) {
 
   function textFields(list: ProfileTextField[]) {
     return list.map(
-      ({ key, label, optional, type, autoComplete, description, className }) => (
-        <FormField
-          key={key}
-          id={`profile-${key}`}
-          label={label}
-          required={!optional}
-          optional={optional}
-          description={description}
-          error={errors[key]?.message}
-          className={className}
-        >
-          {(control) => (
-            <Input
-              {...control}
-              {...register(key)}
-              type={type}
-              autoComplete={autoComplete}
-            />
-          )}
-        </FormField>
-      ),
+      ({ key, label, optional, type, autoComplete, description, className }) => {
+        // A verified company email is shown, not edited.
+        const locked = key === "email" && emailVerified;
+        return (
+          <FormField
+            key={key}
+            id={`profile-${key}`}
+            label={label}
+            required={!optional && !locked}
+            optional={optional}
+            description={
+              locked
+                ? "Verified. Other companies invite you to contracts at this address, so it can't be changed here."
+                : description
+            }
+            error={errors[key]?.message}
+            className={className}
+          >
+            {(control) => (
+              <Input
+                {...control}
+                {...register(key)}
+                type={type}
+                autoComplete={autoComplete}
+                readOnly={locked}
+                aria-readonly={locked || undefined}
+                className={locked ? "bg-muted text-muted-foreground" : undefined}
+              />
+            )}
+          </FormField>
+        );
+      },
     );
   }
 

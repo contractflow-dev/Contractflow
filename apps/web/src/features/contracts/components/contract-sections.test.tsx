@@ -61,6 +61,11 @@ vi.mock("./contract-role-assignment-management", () => ({
     target?: Parameters<typeof targetLabel>[0];
   }) => <div>ROLE ASSIGNMENTS{targetLabel(target)}</div>,
 }));
+vi.mock("./related-contracts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./related-contracts")>()),
+  // Reads lifecycle permissions through RTK Query; not under test here.
+  SubcontractsSection: () => null,
+}));
 vi.mock("./contract-lifecycle-management", () => ({
   ContractLifecycleManagement: ({
     part,

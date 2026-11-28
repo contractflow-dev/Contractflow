@@ -15,8 +15,27 @@ import {
 import type {
   AssignableContractWorkspace,
   Contract,
+  ContractListItem,
   CreateContractRequest,
 } from "@/services/contractApi";
+
+/**
+ * The contracts a new subcontract may belong to: main contracts (not
+ * themselves subcontracts), draft or active and not archived, on which the
+ * company is the awarded party. The API checks the same rules.
+ */
+export function eligibleParentContracts(
+  contracts: readonly ContractListItem[],
+): ContractListItem[] {
+  return contracts.filter(
+    (contract) =>
+      !contract.parentContractId &&
+      !contract.deletedAt &&
+      (contract.status === EContractStatus.DRAFT ||
+        contract.status === EContractStatus.ACTIVE) &&
+      contract.myPartyType === EPartyType.AWARDED,
+  );
+}
 
 export const contractWorkspaces: AssignableContractWorkspace[] = [
   "project",
@@ -30,7 +49,6 @@ export interface ContractDateValues {
   startDate: string;
   endDate: string;
   revisedEndDate: string;
-  actualCompletionDate: string;
 }
 
 export type ContractDateErrors = Partial<
@@ -46,7 +64,7 @@ export function validateContractDates(
   values: ContractDateValues,
 ): ContractDateErrors {
   const errors: ContractDateErrors = {};
-  const { startDate, endDate, revisedEndDate, actualCompletionDate } = values;
+  const { startDate, endDate, revisedEndDate } = values;
   // ISO calendar dates compare correctly as strings.
   if (startDate && endDate && startDate > endDate) {
     errors.startDate = "The start date must not be after the end date.";
@@ -54,10 +72,6 @@ export function validateContractDates(
   if (revisedEndDate && endDate && revisedEndDate < endDate) {
     errors.revisedEndDate =
       "The revised end date must not be before the end date.";
-  }
-  if (actualCompletionDate && startDate && actualCompletionDate < startDate) {
-    errors.actualCompletionDate =
-      "The actual completion date must not be before the start date.";
   }
   return errors;
 }
@@ -112,13 +126,15 @@ export const createContractFormSchema = z.object({
     }),
     description: z.string().trim(),
   }),
-  parties: z.object({
-    partyType: z.enum(EPartyType, {
-      message: "Choose your company's party type.",
+  parties: z
+    .object({
+      // Not shown: the edit form fills in the company's own party type. The
+      // creating company is always the awarding party, and the create
+      // request sends that whatever this holds.
+      partyType: z.enum(EPartyType),
+      parentContractId: z.string(),
+      workspaces: z.array(z.enum(["project", "hse", "finance"])),
     }),
-    parentContractId: z.string(),
-    workspaces: z.array(z.enum(["project", "hse", "finance"])),
-  }),
   commercial: z
     .object({
       currencyCode: z.enum(ECurrencyCode, { message: "Choose a currency." }),
@@ -171,7 +187,6 @@ export const createContractFormSchema = z.object({
       startDate: requiredDate("Enter the start date."),
       endDate: requiredDate("Enter the end date."),
       revisedEndDate: optionalDate,
-      actualCompletionDate: optionalDate,
       defectsLiabilityDays: days(
         "Enter the defects liability period as a whole number of days.",
       ),
@@ -231,7 +246,7 @@ export function createContractDefaults(
       description: "",
     },
     parties: {
-      partyType: Object.values(EPartyType)[0],
+      partyType: EPartyType.AWARDING,
       parentContractId: "",
       workspaces: [...contractWorkspaces],
     },
@@ -248,7 +263,6 @@ export function createContractDefaults(
       startDate: "",
       endDate: "",
       revisedEndDate: "",
-      actualCompletionDate: "",
       defectsLiabilityDays: "0",
       timezone,
     },
@@ -274,7 +288,9 @@ export function toCreateContractRequest(
     title: basics.title.trim(),
     description: basics.description.trim() || null,
     contractType: basics.contractType,
-    partyType: parties.partyType,
+    // A main contract is created by its client, a subcontract by the main
+    // contractor: the creating company is always the awarding party.
+    partyType: EPartyType.AWARDING,
     workspaces: contractWorkspaces.filter((workspace) =>
       parties.workspaces.includes(workspace),
     ),
@@ -305,7 +321,6 @@ export function toCreateContractRequest(
     startDate: dates.startDate,
     endDate: dates.endDate,
     revisedEndDate: dates.revisedEndDate || null,
-    actualCompletionDate: dates.actualCompletionDate || null,
     defectsLiabilityDays: Number(dates.defectsLiabilityDays),
     timezone: dates.timezone,
   };
@@ -316,12 +331,16 @@ export function toCreateContractRequest(
  * workspaces aren't edited here (the API doesn't change them; workspaces
  * have their own controls), so the second step is the parent contract.
  */
+/**
+ * Editing has no parties step: the party type, parent contract and
+ * workspaces are fixed when the contract is created (workspaces have their
+ * own controls on the Overview).
+ */
 export const editContractSteps: Array<{
   id: CreateContractStepId;
   title: string;
 }> = [
   { id: "basics", title: "Basics" },
-  { id: "parties", title: "Parent contract" },
   { id: "commercial", title: "Commercial terms" },
   { id: "dates", title: "Dates" },
 ];
@@ -384,7 +403,6 @@ export function contractToFormValues(
       startDate: calendarDay(contract.startDate),
       endDate: calendarDay(contract.endDate),
       revisedEndDate: calendarDay(contract.revisedEndDate),
-      actualCompletionDate: calendarDay(contract.actualCompletionDate),
       defectsLiabilityDays: String(contract.defectsLiabilityDays),
       timezone: contract.timezone,
     },
@@ -406,7 +424,6 @@ export function toUpdateContractRequest(
     title: full.title,
     description: full.description,
     contractType: full.contractType,
-    parentContractId: full.parentContractId,
     retentionRateBps: full.retentionRateBps,
     advancePaymentRateBps: full.advancePaymentRateBps,
     paymentTermsDays: full.paymentTermsDays,
@@ -415,7 +432,6 @@ export function toUpdateContractRequest(
     startDate: full.startDate,
     endDate: full.endDate,
     revisedEndDate: full.revisedEndDate,
-    actualCompletionDate: full.actualCompletionDate,
     defectsLiabilityDays: full.defectsLiabilityDays,
     timezone: full.timezone,
   };

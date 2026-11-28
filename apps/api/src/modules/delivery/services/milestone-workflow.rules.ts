@@ -1,6 +1,8 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
+import type { Contract } from '../../contract/entities/contract.entity';
 import {
   EContractStatus,
+  ELifecycleStageCode,
   EMilestoneDecisionType,
   EMilestoneStatus,
   EMilestoneSubmissionType,
@@ -30,8 +32,52 @@ const ALLOWED_ACTIONS: Record<EContractStatus, readonly ContractAction[]> = {
   [EContractStatus.DRAFT]: ['planning'],
   [EContractStatus.ACTIVE]: ['planning', 'operation'],
   [EContractStatus.SUSPENDED]: [],
+  // Only the post-contract obligations stage: see assertStageWorkAllowed.
+  [EContractStatus.DEFECTS_LIABILITY]: ['planning', 'operation'],
   [EContractStatus.COMPLETED]: [],
 };
+
+/**
+ * During the defects liability period only the warranty, defects liability
+ * and post-contract obligations stage is worked on (decision D-12); every
+ * other stage, and its milestones, can be read but not changed.
+ */
+export function assertStageWorkAllowed(
+  contract: Pick<Contract, 'status'>,
+  stage: { stageCode: ELifecycleStageCode | null },
+): void {
+  if (
+    contract.status === EContractStatus.DEFECTS_LIABILITY &&
+    stage.stageCode !== ELifecycleStageCode.POST_CONTRACT_OBLIGATIONS
+  ) {
+    throw new ConflictException(
+      'During the defects liability period only the post-contract obligations stage can change.',
+    );
+  }
+}
+
+/**
+ * A contract created from a lifecycle has its stage plan fixed once it is
+ * active (decision D-4): no new stages and no weight changes. Whether a
+ * stage applies can still change. Older contracts keep their rules.
+ */
+export function assertPlanEditable(
+  contract: Pick<Contract, 'status' | 'lifecycleTemplateVersionId'>,
+): void {
+  if (contract.status === EContractStatus.DEFECTS_LIABILITY) {
+    throw new ConflictException(
+      'During the defects liability period the stage plan can’t change.',
+    );
+  }
+  if (
+    contract.lifecycleTemplateVersionId &&
+    contract.status !== EContractStatus.DRAFT
+  ) {
+    throw new ConflictException(
+      'Once the contract is active its stage plan is fixed: stages can’t be added and weights can’t change. Mark a stage as not applying instead.',
+    );
+  }
+}
 
 export function assertContractAllows(
   status: EContractStatus,
@@ -120,9 +166,13 @@ export function requireDateOverride(
 
 /** Stage statuses the Client Project Manager can move a stage to, by current status. */
 const STAGE_TRANSITIONS: Partial<Record<EStatus, readonly EStatus[]>> = {
-  [EStatus.PLANNED]: [EStatus.IN_PROGRESS],
-  [EStatus.IN_PROGRESS]: [EStatus.ON_HOLD, EStatus.COMPLETED],
-  [EStatus.ON_HOLD]: [EStatus.IN_PROGRESS],
+  [EStatus.PLANNED]: [EStatus.IN_PROGRESS, EStatus.CANCELLED],
+  [EStatus.IN_PROGRESS]: [
+    EStatus.ON_HOLD,
+    EStatus.COMPLETED,
+    EStatus.CANCELLED,
+  ],
+  [EStatus.ON_HOLD]: [EStatus.IN_PROGRESS, EStatus.CANCELLED],
 };
 
 /** Stages in these statuses accept no planning changes or new milestones. */
@@ -146,6 +196,7 @@ export function stageTransitionNeedsReason(
 ): boolean {
   return (
     to === EStatus.ON_HOLD ||
+    to === EStatus.CANCELLED ||
     (from === EStatus.ON_HOLD && to === EStatus.IN_PROGRESS)
   );
 }

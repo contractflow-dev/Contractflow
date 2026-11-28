@@ -6,6 +6,7 @@ import type { ContractParty } from '../../contract/entities/contract-party.entit
 import type { Contract } from '../../contract/entities/contract.entity';
 import type { CompanyUser } from '../../identity/entities/company-user.entity';
 import type { ContractStage } from '../entities/contract-stage.entity';
+import type { ContractStageHistory } from '../entities/contract-stage-history.entity';
 import type { MilestoneDecision } from '../entities/milestone-decision.entity';
 import type { MilestoneOutstandingItem } from '../entities/milestone-outstanding-item.entity';
 import type { MilestoneSubmissionEvidence } from '../entities/milestone-submission-evidence.entity';
@@ -104,6 +105,8 @@ export interface IMilestoneWorkflowContext {
     ): Promise<number>;
     nextSequenceInStage(scope: Scope, stageId: string): Promise<number>;
     countNotApprovedInStage(scope: Scope, stageId: string): Promise<number>;
+    /** The stage's milestones that aren't cancelled. */
+    countActiveInStage(scope: Scope, stageId: string): Promise<number>;
     /**
      * How many of the stage's milestones (not cancelled) have a planned start
      * or due date outside `start`..`end`.
@@ -192,6 +195,10 @@ export interface IMilestoneWorkflowContext {
       submissionIds: string[],
     ): Promise<MilestoneSubmissionItem[]>;
   };
+  /** Append-only stage history, written with the change it records. */
+  stageHistory: {
+    record(scope: Scope, data: Partial<ContractStageHistory>): Promise<void>;
+  };
   activity: {
     record(scope: Scope, entry: ActivityEntryInput): Promise<void>;
   };
@@ -215,6 +222,8 @@ export interface IMilestoneWorkflowReader {
     page: { skip: number; take: number },
   ): Promise<{ items: ContractStage[]; total: number }>;
   findStage(scope: Scope, stageId: string): Promise<ContractStage | null>;
+  /** Every stage of the contract, in order. */
+  allStages(scope: Scope): Promise<ContractStage[]>;
   /** The contract's time zone, for its calendar days; null if unknown. */
   contractTimezone(scope: Scope): Promise<string | null>;
   /** Approved progress of each listed stage, in bps of the stage. */

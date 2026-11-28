@@ -178,7 +178,7 @@ describe('contract request monetary fields', () => {
     referenceNumber: 'CTR-1',
     title: 'Pipeline integrity',
     contractType: 'service',
-    partyType: 'client',
+    partyType: 'awarding',
     workspaces: [],
     originalValueMinor: '250000000',
     currencyCode: 'NGN',

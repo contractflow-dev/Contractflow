@@ -6,6 +6,10 @@ import { ContractModule } from '../contract/contract-module';
 import { IdentityModule } from '../identity/identity.module';
 import { DeliveryController } from './controllers/delivery.controller';
 import { ContractStage } from './entities/contract-stage.entity';
+import { ContractStageHistory } from './entities/contract-stage-history.entity';
+import { LifecycleTemplate } from './entities/lifecycle-template.entity';
+import { LifecycleTemplateStage } from './entities/lifecycle-template-stage.entity';
+import { LifecycleTemplateVersion } from './entities/lifecycle-template-version.entity';
 import { ContractVariation } from './entities/contract-variation.entity';
 import { MilestoneDecision } from './entities/milestone-decision.entity';
 import { MilestoneOutstandingItem } from './entities/milestone-outstanding-item.entity';
@@ -40,6 +44,10 @@ import { MilestoneWorkflowService } from './services/milestone-workflow.service'
   imports: [
     TypeOrmModule.forFeature([
       ContractStage,
+      ContractStageHistory,
+      LifecycleTemplate,
+      LifecycleTemplateVersion,
+      LifecycleTemplateStage,
       Milestone,
       ContractVariation,
       MilestoneSubmission,

@@ -28,6 +28,7 @@ import {
   DECISION_LABEL,
   SUBMISSION_TYPE_LABEL,
   actorLabel,
+  projectRoleNames,
 } from "./project-rules";
 import type { ProjectContext } from "./project-ui";
 
@@ -268,7 +269,7 @@ export function SubmissionHistory({
                 {actorLabel(
                   submission.submittedById,
                   project.viewerMembershipId,
-                  "Contractor Project Lead",
+                  projectRoleNames(project.contract).lead,
                 )}{" "}
                 ·{" "}
                 <time dateTime={submission.submittedAt}>
@@ -315,7 +316,8 @@ export function SubmissionHistory({
               />
             ) : (
               <p className="rounded-xl border border-dashed p-3 text-sm text-muted-foreground">
-                Waiting for the Client Project Manager&apos;s decision.
+                Waiting for the {projectRoleNames(project.contract).planner}
+                &apos;s decision.
               </p>
             )}
           </li>
@@ -358,7 +360,7 @@ function DecisionRecord({
           {actorLabel(
             decision.decidedById,
             project.viewerMembershipId,
-            "Client Project Manager",
+            projectRoleNames(project.contract).planner,
           )}{" "}
           ·{" "}
           <time dateTime={decision.decidedAt}>

@@ -7,6 +7,7 @@ import { ContractContextGuard } from '../../../common/guards/contract-context.gu
 import { CurrentContractId } from '../../../common/decorators/current-contract-id.decorator';
 import type { AuthenticatedUser } from '../../identity/interface/auth-context.interface';
 import { ComplianceService } from '../services/compliance-service';
+import { ParseUlidPipe } from '../../../common/pipes/parse-ulid.pipe';
 
 @Controller('contract/compliance')
 @UseGuards(CompanyContextGuard, ContractContextGuard)
@@ -33,7 +34,7 @@ export class ComplianceController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('requirementId') requirementId: string,
+    @Param('requirementId', ParseUlidPipe) requirementId: string,
   ) {
     return this.compliance.requirements.get(
       user.id,
@@ -58,7 +59,7 @@ export class ComplianceController {
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
     @CurrentContractId() contractId: string,
-    @Param('recordId') recordId: string,
+    @Param('recordId', ParseUlidPipe) recordId: string,
   ) {
     return this.compliance.records.get(
       user.id,

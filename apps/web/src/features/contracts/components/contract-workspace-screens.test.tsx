@@ -76,7 +76,7 @@ const contract = {
   membership: {
     id: "m",
     companyId: "company-1",
-    partyType: "contractor",
+    partyType: "awarded",
     signedAt: null,
   },
 };
@@ -353,7 +353,7 @@ describe("ContractWorkspacesCard", () => {
 describe("Project workspace screens", () => {
   const clientContract = {
     ...contract,
-    membership: { ...contract.membership, partyType: "client" },
+    membership: { ...contract.membership, partyType: "awarding" },
   };
   const projectManager = entry("project", {
     hasAccess: true,

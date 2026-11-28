@@ -31,7 +31,7 @@ function contract(
     archived: false,
     ownerCompanyId: ME,
     ownerCompanyName: 'My Works',
-    partyType: EPartyType.CLIENT,
+    partyType: EPartyType.AWARDING,
     contractUpdatedAt: daysAgo(1),
     lastStatusChangeAt: daysAgo(1),
     suspendedByCompanyId: null,
@@ -40,7 +40,7 @@ function contract(
       {
         companyId: ME,
         companyName: 'My Works',
-        partyType: EPartyType.CLIENT,
+        partyType: EPartyType.AWARDING,
         signedAt: daysAgo(10),
       },
     ],
@@ -97,7 +97,7 @@ function portfolio() {
     unstaffedRecent: contract({ title: 'Unstaffed recent', members: [] }),
     awaitingOther: contract({
       title: 'Awaiting Sub',
-      partyType: EPartyType.CONTRACTOR,
+      partyType: EPartyType.AWARDED,
       pendingPartyInvitations: [
         { companyId: 'company-sub', companyName: 'Sub Ltd' },
       ],
@@ -158,7 +158,7 @@ describe('CompanyDepartmentService', () => {
     const [row] = (await list()).data;
 
     expect(row).toMatchObject({
-      partyType: EPartyType.CONTRACTOR,
+      partyType: EPartyType.AWARDED,
       memberCount: 2,
       otherBlockerCount: 0,
       daysSinceMovement: 1,
@@ -211,7 +211,7 @@ describe('CompanyDepartmentService', () => {
     expect(await titles({ status: EContractStatus.DRAFT })).toEqual([
       'Draft one',
     ]);
-    expect(await titles({ partyType: EPartyType.CONTRACTOR })).toEqual([
+    expect(await titles({ partyType: EPartyType.AWARDED })).toEqual([
       'Awaiting Sub',
     ]);
     expect(await titles({ waitingOn: 'us' })).toEqual([

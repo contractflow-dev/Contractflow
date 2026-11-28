@@ -3,11 +3,8 @@ import { Badge } from "@workspace/ui/components/badge";
 
 /** The words for each party type, wherever a company's part is shown. */
 export const PARTY_TYPE_LABELS: Record<EPartyType, string> = {
-  [EPartyType.CLIENT]: "Client",
-  [EPartyType.CONTRACTOR]: "Contractor",
-  [EPartyType.SUBCONTRACTOR]: "Subcontractor",
-  [EPartyType.VENDOR]: "Vendor",
-  [EPartyType.OTHER]: "Other",
+  [EPartyType.AWARDING]: "Awarding",
+  [EPartyType.AWARDED]: "Awarded",
 };
 
 /**

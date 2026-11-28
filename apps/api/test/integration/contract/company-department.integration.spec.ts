@@ -166,9 +166,9 @@ describe('Company department contracts (PostgreSQL)', () => {
     const { company: o } = await factory.createCompanyMember();
 
     await factory.createAdditionalWorkspace(c1, adminA, 'hse');
-    await partyAs(a1, EPartyType.CLIENT, true);
+    await partyAs(a1, EPartyType.AWARDING, true);
     const b1 = await factory.createAdditionalParty(c1, b);
-    await partyAs(b1, EPartyType.CONTRACTOR, false);
+    await partyAs(b1, EPartyType.AWARDED, false);
     await assign(a1, hseLead, EContractorContractRole.HSE_MANAGER, true);
     await assign(b1, memberB, EContractorContractRole.HSE_OFFICER, true);
     await setContract(c1, {
@@ -178,9 +178,9 @@ describe('Company department contracts (PostgreSQL)', () => {
 
     const c2 = await factory.createAdditionalContract(b);
     const b2 = await factory.createAdditionalParty(c2, b);
-    await partyAs(b2, EPartyType.CLIENT, true);
+    await partyAs(b2, EPartyType.AWARDING, true);
     const a2 = await factory.createAdditionalParty(c2, a);
-    await partyAs(a2, EPartyType.CONTRACTOR, true);
+    await partyAs(a2, EPartyType.AWARDED, true);
     await factory.createAdditionalWorkspace(c2, adminB, 'hse');
     await dataSource.getRepository(ContractStatusHistory).save(
       dataSource.getRepository(ContractStatusHistory).create({
@@ -219,7 +219,7 @@ describe('Company department contracts (PostgreSQL)', () => {
         targetCompanyId: o.id,
         invitedByCompanyUserId: adminA.id,
         acceptedByCompanyUserId: null,
-        partyType: EPartyType.CONTRACTOR,
+        partyType: EPartyType.AWARDED,
         email: `invite-${Date.now()}@example.test`,
         tokenHash: `party-${Date.now()}-${Math.random()}`,
         status: 'pending',
@@ -301,7 +301,7 @@ describe('Company department contracts (PostgreSQL)', () => {
 
     const c1 = byId(rows, s.c1.id);
     expect(c1).toMatchObject({
-      partyType: EPartyType.CLIENT,
+      partyType: EPartyType.AWARDING,
       memberCount: 1,
       workspaceAdmins: [{ companyUserId: s.hseLead.id }],
       hasWorkspaceRole: false,
@@ -317,7 +317,7 @@ describe('Company department contracts (PostgreSQL)', () => {
 
     const c2 = byId(rows, s.c2.id);
     expect(c2).toMatchObject({
-      partyType: EPartyType.CONTRACTOR,
+      partyType: EPartyType.AWARDED,
       memberCount: 0,
       workspaceAdmins: [],
       primaryBlocker: {
@@ -364,7 +364,7 @@ describe('Company department contracts (PostgreSQL)', () => {
       [s.c1.id, s.c2.id, s.c4.id].sort(),
     );
     expect(byId(rows, s.c1.id)).toMatchObject({
-      partyType: EPartyType.CONTRACTOR,
+      partyType: EPartyType.AWARDED,
       memberCount: 1,
       workspaceAdmins: [{ companyUserId: s.memberB.id }],
     });

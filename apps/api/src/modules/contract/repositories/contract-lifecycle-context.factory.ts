@@ -16,6 +16,11 @@ import { ContractRoleInvitation } from '../entities/contract-role-invitation.ent
 import { ContractStatusHistory } from '../entities/contract-status-history.entity';
 import { ContractWorkspaceEntity } from '../entities/contract-workspace.entity';
 import { ContractSite } from '../../site-operations/entities/contract-site.entity';
+import { ContractStage } from '../../delivery/entities/contract-stage.entity';
+import { ContractStageHistory } from '../../delivery/entities/contract-stage-history.entity';
+import { LifecycleTemplate } from '../../delivery/entities/lifecycle-template.entity';
+import { LifecycleTemplateStage } from '../../delivery/entities/lifecycle-template-stage.entity';
+import { LifecycleTemplateVersion } from '../../delivery/entities/lifecycle-template-version.entity';
 import type {
   IActiveAssignmentCriteria,
   IContractLifecycleContext,
@@ -41,6 +46,10 @@ export class ContractLifecycleContextFactory implements ITransactionContextFacto
     const history = manager.getRepository(ContractStatusHistory);
     const activity = manager.getRepository(ActivityLog);
     const sites = manager.getRepository(ContractSite);
+    const templateVersions = manager.getRepository(LifecycleTemplateVersion);
+    const templateStages = manager.getRepository(LifecycleTemplateStage);
+    const stages = manager.getRepository(ContractStage);
+    const stageHistory = manager.getRepository(ContractStageHistory);
 
     const activeMembership = {
       status: ECompanyUserStatus.ACTIVE,
@@ -108,7 +117,13 @@ export class ContractLifecycleContextFactory implements ITransactionContextFacto
         findPermissionSnapshot: (contractId) =>
           contracts.findOne({
             where: { id: contractId },
-            select: { id: true, createdByCompanyId: true, deletedAt: true },
+            select: {
+              id: true,
+              createdByCompanyId: true,
+              deletedAt: true,
+              parentContractId: true,
+              status: true,
+            },
           }),
         findForUpdate: (contractId) =>
           contracts.findOne({
@@ -128,34 +143,21 @@ export class ContractLifecycleContextFactory implements ITransactionContextFacto
           contracts.count({
             where: { parentContractId: contractId, deletedAt: IsNull() },
           }),
-        parentWouldCreateCycle: async (parentContractId, contractId) => {
-          const rows = (await manager.query(
-            `
-              WITH RECURSIVE parent_chain("id", "parent_contract_id") AS (
-                SELECT "id", "parent_contract_id"
-                FROM "contract"
-                WHERE "id" = $1 AND "deleted_at" IS NULL
-                UNION ALL
-                SELECT parent."id", parent."parent_contract_id"
-                FROM "contract" AS parent
-                INNER JOIN parent_chain AS chain
-                  ON parent."id" = chain."parent_contract_id"
-                WHERE parent."deleted_at" IS NULL
-              )
-              SELECT EXISTS (
-                SELECT 1 FROM parent_chain WHERE "id" = $2
-              ) AS "found"
-            `,
-            [parentContractId, contractId],
-          )) as Array<{ found: boolean }>;
-          return rows[0]?.found === true;
-        },
       },
       parties: {
         find: (contractId, companyId) =>
           parties.findOne({ where: { contractId, companyId } }),
         countOtherParties: (contractId, companyId) =>
           parties.count({ where: { contractId, companyId: Not(companyId) } }),
+        hasPartyOfType: async (contractId, partyType) =>
+          (await parties.count({ where: { contractId, partyType } })) > 0,
+        countSignatures: async (contractId) => {
+          const [total, signed] = await Promise.all([
+            parties.count({ where: { contractId } }),
+            parties.count({ where: { contractId, signedAt: Not(IsNull()) } }),
+          ]);
+          return { parties: total, signed };
+        },
         findForShare: (contractId, companyId) =>
           parties.findOne({
             where: { contractId, companyId },
@@ -207,6 +209,21 @@ export class ContractLifecycleContextFactory implements ITransactionContextFacto
       roleAssignments: {
         hasActiveAssignment: async (criteria) =>
           Boolean(await assignmentQuery(criteria).getOne()),
+        assign: async (criteria, assignedAt) => {
+          await assignments.save(
+            assignments.create({
+              companyId: criteria.companyId,
+              contractPartyId: criteria.contractPartyId,
+              companyUserId: criteria.companyUserId,
+              role: criteria.role,
+              isWorkspaceAdmin: false,
+              assignedAt,
+              assignedById: criteria.assignedById,
+              revokedAt: null,
+              revokedById: null,
+            }),
+          );
+        },
         hasAnyActiveAssignment: async (criteria) =>
           Boolean(await memberAssignmentQuery(criteria).getOne()),
         hasActiveAssignmentForShare: async (criteria) =>
@@ -450,6 +467,45 @@ export class ContractLifecycleContextFactory implements ITransactionContextFacto
       statusHistory: {
         record: async (data) => {
           await history.save(history.create(data));
+        },
+      },
+      lifecycleTemplates: {
+        findPublishedSystemLifecycle: async () => {
+          const version = await templateVersions
+            .createQueryBuilder('version')
+            .innerJoin(
+              LifecycleTemplate,
+              'template',
+              'template.id = version.lifecycleTemplateId',
+            )
+            .where("template.ownerKind = 'system'")
+            .andWhere("version.status = 'published'")
+            .orderBy('template.code', 'ASC')
+            .getOne();
+          if (!version) return null;
+          return {
+            versionId: version.id,
+            stages: await templateStages.find({
+              where: { lifecycleTemplateVersionId: version.id },
+              order: { sequence: 'ASC' },
+            }),
+          };
+        },
+      },
+      stages: {
+        createMany: (rows) =>
+          stages.save(rows.map((row) => stages.create(row))),
+        listForUpdate: (contractId) =>
+          stages.find({
+            where: { contractId },
+            order: { sequence: 'ASC' },
+            lock: { mode: 'pessimistic_write' },
+          }),
+        save: (stage) => stages.save(stage),
+      },
+      stageHistory: {
+        record: async (data) => {
+          await stageHistory.save(stageHistory.create(data));
         },
       },
       activity: {

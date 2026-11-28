@@ -10,6 +10,7 @@ import {
   RespondIncomingContractInvitationRequestDto,
 } from '../dto/contract-party-invitation.dto';
 import { ContractLifecycleService } from '../services/contract-lifecycle.service';
+import { ParseUlidPipe } from '../../../common/pipes/parse-ulid.pipe';
 
 @Controller()
 export class ContractPartyInvitationController {
@@ -54,7 +55,7 @@ export class ContractPartyInvitationController {
   respondIncoming(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentCompanyId() companyId: string,
-    @Param('invitationId') invitationId: string,
+    @Param('invitationId', ParseUlidPipe) invitationId: string,
     @Body() body: RespondIncomingContractInvitationRequestDto,
   ) {
     return this.lifecycle.respondToIncomingInvitation(

@@ -10,7 +10,7 @@ import {
   EUserStatus,
   EContractorContractRole,
 } from '@contractflow/contracts-schema';
-import type { DataSource } from 'typeorm';
+import { In, type DataSource } from 'typeorm';
 import { ActivityLog } from '../../src/modules/cross-cutting/entities/activity-log.entity';
 import { AppUser } from '../../src/modules/identity/entities/app-user.entity';
 import { Company } from '../../src/modules/identity/entities/company.entity';
@@ -87,11 +87,28 @@ export class ContractTestFactory {
     return { company, member };
   }
 
+  /**
+   * Adds `company` as a party. A contract is between two companies, so by
+   * default it takes whichever of AWARDED and AWARDING is still free.
+   */
   async createAdditionalParty(
     contract: Contract,
     company: Company,
+    partyType?: EPartyType,
   ): Promise<ContractParty> {
-    return this.createParty(contract, company);
+    const taken = partyType
+      ? null
+      : await this.dataSource
+          .getRepository(ContractParty)
+          .findOneBy({
+            contractId: contract.id,
+            partyType: EPartyType.AWARDED,
+          });
+    return this.createParty(
+      contract,
+      company,
+      partyType ?? (taken ? EPartyType.AWARDING : EPartyType.AWARDED),
+    );
   }
 
   async createAdditionalMember(
@@ -101,8 +118,15 @@ export class ContractTestFactory {
     return this.createMember(company, companyRole);
   }
 
-  async createAdditionalContract(company: Company): Promise<Contract> {
-    return this.createContract(company);
+  /**
+   * A contract created by `company`. Pass `parentContractId` for a
+   * subcontract: the parent is fixed at creation (contract_parent_rules).
+   */
+  async createAdditionalContract(
+    company: Company,
+    options: { parentContractId?: string } = {},
+  ): Promise<Contract> {
+    return this.createContract(company, options.parentContractId ?? null);
   }
 
   async createAdditionalWorkspace(
@@ -114,8 +138,15 @@ export class ContractTestFactory {
   }
 
   async cleanup(): Promise<void> {
-    for (const id of this.contractIds) {
-      await this.dataSource.getRepository(Contract).delete({ id });
+    const contractIds = [...this.contractIds];
+    if (contractIds.length > 0) {
+      // Subcontracts first: a parent can't be deleted from under them.
+      await this.dataSource
+        .getRepository(Contract)
+        .delete({ parentContractId: In(contractIds) });
+      await this.dataSource
+        .getRepository(Contract)
+        .delete({ id: In(contractIds) });
     }
     for (const id of this.companyIds) {
       await this.dataSource.getRepository(Company).delete({ id });
@@ -194,7 +225,10 @@ export class ContractTestFactory {
     );
   }
 
-  private async createContract(company: Company): Promise<Contract> {
+  private async createContract(
+    company: Company,
+    parentContractId: string | null = null,
+  ): Promise<Contract> {
     const suffix = this.uniqueSuffix();
     const contract = await this.dataSource.getRepository(Contract).save(
       this.dataSource.getRepository(Contract).create({
@@ -203,7 +237,7 @@ export class ContractTestFactory {
         description: null,
         contractType: EContractType.SERVICE,
         status: EContractStatus.DRAFT,
-        parentContractId: null,
+        parentContractId,
         originalValueMinor: '100000',
         currentValueMinor: '100000',
         currencyCode: ECurrencyCode.NGN,
@@ -215,7 +249,6 @@ export class ContractTestFactory {
         startDate: new Date('2026-01-02T00:00:00.000Z'),
         endDate: new Date('2027-01-01T00:00:00.000Z'),
         revisedEndDate: null,
-        actualCompletionDate: null,
         defectsLiabilityDays: 365,
         timezone: 'Africa/Lagos',
         createdByCompanyId: company.id,
@@ -230,12 +263,13 @@ export class ContractTestFactory {
   private async createParty(
     contract: Contract,
     company: Company,
+    partyType: EPartyType = EPartyType.AWARDED,
   ): Promise<ContractParty> {
     return this.dataSource.getRepository(ContractParty).save(
       this.dataSource.getRepository(ContractParty).create({
         contractId: contract.id,
         companyId: company.id,
-        partyType: EPartyType.CONTRACTOR,
+        partyType,
         signatoryFirstName: null,
         signatoryLastName: null,
         signatoryTitle: null,

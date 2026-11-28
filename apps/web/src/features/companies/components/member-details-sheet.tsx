@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import {
+  contractRoleLabel,
   ECompanyRole,
   ECompanyUserStatus,
   type ICompanyMember,
@@ -192,7 +193,8 @@ export function MemberDetails({
                       {row.contractReference}
                     </p>
                     <p className="flex flex-wrap items-center gap-1.5 text-sm">
-                      {row.role} · {humanizeEnumValue(row.workspace)} workspace
+                      {contractRoleLabel(row.role, row.isSubcontract)} ·{" "}
+                      {humanizeEnumValue(row.workspace)} workspace
                       {row.isWorkspaceAdmin ? (
                         <Badge variant="info">Workspace admin</Badge>
                       ) : null}

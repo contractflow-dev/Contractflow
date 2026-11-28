@@ -19,7 +19,7 @@ const invitation = {
   contractTitle: "Trans-Delta pipeline integrity",
   contractReference: "CF-2026-0142",
   invitingCompanyName: "Atlantic Delta Petroleum",
-  partyType: EPartyType.CONTRACTOR,
+  partyType: EPartyType.AWARDED,
   email: "contracts@ridgeline.test",
   createdAt: "2026-11-08T10:00:00.000Z",
   expiresAt: "2026-11-15T10:00:00.000Z",
@@ -50,7 +50,7 @@ describe("IncomingContractInvitations", () => {
     expect(markup).toContain(">Invitations to contracts</h2>");
     expect(markup).toContain("Trans-Delta pipeline integrity");
     expect(markup).toContain(
-      "CF-2026-0142 · from Atlantic Delta Petroleum · as Contractor",
+      "CF-2026-0142 · from Atlantic Delta Petroleum · as Awarded",
     );
     // The date is formatted in the viewer's locale.
     expect(markup).toMatch(/Expires [^<]*2026/);

@@ -1,0 +1,1090 @@
+%% ContractFlow - CURRENT-STATE ERD (what the database is today)
+%%
+%% Source of truth: the registered migration chain
+%% (apps/api/src/common/database/registered-migrations.ts, 26 migrations,
+%% IdentitySchemaBootstrap1749000000000 .. ContractLifecycleTemplates1794100000000).
+%% Reconciled from:
+%%   1. The schema of contractflow_fresh_backup.dump (pg_restore --schema-only to a
+%%      file; no database was connected). That dump records migrations 1-10, up to
+%%      CompanyInvitationExpiryIndex1792862700001.
+%%   2. The up() of the sixteen later migrations, read from the migration files:
+%%      CompanyInvitationOptionalNames, CompanyEmailVerification,
+%%      DocumentObjectStorage, PasswordResetToken, CompanyLevelDocuments,
+%%      CompanyRoleAssignmentIndex, CompanyMembershipRoles,
+%%      ActivityLogAuditFields, MilestoneWorkflow,
+%%      ContractPartyClassification (party types become awarding | awarded),
+%%      UlidEntityReferences (generic entity_id columns become ULIDs),
+%%      ContractStatusHistoryValues (history holds contract statuses only),
+%%      SubcontractParentRules (one-level subcontracts, fixed parent, restrict),
+%%      ContractPartyRules (one awarding and one awarded party per contract),
+%%      RemoveActualCompletionDate (contract.actual_completion_date dropped),
+%%      ContractLifecycleTemplates (lifecycle templates, stage applicability and
+%%      history, the defects_liability contract status).
+%%   The last seven were run up and down on a throwaway PostgreSQL database by
+%%   their migration tests.
+%% The first 25 are recorded in the local development database (checked
+%% 2026-11-25); ContractLifecycleTemplates has not been applied there yet.
+%% Not verified: any production database.
+%%
+%% Conventions in this file
+%% - Every id and *_id column is varchar(26): a ULID stored as text, including the
+%%   generic entity_id references (CHECK that the value is a ULID). The only
+%%   uuid column left is ACTIVITY_LOG.request_id, a request correlation id;
+%%   ACTIVITY_LOG.entity_id is varchar(36) so older audit rows keep their uuid.
+%% - Every table except CONTRACT_WORKSPACE and the MIGRATION_*_BACKUP tables also
+%%   has created_at and updated_at (timestamptz NOT NULL DEFAULT now()), omitted
+%%   below for brevity.
+%% - A column is NOT NULL unless its comment says nullable. Many tables created
+%%   by CreateDomainSchema have every column NOT NULL, including columns the old
+%%   ERD showed as nullable (approval dates, reasons, optional references). That
+%%   is the real schema and it is shown as such.
+%% - enum columns are PostgreSQL enum types; values are listed in the comment.
+%%   varchar columns with a CHECK list their allowed values too.
+%% - Relationship labels end with the ON DELETE behaviour of the foreign key:
+%%   cascade, set null, restrict or no action (PostgreSQL's default).
+%%   A dotted line (..) is a logical reference with NO database foreign key.
+%% - Cardinality follows the database: a NOT NULL FK is ||, a nullable one |o;
+%%   a UNIQUE FK gives o| on the child side. "At least one" (|{) is never
+%%   enforced by the database, so it is not used.
+%% - Polymorphic references (DOCUMENT_LINK, ACTIVITY_LOG, COMMENT, NOTIFICATION,
+%%   COMPANY_AUDIT_LOG entity_type/entity_id) have no foreign key and no line.
+%% - The TypeORM bookkeeping table "migrations" is omitted.
+
+erDiagram
+
+    %% ---------------------------------------------------------------- Identity
+    APP_USER ||--o{ USER_SESSION : "signs in with (cascade)"
+    APP_USER ||..o{ EMAIL_VERIFICATION_TOKEN : "verifies email (no FK)"
+    APP_USER ||--o{ PASSWORD_RESET_TOKEN : "resets password (cascade)"
+    APP_USER ||--o{ COMPANY_USER : "is member as (cascade)"
+    COMPANY ||--o{ COMPANY_USER : "employs (cascade)"
+    COMPANY ||--o{ COMPANY_VERIFICATION_TOKEN : "verifies email (cascade)"
+    COMPANY ||--o{ COMPANY_INVITATION : "issues (cascade)"
+    COMPANY_USER ||--o{ COMPANY_INVITATION : "sends (no action)"
+    COMPANY ||--o{ COMPANY_AUDIT_LOG : "is audited in (cascade)"
+    COMPANY_USER |o--o{ COMPANY_AUDIT_LOG : "acts as member (set null)"
+    APP_USER ||--o{ COMPANY_AUDIT_LOG : "acts (no action)"
+
+    %% ---------------------------------------------------------------- Contract
+    CONTRACT |o--o{ CONTRACT : "is parent of subcontract (restrict)"
+    COMPANY |o--o{ CONTRACT : "created (restrict)"
+    COMPANY_USER |o--o{ CONTRACT : "archived (set null)"
+    CONTRACT ||--o{ CONTRACT_PARTY : "has parties (cascade)"
+    COMPANY ||--o{ CONTRACT_PARTY : "participates as (cascade)"
+    CONTRACT_PARTY ||--o{ CONTRACT_PARTY_INVITATION : "invites another company from (cascade, composite with company)"
+    COMPANY ||--o{ CONTRACT_PARTY_INVITATION : "is invited (cascade)"
+    COMPANY_USER ||--o{ CONTRACT_PARTY_INVITATION : "sends (cascade, composite with company)"
+    COMPANY_USER |o--o{ CONTRACT_PARTY_INVITATION : "accepts (set null)"
+    CONTRACT_PARTY ||--o{ CONTRACT_ROLE_ASSIGNMENT : "has (cascade, composite with company)"
+    COMPANY_USER ||--o{ CONTRACT_ROLE_ASSIGNMENT : "is assigned (cascade, composite with company)"
+    COMPANY ||--o{ CONTRACT_ROLE_ASSIGNMENT : "scopes (cascade)"
+    COMPANY_USER ||--o{ CONTRACT_ROLE_ASSIGNMENT : "assigned (cascade)"
+    COMPANY_USER |o--o{ CONTRACT_ROLE_ASSIGNMENT : "revoked (cascade)"
+    CONTRACT_PARTY ||--o{ CONTRACT_ROLE_INVITATION : "invites to a role on (cascade, composite with company)"
+    COMPANY ||--o{ CONTRACT_ROLE_INVITATION : "scopes (cascade)"
+    COMPANY_USER ||--o{ CONTRACT_ROLE_INVITATION : "sends (cascade, composite with company)"
+    CONTRACT ||--o{ CONTRACT_WORKSPACE : "enables (cascade)"
+    COMPANY_USER |o--o{ CONTRACT_WORKSPACE : "enabled (set null)"
+    CONTRACT ||--o{ CONTRACT_STATUS_HISTORY : "records (cascade)"
+    COMPANY_USER ||--o{ CONTRACT_STATUS_HISTORY : "changed status (cascade)"
+    CONTRACT ||--o{ CONTRACT_SITE : "is executed at (no action)"
+
+    %% ---------------------------------------------------------------- Delivery
+    CONTRACT ||--o{ CONTRACT_STAGE : "is phased into (cascade)"
+    COMPANY |o--o{ LIFECYCLE_TEMPLATE : "owns, null for system templates (restrict)"
+    LIFECYCLE_TEMPLATE ||--o{ LIFECYCLE_TEMPLATE_VERSION : "is versioned as (restrict)"
+    LIFECYCLE_TEMPLATE_VERSION ||--o{ LIFECYCLE_TEMPLATE_STAGE : "defines (restrict)"
+    LIFECYCLE_TEMPLATE_VERSION |o--o{ CONTRACT : "initialised the stages of (restrict)"
+    LIFECYCLE_TEMPLATE_STAGE |o--o{ CONTRACT_STAGE : "was copied to (restrict)"
+    COMPANY_USER |o--o{ CONTRACT_STAGE : "decided applicability (restrict)"
+    CONTRACT ||--o{ CONTRACT_STAGE_HISTORY : "scopes (cascade)"
+    CONTRACT_STAGE ||--o{ CONTRACT_STAGE_HISTORY : "records the events of (cascade)"
+    COMPANY_USER ||--o{ CONTRACT_STAGE_HISTORY : "acted (restrict)"
+    CONTRACT ||--o{ MILESTONE : "tracks (cascade)"
+    CONTRACT_STAGE ||--o{ MILESTONE : "groups (cascade)"
+    COMPANY_USER |o--o{ MILESTONE : "last submitted (cascade)"
+    COMPANY_USER |o--o{ MILESTONE : "approved (cascade)"
+    CONTRACT ||--o{ MILESTONE_SUBMISSION : "scopes (cascade)"
+    MILESTONE ||--o{ MILESTONE_SUBMISSION : "is submitted in (no action)"
+    COMPANY_USER ||--o{ MILESTONE_SUBMISSION : "submits (no action)"
+    CONTRACT_PARTY ||--o{ MILESTONE_SUBMISSION : "submits for (no action)"
+    MILESTONE_DECISION |o--o{ MILESTONE_SUBMISSION : "is answered by (no action)"
+    CONTRACT ||--o{ MILESTONE_DECISION : "scopes (cascade)"
+    MILESTONE ||--o{ MILESTONE_DECISION : "is decided in (no action)"
+    MILESTONE_SUBMISSION ||--o| MILESTONE_DECISION : "is decided by (unique, no action)"
+    COMPANY_USER ||--o{ MILESTONE_DECISION : "decides (no action)"
+    CONTRACT_PARTY ||--o{ MILESTONE_DECISION : "decides for (no action)"
+    CONTRACT ||--o{ MILESTONE_SUBMISSION_EVIDENCE : "scopes (cascade)"
+    MILESTONE_SUBMISSION ||--o{ MILESTONE_SUBMISSION_EVIDENCE : "is evidenced by (no action)"
+    DOCUMENT ||--o{ MILESTONE_SUBMISSION_EVIDENCE : "is evidence in (no action)"
+    DOCUMENT_VERSION ||--o{ MILESTONE_SUBMISSION_EVIDENCE : "is the version submitted in (no action)"
+    CONTRACT ||--o{ MILESTONE_OUTSTANDING_ITEM : "scopes (cascade)"
+    MILESTONE ||--o{ MILESTONE_OUTSTANDING_ITEM : "has outstanding work (no action)"
+    MILESTONE_DECISION ||--o{ MILESTONE_OUTSTANDING_ITEM : "raises (no action)"
+    MILESTONE_DECISION |o--o{ MILESTONE_OUTSTANDING_ITEM : "accepts (no action)"
+    CONTRACT ||--o{ MILESTONE_SUBMISSION_ITEM : "scopes (cascade)"
+    MILESTONE_SUBMISSION ||--o{ MILESTONE_SUBMISSION_ITEM : "covers (no action)"
+    MILESTONE_OUTSTANDING_ITEM ||--o{ MILESTONE_SUBMISSION_ITEM : "is covered by (no action)"
+    CONTRACT ||--o{ CONTRACT_VARIATION : "is changed by (cascade)"
+    CONTRACT_PARTY ||--o{ CONTRACT_VARIATION : "raises (cascade)"
+    COMPANY_USER ||--o{ CONTRACT_VARIATION : "submitted (cascade)"
+    COMPANY_USER ||--o{ CONTRACT_VARIATION : "decided (cascade)"
+
+    %% ---------------------------------------------------------------- Financial
+    CONTRACT ||--o{ INVOICE : "is billed through (cascade)"
+    CONTRACT_PARTY ||--o{ INVOICE : "issues (cascade)"
+    CONTRACT_PARTY ||--o{ INVOICE : "is billed (cascade)"
+    COMPANY_USER ||--o{ INVOICE : "submitted (cascade)"
+    COMPANY_USER ||--o{ INVOICE : "certified (cascade)"
+    INVOICE ||--o{ INVOICE_LINE_ITEM : "itemises (no action)"
+    MILESTONE ||--o{ INVOICE_LINE_ITEM : "is claimed in (cascade)"
+    INVOICE ||--o{ INVOICE_ADJUSTMENT : "is adjusted by (cascade)"
+    INVOICE ||--o{ PAYMENT : "is settled by (cascade)"
+    CONTRACT ||--o{ PAYMENT : "scopes (cascade)"
+    COMPANY_USER ||--o{ PAYMENT : "recorded (cascade)"
+    COMPANY_USER ||--o{ PAYMENT : "approved (cascade)"
+    COMPANY_USER ||--o{ PAYMENT : "confirmed receipt (cascade)"
+
+    %% ---------------------------------------------------------------- Compliance
+    CONTRACT ||--o{ COMPLIANCE_REQUIREMENT : "requires (cascade)"
+    COMPLIANCE_REQUIREMENT ||--o{ COMPLIANCE_RECORD : "is evidenced by (cascade)"
+    CONTRACT_PARTY ||--o{ COMPLIANCE_RECORD : "submits (cascade)"
+    CONTRACT ||--o{ COMPLIANCE_RECORD : "scopes (cascade)"
+    COMPANY_USER ||--o{ COMPLIANCE_RECORD : "verified (cascade)"
+
+    %% ---------------------------------------------------------------- Documents
+    CONTRACT |o--o{ DOCUMENT : "files (cascade)"
+    COMPANY ||--o{ DOCUMENT : "owns (cascade)"
+    COMPANY_USER |o--o{ DOCUMENT : "archived (no action)"
+    DOCUMENT ||--o{ DOCUMENT_VERSION : "has versions (no action)"
+    COMPANY_USER ||--o{ DOCUMENT_VERSION : "uploaded (no action)"
+    DOCUMENT ||--o{ DOCUMENT_LINK : "is attached via (no action)"
+
+    %% ---------------------------------------------------------------- Site operations
+    CONTRACT_SITE ||--o{ SITE_DAILY_LOG : "is logged in (cascade)"
+    CONTRACT_PARTY ||--o{ SITE_DAILY_LOG : "files (cascade)"
+    CONTRACT ||--o{ SITE_DAILY_LOG : "scopes (cascade)"
+    COMPANY_USER ||--o{ SITE_DAILY_LOG : "submitted (cascade)"
+    COMPANY_USER ||--o{ SITE_DAILY_LOG : "approved (cascade)"
+    SITE_DAILY_LOG ||--o{ SITE_DAILY_LOG_LABOUR : "counts labour in (no action)"
+    SITE_DAILY_LOG ||--o{ SITE_DAILY_LOG_EQUIPMENT : "lists plant in (no action)"
+    SITE_DAILY_LOG ||--o{ SITE_DAILY_LOG_VISITOR : "records (no action)"
+    CONTRACT ||--o{ INVENTORY_ITEM : "stocks (cascade)"
+    CONTRACT_SITE ||--o{ INVENTORY_ITEM : "stores (cascade)"
+    CONTRACT_PARTY ||--o{ INVENTORY_ITEM : "owns stock of (no action)"
+    INVENTORY_ITEM ||--o{ INVENTORY_TRANSACTION : "moves through (no action)"
+    SITE_DAILY_LOG ||--o{ INVENTORY_TRANSACTION : "references (no action)"
+    CONTRACT ||--o{ INVENTORY_TRANSACTION : "scopes (cascade)"
+    COMPANY_USER ||--o{ INVENTORY_TRANSACTION : "performed (no action)"
+
+    %% ---------------------------------------------------------------- HSE
+    CONTRACT ||--o{ HSE_INCIDENT : "scopes (cascade)"
+    CONTRACT_SITE ||--o{ HSE_INCIDENT : "is scene of (cascade)"
+    COMPANY_USER ||--o{ HSE_INCIDENT : "reported (cascade)"
+    COMPANY_USER ||--o{ HSE_INCIDENT : "investigated (cascade)"
+    COMPANY_USER ||--o{ HSE_INCIDENT : "closed (cascade)"
+    HSE_INCIDENT ||--o| HSE_INCIDENT_PERSON : "involves (unique, cascade)"
+    COMPANY_USER ||--o{ HSE_INCIDENT_PERSON : "is (cascade)"
+    CONTRACT ||--o{ HSE_INSPECTION : "scopes (cascade)"
+    CONTRACT_SITE ||--o{ HSE_INSPECTION : "is inspected in (cascade)"
+    COMPANY_USER ||--o{ HSE_INSPECTION : "inspects (cascade)"
+    HSE_INSPECTION ||--o{ HSE_INSPECTION_FINDING : "produces (cascade)"
+    CONTRACT ||--o{ HSE_CORRECTIVE_ACTION : "scopes (cascade)"
+    HSE_INCIDENT ||--o| HSE_CORRECTIVE_ACTION : "triggers (unique, cascade)"
+    HSE_INSPECTION_FINDING ||--o{ HSE_CORRECTIVE_ACTION : "triggers (cascade)"
+    COMPANY_USER ||--o{ HSE_CORRECTIVE_ACTION : "is responsible for (cascade)"
+    COMPANY_USER ||--o{ HSE_CORRECTIVE_ACTION : "verified (cascade)"
+
+    %% ---------------------------------------------------------------- Cross-cutting
+    CONTRACT ||--o{ ACTIVITY_LOG : "is audited in (cascade)"
+    COMPANY ||--o{ ACTIVITY_LOG : "is acted for in (cascade)"
+    COMPANY_USER ||--o{ ACTIVITY_LOG : "performs (no action)"
+    APP_USER ||--o{ NOTIFICATION : "receives (cascade)"
+    CONTRACT ||--o{ NOTIFICATION : "is about (cascade)"
+    CONTRACT ||--o{ COMMENT : "is discussed in (cascade)"
+    COMPANY_USER ||--o{ COMMENT : "writes (no action)"
+    COMMENT ||--o{ COMMENT : "is replied to by (cascade)"
+    CONTRACT ||--o{ CONVERSATION : "has conversations (cascade)"
+    COMPANY_USER ||--o{ CONVERSATION : "creates (no action)"
+    CONVERSATION ||--o{ CONVERSATION_PARTICIPANT : "has participants (cascade)"
+    COMPANY_USER ||--o{ CONVERSATION_PARTICIPANT : "participates in (no action)"
+    CONVERSATION ||--o{ MESSAGE : "contains messages (cascade)"
+    COMPANY_USER ||--o{ MESSAGE : "sends (no action)"
+
+    %% ================================================================ Entities
+
+    %% Identity -----------------------------------------------------------------
+    %% UNIQUE UQ_app_user_email (email)
+    APP_USER {
+        varchar(26) id PK "ULID"
+        citext email UK "case-insensitive"
+        varchar(100) first_name
+        varchar(100) last_name
+        varchar(100) middle_name "NOT NULL in the database"
+        varchar(20) phone_number "NOT NULL in the database"
+        varchar(255) password_hash "NOT NULL in the database"
+        enum status "active | inactive, default active"
+        boolean is_platform_admin
+        boolean mfa_enabled "column only; no 2FA flow"
+        varchar(64) timezone
+        timestamptz email_verified_at "nullable"
+        timestamptz last_login_at "nullable"
+    }
+    %% UNIQUE UQ_user_session_refresh_token_hash (refresh_token_hash)
+    USER_SESSION {
+        varchar(26) id PK
+        varchar(26) user_id FK
+        varchar(255) refresh_token_hash UK "never the raw token"
+        inet ip_address "nullable"
+        text user_agent "default empty string"
+        timestamptz expires_at
+        timestamptz revoked_at "nullable"
+    }
+    %% UNIQUE uq_email_verification_token_hash (token_hash)
+    %% INDEX ix_email_verification_user_created (user_id, created_at)
+    EMAIL_VERIFICATION_TOKEN {
+        varchar(26) id PK
+        varchar(26) user_id "references app_user logically; NO foreign key"
+        char(64) token_hash UK "SHA-256"
+        timestamptz expires_at
+        timestamptz used_at "nullable"
+    }
+    %% UNIQUE uq_password_reset_token_hash (token_hash)
+    %% INDEX ix_password_reset_user_created (user_id, created_at)
+    PASSWORD_RESET_TOKEN {
+        varchar(26) id PK
+        varchar(26) user_id FK
+        char(64) token_hash UK "SHA-256"
+        timestamptz expires_at
+        timestamptz used_at "nullable"
+    }
+    %% UNIQUE INDEX ux_company_verified_email (email) WHERE verified_at IS NOT NULL
+    COMPANY {
+        varchar(26) id PK
+        varchar(255) name
+        varchar(255) legal_name
+        varchar(64) registration_number
+        varchar(64) tax_identification_number "NOT NULL in the database"
+        citext email "unique among verified companies"
+        varchar(20) phone_number
+        varchar(255) website "NOT NULL in the database"
+        varchar(255) address_line1
+        varchar(255) address_line2 "NOT NULL in the database"
+        varchar(100) city
+        varchar(100) state_region
+        varchar(20) postal_code "NOT NULL in the database"
+        char(2) country_code
+        char(3) default_currency_code
+        enum status "active | inactive"
+        timestamptz verified_at "nullable"
+    }
+    %% UNIQUE uq_company_verification_token_hash (token_hash)
+    %% INDEX ix_company_verification_company_created (company_id, created_at)
+    COMPANY_VERIFICATION_TOKEN {
+        varchar(26) id PK
+        varchar(26) company_id FK
+        citext email
+        char(64) token_hash UK "SHA-256"
+        timestamptz expires_at
+        timestamptz used_at "nullable"
+    }
+    %% UNIQUE uq_company_user_active_company_user (company_id, user_id)
+    %%   WHERE status = active AND left_at IS NULL
+    %% UNIQUE uq_company_user_id_company (id, company_id), target of composite FKs
+    COMPANY_USER {
+        varchar(26) id PK
+        varchar(26) company_id FK
+        varchar(26) user_id FK
+        enum company_role "Company Administrator | Member"
+        varchar(150) job_title "NOT NULL in the database"
+        enum status "active | inactive"
+        timestamptz joined_at
+        timestamptz left_at "nullable"
+    }
+    %% UNIQUE UQ_company_invitation_token_hash (token_hash)
+    %% UNIQUE uq_company_invitation_pending_company_email (company_id, email) WHERE status = pending
+    %% INDEX ix_company_invitation_company_status_expiry (company_id, status, expires_at)
+    COMPANY_INVITATION {
+        varchar(26) id PK
+        varchar(26) company_id FK
+        varchar(26) invited_by_company_user_id FK
+        citext email
+        varchar(100) first_name "nullable"
+        varchar(100) last_name "nullable"
+        enum company_role "Company Administrator | Member"
+        varchar(255) token_hash UK
+        varchar(20) status "pending | accepted | declined | expired | revoked (values of company_invitation_status_enum; the column is varchar)"
+        timestamptz expires_at
+        timestamptz accepted_at "nullable"
+        timestamptz revoked_at "nullable"
+    }
+    %% INDEX ix_company_audit_log_company_occurred (company_id, occurred_at)
+    COMPANY_AUDIT_LOG {
+        varchar(26) id PK
+        varchar(26) company_id FK
+        varchar(26) actor_company_user_id FK "nullable"
+        varchar(26) actor_user_id FK "-> app_user"
+        varchar(100) action
+        varchar(60) entity_type
+        varchar(26) entity_id "nullable, polymorphic, no FK"
+        varchar(500) summary
+        jsonb changes "default {}"
+        timestamptz occurred_at
+    }
+    %% Operational table written by CompanyMembershipRoles1793600000000 so its
+    %% down() can restore the old company role labels. Not used by the application.
+    MIGRATION_COMPANY_ROLE_BACKUP {
+        varchar(32) table_name PK "company_user | company_invitation"
+        varchar(26) row_id PK
+        text company_role "the label before the migration"
+    }
+    %% Operational table written by ContractPartyClassification1793900000000 so
+    %% its down() can restore client | contractor | subcontractor | vendor | other.
+    MIGRATION_CONTRACT_PARTY_TYPE_BACKUP {
+        varchar(32) table_name PK "contract_party | contract_party_invitation"
+        varchar(26) row_id PK
+        text party_type "the value before the migration"
+    }
+    %% Operational table written by RemoveActualCompletionDate1794000000004 so
+    %% its down() can restore the dropped contract.actual_completion_date values.
+    MIGRATION_CONTRACT_ACTUAL_COMPLETION_BACKUP {
+        varchar(26) contract_id PK "no FK"
+        date actual_completion_date
+    }
+
+    %% Contract -----------------------------------------------------------------
+    %% UNIQUE UQ_4eb2644094e921caea38a4fe908 (reference_number)
+    %% No owning-company column: ownership and visibility come from CONTRACT_PARTY.
+    %% A subcontract is a separate contract whose parent is a main contract.
+    %% CHECK ck_contract_not_own_parent (parent_contract_id <> id)
+    %% TRIGGER contract_parent_rules: the parent must be a main contract (one
+    %%   level, so no cycles) and parent_contract_id can't change after insert.
+    %% When a contract completed is its CONTRACT_STATUS_HISTORY entry.
+    CONTRACT {
+        varchar(26) id PK
+        varchar(40) reference_number UK
+        varchar(255) title
+        text description "nullable"
+        enum contract_type "service | supply | epc | maintenance"
+        enum status "draft | active | suspended | defects_liability | completed"
+        varchar(26) parent_contract_id FK "nullable; the main contract of a subcontract, fixed"
+        bigint original_value_minor
+        bigint current_value_minor
+        char(3) currency_code
+        int retention_rate_bps
+        int advance_payment_rate_bps "nullable"
+        int payment_terms_days
+        bigint liquidated_damages_per_day_minor "nullable"
+        date award_date
+        date start_date
+        date end_date
+        date revised_end_date "nullable"
+        int defects_liability_days
+        varchar(64) timezone
+        varchar(26) created_by_company_id FK "nullable"
+        varchar(26) lifecycle_template_version_id FK "nullable; null for contracts created before lifecycles"
+        timestamptz lifecycle_initialised_at "nullable; set with the version (CHECK)"
+        timestamptz deleted_at "nullable, archived (soft delete)"
+        varchar(26) deleted_by_company_user_id FK "nullable"
+    }
+    %% UNIQUE uq_contract_party_id_company (id, company_id), target of composite FKs
+    %% UNIQUE uq_contract_party_contract_company (contract_id, company_id)
+    %% UNIQUE uq_contract_party_one_awarding (contract_id) WHERE party_type = awarding
+    %% UNIQUE uq_contract_party_one_awarded (contract_id) WHERE party_type = awarded
+    %% TRIGGER contract_party_rules: on a subcontract, the awarding party is the
+    %%   main contract's awarded party, and the main contract's awarding party
+    %%   (the client) can't be a party.
+    %% A contract is between two companies: the awarding and the awarded party.
+    CONTRACT_PARTY {
+        varchar(26) id PK
+        varchar(26) contract_id FK
+        varchar(26) company_id FK
+        enum party_type "awarding | awarded"
+        varchar(100) signatory_first_name "nullable"
+        varchar(100) signatory_last_name "nullable"
+        varchar(150) signatory_title "nullable"
+        timestamptz signed_at "nullable"
+    }
+    %% CHECK ck_contract_party_invitation_type, ck_contract_party_invitation_status
+    %% UNIQUE uq_contract_party_invitation_token (token_hash)
+    %% UNIQUE uq_contract_party_invitation_pending (source_contract_party_id, target_company_id, party_type) WHERE status = pending
+    %% INDEX ix_contract_party_invitation_target_status (target_company_id, status, expires_at)
+    %% FK (source_contract_party_id, source_company_id) -> contract_party (id, company_id)
+    %% FK (invited_by_company_user_id, source_company_id) -> company_user (id, company_id)
+    CONTRACT_PARTY_INVITATION {
+        varchar(26) id PK
+        varchar(26) source_contract_party_id FK
+        varchar(26) source_company_id FK "part of both composite FKs"
+        varchar(26) target_company_id FK
+        varchar(26) invited_by_company_user_id FK
+        varchar(26) accepted_by_company_user_id FK "nullable"
+        varchar(20) party_type "awarded (CHECK): an invited company is the awarded party"
+        varchar(320) email
+        varchar(64) token_hash UK
+        varchar(20) status "pending | accepted | rejected | expired | revoked (CHECK), default pending"
+        timestamptz expires_at
+        timestamptz responded_at "nullable"
+        timestamptz revoked_at "nullable"
+    }
+    %% UNIQUE uq_contract_role_assignment_active (contract_party_id, company_user_id, contract_role) WHERE revoked_at IS NULL
+    %% INDEX ix_contract_role_assignment_company_active (company_id, assigned_at) WHERE revoked_at IS NULL
+    %% FK (contract_party_id, company_id) -> contract_party (id, company_id)
+    %% FK (company_user_id, company_id) -> company_user (id, company_id)
+    CONTRACT_ROLE_ASSIGNMENT {
+        varchar(26) id PK
+        varchar(26) contract_party_id FK
+        varchar(26) company_user_id FK
+        varchar(26) company_id FK "composite FK to both parents"
+        enum contract_role "Contractor Project Lead | Contractor Site Supervisor | Client Project Manager | Client Site Engineer | HSE Officer | HSE Manager | Finance Officer | Finance Director"
+        boolean is_workspace_admin "default false"
+        timestamptz assigned_at
+        varchar(26) assigned_by_id FK "-> company_user"
+        timestamptz revoked_at "nullable"
+        varchar(26) revoked_by_id FK "nullable, -> company_user"
+    }
+    %% CHECK ck_contract_role_invitation_status, ck_contract_role_invitation_workspace
+    %% UNIQUE uq_contract_role_invitation_token (token_hash)
+    %% UNIQUE uq_contract_role_invitation_pending (contract_party_id, email, contract_role) WHERE status = pending
+    %% INDEX ix_contract_role_invitation_party_status_expiry (contract_party_id, status, expires_at)
+    CONTRACT_ROLE_INVITATION {
+        varchar(26) id PK
+        varchar(26) contract_party_id FK
+        varchar(26) company_id FK "composite FK with party and inviter"
+        varchar(26) invited_by_id FK "-> company_user"
+        varchar(320) email
+        enum contract_role "same values as CONTRACT_ROLE_ASSIGNMENT.contract_role"
+        varchar(20) workspace "project | hse | finance (CHECK)"
+        boolean is_workspace_admin "default false"
+        varchar(64) token_hash UK
+        varchar(20) status "pending | accepted | rejected | expired | revoked (CHECK), default pending"
+        timestamptz expires_at
+        timestamptz responded_at "nullable"
+        timestamptz revoked_at "nullable"
+    }
+    %% PK (contract_id, workspace); CHECK ck_contract_workspace_type. No id, no updated_at.
+    CONTRACT_WORKSPACE {
+        varchar(26) contract_id PK, FK
+        varchar(20) workspace PK "project | hse | finance (CHECK)"
+        varchar(26) created_by_company_user_id FK "nullable"
+        timestamptz created_at "default now()"
+    }
+    %% INDEX ix_contract_status_history_contract_changed (contract_id, changed_at, id)
+    %% Append-only in the application (AppendOnlyContractScopedRepository); no database trigger.
+    CONTRACT_STATUS_HISTORY {
+        varchar(26) id PK
+        varchar(26) contract_id FK
+        enum from_status "nullable; draft | active | suspended | defects_liability | completed"
+        enum to_status "draft | active | suspended | defects_liability | completed"
+        text reason "nullable"
+        varchar(26) changed_by_id FK "-> company_user"
+        timestamptz changed_at
+    }
+    CONTRACT_SITE {
+        varchar(26) id PK
+        varchar(26) contract_id FK
+        varchar(255) name
+        varchar(40) site_code "NOT NULL in the database"
+        varchar(255) address_line1
+        varchar(100) city
+        varchar(100) state_region
+        char(2) country_code
+        int latitude_e6 "NOT NULL in the database"
+        int longitude_e6 "NOT NULL in the database"
+        enum status "planned | active | suspended | completed | closed"
+    }
+
+    %% Delivery -----------------------------------------------------------------
+    %% INDEX ix_contract_stage_contract_sequence (contract_id, sequence), NOT unique
+    %% No CHECK on weight_bps; the at-most-10000 total is enforced only in the service.
+    CONTRACT_STAGE {
+        varchar(26) id PK
+        varchar(26) contract_id FK
+        varchar(255) name
+        text description "nullable"
+        int sequence
+        enum status "planned | active | in_progress | pending_approval | completed | delayed | cancelled | on_hold"
+        int weight_bps "share of the contract, bps (CHECK 0..10000)"
+        date planned_start_date
+        date planned_end_date
+        date actual_start_date "nullable"
+        date actual_end_date "nullable"
+        varchar(40) stage_code "nullable; the lifecycle stage it was copied from (CHECK)"
+        varchar(26) template_stage_id FK "nullable"
+        boolean is_applicable "default true"
+        text applicability_reason "nullable; required when not applicable (CHECK)"
+        varchar(26) applicability_decided_by_id FK "nullable, -> company_user"
+        timestamptz applicability_decided_at "nullable"
+    }
+    %% Append-only (trigger contract_stage_history_immutable refuses UPDATE).
+    %% CHECK ck_contract_stage_history_event; INDEX (contract_id, contract_stage_id, occurred_at)
+    CONTRACT_STAGE_HISTORY {
+        varchar(26) id PK
+        varchar(26) contract_id FK
+        varchar(26) contract_stage_id FK
+        varchar(30) event_type "initialised | status_changed | applicability_changed | weight_changed | dates_changed"
+        varchar(30) from_status "nullable"
+        varchar(30) to_status "nullable"
+        boolean from_applicable "nullable"
+        boolean to_applicable "nullable"
+        int from_weight_bps "nullable"
+        int to_weight_bps "nullable"
+        text reason "nullable"
+        varchar(26) actor_company_user_id FK "-> company_user"
+        timestamptz occurred_at
+    }
+    %% System templates only (CHECK ck_lifecycle_template_system_only).
+    LIFECYCLE_TEMPLATE {
+        varchar(26) id PK
+        varchar(60) code UK
+        varchar(255) name
+        text description "nullable"
+        varchar(20) owner_kind "system (CHECK)"
+        varchar(26) owner_company_id FK "nullable; null while only system templates exist"
+    }
+    %% UNIQUE (lifecycle_template_id, version_number); one published version per template.
+    LIFECYCLE_TEMPLATE_VERSION {
+        varchar(26) id PK
+        varchar(26) lifecycle_template_id FK
+        int version_number
+        varchar(20) status "draft | published | retired (CHECK)"
+        timestamptz published_at "nullable; set once published"
+    }
+    %% Fixed once its version is published (trigger lifecycle_template_stage_immutable).
+    %% UNIQUE (version, stage_code), (version, sequence); the seeded nine total 10000.
+    LIFECYCLE_TEMPLATE_STAGE {
+        varchar(26) id PK
+        varchar(26) lifecycle_template_version_id FK
+        varchar(40) stage_code "the nine lifecycle stage codes (CHECK)"
+        int sequence
+        varchar(255) name
+        text description "nullable"
+        int default_weight_bps "CHECK 0..10000"
+        boolean completes_on_activation "true for contract_award"
+    }
+    %% CHECK ck_milestone_approved_bps (0..10000), ck_milestone_target_quantity (> 0),
+    %%   ck_milestone_approved_quantity (0..target_quantity, needs target_quantity)
+    %% INDEX ix_milestone_contract_stage (contract_id, contract_stage_id, sequence)
+    %% INDEX ix_milestone_contract_status (contract_id, status)
+    %% No CHECK on progress_bps or weight_bps. No composite FK tying contract_id to the stage's contract.
+    MILESTONE {
+        varchar(26) id PK
+        varchar(26) contract_id FK
+        varchar(26) contract_stage_id FK
+        varchar(255) title
+        text description "nullable"
+        text acceptance_criteria "nullable"
+        text deliverables "nullable"
+        int sequence "within the stage, not unique"
+        enum status "planned | active | in_progress | pending_approval | approved | completed | delayed | at_risk | on_hold | cancelled | partially_approved | rejected"
+        int progress_bps "contractor-reported"
+        int approved_bps "client-accepted, default 0"
+        int weight_bps "share of the stage, bps"
+        int target_quantity "nullable"
+        varchar(40) quantity_unit "nullable"
+        int approved_quantity "nullable"
+        boolean is_payment_milestone
+        bigint amount_minor "nullable"
+        char(3) currency_code "nullable"
+        date planned_start_date "nullable"
+        date actual_start_date "nullable"
+        date due_date
+        date revised_due_date "nullable"
+        date completed_date "nullable"
+        timestamptz submitted_at "nullable"
+        varchar(26) submitted_by_id FK "nullable, -> company_user"
+        timestamptz approved_at "nullable"
+        varchar(26) approved_by_id FK "nullable, -> company_user"
+        text rejection_reason "nullable"
+        varchar(30) legacy_status "nullable"
+    }
+    %% UNIQUE uq_milestone_submission_sequence (milestone_id, sequence)
+    %% CHECK ck_milestone_submission_type, _sequence (> 0), _follows_decision, _progress (0..10000)
+    %% INDEX ix_milestone_submission_milestone (contract_id, milestone_id, sequence)
+    %% TRIGGER tr_milestone_submission_immutable: BEFORE UPDATE refuses every update
+    MILESTONE_SUBMISSION {
+        varchar(26) id PK
+        varchar(26) contract_id FK
+        varchar(26) milestone_id FK
+        int sequence "1, 2, 3 per milestone"
+        varchar(20) submission_type "initial | resubmission | outstanding_work (CHECK)"
+        varchar(26) previous_decision_id FK "nullable; null exactly when initial"
+        varchar(26) submitted_by_id FK "-> company_user"
+        varchar(26) submitted_by_party_id FK "-> contract_party"
+        timestamptz submitted_at
+        text notes
+        int reported_progress_bps "nullable"
+    }
+    %% UNIQUE uq_milestone_submission_evidence_position (submission_id, position)
+    %% UNIQUE uq_milestone_submission_evidence_document (submission_id, document_id)
+    %% INDEX ix_milestone_submission_evidence_submission (submission_id)
+    %% TRIGGER tr_milestone_submission_evidence_immutable
+    MILESTONE_SUBMISSION_EVIDENCE {
+        varchar(26) id PK
+        varchar(26) contract_id FK
+        varchar(26) submission_id FK
+        varchar(26) document_id FK
+        varchar(26) document_version_id FK "the version submitted"
+        varchar(255) caption "nullable"
+        int position
+    }
+    %% UNIQUE uq_milestone_decision_submission (submission_id)
+    %% CHECK ck_milestone_decision_type, _bps, _reason, _approved, _partial, _rejected
+    %% INDEX ix_milestone_decision_milestone (contract_id, milestone_id, decided_at)
+    %% TRIGGER tr_milestone_decision_immutable
+    MILESTONE_DECISION {
+        varchar(26) id PK
+        varchar(26) contract_id FK
+        varchar(26) milestone_id FK
+        varchar(26) submission_id FK, UK "one decision per submission"
+        varchar(20) decision "approved | partially_approved | rejected (CHECK)"
+        text reason "nullable; required unless approved (CHECK)"
+        int approved_bps
+        int cumulative_approved_bps
+        text approved_work "nullable; required for partially_approved (CHECK)"
+        int approved_quantity "nullable"
+        varchar(26) decided_by_id FK "-> company_user"
+        varchar(26) decided_by_party_id FK "-> contract_party"
+        timestamptz decided_at
+    }
+    %% UNIQUE uq_milestone_outstanding_item_position (raised_by_decision_id, position)
+    %% CHECK _quantity (> 0), _acceptance (both or neither), _not_self_accepted
+    %% INDEX ix_milestone_outstanding_item_milestone (contract_id, milestone_id)
+    %% TRIGGER tr_milestone_outstanding_item_accept_once: only acceptance may change, once
+    MILESTONE_OUTSTANDING_ITEM {
+        varchar(26) id PK
+        varchar(26) contract_id FK
+        varchar(26) milestone_id FK
+        varchar(26) raised_by_decision_id FK
+        text description
+        int quantity "nullable"
+        int position
+        varchar(26) accepted_by_decision_id FK "nullable"
+        timestamptz accepted_at "nullable"
+    }
+    %% UNIQUE uq_milestone_submission_item (submission_id, outstanding_item_id)
+    %% INDEX ix_milestone_submission_item_item (outstanding_item_id)
+    %% TRIGGER tr_milestone_submission_item_immutable
+    MILESTONE_SUBMISSION_ITEM {
+        varchar(26) id PK
+        varchar(26) contract_id FK
+        varchar(26) submission_id FK
+        varchar(26) outstanding_item_id FK
+    }
+    %% No write routes in the API today.
+    CONTRACT_VARIATION {
+        varchar(26) id PK
+        varchar(26) contract_id FK
+        varchar(26) raised_by_party_id FK
+        varchar(40) reference_number "not unique"
+        varchar(255) title
+        text description
+        enum variation_type "scope_change | time_extension | cost_adjustment | price_revision | schedule_change | design_change | technical_change | procurement_change | material_change | regulatory_change | other"
+        enum status "draft | submitted | under_review | pending_approval | approved | rejected | negotiating | implemented | cancelled | withdrawn"
+        bigint amount_delta_minor
+        char(3) currency_code
+        int time_extension_days
+        timestamptz submitted_at "NOT NULL in the database"
+        varchar(26) submitted_by_id FK "NOT NULL in the database"
+        timestamptz decided_at "NOT NULL in the database"
+        varchar(26) decided_by_id FK "NOT NULL in the database"
+        text decision_note "NOT NULL in the database"
+    }
+
+    %% Financial ----------------------------------------------------------------
+    %% No write routes in the API today.
+    INVOICE {
+        varchar(26) id PK
+        varchar(26) contract_id FK
+        varchar(26) issued_by_party_id FK
+        varchar(26) billed_to_party_id FK
+        varchar(40) invoice_number "not unique"
+        enum invoice_type "interim | final | advance | retention | variation | claim | debit_note | credit_note | proforma | miscellaneous"
+        enum status "draft | issued | submitted | pending_approval | approved | rejected | paid | partially_paid | overdue | disputed | cancelled | void"
+        date issue_date
+        date due_date
+        date period_start "NOT NULL in the database"
+        date period_end "NOT NULL in the database"
+        char(3) currency_code
+        bigint gross_amount_minor
+        bigint adjustments_total_minor
+        bigint net_payable_minor
+        bigint amount_paid_minor
+        timestamptz submitted_at "NOT NULL in the database"
+        varchar(26) submitted_by_id FK "NOT NULL in the database"
+        timestamptz certified_at "NOT NULL in the database"
+        varchar(26) certified_by_id FK "NOT NULL in the database"
+        text rejection_reason "NOT NULL in the database"
+    }
+    INVOICE_LINE_ITEM {
+        varchar(26) id PK
+        varchar(26) invoice_id FK
+        varchar(26) milestone_id FK "NOT NULL: every line must name a milestone"
+        int line_number
+        varchar(500) description
+        bigint quantity_milli
+        varchar(20) unit_of_measure
+        bigint unit_price_minor
+        bigint amount_minor
+        char(3) currency_code
+    }
+    INVOICE_ADJUSTMENT {
+        varchar(26) id PK
+        varchar(26) invoice_id FK
+        enum adjustment_type "vat | withholding_tax | retention | advance_payment | discount | penalty | late_payment_interest | price_adjustment | variation | claim | credit_note | debit_note | revision | other"
+        varchar(255) description "NOT NULL in the database"
+        int rate_bps "NOT NULL in the database"
+        bigint base_amount_minor "NOT NULL in the database"
+        bigint amount_minor
+        char(3) currency_code
+    }
+    %% UNIQUE UQ_54fc428ca06ce52fd478d8706d8 (payment_reference)
+    %% UNIQUE UQ_989fae9e4731f55c44394f53854 (idempotency_key)
+    PAYMENT {
+        varchar(26) id PK
+        varchar(26) contract_id FK
+        varchar(26) invoice_id FK
+        varchar(40) payment_reference UK
+        varchar(64) idempotency_key UK
+        bigint amount_minor
+        char(3) currency_code
+        bigint invoice_amount_minor
+        char(3) invoice_currency_code
+        char(3) fx_base_currency_code "NOT NULL in the database"
+        bigint fx_rate_micro "NOT NULL in the database"
+        varchar(64) fx_rate_source "NOT NULL in the database"
+        timestamptz fx_rate_at "NOT NULL in the database"
+        enum payment_method "bank_transfer | cheque | cash | card | mobile_money | letter_of_credit | advance | escrow | other"
+        enum status "pending | initiated | processing | authorized | completed | partially_paid | failed | reversed | disputed | cancelled | hold"
+        date payment_date
+        varchar(100) external_reference "NOT NULL in the database"
+        timestamptz recorded_at
+        varchar(26) recorded_by_id FK
+        timestamptz approved_at "NOT NULL in the database"
+        varchar(26) approved_by_id FK "NOT NULL in the database"
+        timestamptz receipt_confirmed_at "NOT NULL in the database"
+        varchar(26) receipt_confirmed_by_id FK "NOT NULL in the database"
+        text notes "NOT NULL in the database"
+    }
+
+    %% Compliance ---------------------------------------------------------------
+    %% No write routes in the API today.
+    COMPLIANCE_REQUIREMENT {
+        varchar(26) id PK
+        varchar(26) contract_id FK
+        varchar(255) name
+        text description "NOT NULL in the database"
+        enum category "hse | environmental | petroleum_licensing | tax_and_royalty | labour_and_safety | local_content | community_relations | security_and_protection | insurance_and_indemnity | financial_reporting | anti_corruption | data_and_reporting"
+        enum applies_to_party_type "contractor | subcontractor | supplier | consultant | operator | jv_partner | host_community | regulator | insurer | all_parties"
+        boolean is_mandatory
+        enum frequency "once | daily | weekly | monthly | quarterly | half_yearly | yearly | event_based | continuous"
+        date first_due_date "NOT NULL in the database"
+    }
+    %% Every column NOT NULL: an unverified or pending record cannot be stored as the schema stands.
+    COMPLIANCE_RECORD {
+        varchar(26) id PK
+        varchar(26) contract_id FK
+        varchar(26) compliance_requirement_id FK
+        varchar(26) contract_party_id FK
+        varchar(100) reference_number "NOT NULL in the database"
+        varchar(255) issuing_authority "NOT NULL in the database"
+        date issue_date "NOT NULL in the database"
+        date expiry_date "NOT NULL in the database"
+        bigint covered_amount_minor "NOT NULL in the database"
+        char(3) currency_code "NOT NULL in the database"
+        enum status "pending | active | valid | expired | renewal_due | renewed | under_review | rejected | non_compliant | waived | cancelled"
+        timestamptz verified_at "NOT NULL in the database"
+        varchar(26) verified_by_id FK "NOT NULL in the database"
+        text remarks "NOT NULL in the database"
+    }
+
+    %% Documents ----------------------------------------------------------------
+    %% CHECK ck_document_company_level_private (contract_id IS NOT NULL OR visibility = private)
+    %% INDEX IDX_document_contract_owner_active (contract_id, owner_company_id, created_at) WHERE deleted_at IS NULL
+    %% INDEX IDX_document_company_level_active (owner_company_id, created_at) WHERE contract_id IS NULL AND deleted_at IS NULL
+    DOCUMENT {
+        varchar(26) id PK
+        varchar(26) contract_id FK "nullable, null = company-level file"
+        varchar(26) owner_company_id FK
+        varchar(255) title
+        varchar(60) document_number "NOT NULL in the database"
+        enum category "certificate | HSE | contract | invoice | report | other"
+        enum visibility "public | private"
+        enum status "Valid | Expiring | Expired | Verification Pending | Verified | Rejected"
+        timestamptz deleted_at "nullable, archived"
+        varchar(26) deleted_by_id FK "nullable, -> company_user"
+    }
+    %% UNIQUE UQ_document_version_document_version_number (document_id, version_number)
+    %% UNIQUE UQ_document_version_storage_key (storage_key)
+    %% Immutable by convention only; no database trigger.
+    DOCUMENT_VERSION {
+        varchar(26) id PK
+        varchar(26) document_id FK
+        int version_number
+        varchar(512) storage_key UK "object-store key, never a URL"
+        enum upload_status "pending_upload | processing | available | failed, default pending_upload"
+        varchar(32) storage_provider
+        varchar(255) storage_bucket
+        varchar(1024) storage_version_id "nullable"
+        timestamptz upload_expires_at "nullable"
+        varchar(255) failure_reason "nullable"
+        varchar(255) file_name
+        varchar(127) mime_type
+        bigint size_bytes
+        char(64) checksum_sha256
+        text change_note "NOT NULL in the database"
+        varchar(26) uploaded_by_id FK "-> company_user"
+        timestamptz uploaded_at
+    }
+    %% CHECK ck_document_link_entity_id_ulid. Not written by any service;
+    %% entity_type still holds document categories, not entity kinds.
+    DOCUMENT_LINK {
+        varchar(26) id PK
+        varchar(26) document_id FK
+        enum entity_type "certificate | HSE | contract | invoice | report | other (same values as DOCUMENT.category, not entity kinds)"
+        varchar(26) entity_id "ULID (CHECK), polymorphic, no FK"
+        varchar(255) caption "NOT NULL in the database"
+    }
+
+    %% Site operations ----------------------------------------------------------
+    SITE_DAILY_LOG {
+        varchar(26) id PK
+        varchar(26) contract_id FK
+        varchar(26) contract_site_id FK
+        varchar(26) contract_party_id FK
+        date log_date "not unique per site"
+        enum weather_condition "clear | cloudy | partly_cloudy | rainy | heavy_rain | windy | stormy | foggy | hot | cold | snowy | hail"
+        smallint temperature_celsius "NOT NULL in the database"
+        int weather_delay_minutes
+        text work_performed
+        text work_planned_next "NOT NULL in the database"
+        text issues_and_delays "NOT NULL in the database"
+        enum status "on_schedule | ahead_of_schedule | behind_schedule | delayed | suspended | completed | at_risk | hold | closed"
+        timestamptz submitted_at "NOT NULL in the database"
+        varchar(26) submitted_by_id FK "NOT NULL in the database"
+        timestamptz approved_at "NOT NULL in the database"
+        varchar(26) approved_by_id FK "NOT NULL in the database"
+        text rejection_reason "NOT NULL in the database"
+    }
+    SITE_DAILY_LOG_LABOUR {
+        varchar(26) id PK
+        varchar(26) site_daily_log_id FK
+        varchar(100) trade
+        int worker_count
+        int minutes_worked
+        text remarks "NOT NULL in the database"
+    }
+    SITE_DAILY_LOG_EQUIPMENT {
+        varchar(26) id PK
+        varchar(26) site_daily_log_id FK
+        varchar(150) equipment_name
+        varchar(60) equipment_tag "NOT NULL in the database"
+        int quantity
+        int minutes_operated
+        int minutes_idle
+        enum condition "excellent | good | fair | poor | damaged | repair_required | out_of_service | idle | operating | standby"
+        text remarks "NOT NULL in the database"
+    }
+    SITE_DAILY_LOG_VISITOR {
+        varchar(26) id PK
+        varchar(26) site_daily_log_id FK
+        varchar(100) first_name
+        varchar(100) last_name
+        varchar(255) organization "spelled organization in the database"
+        varchar(255) purpose
+        timestamptz time_in
+        timestamptz time_out "NOT NULL in the database"
+    }
+    INVENTORY_ITEM {
+        varchar(26) id PK
+        varchar(26) contract_id FK
+        varchar(26) contract_site_id FK "NOT NULL in the database"
+        varchar(26) contract_party_id FK
+        varchar(60) item_code "not unique"
+        varchar(255) name
+        varchar(100) category "NOT NULL in the database"
+        varchar(20) unit_of_measure
+        bigint quantity_on_hand_milli
+        bigint reorder_level_milli "NOT NULL in the database"
+    }
+    %% Append-only in the application; no database trigger.
+    INVENTORY_TRANSACTION {
+        varchar(26) id PK
+        varchar(26) contract_id FK
+        varchar(26) inventory_item_id FK
+        varchar(26) site_daily_log_id FK "NOT NULL in the database"
+        enum transaction_type "receipt | issue | adjustment | transfer | return"
+        bigint quantity_milli
+        bigint unit_cost_minor "NOT NULL in the database"
+        varchar(3) currency_code "NOT NULL in the database"
+        varchar(100) reference_number "NOT NULL in the database"
+        varchar(255) counterparty_name "NOT NULL in the database"
+        timestamptz transaction_at
+        varchar(26) performed_by_id FK "-> company_user"
+        text remarks "NOT NULL in the database"
+    }
+
+    %% HSE ----------------------------------------------------------------------
+    HSE_INCIDENT {
+        varchar(26) id PK
+        varchar(26) contract_id FK
+        varchar(26) contract_site_id FK
+        varchar(40) reference_number "not unique"
+        enum incident_type "accident | near_miss | hazard | environmental | security | other"
+        enum severity "critical | major | minor | negligible"
+        enum status "open | in_progress | closed"
+        timestamptz occurred_at
+        varchar(255) location_detail
+        text description
+        text immediate_action_taken "NOT NULL in the database"
+        text root_cause "NOT NULL in the database"
+        text investigation_summary "NOT NULL in the database"
+        int lost_time_days
+        bigint estimated_cost_minor "NOT NULL in the database"
+        char(3) currency_code "NOT NULL in the database"
+        boolean is_notifiable
+        timestamptz authority_notified_at "NOT NULL in the database"
+        timestamptz reported_at
+        varchar(26) reported_by_id FK
+        varchar(26) investigated_by_id FK "NOT NULL in the database"
+        timestamptz closed_at "NOT NULL in the database"
+        varchar(26) closed_by_id FK "NOT NULL in the database"
+    }
+    %% UNIQUE REL_b813c63ec88a0dfc7b5dd81893 (hse_incident_id): at most ONE person per incident
+    HSE_INCIDENT_PERSON {
+        varchar(26) id PK
+        varchar(26) hse_incident_id FK, UK
+        varchar(26) company_user_id FK "NOT NULL in the database"
+        varchar(100) first_name
+        varchar(100) last_name
+        enum involvement "victim | injured_person | witness | reporter | supervisor | first_aider | emergency_responder | investigator | contractor | visitor | other"
+        varchar(255) employer_name "NOT NULL in the database"
+        varchar(150) job_title "NOT NULL in the database"
+        varchar(20) phone_number "NOT NULL in the database"
+        text injury_description "NOT NULL in the database; encrypted by the application"
+        varchar(100) body_part_affected "NOT NULL in the database"
+        text treatment_given "NOT NULL in the database"
+        text statement "NOT NULL in the database"
+    }
+    HSE_INSPECTION {
+        varchar(26) id PK
+        varchar(26) contract_id FK
+        varchar(26) contract_site_id FK
+        varchar(26) inspector_company_user_id FK "NOT NULL in the database"
+        varchar(40) reference_number
+        enum inspection_type "safety | environmental | health | other"
+        enum status "pending | in_progress | completed | cancelled"
+        date scheduled_date
+        timestamptz conducted_at "NOT NULL in the database"
+        varchar(100) external_inspector_first_name "NOT NULL in the database"
+        varchar(100) external_inspector_last_name "NOT NULL in the database"
+        varchar(255) external_inspector_organization "NOT NULL in the database"
+        enum overall_result "pass | fail | inconclusive"
+        int score_bps "NOT NULL in the database"
+        text summary "NOT NULL in the database"
+    }
+    HSE_INSPECTION_FINDING {
+        varchar(26) id PK
+        varchar(26) hse_inspection_id FK
+        int item_number
+        varchar(100) category
+        text description
+        enum result "compliant | non_compliant | not_applicable"
+        enum risk_level "low | medium | high"
+        text recommendation "NOT NULL in the database"
+    }
+    %% UNIQUE REL_e87948b2c97f9a28fa02d84fe4 (hse_incident_id): at most ONE action per incident
+    %% Both sources are NOT NULL: every action needs an incident AND a finding.
+    HSE_CORRECTIVE_ACTION {
+        varchar(26) id PK
+        varchar(26) contract_id FK
+        varchar(26) hse_incident_id FK, UK "NOT NULL in the database"
+        varchar(26) hse_inspection_finding_id FK "NOT NULL in the database"
+        varchar(26) assigned_to_company_user_id FK
+        text description
+        enum priority "low | medium | high"
+        enum status "open | in_progress | closed"
+        date due_date
+        timestamptz completed_at "NOT NULL in the database"
+        timestamptz verified_at "NOT NULL in the database"
+        varchar(26) verified_by_id FK "NOT NULL in the database"
+        text closure_note "NOT NULL in the database"
+    }
+
+    %% Cross-cutting ------------------------------------------------------------
+    %% CHECK ck_activity_log_workspace (workspace IS NULL OR project | hse | finance)
+    %% INDEX ix_activity_log_feed (company_id, contract_id, occurred_at DESC, id)
+    %% INDEX ix_activity_log_entity (company_id, contract_id, entity_type, entity_id)
+    %% Append-only in the application only; the database permits UPDATE and DELETE.
+    ACTIVITY_LOG {
+        varchar(26) id PK
+        varchar(26) contract_id FK
+        varchar(26) company_id FK
+        varchar(26) actor_user_id FK "-> company_user, the acting membership"
+        varchar(100) action "area.verb_noun"
+        varchar(60) entity_type
+        varchar(36) entity_id "polymorphic, no FK; ULID, older rows a uuid"
+        varchar(20) workspace "nullable; project | hse | finance (CHECK)"
+        varchar(2000) reason "nullable"
+        varchar(500) summary
+        jsonb changes
+        jsonb metadata
+        inet ip_address "nullable"
+        varchar user_agent "nullable"
+        uuid request_id "nullable, correlation id"
+        timestamptz occurred_at
+    }
+    %% Not written by any service. sent_at and read_at NOT NULL make an unsent notification unstorable.
+    %% CHECK ck_notification_entity_id_ulid
+    NOTIFICATION {
+        varchar(26) id PK
+        varchar(26) recipient_user_id FK "-> app_user"
+        varchar(26) contract_id FK "NOT NULL in the database"
+        varchar(100) notification_type
+        varchar(255) title
+        text body
+        varchar(60) entity_type "NOT NULL in the database"
+        varchar(26) entity_id "ULID (CHECK), polymorphic, no FK"
+        enum channel "push | sms | email"
+        enum status "sent | delivered | pending | failed | read, default pending"
+        timestamptz sent_at "NOT NULL in the database"
+        timestamptz read_at "NOT NULL in the database"
+    }
+    %% parent_comment_id NOT NULL: a first, top-level comment cannot be stored as the schema stands.
+    %% CHECK ck_comment_entity_id_ulid
+    COMMENT {
+        varchar(26) id PK
+        varchar(26) contract_id FK
+        varchar(26) author_company_user_id FK
+        varchar(26) parent_comment_id FK "NOT NULL in the database"
+        enum entity_type "contract | document | comment | other"
+        varchar(26) entity_id "ULID (CHECK), polymorphic, no FK"
+        varchar body
+        enum visibility "public | private"
+    }
+    CONVERSATION {
+        varchar(26) id PK
+        enum conversation_type "comment | message"
+        varchar(26) contract_id FK "NOT NULL in the database"
+        enum workspace "project | finance | hse; NOT NULL in the database"
+        varchar(126) title "NOT NULL in the database"
+        timestamptz conversation_created_at
+        varchar(26) created_by_id FK "-> company_user"
+    }
+    CONVERSATION_PARTICIPANT {
+        varchar(26) id PK
+        varchar(26) conversation_id FK
+        varchar(26) company_user_id FK
+        timestamptz joined_at
+        timestamptz left_at "NOT NULL in the database"
+        timestamptz last_read_at "NOT NULL in the database"
+    }
+    MESSAGE {
+        varchar(26) id PK
+        varchar(26) conversation_id FK
+        varchar(26) sender_company_user_id FK
+        text body
+        jsonb attachements "spelled attachements in the database"
+        timestamptz sent_at
+        timestamptz edited_at "NOT NULL in the database"
+        timestamptz deleted_at "NOT NULL in the database"
+    }

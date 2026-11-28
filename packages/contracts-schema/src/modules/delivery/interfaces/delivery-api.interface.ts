@@ -11,6 +11,7 @@ import type {
   EMilestoneOutstandingItemStatus,
   EMilestoneStatus,
   EMilestoneSubmissionType,
+  ELifecycleStageCode,
   EStatus,
 } from "../enums/delivery.enum.js";
 
@@ -18,10 +19,19 @@ import type {
 export interface ContractStage {
   id: string;
   contractId: string;
+  /** The lifecycle stage it was copied from; null for a custom or older stage. */
+  stageCode: ELifecycleStageCode | null;
   name: string;
   description: string | null;
   sequence: number;
   status: EStatus;
+  /**
+   * Whether the stage applies to this contract. A stage that doesn't apply
+   * keeps its record but counts for nothing in progress.
+   */
+  isApplicable: boolean;
+  /** Why the stage doesn't apply; null while it applies. */
+  applicabilityReason: string | null;
   /** Share of the contract, in basis points (10,000 = 100%). */
   weightBps: number;
   /**
@@ -140,11 +150,44 @@ export type UpdateContractStageRequest = Partial<CreateContractStageRequest> & {
  * every milestone of the stage is approved).
  */
 export interface TransitionContractStageRequest {
-  status: EStatus.IN_PROGRESS | EStatus.ON_HOLD | EStatus.COMPLETED;
-  /** Required when putting a stage on hold or resuming it. */
+  status:
+    | EStatus.IN_PROGRESS
+    | EStatus.ON_HOLD
+    | EStatus.COMPLETED
+    | EStatus.CANCELLED;
+  /** Required when putting a stage on hold, resuming it or cancelling it. */
   reason?: string | null;
   /** The actual start or end day; defaults to today in the contract's time zone. */
   effectiveDate?: DateOnlyString | null;
+}
+
+/**
+ * `POST /contract/stages/:stageId/applicability`: Client Project Manager.
+ * A planned stage with no milestones may be marked as not applying (a
+ * reason is required) and reinstated while it is still planned.
+ */
+export interface SetContractStageApplicabilityRequest {
+  isApplicable: boolean;
+  reason?: string | null;
+}
+
+/**
+ * `GET /contract/progress`, Project workspace: the contract's lifecycle
+ * progress, calculated by the API. Stages that don't apply or were
+ * cancelled are left out, and the rest are weighted against their own
+ * total, so the figure still reaches 10,000 when every counted stage is
+ * done. A completed stage counts in full.
+ */
+export interface ContractProgress {
+  lifecycleProgressBps: number;
+  /** The total weight of the counted stages. */
+  countedWeightBps: number;
+  stages: Array<{
+    stageId: string;
+    weightBps: number;
+    progressBps: number;
+    counted: boolean;
+  }>;
 }
 
 /** `POST /contract/stages/:stageId/milestones`: Client Project Manager. */

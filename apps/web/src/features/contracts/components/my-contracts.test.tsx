@@ -43,7 +43,7 @@ function contract(overrides: Partial<ContractListItem> = {}): ContractListItem {
     revisedEndDate: null,
     deletedAt: null,
     counterparties: [
-      { companyName: "Bravo Energy", partyType: EPartyType.CLIENT },
+      { companyName: "Bravo Energy", partyType: EPartyType.AWARDING },
     ],
     myRoles: [
       {

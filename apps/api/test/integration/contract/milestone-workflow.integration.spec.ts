@@ -189,7 +189,7 @@ describe('Stages and Milestones workflow (PostgreSQL)', () => {
     // Operations need an active contract (approved rule 6); fixtures are drafts.
     await setContract({ status: EContractStatus.ACTIVE });
     clientParty = await factory.createAdditionalParty(contract, client);
-    clientParty.partyType = EPartyType.CLIENT;
+    clientParty.partyType = EPartyType.AWARDING;
     await dataSource.getRepository(ContractParty).save(clientParty);
     await factory.createAdditionalWorkspace(contract, manager, 'project');
     await factory.createAdditionalWorkspace(contract, manager, 'finance');

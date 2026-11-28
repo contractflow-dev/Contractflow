@@ -26,6 +26,11 @@ export interface Contract {
   contractType: EContractType;
   status: EContractStatus;
   parentContractId: string | null;
+  /**
+   * The lifecycle template version the stages were copied from; null for a
+   * contract created before lifecycles, whose stage plan stays editable.
+   */
+  lifecycleTemplateVersionId: string | null;
   originalValueMinor: MinorAmount;
   currentValueMinor: MinorAmount;
   currencyCode: ECurrencyCode;
@@ -37,7 +42,6 @@ export interface Contract {
   startDate: string;
   endDate: string;
   revisedEndDate: string | null;
-  actualCompletionDate: string | null;
   defectsLiabilityDays: number;
   timezone: string;
   createdAt: string;
@@ -59,7 +63,26 @@ export interface ContractListRole {
 }
 
 /** A contract-list row: the contract and the other parties to it. */
+/**
+ * A related contract (a subcontract's main contract, or a main contract's
+ * subcontract), named only when the reader may see it.
+ */
+export interface ContractRelationSummary {
+  id: string;
+  referenceNumber: string;
+  title: string;
+  status: EContractStatus;
+}
+
 export interface ContractListItem extends Contract {
+  /**
+   * A subcontract's main contract when the reader may see it; null for a
+   * main contract, or when the main contract isn't visible to the reader
+   * (`parentContractId` still marks it as a subcontract).
+   */
+  parentContract: ContractRelationSummary | null;
+  /** The requesting company's own party type on the contract. */
+  myPartyType: EPartyType | null;
   /** Every party except the requesting company; empty for archived contracts. */
   counterparties: ContractCounterparty[];
   /** The signed-in user's active roles on it; empty when none or archived. */
@@ -112,6 +135,13 @@ export interface ContractPartySignatory {
 export interface ContractDetail {
   contract: Contract;
   membership: ContractMembership;
+  /**
+   * The main contract of a subcontract, when the reader may see it. Null for
+   * a main contract, or a main contract the reader can't open.
+   */
+  parentContract: ContractRelationSummary | null;
+  /** The subcontracts of a main contract that the reader may see. */
+  subcontracts: ContractRelationSummary[];
 }
 
 export interface ContractStatusHistory {
@@ -144,7 +174,17 @@ export interface CompanyContractHistoryQuery
 }
 
 export type AssignableContractWorkspace = "project" | "hse" | "finance";
-export type ContractTransition = "activate" | "hold" | "resume" | "complete";
+/**
+ * activate: draft to active. hold / resume: active to suspended and back.
+ * practical_completion: active to defects liability. complete: active or
+ * defects liability to completed.
+ */
+export type ContractTransition =
+  | "activate"
+  | "hold"
+  | "resume"
+  | "practical_completion"
+  | "complete";
 
 export interface ContractPartyInvitation {
   id: string;
@@ -194,7 +234,11 @@ export interface CreateContractRequest {
   title: string;
   description?: string | null;
   contractType: EContractType;
-  partyType: EPartyType;
+  /**
+   * The creating company's party type: always awarding (a main contract is
+   * created by its client, a subcontract by the main contractor). Optional.
+   */
+  partyType?: EPartyType;
   workspaces: AssignableContractWorkspace[];
   parentContractId?: string | null;
   originalValueMinor: MinorAmount;
@@ -207,7 +251,6 @@ export interface CreateContractRequest {
   startDate: string;
   endDate: string;
   revisedEndDate?: string | null;
-  actualCompletionDate?: string | null;
   defectsLiabilityDays: number;
   timezone: string;
 }
@@ -238,6 +281,8 @@ export interface CompanyRoleAssignment {
   contractReference: string;
   contractTitle: string;
   contractStatus: EContractStatus;
+  /** The contract is a subcontract: its roles read main contractor / subcontractor. */
+  isSubcontract: boolean;
   companyUserId: string;
   firstName: string;
   lastName: string;
@@ -269,6 +314,8 @@ export interface ContractRoleInvitation {
 
 export interface ContractRoleInvitationPreview {
   contractTitle: string;
+  /** The contract is a subcontract: the role reads main contractor / subcontractor. */
+  isSubcontract: boolean;
   companyName: string;
   email: string;
   role: ContractRole;
@@ -285,6 +332,20 @@ export interface ContractLifecyclePermissions {
   canManage: boolean;
   canTransition: boolean;
   canRestore: boolean;
+  /**
+   * The caller may list, send and revoke this contract's party invitations:
+   * on a main contract its creating company's Company Administrator, on a
+   * subcontract only the main contractor's Contractor Project Lead on the
+   * main contract.
+   */
+  canInviteParties: boolean;
+  /** This is a subcontract: an invited company joins as the subcontractor. */
+  invitesSubcontractors: boolean;
+  /**
+   * The caller may create a subcontract of this main contract: the awarded
+   * party's Contractor Project Lead, while it is draft or active.
+   */
+  canCreateSubcontract: boolean;
 }
 
 /**
