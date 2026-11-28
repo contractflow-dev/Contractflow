@@ -286,7 +286,7 @@ describe('ContractLifecycleService', () => {
       referenceNumber: 'CTR-002',
       title: 'New contract',
       contractType: EContractType.SERVICE,
-      partyType: EPartyType.AWARDED,
+      partyType: EPartyType.AWARDING,
       workspaces: ['project'],
       originalValueMinor: '1000',
       currencyCode: ECurrencyCode.NGN,
@@ -306,7 +306,7 @@ describe('ContractLifecycleService', () => {
     expect(context.parties.create).toHaveBeenCalledWith({
       contractId: newContract.id,
       companyId: actor.companyId,
-      partyType: EPartyType.AWARDED,
+      partyType: EPartyType.AWARDING,
     });
     expect(context.workspaces.addMany).toHaveBeenCalledWith(
       newContract.id,
@@ -338,7 +338,7 @@ describe('ContractLifecycleService', () => {
       referenceNumber: 'CTR-003',
       title: 'Large contract',
       contractType: EContractType.SERVICE,
-      partyType: EPartyType.AWARDED,
+      partyType: EPartyType.AWARDING,
       workspaces: [],
       // Beyond Number.MAX_SAFE_INTEGER: a JavaScript number would round it.
       originalValueMinor: '9007199254740993',
@@ -359,6 +359,65 @@ describe('ContractLifecycleService', () => {
         currentValueMinor: '9007199254740993',
         liquidatedDamagesPerDayMinor: '500000',
       }),
+    );
+  });
+
+  it('refuses a main contract created by its awarded party: the client must be on the platform', async () => {
+    context.companies.findActiveForShare.mockResolvedValue({
+      id: actor.companyId,
+    });
+    context.memberships.findActiveForUpdate.mockResolvedValue({
+      ...actor,
+      companyRole: ECompanyRole.COMPANY_ADMIN,
+    });
+    await expect(
+      service.create(actor.userId, actor.companyId, {
+        referenceNumber: 'CTR-NO-CLIENT',
+        title: 'Contractor-only contract',
+        contractType: EContractType.SERVICE,
+        partyType: EPartyType.AWARDED,
+        workspaces: [],
+        originalValueMinor: '1000',
+        currencyCode: ECurrencyCode.NGN,
+        retentionRateBps: 500,
+        paymentTermsDays: 30,
+        awardDate: '2026-01-01',
+        startDate: '2026-01-02',
+        endDate: '2026-12-31',
+        defectsLiabilityDays: 365,
+        timezone: 'Africa/Lagos',
+      }),
+    ).rejects.toThrow('The company creating a contract is its awarding party');
+    expect(unitOfWork.execute).not.toHaveBeenCalled();
+    expect(context.contracts.create).not.toHaveBeenCalled();
+  });
+
+  it('makes the creating company the awarding party when no party type is sent', async () => {
+    context.companies.findActiveForShare.mockResolvedValue({
+      id: actor.companyId,
+    });
+    context.memberships.findActiveForUpdate.mockResolvedValue({
+      ...actor,
+      companyRole: ECompanyRole.COMPANY_ADMIN,
+    });
+    context.contracts.create.mockResolvedValue({ id: 'contract-created' });
+    await service.create(actor.userId, actor.companyId, {
+      referenceNumber: 'CTR-DEFAULT',
+      title: 'Default party',
+      contractType: EContractType.SERVICE,
+      workspaces: [],
+      originalValueMinor: '1000',
+      currencyCode: ECurrencyCode.NGN,
+      retentionRateBps: 500,
+      paymentTermsDays: 30,
+      awardDate: '2026-01-01',
+      startDate: '2026-01-02',
+      endDate: '2026-12-31',
+      defectsLiabilityDays: 365,
+      timezone: 'Africa/Lagos',
+    });
+    expect(context.parties.create).toHaveBeenCalledWith(
+      expect.objectContaining({ partyType: EPartyType.AWARDING }),
     );
   });
 

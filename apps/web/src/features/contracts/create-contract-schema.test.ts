@@ -273,16 +273,18 @@ describe("time zones", () => {
 });
 
 describe("subcontracts", () => {
-  it("requires your company to be awarding on a subcontract", () => {
+  it("makes your company the awarding party, on a main contract or a subcontract", () => {
     const values = validValues();
-    values.parties.parentContractId = "01JD4X2Y3Z4A5B6C7D8E9F0G1H";
-    values.parties.partyType = EPartyType.AWARDED;
-    expect(issues(values)).toEqual({
-      "parties.partyType":
-        "Your company awards a subcontract: choose Awarding.",
-    });
-    values.parties.partyType = EPartyType.AWARDING;
+    expect(createContractDefaults("UTC").parties.partyType).toBe(
+      EPartyType.AWARDING,
+    );
     expect(issues(values)).toEqual({});
+    values.parties.parentContractId = "01JD4X2Y3Z4A5B6C7D8E9F0G1H";
+    expect(issues(values)).toEqual({});
+    // An awarded creator is refused, as by the API.
+    (values.parties as { partyType: EPartyType }).partyType =
+      EPartyType.AWARDED;
+    expect(Object.keys(issues(values))).toEqual(["parties.partyType"]);
   });
 
   it("offers as parents only main contracts awarded to your company, draft or active", () => {

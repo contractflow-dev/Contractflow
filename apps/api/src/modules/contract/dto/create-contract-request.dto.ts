@@ -45,8 +45,14 @@ export class CreateContractRequestDto implements CreateContractRequest {
   @IsEnum(EContractType)
   contractType!: EContractType;
 
+  /**
+   * The creating company's party type. It is always the awarding party: a
+   * main contract is created by its client, a subcontract by the main
+   * contractor. Optional; any other value is refused.
+   */
+  @IsOptional()
   @IsEnum(EPartyType)
-  partyType!: EPartyType;
+  partyType?: EPartyType;
 
   @IsArray()
   @ArrayUnique()

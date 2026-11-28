@@ -89,7 +89,7 @@ describe("contract setup step fields", () => {
         /<(?:input|select|textarea)(?![^>]*aria-hidden)[^>]*id="([^"]+)"/g,
       ),
     ].map((match) => match[1]);
-    expect(ids.length).toBe(18);
+    expect(ids.length).toBe(17);
     for (const id of ids) expect(markup).toContain(`for="${id}"`);
     expect(markup.match(/role="checkbox"/g)).toHaveLength(3);
   });
@@ -100,7 +100,6 @@ describe("contract setup step fields", () => {
       "referenceNumber",
       "title",
       "contractType",
-      "partyType",
       "originalValue",
       "currencyCode",
       "paymentTermsDays",

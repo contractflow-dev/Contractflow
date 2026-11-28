@@ -254,6 +254,14 @@ export class ContractLifecycleService {
       dto.endDate,
       dto.revisedEndDate,
     );
+    // The creating company is always the awarding party: a contractor can't
+    // create a main contract without its client on the platform, and the
+    // main contractor awards its subcontracts.
+    if (dto.partyType !== undefined && dto.partyType !== EPartyType.AWARDING) {
+      throw new BadRequestException(
+        'The company creating a contract is its awarding party: a main contract is created by its client, a subcontract by the main contractor.',
+      );
+    }
     try {
       return await this.unitOfWork.execute(async (context) => {
         // A main contract is created by a Company Administrator. A
@@ -265,7 +273,6 @@ export class ContractLifecycleService {
               userId,
               companyId,
               dto.parentContractId,
-              dto.partyType,
             )
           : await this.requireCompanyAdmin(context, userId, companyId);
 
@@ -306,7 +313,7 @@ export class ContractLifecycleService {
         const ownParty = await context.parties.create({
           contractId: savedContract.id,
           companyId,
-          partyType: dto.partyType,
+          partyType: EPartyType.AWARDING,
         });
         await context.workspaces.addMany(
           savedContract.id,
@@ -1644,15 +1651,14 @@ export class ContractLifecycleService {
   /**
    * A subcontract's parent must be a main contract (not itself a
    * subcontract), not archived, and draft or active. Only the company that
-   * is the AWARDED party on it may subcontract its work, and that company
-   * is the AWARDING party on the subcontract. The parent is locked so it
-   * can't be archived meanwhile.
+   * is the AWARDED party on it may subcontract its work (it becomes the
+   * subcontract's AWARDING party). The parent is locked so it can't be
+   * archived meanwhile.
    */
   private async requireEligibleParent(
     context: IContractLifecycleContext,
     parentContractId: string,
     companyId: string,
-    partyType: EPartyType,
   ): Promise<void> {
     const parent =
       await context.contracts.findActiveForUpdate(parentContractId);
@@ -1679,11 +1685,6 @@ export class ContractLifecycleService {
     ) {
       throw new ConflictException(
         `Subcontracts can only be added to a draft or active main contract; this one is ${parent.status}.`,
-      );
-    }
-    if (partyType !== EPartyType.AWARDING) {
-      throw new BadRequestException(
-        'Your company awards a subcontract, so its party type must be Awarding.',
       );
     }
   }
@@ -1754,7 +1755,6 @@ export class ContractLifecycleService {
     userId: string,
     companyId: string,
     parentContractId: string,
-    partyType: EPartyType,
   ): Promise<CompanyUser> {
     const company = await context.companies.findActiveForShare(companyId);
     const actor = company
@@ -1763,12 +1763,7 @@ export class ContractLifecycleService {
     if (!actor) {
       throw new ForbiddenException('Active company membership is required.');
     }
-    await this.requireEligibleParent(
-      context,
-      parentContractId,
-      companyId,
-      partyType,
-    );
+    await this.requireEligibleParent(context, parentContractId, companyId);
     if (
       !(await this.holdsMainContractProjectLead(
         context,

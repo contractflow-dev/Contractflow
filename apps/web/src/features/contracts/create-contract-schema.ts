@@ -128,21 +128,11 @@ export const createContractFormSchema = z.object({
   }),
   parties: z
     .object({
-      partyType: z.enum(EPartyType, {
-        message: "Choose your company's party type.",
-      }),
+      // The creating company is always the awarding party: a main contract
+      // is created by its client, a subcontract by the main contractor.
+      partyType: z.literal(EPartyType.AWARDING),
       parentContractId: z.string(),
       workspaces: z.array(z.enum(["project", "hse", "finance"])),
-    })
-    .superRefine((values, context) => {
-      // As the API: your company awards a subcontract.
-      if (values.parentContractId && values.partyType !== EPartyType.AWARDING) {
-        context.addIssue({
-          code: "custom",
-          path: ["partyType"],
-          message: "Your company awards a subcontract: choose Awarding.",
-        });
-      }
     }),
   commercial: z
     .object({
@@ -255,7 +245,7 @@ export function createContractDefaults(
       description: "",
     },
     parties: {
-      partyType: Object.values(EPartyType)[0],
+      partyType: EPartyType.AWARDING,
       parentContractId: "",
       workspaces: [...contractWorkspaces],
     },

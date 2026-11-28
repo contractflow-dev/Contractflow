@@ -2,11 +2,7 @@
 
 import { useId, useMemo, type FocusEvent } from "react";
 import { Controller, useFormContext, useWatch } from "react-hook-form";
-import {
-  EContractType,
-  ECurrencyCode,
-  EPartyType,
-} from "@contractflow/contracts-schema";
+import { EContractType, ECurrencyCode } from "@contractflow/contracts-schema";
 import { Input } from "@workspace/ui/components/input";
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import { Field, FieldLabel } from "@workspace/ui/components/field";
@@ -144,51 +140,16 @@ export function ContractPartiesFields({
   parentContractsLoading: boolean;
   parentContractsError?: unknown;
 }) {
-  const {
-    control: formControl,
-    register,
-    setValue,
-    formState: { errors },
-  } = useCreateContractForm();
+  const { control: formControl, register } = useCreateContractForm();
   const workspaceFieldId = useId();
-  const fieldErrors = errors.parties;
-  // A subcontract is awarded by your company, so its party type is fixed.
-  const isSubcontract = Boolean(
-    useWatch({ control: formControl, name: "parties.parentContractId" }),
-  );
 
   return (
     <>
       <FormSection
         legend="Contract parties"
-        description="Other companies are invited to the contract after the draft is created."
+        description="Your company is the awarding party: a main contract is created by its client, a subcontract by the main contractor. The awarded company is invited after the draft is created."
       >
         <FormGrid columns={2}>
-          <FormField
-            id={fieldId("partyType")}
-            label="Your company's party type"
-            required
-            description={
-              isSubcontract
-                ? "Awarding: your company awards this subcontract."
-                : "Awarding if your company awards this contract; Awarded if it was awarded to your company."
-            }
-            error={fieldErrors?.partyType?.message}
-          >
-            {(control) => (
-              <NativeSelect
-                {...control}
-                {...register("parties.partyType")}
-                className="w-full"
-              >
-                {Object.values(EPartyType).map((value) => (
-                  <NativeSelectOption key={value} value={value}>
-                    {humanizeEnumValue(value)}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
-            )}
-          </FormField>
           <FormField
             id={fieldId("parentContractId")}
             label="Parent contract"
@@ -206,15 +167,7 @@ export function ContractPartiesFields({
             {(control) => (
               <NativeSelect
                 {...control}
-                {...register("parties.parentContractId", {
-                  onChange: (event: { target: { value: string } }) => {
-                    if (event.target.value) {
-                      setValue("parties.partyType", EPartyType.AWARDING, {
-                        shouldDirty: true,
-                      });
-                    }
-                  },
-                })}
+                {...register("parties.parentContractId")}
                 className="w-full"
                 disabled={parentContractsLoading}
                 aria-busy={parentContractsLoading || undefined}

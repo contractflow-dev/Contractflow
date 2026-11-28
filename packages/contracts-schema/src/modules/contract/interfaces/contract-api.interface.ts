@@ -234,7 +234,11 @@ export interface CreateContractRequest {
   title: string;
   description?: string | null;
   contractType: EContractType;
-  partyType: EPartyType;
+  /**
+   * The creating company's party type: always awarding (a main contract is
+   * created by its client, a subcontract by the main contractor). Optional.
+   */
+  partyType?: EPartyType;
   workspaces: AssignableContractWorkspace[];
   parentContractId?: string | null;
   originalValueMinor: MinorAmount;

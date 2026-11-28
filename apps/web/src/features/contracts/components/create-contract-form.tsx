@@ -6,7 +6,6 @@ import { FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   EContractSortField,
-  EPartyType,
   ESortOrder,
   MAX_PAGE_LIMIT,
 } from "@contractflow/contracts-schema";
@@ -63,15 +62,7 @@ export function CreateContractWizard({
   const [defaultValues] = useState(() => {
     const values = createContractDefaults(defaultTimeZone(timeZoneOptions()));
     return parentContractId
-      ? {
-          ...values,
-          parties: {
-            ...values.parties,
-            parentContractId,
-            // Your company awards a subcontract.
-            partyType: EPartyType.AWARDING,
-          },
-        }
+      ? { ...values, parties: { ...values.parties, parentContractId } }
       : values;
   });
   const form = useForm<CreateContractFormValues>({
