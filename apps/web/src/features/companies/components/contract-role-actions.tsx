@@ -1,5 +1,6 @@
 "use client";
 
+import { contractRoleLabel } from "@contractflow/contracts-schema";
 import { useState } from "react";
 import { Button } from "@workspace/ui/components/button";
 import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
@@ -69,7 +70,7 @@ export function ContractRoleActions({
       setConfirming(null);
       notifySuccess(
         "Contract role revoked",
-        `${row.role} on ${row.contractTitle}`,
+        `${contractRoleLabel(row.role, row.isSubcontract)} on ${row.contractTitle}`,
       );
     } catch {
       // Shown in the dialog through `revokeState.error`.
@@ -100,7 +101,7 @@ export function ContractRoleActions({
         size="sm"
         variant="destructive"
         disabled={busy}
-        aria-label={`Revoke ${row.role} from ${name} on ${row.contractTitle}`}
+        aria-label={`Revoke ${contractRoleLabel(row.role, row.isSubcontract)} from ${name} on ${row.contractTitle}`}
         onClick={() => {
           revokeState.reset();
           setConfirming("revoke");
@@ -118,7 +119,7 @@ export function ContractRoleActions({
         }
         description={
           row.isWorkspaceAdmin
-            ? `${name} keeps the ${row.role} role but can no longer assign or revoke roles in the ${workspaceLabel} workspace on “${row.contractTitle}”.`
+            ? `${name} keeps the ${contractRoleLabel(row.role, row.isSubcontract)} role but can no longer assign or revoke roles in the ${workspaceLabel} workspace on “${row.contractTitle}”.`
             : `${name} will be able to assign and revoke roles in the ${workspaceLabel} workspace on “${row.contractTitle}” only. This gives no rights in other workspaces, other contracts or the company.`
         }
         error={
@@ -142,7 +143,7 @@ export function ContractRoleActions({
       <ConfirmDialog
         open={confirming === "revoke"}
         title="Revoke this contract role?"
-        description={`${name} will lose the ${row.role} role on “${row.contractTitle}” straight away. Records they created stay on the contract.`}
+        description={`${name} will lose the ${contractRoleLabel(row.role, row.isSubcontract)} role on “${row.contractTitle}” straight away. Records they created stay on the contract.`}
         error={
           revokeState.error
             ? getApiErrorMessage(

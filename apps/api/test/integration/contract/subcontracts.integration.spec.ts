@@ -673,6 +673,19 @@ describe('Subcontracts (PostgreSQL)', () => {
       expect(list.data[0].parentContract).toBeNull();
     });
 
+    it('names the main contractor’s role when refusing a status change on a subcontract', async () => {
+      await expect(
+        lifecycle.transition(
+          contractorAdmin.userId,
+          contractor.id,
+          subcontract.id,
+          { transition: 'activate', reason: 'Not my role.' },
+        ),
+      ).rejects.toThrow(
+        'Only the awarding party’s Main Contractor Project Manager can change the contract’s status.',
+      );
+    });
+
     it('keeps the main contract’s records its own: a subcontract changes nothing on it', async () => {
       // Both parties of the subcontract have signed (activation needs it).
       await dataSource!

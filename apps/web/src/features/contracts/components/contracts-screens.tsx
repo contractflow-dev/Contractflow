@@ -901,6 +901,7 @@ export function ContractDetail({
               companyId={companyId}
               contractId={contractId}
               canAssignRoles={access.roles === true}
+              isSubcontract={Boolean(contract.parentContractId)}
             />
           )}
           <SubcontractsSection
@@ -966,6 +967,7 @@ export function ContractDetail({
               companyId={companyId}
               contractId={contractId}
               contractLabel={`${contract.referenceNumber} · ${contract.title}`}
+              isSubcontract={Boolean(contract.parentContractId)}
               initialWorkspace={rolesWorkspace ?? undefined}
               target={target}
             />

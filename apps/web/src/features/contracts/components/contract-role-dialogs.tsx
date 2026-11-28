@@ -39,6 +39,10 @@ import { getApiErrorMessage } from "@/lib/apiError";
 import { emailFieldError } from "@/lib/email-field";
 import { formatDate, humanizeEnumValue } from "@/lib/format";
 import { notifySuccess } from "@/lib/notify";
+import {
+  useContractRoleLabel,
+  useContractSideLabel,
+} from "./contract-role-labels";
 import { cn } from "@/lib/utils";
 import {
   useAssignContractRoleMutation,
@@ -108,6 +112,7 @@ function RoleField({
   value: ContractRole | undefined;
   onChange: (role: ContractRole) => void;
 }) {
+  const roleLabel = useContractRoleLabel();
   return (
     <FormField id={id} label="Contract role">
       {(control) => (
@@ -123,7 +128,7 @@ function RoleField({
         >
           {roles.map((option) => (
             <NativeSelectOption key={option} value={option}>
-              {option}
+              {roleLabel(option)}
             </NativeSelectOption>
           ))}
         </NativeSelect>
@@ -177,8 +182,10 @@ function AssignMemberForm({
   // The API offers only the roles of this company's side of the contract.
   const roles = permissions.data?.roles ?? [];
   const selectedRole = role && roles.includes(role) ? role : roles[0];
-  const side =
-    permissions.data?.roleSide === "client" ? "client" : "contractor";
+  const roleLabel = useContractRoleLabel();
+  const side = useContractSideLabel()(
+    permissions.data?.roleSide === "client" ? "client" : "contractor",
+  );
   const noMembers = !members.error && members.data?.length === 0;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -196,7 +203,10 @@ function AssignMemberForm({
         role: selectedRole,
         isWorkspaceAdmin: false,
       }).unwrap();
-      notifySuccess("Contract role assigned", `${selectedRole} was assigned.`);
+      notifySuccess(
+        "Contract role assigned",
+        `${roleLabel(selectedRole)} was assigned.`,
+      );
       onDone();
     } catch (error) {
       setFailure(
@@ -362,6 +372,7 @@ function RoleInvitationsPanel({
 }) {
   const formId = useId();
   const timeZone = useUserTimeZone();
+  const roleLabel = useContractRoleLabel();
   const [workspace, setWorkspace] = useState(initialWorkspace);
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState<string>();
@@ -401,7 +412,7 @@ function RoleInvitationsPanel({
       }).unwrap();
       notifySuccess(
         "Role invitation sent",
-        `${email.trim()} was invited as ${selectedRole}.`,
+        `${email.trim()} was invited as ${roleLabel(selectedRole)}.`,
       );
       setEmail("");
       setAsAdmin(false);
@@ -566,7 +577,7 @@ function RoleInvitationsPanel({
                           {invitation.email}
                         </p>
                         <p className="text-muted-foreground">
-                          {invitation.role}
+                          {roleLabel(invitation.role)}
                           {invitation.isWorkspaceAdmin
                             ? " · Workspace Admin"
                             : ""}
@@ -599,8 +610,8 @@ function RoleInvitationsPanel({
                       <div className="space-y-2 rounded-xl border p-3">
                         <p>
                           The invitation for {invitation.email} to join as{" "}
-                          {invitation.role} will stop working. You can send a
-                          new invitation later.
+                          {roleLabel(invitation.role)} will stop working. You
+                          can send a new invitation later.
                         </p>
                         {revokeFailure ? (
                           <p role="alert" className="text-destructive">

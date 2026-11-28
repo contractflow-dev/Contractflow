@@ -47,6 +47,7 @@ import {
   DOCUMENT_TYPES_LABEL,
   documentFileProblem,
 } from "../document-files";
+import { projectRoleNames } from "./project-rules";
 import { Prose, type ProjectContext } from "./project-ui";
 
 /**
@@ -95,6 +96,7 @@ export function MilestoneSubmissionForm({
 }) {
   const { companyId, contractId } = project;
   const outstandingOnly = openItems.length > 0;
+  const { planner } = projectRoleNames(project.contract);
   const documents = useGetContractDocumentsQuery({
     companyId,
     contractId,
@@ -163,7 +165,7 @@ export function MilestoneSubmissionForm({
       setReviewing(false);
       notifySuccess(
         outstandingOnly ? "Outstanding work submitted" : "Milestone submitted",
-        `${milestone.title} is waiting for the Client Project Manager's review.`,
+        `${milestone.title} is waiting for the ${planner}'s review.`,
       );
       onDone();
     }
@@ -186,8 +188,8 @@ export function MilestoneSubmissionForm({
             {outstandingOnly ? "Submit outstanding work" : "Submit for review"}
           </SheetTitle>
           <SheetDescription>
-            {milestone.title}. The Client Project Manager reviews it against the
-            acceptance criteria.
+            {milestone.title}. The {planner} reviews it against the acceptance
+            criteria.
           </SheetDescription>
         </SheetHeader>
         <div className="flex-1 space-y-6 p-4">
@@ -269,7 +271,7 @@ export function MilestoneSubmissionForm({
                 label="Your measure of completion (%)"
                 optional
                 error={errors.progress}
-                description="Only the client's decision decides what is accepted."
+                description={`Only the ${planner}'s decision decides what is accepted.`}
               >
                 {(control) => (
                   <Input
@@ -388,7 +390,7 @@ export function MilestoneSubmissionForm({
         description={
           outstandingOnly
             ? `This covers the ${openItems.length} outstanding item${openItems.length === 1 ? "" : "s"} only. The work already accepted is not affected.`
-            : "The Client Project Manager will review the whole milestone. Its scope is fixed once it is submitted."
+            : `The ${planner} will review the whole milestone. Its scope is fixed once it is submitted.`
         }
         confirmLabel="Submit"
         pendingLabel="Submitting…"

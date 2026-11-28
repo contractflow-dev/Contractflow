@@ -120,7 +120,7 @@ export class TypeOrmContractRoleAssignmentContext implements IContractRoleAssign
     findInvitationDetails: (contractId: string) =>
       this.manager.getRepository(Contract).findOne({
         where: { id: contractId, deletedAt: IsNull() },
-        select: { id: true, title: true },
+        select: { id: true, title: true, parentContractId: true },
       }),
   };
 
@@ -192,6 +192,7 @@ export class TypeOrmContractRoleAssignmentContext implements IContractRoleAssign
         .addSelect('contract.referenceNumber', 'contractReference')
         .addSelect('contract.title', 'contractTitle')
         .addSelect('contract.status', 'contractStatus')
+        .addSelect('contract.parentContractId', 'parentContractId')
         .addSelect('assignment.companyUserId', 'companyUserId')
         .addSelect('user.firstName', 'firstName')
         .addSelect('user.lastName', 'lastName')
@@ -211,6 +212,7 @@ export class TypeOrmContractRoleAssignmentContext implements IContractRoleAssign
           contractReference: string;
           contractTitle: string;
           contractStatus: Contract['status'];
+          parentContractId: string | null;
           companyUserId: string;
           firstName: string;
           lastName: string;
@@ -221,8 +223,9 @@ export class TypeOrmContractRoleAssignmentContext implements IContractRoleAssign
         }>();
       return {
         total,
-        items: rows.map((row) => ({
+        items: rows.map(({ parentContractId, ...row }) => ({
           ...row,
+          isSubcontract: parentContractId !== null,
           assignedAt: new Date(row.assignedAt),
         })),
       };

@@ -8,6 +8,8 @@ import {
   ELifecycleStageCode,
   EPartyType,
   EStatus,
+  contractRoleLabel,
+  type Contract,
   type ContractRole,
   type ContractStage,
   type Milestone,
@@ -361,13 +363,33 @@ export function legacyStatusLabel(legacyStatus: string | null): string | null {
 }
 
 /**
+ * The Project roles' names on this contract. On a subcontract the main
+ * contractor plans and decides, and the subcontractor submits.
+ */
+export function projectRoleNames(
+  contract: Pick<Contract, "parentContractId">,
+): { planner: string; lead: string } {
+  const isSubcontract = Boolean(contract.parentContractId);
+  return {
+    planner: contractRoleLabel(
+      EClientContractRole.CLIENT_PROJECT_MANAGER,
+      isSubcontract,
+    ),
+    lead: contractRoleLabel(
+      EContractorContractRole.CONTRACTOR_PROJECT_LEAD,
+      isSubcontract,
+    ),
+  };
+}
+
+/**
  * Who acted, from the membership ids the API returns: "You" for the viewer,
  * otherwise the side's role. The API doesn't name the other company's members.
  */
 export function actorLabel(
   membershipId: string,
   viewerMembershipId: string | undefined,
-  role: "Contractor Project Lead" | "Client Project Manager",
+  role: string,
 ): string {
   return membershipId === viewerMembershipId ? "You" : role;
 }

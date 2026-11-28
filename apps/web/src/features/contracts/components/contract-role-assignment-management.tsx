@@ -38,6 +38,11 @@ import {
   AssignMemberDialog,
   ContractRoleInvitationsSheet,
 } from "./contract-role-dialogs";
+import {
+  ContractRoleLabels,
+  useContractRoleLabel,
+  useContractSideLabel,
+} from "./contract-role-labels";
 
 const workspaceOptions: AssignableContractWorkspace[] = [
   "project",
@@ -48,6 +53,7 @@ const workspaceOptions: AssignableContractWorkspace[] = [
 /** A workspace's role assignments, with dates in the viewer's time zone. */
 function assignmentColumns(
   timeZone: string | undefined,
+  roleLabel: (role: string) => string,
 ): ReadonlyArray<DataTableColumn<ContractRoleAssignment>> {
   return [
     {
@@ -68,7 +74,7 @@ function assignmentColumns(
       wrap: true,
       cell: (assignment) => (
         <>
-          <p>{assignment.role}</p>
+          <p>{roleLabel(assignment.role)}</p>
           {assignment.isWorkspaceAdmin ? (
             <p className="text-xs font-medium text-primary">Workspace Admin</p>
           ) : null}
@@ -87,14 +93,25 @@ function assignmentColumns(
 const memberName = (assignment: ContractRoleAssignment) =>
   `${assignment.firstName} ${assignment.lastName}`.trim() || assignment.email;
 
+/**
+ * The contract's role assignments. On a subcontract the roles read
+ * "Main Contractor …" and "Subcontractor …".
+ */
 export function ContractRoleAssignmentManagement({
-  companyId,
-  contractId,
-  contractLabel,
-  fixedWorkspace,
-  initialWorkspace,
-  target,
-}: {
+  isSubcontract = false,
+  ...props
+}: RoleAssignmentManagementProps & {
+  /** The contract is a subcontract (for the roles' names). */
+  isSubcontract?: boolean;
+}) {
+  return (
+    <ContractRoleLabels isSubcontract={isSubcontract}>
+      <RoleAssignmentManagement {...props} />
+    </ContractRoleLabels>
+  );
+}
+
+type RoleAssignmentManagementProps = {
   companyId: string;
   contractId: string;
   /** Reference and title, naming the contract in the invitations panel. */
@@ -107,7 +124,18 @@ export function ContractRoleAssignmentManagement({
    */
   fixedWorkspace?: AssignableContractWorkspace;
   target?: ContractActivityTarget | null;
-}) {
+};
+
+function RoleAssignmentManagement({
+  companyId,
+  contractId,
+  contractLabel,
+  fixedWorkspace,
+  initialWorkspace,
+  target,
+}: RoleAssignmentManagementProps) {
+  const roleLabel = useContractRoleLabel();
+  const sideName = useContractSideLabel();
   const scope = { companyId, contractId };
   const otherWorkspace = (option: AssignableContractWorkspace) =>
     Boolean(fixedWorkspace) && option !== fixedWorkspace;
@@ -215,7 +243,7 @@ export function ContractRoleAssignmentManagement({
       }).unwrap();
       notifySuccess(
         "Contract role revoked",
-        `${memberName(assignmentToRevoke)} no longer has ${assignmentToRevoke.role}.`,
+        `${memberName(assignmentToRevoke)} no longer has ${roleLabel(assignmentToRevoke.role)}.`,
       );
       setAssignmentToRevoke(null);
     } catch (error) {
@@ -275,7 +303,7 @@ export function ContractRoleAssignmentManagement({
         open={assignmentToRevoke !== null}
         title={
           assignmentToRevoke
-            ? `Revoke ${assignmentToRevoke.role}?`
+            ? `Revoke ${roleLabel(assignmentToRevoke.role)}?`
             : "Revoke this contract role?"
         }
         description={
@@ -353,7 +381,9 @@ export function ContractRoleAssignmentManagement({
   }
   const permissions = fixedPermissions?.data;
   if (!permissions?.canManage) return null;
-  const sideLabel = permissions.roleSide === "client" ? "client" : "contractor";
+  const sideLabel = sideName(
+    permissions.roleSide === "client" ? "client" : "contractor",
+  );
 
   return (
     <>
@@ -367,7 +397,7 @@ export function ContractRoleAssignmentManagement({
             table serves every width and deep links keep a single target. */}
         <DataTable
           label="Role assignments"
-          columns={assignmentColumns(timeZone)}
+          columns={assignmentColumns(timeZone, roleLabel)}
           rows={assignmentsQuery.data ?? []}
           getRowKey={(assignment) => assignment.id}
           getRowProps={(assignment) => ({
@@ -380,7 +410,7 @@ export function ContractRoleAssignmentManagement({
           })}
           rowActions={(assignment) => (
             <DataTableRowActions
-              label={`Actions for ${memberName(assignment)}, ${assignment.role}`}
+              label={`Actions for ${memberName(assignment)}, ${roleLabel(assignment.role)}`}
             >
               {permissions.canGrantWorkspaceAdmin ? (
                 <DropdownMenuItem
@@ -551,6 +581,7 @@ function WorkspaceTeamCard({
   onRevoke: (assignment: ContractRoleAssignment) => void;
 }) {
   const label = formatLabel(workspace);
+  const roleLabel = useContractRoleLabel();
   const permissionQuery = useGetContractRoleManagementPermissionsQuery({
     companyId,
     contractId,
@@ -633,7 +664,7 @@ function WorkspaceTeamCard({
                     ) : null}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {assignment.role}
+                    {roleLabel(assignment.role)}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -661,7 +692,7 @@ function WorkspaceTeamCard({
                     size="sm"
                     disabled={busy}
                     onClick={() => onRevoke(assignment)}
-                    aria-label={`Revoke ${assignment.role} from ${memberName(assignment)}`}
+                    aria-label={`Revoke ${roleLabel(assignment.role)} from ${memberName(assignment)}`}
                   >
                     Revoke
                   </Button>

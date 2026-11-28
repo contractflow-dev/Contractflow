@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  contractRoleLabel,
   EClientContractRole,
   EContractStatus,
   EContractorContractRole,
@@ -71,18 +72,26 @@ import {
   type ContractAction,
 } from './milestone-workflow.rules';
 
-/** Who plans and decides: the awarding party's Client Project Manager. */
+/**
+ * Who plans and decides: the awarding party's Client Project Manager (the
+ * main contractor's, on a subcontract).
+ */
 const PLANNER = {
   role: EClientContractRole.CLIENT_PROJECT_MANAGER,
   parties: [EPartyType.AWARDING],
-  refusal: 'Only the client’s Client Project Manager can',
+  refusal: (isSubcontract: boolean) =>
+    `Only the ${contractRoleLabel(EClientContractRole.CLIENT_PROJECT_MANAGER, isSubcontract)} can`,
 } as const;
 
-/** Who performs and submits: the awarded party's Contractor Project Lead. */
+/**
+ * Who performs and submits: the awarded party's Contractor Project Lead
+ * (the subcontractor's, on a subcontract).
+ */
 const SUBMITTER = {
   role: EContractorContractRole.CONTRACTOR_PROJECT_LEAD,
   parties: [EPartyType.AWARDED],
-  refusal: 'Only the contractor’s Contractor Project Lead can',
+  refusal: (isSubcontract: boolean) =>
+    `Only the ${contractRoleLabel(EContractorContractRole.CONTRACTOR_PROJECT_LEAD, isSubcontract)} can`,
 } as const;
 
 /**
@@ -1111,7 +1120,7 @@ export class MilestoneWorkflowService {
     required: {
       role: ContractRole;
       parties: readonly EPartyType[];
-      refusal: string;
+      refusal: (isSubcontract: boolean) => string;
     },
     what: string,
   ): Promise<Actor> {
@@ -1135,7 +1144,15 @@ export class MilestoneWorkflowService {
         required.role,
       ));
     if (!holdsRole) {
-      throw new ForbiddenException(`${required.refusal} ${what}.`);
+      // Named the subcontract way on a subcontract.
+      const contract = await context.contracts.findActiveForLock(
+        scope,
+        member.id,
+        'share',
+      );
+      throw new ForbiddenException(
+        `${required.refusal(Boolean(contract?.parentContractId))} ${what}.`,
+      );
     }
     return { member, party };
   }

@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { ECompanyUserStatus } from "@contractflow/contracts-schema";
+import {
+  contractRoleLabel,
+  ECompanyUserStatus,
+} from "@contractflow/contracts-schema";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { DataTable, DataTableEmpty } from "@/components/data-table/data-table";
@@ -164,7 +167,7 @@ export function CompanyContractRoles({ companyId }: { companyId: string }) {
               wrap: true,
               cell: (row) => (
                 <>
-                  <p>{row.role}</p>
+                  <p>{contractRoleLabel(row.role, row.isSubcontract)}</p>
                   <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                     {humanizeEnumValue(row.workspace)}
                     {row.isWorkspaceAdmin ? (
@@ -191,7 +194,8 @@ export function CompanyContractRoles({ companyId }: { companyId: string }) {
               <RoleMember row={row} />
               <RoleContract row={row} />
               <p className="flex flex-wrap items-center gap-1.5 text-sm">
-                {row.role} · {humanizeEnumValue(row.workspace)}
+                {contractRoleLabel(row.role, row.isSubcontract)} ·{" "}
+                {humanizeEnumValue(row.workspace)}
                 {row.isWorkspaceAdmin ? (
                   <Badge variant="info">Workspace admin</Badge>
                 ) : null}

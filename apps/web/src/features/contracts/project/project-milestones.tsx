@@ -36,7 +36,7 @@ import {
 } from "@/services/deliveryApi";
 import { contractWorkspaceHref } from "../contract-workspaces";
 import { MilestoneSheet } from "./milestone-form";
-import { MILESTONE_FILTER_STATUSES } from "./project-rules";
+import { MILESTONE_FILTER_STATUSES, projectRoleNames } from "./project-rules";
 import {
   BpsMeter,
   DayRange,
@@ -380,7 +380,7 @@ export function ProjectMilestones({ project }: { project: ProjectContext }) {
                     ? stages.length
                       ? "Add the first milestone to one of the contract's stages."
                       : "Add a stage first; milestones are planned within stages."
-                    : "The client's Client Project Manager plans the milestones."
+                    : `The ${projectRoleNames(project.contract).planner} plans the milestones.`
                 }
               />
             )

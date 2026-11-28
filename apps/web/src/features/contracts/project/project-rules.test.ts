@@ -7,6 +7,7 @@ import {
   EPartyType,
   ELifecycleStageCode,
   EStatus,
+  contractRoleLabel,
 } from "@contractflow/contracts-schema";
 import {
   actorLabel,
@@ -19,6 +20,7 @@ import {
   legacyStatusLabel,
   milestonesOutsideDates,
   projectPermissions,
+  projectRoleNames,
   shareForQuantity,
   stageBlocksWork,
   stageOpen,
@@ -303,5 +305,38 @@ describe("milestones", () => {
         quantity: 1,
       }),
     ).toBe(3333);
+  });
+});
+
+describe("role names on a subcontract", () => {
+  it("reads main contractor and subcontractor on a subcontract only", () => {
+    expect(projectRoleNames({ parentContractId: null })).toEqual({
+      planner: "Client Project Manager",
+      lead: "Contractor Project Lead",
+    });
+    expect(
+      projectRoleNames({ parentContractId: "01J0000000000000000000MAIN" }),
+    ).toEqual({
+      planner: "Main Contractor Project Manager",
+      lead: "Subcontractor Project Lead",
+    });
+  });
+
+  it("renames the four Project roles and leaves HSE and Finance roles alone", () => {
+    expect(
+      contractRoleLabel(EClientContractRole.CLIENT_SITE_ENGINEER, true),
+    ).toBe("Main Contractor Site Engineer");
+    expect(
+      contractRoleLabel(
+        EContractorContractRole.CONTRACTOR_SITE_SUPERVISOR,
+        true,
+      ),
+    ).toBe("Subcontractor Site Supervisor");
+    expect(contractRoleLabel(EClientContractRole.HSE_MANAGER, true)).toBe(
+      "HSE Manager",
+    );
+    expect(
+      contractRoleLabel(EClientContractRole.CLIENT_PROJECT_MANAGER, false),
+    ).toBe("Client Project Manager");
   });
 });

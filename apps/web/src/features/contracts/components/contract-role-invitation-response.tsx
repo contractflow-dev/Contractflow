@@ -1,5 +1,6 @@
 "use client";
 
+import { contractRoleLabel } from "@contractflow/contracts-schema";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -101,7 +102,12 @@ export function ContractRoleInvitationResponse({ token }: { token: string }) {
                     {invitation.contractTitle}
                   </span>{" "}
                   {invitation.workspace} workspace as{" "}
-                  <span className="font-medium">{invitation.role}</span>
+                  <span className="font-medium">
+                    {contractRoleLabel(
+                      invitation.role,
+                      invitation.isSubcontract,
+                    )}
+                  </span>
                   {invitation.isWorkspaceAdmin
                     ? " with Workspace Admin privileges"
                     : ""}

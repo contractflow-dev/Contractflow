@@ -110,10 +110,17 @@ describe('ContractRoleAssignmentService', () => {
       contracts: {
         findActive: vi.fn(async () => ({ id: 'contract-1' })),
         findActiveForUpdate: vi.fn(async () => ({ id: 'contract-1' })),
-        findInvitationDetails: vi.fn(async () => ({
-          id: 'contract-1',
-          title: 'Sample contract',
-        })),
+        findInvitationDetails: vi.fn(
+          async (): Promise<{
+            id: string;
+            title: string;
+            parentContractId: string | null;
+          }> => ({
+            id: 'contract-1',
+            title: 'Sample contract',
+            parentContractId: null,
+          }),
+        ),
       },
       companies: { findName: vi.fn(async () => 'Sample company') },
       workspaces: {
@@ -215,6 +222,7 @@ describe('ContractRoleAssignmentService', () => {
       contractReference: 'CTR-001',
       contractTitle: 'Pipeline integrity',
       contractStatus: EContractStatus.ACTIVE,
+      isSubcontract: false,
       companyUserId: target.id,
       firstName: 'Casey',
       lastName: 'Member',
@@ -621,6 +629,33 @@ describe('ContractRoleAssignmentService', () => {
       expect.objectContaining({ status: 'pending', respondedAt: null }),
     );
     expect(transactionContext.assignments.create).not.toHaveBeenCalled();
+  });
+
+  it('names a subcontract role the subcontractor way in the invitation email', async () => {
+    vi.mocked(
+      transactionContext.contracts.findInvitationDetails,
+    ).mockResolvedValue({
+      id: 'contract-1',
+      title: 'Sample subcontract',
+      parentContractId: 'contract-main',
+    });
+    await service.invite(
+      'actor-user',
+      'company-1',
+      'contract-1',
+      'project',
+      'someone@example.com',
+      EContractorContractRole.CONTRACTOR_PROJECT_LEAD,
+    );
+
+    expect(mail.sendContractRoleInvitationEmail).toHaveBeenCalledWith(
+      'someone@example.com',
+      'Sample subcontract',
+      'Subcontractor Project Lead',
+      'project',
+      expect.any(String),
+      'Sample company',
+    );
   });
 
   it('rejects duplicate active assignments', async () => {

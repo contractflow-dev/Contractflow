@@ -281,6 +281,8 @@ export interface CompanyRoleAssignment {
   contractReference: string;
   contractTitle: string;
   contractStatus: EContractStatus;
+  /** The contract is a subcontract: its roles read main contractor / subcontractor. */
+  isSubcontract: boolean;
   companyUserId: string;
   firstName: string;
   lastName: string;
@@ -312,6 +314,8 @@ export interface ContractRoleInvitation {
 
 export interface ContractRoleInvitationPreview {
   contractTitle: string;
+  /** The contract is a subcontract: the role reads main contractor / subcontractor. */
+  isSubcontract: boolean;
   companyName: string;
   email: string;
   role: ContractRole;

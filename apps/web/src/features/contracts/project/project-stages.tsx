@@ -59,6 +59,7 @@ import {
   asksForDateOverride,
   isStageClosed,
   milestonesOutsideDates,
+  projectRoleNames,
   stageOpen,
   stageTransitions,
   type StageTransition,
@@ -273,7 +274,7 @@ export function ProjectStages({ project }: { project: ProjectContext }) {
               description={
                 permissions.canPlan
                   ? "Add the contract's first stage, then plan its milestones."
-                  : "The client's Client Project Manager plans the contract's stages."
+                  : `The ${projectRoleNames(project.contract).planner} plans the contract's stages.`
               }
             />
           }

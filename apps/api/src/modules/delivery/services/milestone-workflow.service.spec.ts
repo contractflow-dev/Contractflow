@@ -329,13 +329,40 @@ describe('MilestoneWorkflowService', () => {
       });
       await expect(
         service.submit(CALLER, 'milestone-1', submission),
-      ).rejects.toThrow(
-        /Only the contractor’s Contractor Project Lead can submit/,
-      );
+      ).rejects.toThrow(/Only the Contractor Project Lead can submit/);
       expect(
         context.roleAssignments.hasActiveRoleForShare,
       ).not.toHaveBeenCalled();
       expect(writes()).toEqual([]);
+    });
+
+    it('names the roles the subcontract way when refusing on a subcontract', async () => {
+      const subcontract = {
+        id: SCOPE.contractId,
+        currencyCode: 'NGN',
+        status: EContractStatus.ACTIVE,
+        timezone: 'Africa/Lagos',
+        parentContractId: 'contract-main',
+      };
+      const asMainContractor = setup({
+        partyType: EPartyType.AWARDING,
+        contract: subcontract,
+      });
+      await expect(
+        asMainContractor.service.submit(CALLER, 'milestone-1', submission),
+      ).rejects.toThrow(/^Only the Subcontractor Project Lead can submit/);
+      const asSubcontractor = setup({
+        partyType: EPartyType.AWARDED,
+        contract: subcontract,
+      });
+      await expect(
+        asSubcontractor.service.createStage(CALLER, {
+          name: 'S',
+          weightBps: 100,
+          plannedStartDate: '2027-01-01',
+          plannedEndDate: '2027-02-01',
+        }),
+      ).rejects.toThrow(/^Only the Main Contractor Project Manager can/);
     });
 
     it('refuses planning and decisions from the contractor side', async () => {

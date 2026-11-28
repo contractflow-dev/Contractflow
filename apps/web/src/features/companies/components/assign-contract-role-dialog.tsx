@@ -2,6 +2,7 @@
 
 import { useId, useState, type FormEvent } from "react";
 import {
+  contractRoleLabel,
   ECompanyUserStatus,
   EContractSortField,
   ESortOrder,
@@ -132,6 +133,7 @@ export function AssignContractRoleForm({
   const selectedMember = memberOptions.find(({ id }) => id === companyUserId);
   const contractOptions = contracts.currentData?.data ?? [];
   const selectedContract = contractOptions.find(({ id }) => id === contractId);
+  const isSubcontract = Boolean(selectedContract?.parentContractId);
   const workspaceOptions = workspaces.currentData ?? [];
   const allowed = permissions.currentData;
   const roleOptions = allowed?.canManage ? allowed.roles : [];
@@ -159,7 +161,7 @@ export function AssignContractRoleForm({
       }).unwrap();
       notifySuccess(
         "Contract role assigned",
-        `${selectedMember ? memberLabel(selectedMember) : "The member"} is now ${role} on ${selectedContract?.title ?? "the contract"}${isWorkspaceAdmin && canGrantWorkspaceAdmin ? ", as workspace administrator" : ""}.`,
+        `${selectedMember ? memberLabel(selectedMember) : "The member"} is now ${contractRoleLabel(role, isSubcontract)} on ${selectedContract?.title ?? "the contract"}${isWorkspaceAdmin && canGrantWorkspaceAdmin ? ", as workspace administrator" : ""}.`,
       );
       onDone();
     } catch (error) {
@@ -325,7 +327,7 @@ export function AssignContractRoleForm({
             <NativeSelectOption value="">Choose a role</NativeSelectOption>
             {roleOptions.map((option) => (
               <NativeSelectOption key={option} value={option}>
-                {option}
+                {contractRoleLabel(option, isSubcontract)}
               </NativeSelectOption>
             ))}
           </NativeSelect>

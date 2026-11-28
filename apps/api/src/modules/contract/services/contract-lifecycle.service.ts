@@ -8,6 +8,7 @@
 } from '@nestjs/common';
 import { createHash, randomBytes } from 'node:crypto';
 import {
+  contractRoleLabel,
   ECompanyRole,
   EClientContractRole,
   EContractorContractRole,
@@ -686,6 +687,7 @@ export class ContractLifecycleService {
         userId,
         companyId,
         contractId,
+        contract.parentContractId !== null,
       );
       const transition = transitionMap[dto.transition];
       if (!transition.from.includes(contract.status)) {
@@ -924,7 +926,9 @@ export class ContractLifecycleService {
     siteId: string,
     dto: UpdateContractSiteRequestDto,
   ): Promise<ContractSiteResponse> {
-    const fields = Object.keys(dto) as Array<keyof UpdateContractSiteRequestDto>;
+    const fields = Object.keys(dto) as Array<
+      keyof UpdateContractSiteRequestDto
+    >;
     if (fields.length === 0) {
       throw new BadRequestException('At least one site field is required.');
     }
@@ -1095,7 +1099,9 @@ export class ContractLifecycleService {
         );
       }
       // A contract is between two companies only.
-      if (await context.parties.hasPartyOfType(contractId, EPartyType.AWARDED)) {
+      if (
+        await context.parties.hasPartyOfType(contractId, EPartyType.AWARDED)
+      ) {
         throw new ConflictException(
           'This contract already has its awarded party. Each subcontractor needs its own subcontract.',
         );
@@ -1829,6 +1835,7 @@ export class ContractLifecycleService {
     userId: string,
     companyId: string,
     contractId: string,
+    isSubcontract: boolean,
   ): Promise<CompanyUser> {
     const actor = await context.memberships.findActiveForUpdate(
       userId,
@@ -1851,11 +1858,17 @@ export class ContractLifecycleService {
         role: authorizedRole,
       }));
     if (!hasAssignment) {
-      if (!(await this.canSeeContract(context, userId, companyId, contractId))) {
+      if (
+        !(await this.canSeeContract(context, userId, companyId, contractId))
+      ) {
         throw new NotFoundException('Contract was not found.');
       }
+      // On a subcontract the role reads Main Contractor Project Manager.
       throw new ForbiddenException(
-        'Only the awarding party’s Client Project Manager can change the contract’s status.',
+        `Only the awarding party’s ${contractRoleLabel(
+          EClientContractRole.CLIENT_PROJECT_MANAGER,
+          isSubcontract,
+        )} can change the contract’s status.`,
       );
     }
     return actor;

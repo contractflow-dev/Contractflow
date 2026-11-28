@@ -64,6 +64,25 @@ export const CONTRACT_ROLES: readonly ContractRole[] = [
  */
 export type ContractRoleSide = 'client' | 'contractor';
 
+/**
+ * How a contract role reads on screen. On a subcontract the main contractor
+ * holds the awarding-side roles and the subcontractor the awarded-side ones,
+ * so the client and contractor wording becomes main contractor and
+ * subcontractor. Display only: the stored value is unchanged.
+ */
+const SUBCONTRACT_ROLE_LABELS: Readonly<Record<string, string>> = {
+    [EClientContractRole.CLIENT_PROJECT_MANAGER]: 'Main Contractor Project Manager',
+    [EClientContractRole.CLIENT_SITE_ENGINEER]: 'Main Contractor Site Engineer',
+    [EContractorContractRole.CONTRACTOR_PROJECT_LEAD]: 'Subcontractor Project Lead',
+    [EContractorContractRole.CONTRACTOR_SITE_SUPERVISOR]:
+        'Subcontractor Site Supervisor',
+};
+
+/** A contract role's label on a main contract or a subcontract. */
+export function contractRoleLabel(role: string, isSubcontract: boolean): string {
+    return (isSubcontract && SUBCONTRACT_ROLE_LABELS[role]) || role;
+}
+
 /** The role set of a party type. */
 export function contractRoleSide(partyType: EPartyType): ContractRoleSide {
     return partyType === EPartyType.AWARDING ? 'client' : 'contractor';

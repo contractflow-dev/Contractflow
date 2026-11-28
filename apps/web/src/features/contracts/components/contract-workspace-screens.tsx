@@ -3,9 +3,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { RiArrowRightLine, RiShieldUserLine } from "@remixicon/react";
-import type {
-  AssignableContractWorkspace,
-  ContractWorkspaceAccess,
+import {
+  contractRoleLabel,
+  type AssignableContractWorkspace,
+  type ContractWorkspaceAccess,
 } from "@contractflow/contracts-schema";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Badge } from "@workspace/ui/components/badge";
@@ -43,7 +44,7 @@ import { ProjectActivity } from "../project/project-activity";
 import { ProjectMilestones } from "../project/project-milestones";
 import { ProjectOverview } from "../project/project-overview";
 import { ProjectReviews } from "../project/project-reviews";
-import { projectPermissions } from "../project/project-rules";
+import { projectRoleNames, projectPermissions } from "../project/project-rules";
 import { ProjectStages } from "../project/project-stages";
 import type { ProjectContext } from "../project/project-ui";
 
@@ -92,7 +93,9 @@ export function ContractWorkspace({
     return (
       <WorkspaceProblem
         title={
-          notFound ? "Contract was not found" : "This contract could not be loaded"
+          notFound
+            ? "Contract was not found"
+            : "This contract could not be loaded"
         }
         text={
           notFound
@@ -171,8 +174,8 @@ export function ContractWorkspace({
                 <ProjectReviews project={project} />
               ) : (
                 <WorkspaceProblem
-                  title="Reviews are for the Client Project Manager"
-                  text="The client's Client Project Manager decides on milestone submissions. You can follow each milestone's status and history under Milestones."
+                  title={`Reviews are for the ${projectRoleNames(detail.contract).planner}`}
+                  text={`The ${projectRoleNames(detail.contract).planner} decides on milestone submissions. You can follow each milestone's status and history under Milestones.`}
                 />
               )
             ) : (
@@ -194,6 +197,7 @@ export function ContractWorkspace({
                 contractId={contractId}
                 contractLabel={`${detail.contract.referenceNumber} · ${detail.contract.title}`}
                 fixedWorkspace={workspace}
+                isSubcontract={Boolean(detail.contract.parentContractId)}
               />
             ) : (
               <WorkspaceProblem
@@ -384,7 +388,12 @@ function WorkspaceOverview({
             <ul className="flex flex-wrap gap-2">
               {access.roles.map((role) => (
                 <li key={role}>
-                  <Badge variant="secondary">{role}</Badge>
+                  <Badge variant="secondary">
+                    {contractRoleLabel(
+                      role,
+                      Boolean(contract.currentData?.contract.parentContractId),
+                    )}
+                  </Badge>
                 </li>
               ))}
             </ul>
@@ -431,9 +440,12 @@ export function ContractWorkspacesCard({
   companyId,
   contractId,
   canAssignRoles,
+  isSubcontract = false,
 }: {
   companyId: string;
   contractId: string;
+  /** The contract is a subcontract (for the roles' names). */
+  isSubcontract?: boolean;
   /** The viewer can use the Roles section (to suggest it when empty). */
   canAssignRoles?: boolean;
 }) {
@@ -496,7 +508,9 @@ export function ContractWorkspacesCard({
                     />
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {entry.roles.join(", ")}
+                    {entry.roles
+                      .map((role) => contractRoleLabel(role, isSubcontract))
+                      .join(", ")}
                     {entry.isWorkspaceAdmin ? " · Workspace Admin" : ""}
                   </span>
                 </Link>
