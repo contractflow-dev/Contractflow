@@ -132,6 +132,29 @@ describe("contract setup step fields", () => {
     }
   });
 
+  it("leaves retention, the revised end date and defects liability off the New contract form", () => {
+    const markup = renderToStaticMarkup(
+      <Harness>
+        <ContractCommercialFields creating />
+        <ContractDatesFields creating />
+      </Harness>,
+    );
+    for (const name of [
+      "retentionRate",
+      "revisedEndDate",
+      "defectsLiabilityDays",
+    ]) {
+      expect(markup).not.toContain(`new-contract-${name}`);
+    }
+    expect(markup).not.toContain("Retention rate");
+    expect(markup).not.toContain("Revised end date");
+    expect(markup).not.toContain("Defects liability");
+    // The rest of both steps is still asked for.
+    for (const name of ["originalValue", "paymentTermsDays", "endDate"]) {
+      expect(markup).toContain(`id="new-contract-${name}"`);
+    }
+  });
+
   it("asks for amounts and percentages, not minor units or basis points", () => {
     const markup = renderAllSteps();
 

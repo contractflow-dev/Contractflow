@@ -154,8 +154,10 @@ export function CreateContractWizard({
             parentContractsError={parentContractsQuery.error}
           />
         ) : null}
-        {step.id === "commercial" ? <ContractCommercialFields /> : null}
-        {step.id === "dates" ? <ContractDatesFields /> : null}
+        {step.id === "commercial" ? (
+          <ContractCommercialFields creating />
+        ) : null}
+        {step.id === "dates" ? <ContractDatesFields creating /> : null}
 
         {createState.error ? (
           <Alert variant="destructive">

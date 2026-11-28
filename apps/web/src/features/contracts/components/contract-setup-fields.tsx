@@ -237,12 +237,18 @@ export function ContractPartiesFields({
 /** Step 3: value, currency, payment terms and rates. */
 export function ContractCommercialFields({
   valueLocked = false,
+  creating = false,
 }: {
   /**
    * Editing a contract past draft: its original value and currency are
    * fixed (the API refuses to change the value; the currency stays with it).
    */
   valueLocked?: boolean;
+  /**
+   * The New contract form: the retention rate isn't asked for. The contract
+   * is created with none, and it is set when the contract is edited.
+   */
+  creating?: boolean;
 } = {}) {
   const {
     control: formControl,
@@ -373,25 +379,27 @@ export function ContractCommercialFields({
             />
           )}
         </FormField>
-        <FormField
-          id={fieldId("retentionRate")}
-          label="Retention rate (%)"
-          required
-          description={percentHint(
-            retention,
-            "Enter 0 if there is no retention.",
-          )}
-          error={fieldErrors?.retentionRate?.message}
-        >
-          {(control) => (
-            <Input
-              {...control}
-              {...register("commercial.retentionRate")}
-              inputMode="decimal"
-              autoComplete="off"
-            />
-          )}
-        </FormField>
+        {creating ? null : (
+          <FormField
+            id={fieldId("retentionRate")}
+            label="Retention rate (%)"
+            required
+            description={percentHint(
+              retention,
+              "Enter 0 if there is no retention.",
+            )}
+            error={fieldErrors?.retentionRate?.message}
+          >
+            {(control) => (
+              <Input
+                {...control}
+                {...register("commercial.retentionRate")}
+                inputMode="decimal"
+                autoComplete="off"
+              />
+            )}
+          </FormField>
+        )}
         <FormField
           id={fieldId("advancePaymentRate")}
           label="Advance payment rate (%)"
@@ -430,7 +438,16 @@ export function ContractCommercialFields({
 }
 
 /** Step 4: key dates, defects liability and the contract's time zone. */
-export function ContractDatesFields() {
+export function ContractDatesFields({
+  creating = false,
+}: {
+  /**
+   * The New contract form: the revised end date and the defects liability
+   * period aren't asked for. The contract is created with neither, and they
+   * are set when the contract is edited.
+   */
+  creating?: boolean;
+} = {}) {
   const {
     register,
     formState: { errors },
@@ -472,36 +489,40 @@ export function ContractDatesFields() {
             <Input {...control} {...register("dates.endDate")} type="date" />
           )}
         </FormField>
-        <FormField
-          id={fieldId("revisedEndDate")}
-          label="Revised end date"
-          optional
-          description="Must not be before the end date."
-          error={fieldErrors?.revisedEndDate?.message}
-        >
-          {(control) => (
-            <Input
-              {...control}
-              {...register("dates.revisedEndDate")}
-              type="date"
-            />
-          )}
-        </FormField>
-        <FormField
-          id={fieldId("defectsLiabilityDays")}
-          label="Defects liability (days)"
-          required
-          error={fieldErrors?.defectsLiabilityDays?.message}
-        >
-          {(control) => (
-            <Input
-              {...control}
-              {...register("dates.defectsLiabilityDays")}
-              inputMode="numeric"
-              autoComplete="off"
-            />
-          )}
-        </FormField>
+        {creating ? null : (
+          <>
+            <FormField
+              id={fieldId("revisedEndDate")}
+              label="Revised end date"
+              optional
+              description="Must not be before the end date."
+              error={fieldErrors?.revisedEndDate?.message}
+            >
+              {(control) => (
+                <Input
+                  {...control}
+                  {...register("dates.revisedEndDate")}
+                  type="date"
+                />
+              )}
+            </FormField>
+            <FormField
+              id={fieldId("defectsLiabilityDays")}
+              label="Defects liability (days)"
+              required
+              error={fieldErrors?.defectsLiabilityDays?.message}
+            >
+              {(control) => (
+                <Input
+                  {...control}
+                  {...register("dates.defectsLiabilityDays")}
+                  inputMode="numeric"
+                  autoComplete="off"
+                />
+              )}
+            </FormField>
+          </>
+        )}
         <FormField
           id={fieldId("timezone")}
           label="Contract time zone"
