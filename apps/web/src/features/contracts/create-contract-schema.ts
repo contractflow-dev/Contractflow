@@ -128,9 +128,10 @@ export const createContractFormSchema = z.object({
   }),
   parties: z
     .object({
-      // The creating company is always the awarding party: a main contract
-      // is created by its client, a subcontract by the main contractor.
-      partyType: z.literal(EPartyType.AWARDING),
+      // Not shown: the edit form fills in the company's own party type. The
+      // creating company is always the awarding party, and the create
+      // request sends that whatever this holds.
+      partyType: z.enum(EPartyType),
       parentContractId: z.string(),
       workspaces: z.array(z.enum(["project", "hse", "finance"])),
     }),
@@ -287,7 +288,9 @@ export function toCreateContractRequest(
     title: basics.title.trim(),
     description: basics.description.trim() || null,
     contractType: basics.contractType,
-    partyType: parties.partyType,
+    // A main contract is created by its client, a subcontract by the main
+    // contractor: the creating company is always the awarding party.
+    partyType: EPartyType.AWARDING,
     workspaces: contractWorkspaces.filter((workspace) =>
       parties.workspaces.includes(workspace),
     ),

@@ -281,10 +281,11 @@ describe("subcontracts", () => {
     expect(issues(values)).toEqual({});
     values.parties.parentContractId = "01JD4X2Y3Z4A5B6C7D8E9F0G1H";
     expect(issues(values)).toEqual({});
-    // An awarded creator is refused, as by the API.
-    (values.parties as { partyType: EPartyType }).partyType =
-      EPartyType.AWARDED;
-    expect(Object.keys(issues(values))).toEqual(["parties.partyType"]);
+    // The edit form may hold an awarded company's own party type; a new
+    // contract is still sent as awarded by its creator.
+    values.parties.partyType = EPartyType.AWARDED;
+    expect(issues(values)).toEqual({});
+    expect(toCreateContractRequest(values).partyType).toBe(EPartyType.AWARDING);
   });
 
   it("offers as parents only main contracts awarded to your company, draft or active", () => {
